@@ -7,7 +7,6 @@
 *.exp
 *.lib
 
-
 # Runtime artefacts and user data
 /app/cache/
 /app/saves/
@@ -23,7 +22,6 @@
 /app/*.log*
 /app/*.exe
 /app/*.pdb
-
 
 # Cores, BIOS and ROMs (NUNCA versionar: violacao de direitos autorais)
 /app/cores/
@@ -117,5 +115,4 @@
 *.7z
 *.rar
 /temp_cores_dl/
-src/main_win32.cpp
-app/MiSTer_Flavor_v2.0.exe
+
