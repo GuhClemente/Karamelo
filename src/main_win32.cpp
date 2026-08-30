@@ -56,18 +56,18 @@ struct ThemeColor
 
 // 0=Red/Burgundy (Screenshot Authentic), 1=Blue (Classic MiSTer), 2=Green, 3=Amber, 4=Gray, 5=Dark
 static const ThemeColor THEMES[] = {
-	// 0: Red / Warm Burgundy (From National MiSTer-x64 Screenshots!)
-	{ 0x00E8DCD8, 0x00180808, 0x00582020, 0x00802828, 0x00E8DCD8, 0x00180808, 0x00682828, 0x00241212, 0x00E8DCD8, 0x00180808, 0x00FFFFFF, 0x00D0C4C0 },
+	// 0: Red / Warm Burgundy (Authentic MiSTer Screenshot Palette)
+	{ 0x00DFC4C1, 0x001E0808, 0x00000000, 0x00000000, 0x00DFC4C1, 0x001E0808, 0x001E0808, 0x001E0808, 0x00DFC4C1, 0x001E0808, 0x00DFC4C1, 0x00A09090 },
 	// 1: Blue (Classic MiSTer)
-	{ 0x00D8E4F8, 0x000C1838, 0x001B3A78, 0x002A54A8, 0x00D8E4F8, 0x000C1838, 0x003868C0, 0x00121520, 0x00D8E4F8, 0x000C1838, 0x00FFFFFF, 0x00A0B8D8 },
-	// 2: Green (Matrix / Phosphor)
-	{ 0x00D0F8D8, 0x00082010, 0x00185828, 0x00288838, 0x00D0F8D8, 0x00082010, 0x00206830, 0x00102014, 0x00D0F8D8, 0x00082010, 0x00FFFFFF, 0x00A8E0B0 },
+	{ 0x00D0DEF4, 0x000E1428, 0x00000000, 0x00000000, 0x00D0DEF4, 0x000E1428, 0x000E1428, 0x000E1428, 0x00D0DEF4, 0x000E1428, 0x00D0DEF4, 0x0090A0B0 },
+	// 2: Green (Phosphor)
+	{ 0x00D0F4D8, 0x00082010, 0x00000000, 0x00000000, 0x00D0F4D8, 0x00082010, 0x00082010, 0x00082010, 0x00D0F4D8, 0x00082010, 0x00D0F4D8, 0x0090B098 },
 	// 3: Amber (Retro CRT Amber)
-	{ 0x00F8E8C8, 0x00281808, 0x00684018, 0x00986020, 0x00F8E8C8, 0x00281808, 0x00885018, 0x00241A10, 0x00F8E8C8, 0x00281808, 0x00FFFFFF, 0x00E0CCA8 },
-	// 4: Gray (Arcade Cabinet)
-	{ 0x00E0E0E0, 0x00181818, 0x00484848, 0x00707070, 0x00E0E0E0, 0x00181818, 0x00585858, 0x001C1C1C, 0x00E0E0E0, 0x00181818, 0x00FFFFFF, 0x00C0C0C0 },
+	{ 0x00F8E8C8, 0x00281808, 0x00000000, 0x00000000, 0x00F8E8C8, 0x00281808, 0x00281808, 0x00281808, 0x00F8E8C8, 0x00281808, 0x00F8E8C8, 0x00B8A890 },
+	// 4: Gray (Arcade Monochrome)
+	{ 0x00E0E0E0, 0x00181818, 0x00000000, 0x00000000, 0x00E0E0E0, 0x00181818, 0x00181818, 0x00181818, 0x00E0E0E0, 0x00181818, 0x00E0E0E0, 0x00A0A0A0 },
 	// 5: Dark Obsidian
-	{ 0x00C8C8D0, 0x000A0A10, 0x00282830, 0x00404048, 0x00C8C8D0, 0x000A0A10, 0x00383840, 0x000E0E12, 0x00C8C8D0, 0x000A0A10, 0x00FFFFFF, 0x00A0A0B0 }
+	{ 0x00C8C8D4, 0x000E0E14, 0x00000000, 0x00000000, 0x00C8C8D4, 0x000E0E14, 0x000E0E14, 0x000E0E14, 0x00C8C8D4, 0x000E0E14, 0x00C8C8D4, 0x009090A0 }
 };
 
 static uint32_t* pixel_buffer = nullptr;
@@ -628,48 +628,33 @@ static void RenderFrame()
 	if (OsdIsEnabled())
 	{
 		const uint8_t* osd = OsdGetBuffer();
-		const uint8_t* invert_map = OsdGetInvertMap();
 		int osd_lines = OsdGetSize();
-		if (osd_lines <= 0) osd_lines = 8;
-		// 8 is not a free parameter: the vertical system name down the left edge
-		// is drawn against this same pitch, so widening the rows tore it into
-		// stripes. Making the card taller means scaling the whole OSD bitmap,
-		// not spreading the rows apart.
+		if (osd_lines <= 0) osd_lines = 16;
+
 		const int OSD_ROW_H = 8;
 		int osd_w = 256;
 		int osd_h = osd_lines * OSD_ROW_H;
 
 		int ox = (CANVAS_WIDTH - osd_w) / 2;
-		int oy = (CANVAS_HEIGHT - osd_h) / 2 + 10;
+		int hdr_h = 14;
+		int gap = 4;
+		int total_h = hdr_h + gap + osd_h;
+		int hdr_y = (CANVAS_HEIGHT - total_h) / 2;
+		int oy = hdr_y + hdr_h + gap;
 
-		// 1. Floating Top Header Box (Matches screenshot!)
-		int hdr_y = oy - 22;
-		int hdr_h = 16;
-
-		// Bounds of everything this block paints: the floating header above and
-		// the card below, both including their drop shadows, plus a small
-		// margin. WM_PAINT blits exactly this region over the native-res game.
-		g_osd_rect.left   = ox - 6;
-		g_osd_rect.top    = hdr_y - 6;
-		g_osd_rect.right  = ox + osd_w + 12;
-		g_osd_rect.bottom = oy + osd_h + 12;
+		// Bounds of everything this block paints: floating header + card + 1px border.
+		// WM_PAINT blits exactly this region over the native-res game.
+		g_osd_rect.left   = ox - 2;
+		g_osd_rect.top    = hdr_y - 2;
+		g_osd_rect.right  = ox + osd_w + 2;
+		g_osd_rect.bottom = oy + osd_h + 2;
 		if (g_osd_rect.left < 0) g_osd_rect.left = 0;
 		if (g_osd_rect.top < 0) g_osd_rect.top = 0;
 		if (g_osd_rect.right > CANVAS_WIDTH) g_osd_rect.right = CANVAS_WIDTH;
 		if (g_osd_rect.bottom > CANVAS_HEIGHT) g_osd_rect.bottom = CANVAS_HEIGHT;
 		g_osd_rect_valid = true;
 
-		// Header Drop Shadow
-		for (int y = hdr_y + 3; y < hdr_y + hdr_h + 3; y++)
-		{
-			for (int x = ox + 3; x < ox + osd_w + 3; x++)
-			{
-				if (x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT)
-					pixel_buffer[y * CANVAS_WIDTH + x] = 0x00020308;
-			}
-		}
-
-		// Header Outer Border
+		// 1. Floating Header Outer Border (1px)
 		for (int y = hdr_y - 1; y < hdr_y + hdr_h + 1; y++)
 		{
 			for (int x = ox - 1; x < ox + osd_w + 1; x++)
@@ -679,7 +664,7 @@ static void RenderFrame()
 			}
 		}
 
-		// Header Background
+		// 2. Floating Header Background
 		for (int y = hdr_y; y < hdr_y + hdr_h; y++)
 		{
 			for (int x = ox; x < ox + osd_w; x++)
@@ -689,8 +674,9 @@ static void RenderFrame()
 			}
 		}
 
-		// Header Text (Left: MiSTer, Right: Date/Time like "Aug 28 Fri 15:52:13")
-		DrawString(ox + 6, hdr_y + 4, "MiSTer", theme.header_txt);
+		// 3. Floating Header Text (Left: MiSTer, Right: Date/Time like "Aug 30 Sun17:16:41")
+		int txt_y = hdr_y + (hdr_h - 8) / 2;
+		DrawString(ox + 6, txt_y, "MiSTer", theme.header_txt);
 
 		time_t now = time(NULL);
 		struct tm* tm_now = localtime(&now);
@@ -700,86 +686,41 @@ static void RenderFrame()
 			static const char* DAYS[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 			char date_str[64];
-			snprintf(date_str, sizeof(date_str), "%s %02d %s %02d:%02d:%02d",
+			snprintf(date_str, sizeof(date_str), "%s %02d %s%02d:%02d:%02d",
 				MONTHS[tm_now->tm_mon], tm_now->tm_mday, DAYS[tm_now->tm_wday],
 				tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
-			DrawString(ox + osd_w - (int)strlen(date_str) * 8 - 6, hdr_y + 4, date_str, theme.header_txt);
+			DrawString(ox + osd_w - (int)strlen(date_str) * 8 - 6, txt_y, date_str, theme.header_txt);
 		}
 
-		// 2. Main OSD Card Drop Shadow
-		for (int y = oy + 4; y < oy + osd_h + 8; y++)
+		// 4. Main OSD Card Outer Border (1px)
+		for (int y = oy - 1; y < oy + osd_h + 1; y++)
 		{
-			for (int x = ox + 4; x < ox + osd_w + 8; x++)
-			{
-				if (x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT)
-					pixel_buffer[y * CANVAS_WIDTH + x] = 0x00020308;
-			}
-		}
-
-		// 3. Outer Border
-		for (int y = oy - 2; y < oy + osd_h + 2; y++)
-		{
-			for (int x = ox - 2; x < ox + osd_w + 2; x++)
+			for (int x = ox - 1; x < ox + osd_w + 1; x++)
 			{
 				if (x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT)
 					pixel_buffer[y * CANVAS_WIDTH + x] = theme.border_out;
 			}
 		}
 
-		// 4. Card Backgrounds (Left Title Bar + Menu Area)
-		for (int y = oy; y < oy + osd_h; y++)
-		{
-			for (int x = ox; x < ox + osd_w; x++)
-			{
-				int rel_x = x - ox;
-				int rel_y = y - oy;
-				int row = rel_y / OSD_ROW_H;
-
-				if (rel_x < 20)
-				{
-					pixel_buffer[y * CANVAS_WIDTH + x] = theme.side_bg;
-				}
-				else if (rel_x == 20)
-				{
-					pixel_buffer[y * CANVAS_WIDTH + x] = theme.side_line;
-				}
-				else
-				{
-					bool is_row_inverted = (row < 32 && invert_map[row] != 0);
-					pixel_buffer[y * CANVAS_WIDTH + x] = is_row_inverted ? theme.cursor_bg : theme.menu_bg;
-				}
-			}
-		}
-
-		// 5. Render OSD Pixel Matrix (Text + Vertical Title)
+		// 5. Render Main OSD Card (Authentic 1-bit MiSTer FPGA buffer rendering:
+		// 1-bit is theme.header_bg (Light Foreground), 0-bit is theme.menu_bg (Dark Background))
 		for (int row = 0; row < osd_lines; row++)
 		{
-			bool is_row_inverted = (row < 32 && invert_map[row] != 0);
 			int base_idx = row * 256;
 
 			for (int x = 0; x < 256; x++)
 			{
 				uint8_t byte_val = osd[base_idx + x];
-				if (byte_val == 0) continue;
 
 				for (int bit = 0; bit < 8; bit++)
 				{
-					if (byte_val & (1 << bit))
-					{
-						int px = ox + x;
-						int py = oy + row * OSD_ROW_H + bit;
+					int px = ox + x;
+					int py = oy + row * OSD_ROW_H + bit;
 
-						if (px >= 0 && px < CANVAS_WIDTH && py >= 0 && py < CANVAS_HEIGHT)
-						{
-							if (x < 20)
-							{
-								pixel_buffer[py * CANVAS_WIDTH + px] = theme.side_txt;
-							}
-							else
-							{
-								pixel_buffer[py * CANVAS_WIDTH + px] = is_row_inverted ? theme.cursor_txt : theme.text_white;
-							}
-						}
+					if (px >= 0 && px < CANVAS_WIDTH && py >= 0 && py < CANVAS_HEIGHT)
+					{
+						bool is_fg = (byte_val & (1 << bit)) != 0;
+						pixel_buffer[py * CANVAS_WIDTH + px] = is_fg ? theme.header_bg : theme.menu_bg;
 					}
 				}
 			}
