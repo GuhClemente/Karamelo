@@ -191,6 +191,28 @@ static void DrawCharTo(uint32_t* buf, int bw, int bh, int x, int y, char c, uint
 	}
 }
 
+static void DrawRotatedCharTo(uint32_t* buf, int bw, int bh, int x, int y, char c, uint32_t color)
+{
+	if (!buf) return;
+	const unsigned char* p = &charfont[(unsigned char)c][0];
+	for (int font_x = 0; font_x < 8; font_x++)
+	{
+		unsigned char b = p[font_x];
+		for (int font_y = 0; font_y < 8; font_y++)
+		{
+			if (b & (1 << font_y))
+			{
+				int px = x + font_y;
+				int py = y + font_x;
+				if (px >= 0 && px < bw && py >= 0 && py < bh)
+				{
+					buf[py * bw + px] = color;
+				}
+			}
+		}
+	}
+}
+
 static void DrawStringTo(uint32_t* buf, int bw, int bh, int x, int y, const char* str, uint32_t color)
 {
 	while (*str)
@@ -628,16 +650,18 @@ static void RenderFrame()
 	if (OsdIsEnabled())
 	{
 		const uint8_t* osd = OsdGetBuffer();
+		const uint8_t* invert_map = OsdGetInvertMap();
 		int osd_lines = OsdGetSize();
-		if (osd_lines <= 0) osd_lines = 16;
+		if (osd_lines <= 0) osd_lines = 15;
 
-		const int OSD_ROW_H = 8;
-		int osd_w = 256;
+		const int OSD_ROW_H = 12;
+		const int side_w = 18;
+		int osd_w = 232;
 		int osd_h = osd_lines * OSD_ROW_H;
 
 		int ox = (CANVAS_WIDTH - osd_w) / 2;
 		int hdr_h = 14;
-		int gap = 4;
+		int gap = 12;
 		int total_h = hdr_h + gap + osd_h;
 		int hdr_y = (CANVAS_HEIGHT - total_h) / 2;
 		int oy = hdr_y + hdr_h + gap;
@@ -674,7 +698,7 @@ static void RenderFrame()
 			}
 		}
 
-		// 3. Floating Header Text (Left: MiSTer, Right: Date/Time like "Aug 30 Sun17:16:41")
+		// 3. Floating Header Text (Left: MiSTer, Right: Date/Time like "Aug 30 Sun17:30:01")
 		int txt_y = hdr_y + (hdr_h - 8) / 2;
 		DrawString(ox + 6, txt_y, "MiSTer", theme.header_txt);
 
@@ -702,25 +726,69 @@ static void RenderFrame()
 			}
 		}
 
-		// 5. Render Main OSD Card (Authentic 1-bit MiSTer FPGA buffer rendering:
-		// 1-bit is theme.header_bg (Light Foreground), 0-bit is theme.menu_bg (Dark Background))
+		// 5. Main OSD Card Backgrounds (Left Sidebar + Rows)
+		for (int y = oy; y < oy + osd_h; y++)
+		{
+			int rel_y = y - oy;
+			int row = rel_y / OSD_ROW_H;
+			bool is_row_inverted = (row < 32 && invert_map[row] != 0);
+
+			for (int x = ox; x < ox + osd_w; x++)
+			{
+				int rel_x = x - ox;
+				if (rel_x < side_w)
+				{
+					pixel_buffer[y * CANVAS_WIDTH + x] = theme.header_bg;
+				}
+				else if (rel_x == side_w)
+				{
+					pixel_buffer[y * CANVAS_WIDTH + x] = theme.border_out;
+				}
+				else
+				{
+					pixel_buffer[y * CANVAS_WIDTH + x] = is_row_inverted ? theme.header_bg : theme.menu_bg;
+				}
+			}
+		}
+
+		// 6. Vertical Title in Left Sidebar
+		const char* title = MenuGetTitle();
+		if (!title || !*title) title = "MiSTer";
+		int tlen = (int)strlen(title);
+		int th = tlen * 8;
+		int title_start_y = oy + (osd_h - th) / 2;
+		int title_x = ox + (side_w - 8) / 2;
+		for (int i = 0; i < tlen; i++)
+		{
+			DrawRotatedCharTo(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, title_x, title_start_y + i * 8, title[i], theme.header_txt);
+		}
+
+		// 7. Render Text Glyphs for Each Row
 		for (int row = 0; row < osd_lines; row++)
 		{
+			int row_y = oy + row * OSD_ROW_H;
+			int font_y = row_y + (OSD_ROW_H - 8) / 2;
+			bool is_row_inverted = (row < 32 && invert_map[row] != 0);
+			uint32_t text_col = is_row_inverted ? theme.menu_bg : theme.header_bg;
 			int base_idx = row * 256;
 
-			for (int x = 0; x < 256; x++)
+			for (int c = 22; c < 256; c++)
 			{
-				uint8_t byte_val = osd[base_idx + x];
-
-				for (int bit = 0; bit < 8; bit++)
+				int px = ox + side_w + 1 + (c - 22);
+				if (px >= ox + side_w + 1 && px < ox + osd_w - 1)
 				{
-					int px = ox + x;
-					int py = oy + row * OSD_ROW_H + bit;
-
-					if (px >= 0 && px < CANVAS_WIDTH && py >= 0 && py < CANVAS_HEIGHT)
+					uint8_t byte_val = osd[base_idx + c];
+					for (int bit = 0; bit < 8; bit++)
 					{
-						bool is_fg = (byte_val & (1 << bit)) != 0;
-						pixel_buffer[py * CANVAS_WIDTH + px] = is_fg ? theme.header_bg : theme.menu_bg;
+						bool is_glyph = is_row_inverted ? ((byte_val & (1 << bit)) == 0) : ((byte_val & (1 << bit)) != 0);
+						if (is_glyph)
+						{
+							int py = font_y + bit;
+							if (py >= 0 && py < CANVAS_HEIGHT)
+							{
+								pixel_buffer[py * CANVAS_WIDTH + px] = text_col;
+							}
+						}
 					}
 				}
 			}

@@ -11,6 +11,15 @@ call "%~dp0setup_msvc.bat"
 if errorlevel 1 exit /b 1
 
 if not exist build mkdir build
+if not exist app mkdir app
+
+set APP_BASE=MiSTer_Flavor
+set APP_VER=v2.0
+set APP_EXE=%APP_BASE%_%APP_VER%.exe
+
+rem Close any running instances so the linker does not fail with LNK1104 (file in use)
+taskkill /F /IM "%APP_EXE%" >nul 2>&1
+taskkill /F /IM "%APP_BASE%.exe" >nul 2>&1
 
 rc.exe /nologo /I include /fobuild\resource.res src\resource.rc
 
@@ -32,9 +41,6 @@ rem /std:c++20 enables modern C++20 standard with concepts, spans and optimizer 
 rem /Oi enables compiler intrinsic functions (SSE2/AVX vectorization).
 rem /Ot favors maximum CPU execution speed.
 rem /fp:fast enables high-performance floating-point math for CRT shaders and resamplers.
-set APP_BASE=MiSTer_Flavor
-set APP_VER=v2.0
-set APP_EXE=%APP_BASE%_%APP_VER%.exe
 
 cl.exe /nologo /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
     /I include ^
@@ -72,7 +78,6 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
 if %ERRORLEVEL% equ 0 (
     echo.
     echo [BUILD SUCCESS] app\%APP_EXE%
-    copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
     echo.
     echo ==================================================
     echo [RUNNING AUTOMATED UNIT TESTS]

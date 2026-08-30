@@ -13,7 +13,7 @@ typedef unsigned int uint;
 // four entries and twelve blank rows, it does not shrink. Sizing the card to
 // its contents made it grow and shrink as you moved between pages, which is
 // the one thing the hardware never does.
-#define OSD_FIXED_LINES 16
+#define OSD_FIXED_LINES 15
 
 static int osd_size = OSD_FIXED_LINES;
 static bool osd_enabled = true;
