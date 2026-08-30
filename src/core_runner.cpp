@@ -1848,10 +1848,11 @@ static bool CoreLoadGame(const char* rom_path)
 
 static void CoreUnload()
 {
+	HwContextDestroy();
+
 	if (is_game_loaded)
 	{
 		RaOnGameUnload();
-		HwContextDestroy();
 		CoreReleaseMemoryMap();
 
 		EnterCriticalSection(&options_lock);

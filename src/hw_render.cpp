@@ -241,6 +241,7 @@ void HwShutdown()
 	g_gl_ready = false;
 	g_hw_active = false;
 	g_context_live = false;
+	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 	g_surface_w = g_surface_h = 0;
 }
 
@@ -397,11 +398,13 @@ void HwContextReset()
 
 void HwContextDestroy()
 {
-	if (!g_context_live) return;
-	if (!HwMakeCurrent()) return;
-
-	if (g_hw_cb.context_destroy) g_hw_cb.context_destroy();
+	if (g_context_live && HwMakeCurrent())
+	{
+		if (g_hw_cb.context_destroy) g_hw_cb.context_destroy();
+	}
 	g_context_live = false;
+	g_hw_active = false;
+	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 }
 
 bool HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
