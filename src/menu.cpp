@@ -47,7 +47,7 @@ static std::vector<MenuItem> items;
 static int selected_idx = 0;
 static int scroll_top = 0;
 static int main_menu_saved_idx = 0;
-static std::string current_title = "MiSTer 4 ALL";
+static std::string current_title = "MiSTer";
 static std::string current_dir = "roms";
 static std::string status_msg = "MiSTer 4 ALL - mister4all.com - @GuhClemente";
 
@@ -451,12 +451,12 @@ static bool SystemHasCore(int action_id)
 void PopulateMainMenu()
 {
 	items.clear();
-	current_title = APP_NAME;
+	current_title = "MiSTer";
 
 	if (CoreIsRunning())
 	{
 		std::string core_name = CoreGetCoreName();
-		current_title = core_name.empty() ? APP_NAME : core_name;
+		current_title = core_name.empty() ? "MiSTer" : core_name;
 
 		const char* aspects[] = { "Original", "4:3", "16:9" };
 
@@ -464,8 +464,9 @@ void PopulateMainMenu()
 		std::string load_label = "Load";
 		std::string game_name = CoreGetGameName();
 		if (game_name.length() > 16) game_name = game_name.substr(0, 14) + "..";
-		items.push_back({ load_label, game_name, false, true, 1 });
+		items.push_back({ load_label, game_name.empty() ? ">" : game_name, false, true, 1 });
 		items.push_back({ "Reset", "", false, true, 6 });
+		items.push_back({ " ", "", false, false, 0 });
 
 		// 2. NeoGeo Authentic MiSTer Options
 		if (core_name == "NeoGeo" || core_name.find("Neo") != std::string::npos)
@@ -547,11 +548,13 @@ void PopulateMainMenu()
 		}
 
 		// 5. Savestates & Controls
+		items.push_back({ " ", "", false, false, 0 });
 		char save_str[32];
 		snprintf(save_str, sizeof(save_str), "Slot %d", CoreGetSelectedSlot());
 		items.push_back({ "Save State", save_str, false, true, 2 });
 		items.push_back({ "Load State", save_str, false, true, 3 });
 		items.push_back({ "Define Buttons", ">", false, true, 203 });
+		items.push_back({ " ", "", false, false, 0 });
 		items.push_back({ "Close Game", "", false, true, 7 });
 
 		OsdSetSize((int)items.size());
@@ -1285,20 +1288,34 @@ void MenuRun()
 
 		bool is_selected = (item_idx == selected_idx);
 
-		if (!item.value.empty())
+		if (item.label == " " || item.label.empty())
 		{
-			if (item.value == ">")
+			line_buf[0] = '\0';
+		}
+		else if (!item.value.empty())
+		{
+			if (item.value == ">" || item.value == "\x16" || item.value == "\x10")
 			{
-				snprintf(line_buf, sizeof(line_buf), " %-24.24s >", item.label.c_str());
+				snprintf(line_buf, sizeof(line_buf), " %-26.26s \x16", item.label.c_str());
 			}
 			else
 			{
-				snprintf(line_buf, sizeof(line_buf), " %-14.14s %s", item.label.c_str(), item.value.c_str());
+				int val_len = (int)item.value.length();
+				int max_lbl = 26 - val_len;
+				if (max_lbl < 1) max_lbl = 1;
+				snprintf(line_buf, sizeof(line_buf), " %-*.*s %s", max_lbl, max_lbl, item.label.c_str(), item.value.c_str());
 			}
 		}
 		else
 		{
-			snprintf(line_buf, sizeof(line_buf), " %s", item.label.c_str());
+			if (item.is_folder)
+			{
+				snprintf(line_buf, sizeof(line_buf), " %-26.26s \x16", item.label.c_str());
+			}
+			else
+			{
+				snprintf(line_buf, sizeof(line_buf), " %s", item.label.c_str());
+			}
 		}
 
 		OsdWrite((unsigned char)i, line_buf, is_selected ? 1 : 0, 0, 0, 30, 0);
@@ -1341,13 +1358,27 @@ static void MenuProcessKeyImpl(MenuKey key)
 	switch (key)
 	{
 	case KEY_UP:
-		if (selected_idx > 0) selected_idx--;
-		else selected_idx = total - 1;
+		if (total > 0)
+		{
+			int tries = 0;
+			do {
+				if (selected_idx > 0) selected_idx--;
+				else selected_idx = total - 1;
+				tries++;
+			} while (selected_idx < total && items[selected_idx].label == " " && tries < total);
+		}
 		break;
 
 	case KEY_DOWN:
-		if (selected_idx < total - 1) selected_idx++;
-		else selected_idx = 0;
+		if (total > 0)
+		{
+			int tries = 0;
+			do {
+				if (selected_idx < total - 1) selected_idx++;
+				else selected_idx = 0;
+				tries++;
+			} while (selected_idx < total && items[selected_idx].label == " " && tries < total);
+		}
 		break;
 
 	case KEY_PAGEUP:
