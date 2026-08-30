@@ -13,20 +13,21 @@ if errorlevel 1 exit /b 1
 if not exist build mkdir build
 if not exist app mkdir app
 
-set APP_BASE=MiSTer_Flavor
-set APP_VER=v2.0
+set APP_BASE=MiSTer_4_ALL
+set APP_VER=v1.0
 set APP_EXE=%APP_BASE%_%APP_VER%.exe
 
 rem Close any running instances so the linker does not fail with LNK1104 (file in use)
 taskkill /F /IM "%APP_EXE%" >nul 2>&1
 taskkill /F /IM "%APP_BASE%.exe" >nul 2>&1
+taskkill /F /IM "MiSTer_Flavor*.exe" >nul 2>&1
 
 rc.exe /nologo /I include /fobuild\resource.res src\resource.rc
 
 rem libchdr on its own, at /W0. It is vendored third-party code we do not edit,
 rem and at /W3 it emits ~30 conversion warnings that scroll our own off screen.
 echo [libchdr]
-cl.exe /nologo /c /O2 /W0 /FS ^
+cl.exe /nologo /c /MT /O2 /W0 /FS ^
     /D_CRT_SECURE_NO_WARNINGS /DZSTD_DISABLE_ASM ^
     /I third_party\libchdr\include /I third_party\libchdr ^
     /Fobuild\ ^
@@ -37,12 +38,13 @@ if errorlevel 1 (
 )
 
 rem /Fobuild\ keeps the .obj files out of the source tree.
+rem /MT statically links the C/C++ runtime so the exe runs on any Windows machine with 0 dependencies.
 rem /std:c++20 enables modern C++20 standard with concepts, spans and optimizer enhancements.
 rem /Oi enables compiler intrinsic functions (SSE2/AVX vectorization).
 rem /Ot favors maximum CPU execution speed.
 rem /fp:fast enables high-performance floating-point math for CRT shaders and resamplers.
 
-cl.exe /nologo /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
+cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
     /I include ^
     /I third_party\rcheevos\include ^
     /I third_party\rcheevos\src ^
