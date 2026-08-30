@@ -137,29 +137,19 @@ static int setting_theme =
     0; // 0=Red/Burgundy, 1=Blue, 2=Green, 3=Amber, 4=Gray, 5=Dark
 static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
 static int setting_latency = 1;  // 0=16ms, 1=32ms, 2=64ms, 3=128ms
-static int setting_driver =
-    0; // 0=DirectX 11, 1=Vulkan, 2=OpenGL, 3=DirectX 12, 4=Software DIB
+static const char *kVideoDrivers[] = {
+    "Software (CPU)",
+    "OpenGL (GPU 3D)",
+    "Vulkan (GPU 3D)",
+    "DirectX 11 (GPU)"
+};
+static const int kVideoDriverCount = 4;
+static int setting_driver = 1; // Default to OpenGL (GPU 3D)
 static int setting_sync = 1;  // 0=Native (Game Rate), 1=Sync to Display
 static int setting_vsync = 1; // 0=Disabled, 1=Enabled
-// 0 = the core bundled with the project: it runs, but exports no memory, so
-//     RetroAchievements can never work on it.
-// 1 = official ParaLLEl-N64, 2 = official Mupen64Plus-Next. Both export memory.
 static int setting_n64_core = 0;
-// FBNeo, MAME 2003 and MAME 2010 all shipped in cores/, but every arcade path
-// hardcoded FBNeo, so two of them could never be loaded. They are not
-// interchangeable: each expects ROM sets built for its own romset version, and
-// a game that refuses to boot on one often runs on another. That is the whole
-// reason to carry three.
 static int setting_arcade_core = 0; // 0=FBNeo, 1=MAME 2003, 2=MAME 2010
-// Seconds of no input before the OSD closes itself during a game. 0 keeps it
-// open until dismissed, which is what it always did.
 static int setting_osd_timeout = 0; // index into kOsdTimeouts
-// Hardware rendering is opt-in. Accepting SET_HW_RENDER changes behaviour for
-// every core that can use a GPU, and a frontend-side GL problem takes those
-// cores down with it instead of letting them fall back to software - which is
-// how they all behaved before. Off means "act like we have no GL", which is
-// the configuration everything was tested in.
-static int setting_hw_render = 0;
 static int setting_sms_fm = 0; // 0=auto, 1=desligado, 2=ligado
 // melonDS screen arrangement. The stored values are exactly the strings the
 // core declares; anything else leaves it on its default silently.
@@ -246,7 +236,7 @@ static const char *GetN64CoreDll() {
     return "cores/n64_mupen.dll";
   return "cores/n64.dll";
 }
-int MenuGetHwRender() { return setting_hw_render; }
+int MenuGetHwRender() { return (setting_driver != 0) ? 1 : 0; }
 int MenuGetLanguage() { return setting_language; }
 const char *MenuGetStatus() { return status_msg.c_str(); }
 const char *MenuGetTitle() { return current_title.c_str(); }
@@ -839,8 +829,6 @@ void PopulateVideoSettings() {
                               "Cyber Grid", "Flavor Chef",  "Flavor Arcade"};
   const char *displays[] = {"Windowed", "Fullscreen"};
   const char *themes[] = {"Red", "Blue", "Green", "Amber", "Gray", "Dark"};
-  const char *drivers[] = {"DirectX 11", "Vulkan", "OpenGL", "DirectX 12",
-                           "Software DIB"};
 
   items.push_back({"Aspect Ratio", aspects[setting_aspect], false, false, 301});
   items.push_back(
@@ -850,11 +838,7 @@ void PopulateVideoSettings() {
   items.push_back(
       {"Display", displays[setting_fullscreen ? 1 : 0], false, false, 304});
   items.push_back({"OSD Color", themes[setting_theme], false, false, 305});
-  items.push_back({"Video Driver", drivers[setting_driver], false, false, 306});
-
-  const char *hw3d[] = {"Off (software)", "On (OpenGL)"};
-  items.push_back(
-      {"3D Acceleration", hw3d[setting_hw_render], false, false, 310});
+  items.push_back({"Video Driver", kVideoDrivers[setting_driver], false, false, 306});
 
   // Named after what each core reports through retro_get_system_info, not
   // after the filename. cores/n64.dll identifies itself only as "Nintendo 64"
@@ -1198,7 +1182,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "n64_core", setting_n64_core);
   AppendSetting(out, "arcade_core", setting_arcade_core);
   AppendSetting(out, "osd_timeout", setting_osd_timeout);
-  AppendSetting(out, "hw_render", setting_hw_render);
+  AppendSetting(out, "hw_render", (setting_driver != 0) ? 1 : 0);
   AppendSetting(out, "sms_fm", setting_sms_fm);
   AppendSetting(out, "nds_layout", setting_nds_layout);
   AppendSetting(out, "nds_gap", setting_nds_gap);
@@ -1299,7 +1283,9 @@ static void MenuLoadSettings() {
     else if (!strcmp(key, "osd_timeout"))
       setting_osd_timeout = ClampInt(iv, 0, kOsdTimeoutCount - 1);
     else if (!strcmp(key, "hw_render"))
-      setting_hw_render = ClampInt(iv, 0, 1);
+    {
+      if (iv != 0 && setting_driver == 0) setting_driver = 1;
+    }
     else if (!strcmp(key, "sms_fm"))
       setting_sms_fm = ClampInt(iv, 0, 2);
     else if (!strcmp(key, "nds_layout"))
@@ -1672,14 +1658,6 @@ static void MenuProcessKeyImpl(MenuKey key) {
                    200);
       PopulateMainMenu();
       selected_idx = cur;
-    } else if (item.action_id == 310) // 3D acceleration
-    {
-      setting_hw_render = (setting_hw_render + delta + 2) % 2;
-      CoreSetToast(setting_hw_render == 1 ? "3D: OPENGL (RECARREGUE O JOGO)"
-                                          : "3D: SOFTWARE (RECARREGUE O JOGO)",
-                   200);
-      PopulateVideoSettings();
-      selected_idx = 6;
     } else if (item.action_id == 309) // N64 core
     {
       setting_n64_core = (setting_n64_core + delta + 3) % 3;
@@ -1731,11 +1709,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
       selected_idx = 7;
     } else if (item.action_id == 306) // Video Driver
     {
-      setting_driver = (setting_driver + delta + 5) % 5;
-      const char *drivers[] = {"DirectX 11", "Vulkan", "OpenGL", "DirectX 12",
-                               "Software DIB"};
+      setting_driver = (setting_driver + delta + kVideoDriverCount) % kVideoDriverCount;
       char msg[64];
-      snprintf(msg, sizeof(msg), "DRIVER: %s", drivers[setting_driver]);
+      if (setting_driver == 0) {
+        snprintf(msg, sizeof(msg), "DRIVER: SOFTWARE (CPU)");
+      } else {
+        snprintf(msg, sizeof(msg), "DRIVER: %s (3D GPU ATIVADO)", kVideoDrivers[setting_driver]);
+      }
       CoreSetToast(msg, 90);
       PopulateVideoSettings();
       selected_idx = 5;
