@@ -254,8 +254,8 @@ void PopulateMainMenu();
 //
 // dir_hint is the folder the file was browsed from; when there is none, the
 // full path serves, since roms/<System>/game.ext carries the same information.
-static std::string ResolveCoreForPath(const std::string &file_path,
-                                      const std::string &dir_hint) {
+std::string MenuResolveCoreForPath(const std::string &file_path,
+                                  const std::string &dir_hint) {
   std::string ext = fs::path(file_path).extension().string();
   std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
@@ -2056,7 +2056,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         // Archives are extracted on the core thread now - doing it here
         // blocked the message pump for as long as the extraction took.
         // The core is resolved the same way for every entry point.
-        std::string core_dll = ResolveCoreForPath(full_rom_path, current_dir);
+        std::string core_dll = MenuResolveCoreForPath(full_rom_path, current_dir);
 
         // Returns immediately; the worker thread reports back through
         // CoreIsLoading() / CoreIsRunning().
@@ -2094,7 +2094,7 @@ bool MenuLaunchGamePath(const std::string &full_rom_path) {
   std::string path_str = full_rom_path;
   // One resolver for the OSD and for the command line: the two used to carry
   // separate copies of this and had already diverged.
-  std::string core_dll = ResolveCoreForPath(full_rom_path, path_str);
+  std::string core_dll = MenuResolveCoreForPath(full_rom_path, path_str);
 
   if (core_dll.empty())
     return false;

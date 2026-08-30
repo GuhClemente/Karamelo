@@ -200,6 +200,124 @@ bool ArchiveIsCompressed(const std::string& filepath)
 	return (ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".tar" || ext == ".gz");
 }
 
+std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::string& dir_hint)
+{
+	std::string ext = fs::path(file_path).extension().string();
+	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+	const std::string& hint = dir_hint.empty() ? file_path : dir_hint;
+	auto in = [&hint](const char* needle) {
+		return hint.find(needle) != std::string::npos;
+	};
+
+	if (ext == ".z64" || ext == ".n64" || ext == ".v64") return "cores/n64.dll";
+	if (ext == ".nes" || ext == ".fds") return "cores/nes.dll";
+	if (ext == ".sfc" || ext == ".smc") return "cores/snes.dll";
+	if (ext == ".md" || ext == ".gen" || ext == ".smd") return "cores/genesis.dll";
+	if (ext == ".sms" || ext == ".gg" || ext == ".sg") return "cores/sms.dll";
+	if (ext == ".pce" || ext == ".sgx") return "cores/pce.dll";
+	if (ext == ".neo") return "cores/neogeo.dll";
+	if (ext == ".a26") return "cores/atari2600.dll";
+	if (ext == ".a52") return "cores/atari5200.dll";
+	if (ext == ".a78") return "cores/atari7800.dll";
+	if (ext == ".nds") return "cores/nds.dll";
+	if (ext == ".3ds" || ext == ".cia") return "cores/3ds.dll";
+	if (ext == ".gdi" || ext == ".cdi") return "cores/dreamcast.dll";
+	if (ext == ".gcm" || ext == ".rvz" || ext == ".wbfs") return "cores/gamecube.dll";
+	if (ext == ".gba") return "cores/gba.dll";
+	if (ext == ".gb" || ext == ".gbc") return "cores/gb.dll";
+	if (ext == ".ngp" || ext == ".ngc") return "cores/ngp.dll";
+	if (ext == ".ws" || ext == ".wsc") return "cores/wswan.dll";
+	if (ext == ".lnx") return "cores/lynx.dll";
+	if (ext == ".32x") return "cores/32x.dll";
+	if (ext == ".j64" || ext == ".jag") return "cores/jaguar.dll";
+	if (ext == ".col") return "cores/coleco.dll";
+	if (ext == ".adf" || ext == ".hdf" || ext == ".lha") return "cores/amiga.dll";
+	if (ext == ".d64" || ext == ".t64" || ext == ".prg" || ext == ".crt") return "cores/c64.dll";
+	if (ext == ".tzx" || ext == ".tap" || ext == ".z80" || ext == ".sna") return "cores/spectrum.dll";
+	if (ext == ".pcfx") return "cores/pcfx.dll";
+	if (ext == ".cso") return "cores/psp.dll";
+
+	if (ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" ||
+		ext == ".pbp" || ext == ".toc")
+	{
+		if (in("NeoGeo")) return "cores/neocd_alt.dll";
+		if (in("Saturn")) return "cores/saturn.dll";
+		if (in("MegaCD")) return "cores/genesis.dll";
+		if (in("TurboGrafx") || in("PCE")) return "cores/pce.dll";
+		if (in("Dreamcast")) return "cores/dreamcast.dll";
+		if (in("GameCube")) return "cores/gamecube.dll";
+		if (in("PlayStation2") || in("PS2")) return "cores/ps2.dll";
+		if (in("PSP")) return "cores/psp.dll";
+		if (in("3DO")) return "cores/3do.dll";
+		if (in("Amiga") || in("CD32")) return "cores/amiga.dll";
+		if (in("PCFX") || in("PC-FX")) return "cores/pcfx.dll";
+		return "cores/psx.dll";
+	}
+
+	if (ext == ".bin" || ext == ".rom" || ext == ".dsk" || ext == ".cas")
+	{
+		if (in("NeoGeo")) return "cores/neogeo.dll";
+		if (in("Atari5200")) return "cores/atari5200.dll";
+		if (in("Atari7800")) return "cores/atari7800.dll";
+		if (in("Atari")) return "cores/atari2600.dll";
+		if (in("Genesis")) return "cores/genesis.dll";
+		if (in("32X")) return "cores/32x.dll";
+		if (in("NES")) return "cores/nes.dll";
+		if (in("Saturn")) return "cores/saturn.dll";
+		if (in("PlayStation2") || in("PS2")) return "cores/ps2.dll";
+		if (in("PlayStation")) return "cores/psx.dll";
+		if (in("Dreamcast")) return "cores/dreamcast.dll";
+		if (in("MSX")) return "cores/msx.dll";
+		if (in("Amiga")) return "cores/amiga.dll";
+		if (in("3DO")) return "cores/3do.dll";
+		if (in("Coleco")) return "cores/coleco.dll";
+		return "cores/genesis.dll";
+	}
+
+	if (ext == ".zip" || ext == ".7z" || ext == ".rar")
+	{
+		if (in("Arcade")) return "cores/arcade_fbneo.dll";
+		if (in("NeoGeo")) return "cores/neogeo.dll";
+		if (in("Atari5200")) return "cores/atari5200.dll";
+		if (in("Atari7800")) return "cores/atari7800.dll";
+		if (in("Atari")) return "cores/atari2600.dll";
+		if (in("Jaguar")) return "cores/jaguar.dll";
+		if (in("Lynx")) return "cores/lynx.dll";
+		if (in("Coleco")) return "cores/coleco.dll";
+		if (in("MasterSystem")) return "cores/sms.dll";
+		if (in("MegaCD")) return "cores/genesis.dll";
+		if (in("32X")) return "cores/32x.dll";
+		if (in("Genesis")) return "cores/genesis.dll";
+		if (in("SNES")) return "cores/snes.dll";
+		if (in("NES")) return "cores/nes.dll";
+		if (in("Nintendo64") || in("N64")) return "cores/n64.dll";
+		if (in("GBA")) return "cores/gba.dll";
+		if (in("GameBoy") || in("GB")) return "cores/gb.dll";
+		if (in("NDS")) return "cores/nds.dll";
+		if (in("3DS")) return "cores/3ds.dll";
+		if (in("PSP")) return "cores/psp.dll";
+		if (in("DOS") || in("MSDOS")) return "cores/dosbox_pure.dll";
+		if (in("MSX")) return "cores/msx.dll";
+		if (in("Amiga")) return "cores/amiga.dll";
+		if (in("C64") || in("Commodore")) return "cores/c64.dll";
+		if (in("Spectrum") || in("ZXSpectrum")) return "cores/spectrum.dll";
+		if (in("3DO")) return "cores/3do.dll";
+		if (in("NGP") || in("NeoGeoPocket")) return "cores/ngp.dll";
+		if (in("WonderSwan") || in("WSwan")) return "cores/wswan.dll";
+		if (in("PCFX") || in("PC-FX")) return "cores/pcfx.dll";
+		if (in("Saturn")) return "cores/saturn.dll";
+		if (in("TurboGrafx")) return "cores/pce.dll";
+		if (in("Dreamcast")) return "cores/dreamcast.dll";
+		if (in("GameCube")) return "cores/gamecube.dll";
+		if (in("PlayStation2") || in("PS2")) return "cores/ps2.dll";
+		if (in("PlayStation")) return "cores/psx.dll";
+		return "cores/arcade_fbneo.dll";
+	}
+
+	return "";
+}
+
 bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extracted_rom_path, std::string& out_core_dll)
 {
 	fs::path arch_path(archive_path);
@@ -249,15 +367,22 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 	//    core with no game.
 	static const std::vector<std::string> KNOWN_EXTS = {
 		".m3u",                          // multi-disc playlist wins outright
-		".cue", ".chd", ".toc", ".iso",  // disc images
+		".cue", ".chd", ".toc", ".iso", ".gdi", ".cdi", ".gcm", ".rvz", ".wbfs", ".cso", ".pbp",  // disc images
 		".z64", ".n64", ".v64",
 		".sfc", ".smc",
 		".nes", ".fds",
-		".md", ".gen",
+		".md", ".gen", ".smd",
 		".sms", ".gg", ".sg",
-		".pce", ".sgx",
+		".pce", ".sgx", ".pcfx",
 		".neo",
-		".a26", ".a78", ".bin"
+		".gb", ".gbc", ".gba",
+		".nds", ".3ds", ".cia",
+		".32x",
+		".a26", ".a52", ".a78", ".j64", ".jag", ".lnx", ".col",
+		".ws", ".wsc", ".ngp", ".ngc",
+		".adf", ".hdf", ".lha", ".d64", ".t64", ".prg", ".crt",
+		".tzx", ".tap", ".z80", ".sna", ".dsk", ".cas",
+		".bin", ".rom"
 	};
 
 	// Collect once, then pick by priority.
@@ -292,52 +417,10 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 					if (f_ext == ".cue" && !SanitizeCue(entry_path, usable_path))
 						continue;
 
-					{
-						out_extracted_rom_path = usable_path;
-
-						// Determine matching core DLL
-						if (f_ext == ".z64" || f_ext == ".n64" || f_ext == ".v64")
-						{
-							int n64_c = MenuGetN64Core();
-							if (n64_c == 1) out_core_dll = "cores/n64_parallel.dll";
-							else if (n64_c == 2) out_core_dll = "cores/n64_mupen.dll";
-							else out_core_dll = "cores/n64.dll";
-						}
-						else if (f_ext == ".nes" || f_ext == ".fds") out_core_dll = "cores/nes.dll";
-						else if (f_ext == ".sfc" || f_ext == ".smc") out_core_dll = "cores/snes.dll";
-						else if (f_ext == ".md" || f_ext == ".gen") out_core_dll = "cores/genesis.dll";
-						else if (f_ext == ".sms" || f_ext == ".gg" || f_ext == ".sg") out_core_dll = "cores/sms.dll";
-						else if (f_ext == ".pce" || f_ext == ".sgx") out_core_dll = "cores/pce.dll";
-						else if (f_ext == ".neo") out_core_dll = "cores/neogeo.dll";
-						else if (f_ext == ".a26") out_core_dll = "cores/atari2600.dll";
-						// .a78 is Atari 7800. The bundled atari2600.dll is Stella,
-						// which does not play 7800 carts - we still resolve the
-						// file so the failure is reported honestly instead of
-						// looking like a broken extraction.
-						else if (f_ext == ".a78") out_core_dll = "cores/atari7800.dll";
-						else if (f_ext == ".bin")
-						{
-							if (archive_path.find("NeoGeo") != std::string::npos) out_core_dll = "cores/neogeo.dll";
-							else if (archive_path.find("Atari") != std::string::npos) out_core_dll = "cores/atari2600.dll";
-							else if (archive_path.find("Genesis") != std::string::npos) out_core_dll = "cores/genesis.dll";
-							else if (archive_path.find("NES") != std::string::npos) out_core_dll = "cores/nes.dll";
-							else if (archive_path.find("Saturn") != std::string::npos) out_core_dll = "cores/saturn.dll";
-							else if (archive_path.find("PlayStation") != std::string::npos) out_core_dll = "cores/psx.dll";
-							else out_core_dll = "cores/genesis.dll";
-						}
-						else if (f_ext == ".chd" || f_ext == ".iso" || f_ext == ".cue" ||
-								 f_ext == ".m3u" || f_ext == ".toc")
-						{
-							// Disc images for Neo Geo use the dedicated CD core.
-							if (archive_path.find("NeoGeo") != std::string::npos) out_core_dll = "cores/neocd_alt.dll";
-							else if (archive_path.find("Saturn") != std::string::npos) out_core_dll = "cores/saturn.dll";
-							else if (archive_path.find("MegaCD") != std::string::npos) out_core_dll = "cores/genesis.dll";
-							else if (archive_path.find("TurboGrafx") != std::string::npos) out_core_dll = "cores/pce.dll";
-							else out_core_dll = "cores/psx.dll";
-						}
-
+					out_extracted_rom_path = usable_path;
+					out_core_dll = ArchiveResolveCoreForPath(usable_path, archive_path);
+					if (!out_core_dll.empty())
 						return true;
-					}
 				}
 			}
 		}
