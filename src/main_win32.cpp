@@ -195,15 +195,15 @@ static void DrawRotatedCharTo(uint32_t* buf, int bw, int bh, int x, int y, char 
 {
 	if (!buf) return;
 	const unsigned char* p = &charfont[(unsigned char)c][0];
-	for (int font_x = 0; font_x < 8; font_x++)
+	for (int col = 0; col < 8; col++)
 	{
-		unsigned char b = p[font_x];
-		for (int font_y = 0; font_y < 8; font_y++)
+		unsigned char b = p[col];
+		for (int row = 0; row < 8; row++)
 		{
-			if (b & (1 << font_y))
+			if (b & (1 << row))
 			{
-				int px = x + font_y;
-				int py = y + font_x;
+				int px = x + row;
+				int py = y + (7 - col);
 				if (px >= 0 && px < bw && py >= 0 && py < bh)
 				{
 					buf[py * bw + px] = color;
@@ -751,7 +751,7 @@ static void RenderFrame()
 			}
 		}
 
-		// 6. Vertical Title in Left Sidebar
+		// 6. Vertical Title in Left Sidebar (Authentic MiSTer FPGA: 'M' at bottom, 'r' at top)
 		const char* title = MenuGetTitle();
 		if (!title || !*title) title = "MiSTer";
 		int tlen = (int)strlen(title);
@@ -760,7 +760,9 @@ static void RenderFrame()
 		int title_x = ox + (side_w - 8) / 2;
 		for (int i = 0; i < tlen; i++)
 		{
-			DrawRotatedCharTo(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, title_x, title_start_y + i * 8, title[i], theme.header_txt);
+			// i = 0 ('M') at the bottom, i = tlen - 1 ('r') at the top
+			int char_y = title_start_y + (tlen - 1 - i) * 8;
+			DrawRotatedCharTo(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, title_x, char_y, title[i], theme.header_txt);
 		}
 
 		// 7. Render Text Glyphs for Each Row
