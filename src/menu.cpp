@@ -850,7 +850,6 @@ void PopulateVideoSettings() {
   items.push_back(
       {"Display", displays[setting_fullscreen ? 1 : 0], false, false, 304});
   items.push_back({"OSD Color", themes[setting_theme], false, false, 305});
-  items.push_back({"Video Driver", drivers[setting_driver], false, false, 306});
 
   const char *hw3d[] = {"Off (software)", "On (OpenGL)"};
   items.push_back(
@@ -1729,16 +1728,6 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetToast(setting_sync == 1 ? "SYNC: DISPLAY" : "SYNC: NATIVE", 120);
       PopulateVideoSettings();
       selected_idx = 7;
-    } else if (item.action_id == 306) // Video Driver
-    {
-      setting_driver = (setting_driver + delta + 5) % 5;
-      const char *drivers[] = {"DirectX 11", "Vulkan", "OpenGL", "DirectX 12",
-                               "Software DIB"};
-      char msg[64];
-      snprintf(msg, sizeof(msg), "DRIVER: %s", drivers[setting_driver]);
-      CoreSetToast(msg, 90);
-      PopulateVideoSettings();
-      selected_idx = 5;
     } else if (item.action_id == 401) // Mute
     {
       CoreSetMute(!CoreGetMute());
