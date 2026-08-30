@@ -936,6 +936,16 @@ static bool CB_Environment(unsigned cmd, void* data)
 		// all. Refusing makes it fall back to the interface we do implement.
 		return false;
 
+	case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS:
+		return true;
+
+	case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
+	{
+		int* mask = (int*)data;
+		if (mask) *mask = 1 | 2; // Bit 0: Video, Bit 1: Audio
+		return true;
+	}
+
 	case RETRO_ENVIRONMENT_SHUTDOWN:
 		// Raised from inside retro_run. Unloading here would FreeLibrary the
 		// DLL we are currently executing, so only ask the loop to stop.
@@ -1243,6 +1253,15 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 
 	if (device == RETRO_DEVICE_JOYPAD)
 	{
+		if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
+		{
+			int16_t mask = 0;
+			for (int b = 0; b < 16; b++)
+			{
+				if (joypad_buttons[port][b]) mask |= (int16_t)(1 << b);
+			}
+			return mask;
+		}
 		if (id < 16) return joypad_buttons[port][id];
 	}
 	else if (device == RETRO_DEVICE_ANALOG)
@@ -1416,6 +1435,30 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 // options_lock was left held by a thread that no longer exists. The next
 // EnterCriticalSection then waited forever - which is why loading Master System
 // afterwards did nothing until the whole app was restarted.
+static void ResetCoreFunctionPointers()
+{
+	p_retro_init = NULL;
+	p_retro_deinit = NULL;
+	p_retro_get_system_info = NULL;
+	p_retro_get_system_av_info = NULL;
+	p_retro_set_environment = NULL;
+	p_retro_set_video_refresh = NULL;
+	p_retro_set_audio_sample = NULL;
+	p_retro_set_audio_sample_batch = NULL;
+	p_retro_set_input_poll = NULL;
+	p_retro_set_input_state = NULL;
+	p_retro_set_controller_port_device = NULL;
+	p_retro_reset = NULL;
+	p_retro_run = NULL;
+	p_retro_serialize_size = NULL;
+	p_retro_serialize = NULL;
+	p_retro_unserialize = NULL;
+	p_retro_get_memory_data = NULL;
+	p_retro_get_memory_size = NULL;
+	p_retro_load_game = NULL;
+	p_retro_unload_game = NULL;
+}
+
 static void RecoverAfterKilledCore()
 {
 	// A critical section owned by a dead thread is never released. Recreating it
@@ -1426,11 +1469,11 @@ static void RecoverAfterKilledCore()
 	DeleteCriticalSection(&name_lock);
 	InitializeCriticalSection(&name_lock);
 
+	HwContextDestroy();
+
 	is_game_loaded = false;
 	is_core_loaded = false;
-	p_retro_run = NULL;
-	p_retro_unload_game = NULL;
-	p_retro_deinit = NULL;
+	ResetCoreFunctionPointers();
 
 	// The DLL is deliberately left mapped. FreeLibrary on a module whose thread
 	// was killed inside it can fault during its own cleanup, and a leaked
@@ -1447,6 +1490,12 @@ static void RecoverAfterKilledCore()
 	if (h_audio_event) { CloseHandle(h_audio_event); h_audio_event = NULL; }
 	if (h_audio_thread) { CloseHandle(h_audio_thread); h_audio_thread = NULL; }
 	audio_thread_running = false;
+
+	g_resample_phase = 0.0;
+	g_last_left = 0;
+	g_last_right = 0;
+	InterlockedExchange(&g_ring_write_pos, 0);
+	InterlockedExchange(&g_ring_read_pos, 0);
 
 	memset(g_triple_fb, 0, sizeof(g_triple_fb));
 	InterlockedExchange(&g_fb_dirty, 0);
@@ -1858,17 +1907,14 @@ static void CoreUnload()
 		EnterCriticalSection(&options_lock);
 		g_core_defaults.clear();
 		LeaveCriticalSection(&options_lock);
-	}
 
-	if (is_game_loaded && p_retro_unload_game)
-	{
-		p_retro_unload_game();
+		RetroUnloadGameGuarded();
 		is_game_loaded = false;
 	}
 
-	if (is_core_loaded && p_retro_deinit)
+	if (is_core_loaded)
 	{
-		p_retro_deinit();
+		RetroDeinitGuarded();
 		is_core_loaded = false;
 	}
 
@@ -1877,6 +1923,8 @@ static void CoreUnload()
 		FreeLibrary(h_core_dll);
 		h_core_dll = NULL;
 	}
+
+	ResetCoreFunctionPointers();
 
 	if (audio_thread_running)
 	{
@@ -1910,6 +1958,12 @@ static void CoreUnload()
 		CloseHandle(h_audio_event);
 		h_audio_event = NULL;
 	}
+
+	g_resample_phase = 0.0;
+	g_last_left = 0;
+	g_last_right = 0;
+	InterlockedExchange(&g_ring_write_pos, 0);
+	InterlockedExchange(&g_ring_read_pos, 0);
 }
 
 static void DoReset()

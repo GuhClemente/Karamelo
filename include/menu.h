@@ -40,6 +40,7 @@ int  MenuGetVsync();
 int  MenuGetN64Core();
 int  MenuGetHwRender();
 int  MenuGetLanguage();
+std::string MenuResolveCoreForPath(const std::string& file_path, const std::string& dir_hint);
 bool MenuLaunchGamePath(const std::string& filepath);
 
 #endif
