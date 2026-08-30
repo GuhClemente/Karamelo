@@ -1,0 +1,82 @@
+#ifndef CORE_RUNNER_H_INCLUDED
+#define CORE_RUNNER_H_INCLUDED
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string>
+
+// Lifecycle Management
+//
+// The core lives entirely on its own thread: archive extraction, retro_load_game
+// and retro_run all happen there. Loading a disc image takes seconds, and doing
+// that on the UI thread stalled the message pump long enough for Windows to
+// declare the window unresponsive.
+bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint);
+bool CoreIsLoading();
+void CoreShutdown();
+void CoreReset();
+bool CoreIsRunning();
+double CoreGetTargetFps();
+
+// Slave the core's frame rate to the display's, so a 59.19fps core stops
+// beating against a 59.94Hz panel. Audio is rescaled to match.
+void   CoreSetDisplaySync(bool enable, double display_fps);
+double CoreGetDisplayFps();
+bool   CoreDisplaySyncActive();
+
+// Emulated console memory, for RetroAchievements. id is RETRO_MEMORY_SYSTEM_RAM
+// and friends. Returns NULL/0 when the core does not expose that region.
+void*  CoreGetMemoryData(unsigned id);
+size_t CoreGetMemorySize(unsigned id);
+
+// The core's retro_memory_map, when it published one. NULL otherwise.
+// RetroAchievements needs it to map a console's whole achievement address
+// space; without it only the first region resolves.
+const void* CoreGetMemoryMap();
+
+// Presentation (UI thread; reads the shared framebuffer)
+void CoreRender(uint32_t* dest_buffer, int dest_w, int dest_h, int aspect_mode, int filter_mode);
+
+// High-Performance Input Dispatch
+void CoreSetButtonState(int player, int button_id, bool pressed);
+void CoreSetAnalogState(int player, int stick_id, int axis_id, int16_t value);
+
+// Dynamic Savestates (0-9)
+bool CoreSaveState(int slot = 0);
+bool CoreLoadState(int slot = 0);
+int  CoreGetSelectedSlot();
+void CoreSetSelectedSlot(int slot);
+bool CoreTakeScreenshot();
+
+// Volume & Audio Controls
+void CoreSetVolume(int volume_percent);
+int  CoreGetVolume();
+void CoreSetMute(bool mute);
+bool CoreGetMute();
+
+// HUD Toast Notification Engine
+void CoreSetToast(const char* message, int frames_duration = 120);
+const char* CoreGetToast();
+bool CoreIsToastActive();
+void CoreUpdateToast();
+
+// Core & Game Metadata & Options
+const char* CoreGetGameName();
+const char* CoreGetCoreName();
+void CoreSetOption(const char* key, const char* value);
+
+// Mouse as a stylus. Takes the cursor position as a fraction of the client
+// area (0..1) and maps it through the current viewport onto the core's
+// framebuffer, so the touch lands under the cursor whatever the aspect ratio
+// or window size. A position outside the picture is reported as not touching.
+void CoreSetPointer(double client_fx, double client_fy, bool pressed);
+
+// True when the loaded game came from a disc image rather than a cartridge.
+bool CoreIsDiscGame();
+
+// Folder the loaded ROM came from, so the menu can reopen that list.
+const char* CoreGetRomDir();
+const char* CoreGetOption(const char* key);
+
+#endif

@@ -1,0 +1,116 @@
+# Build output
+/build/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Runtime artefacts and user data
+/app/MiSTer_Win32.exe
+/app/MiSTer_Win32.pdb
+/app/cache/
+/app/saves/
+/app/screenshots/
+/app/*.log
+/app/*.bmp
+/MiSTer_Win32_Port/
+/cache/
+/saves/
+/screenshots/
+*.log
+*.log.old
+/app/*.log*
+
+# Cores, BIOS and ROMs (NUNCA versionar: violacao de direitos autorais)
+/app/cores/
+/app/bios/
+/app/roms/
+/app/games/
+/roms/
+/games/
+/bios/
+/cores/
+**/bios/
+**/cores/
+**/roms/
+**/games/
+
+# ROM, Disc & BIOS image extensions
+*.chd
+*.iso
+*.cue
+*.bin
+*.cso
+*.pbp
+*.m3u
+*.nes
+*.sfc
+*.smc
+*.z64
+*.n64
+*.v64
+*.md
+*.gen
+*.smd
+*.pce
+*.sgx
+*.sms
+*.gg
+*.3ds
+*.nds
+*.gcm
+*.gba
+*.gb
+*.gbc
+*.ngp
+*.ngc
+*.ws
+*.wsc
+*.lnx
+*.32x
+*.j64
+*.jag
+*.col
+*.a52
+*.a78
+*.a26
+*.adf
+*.hdf
+*.lha
+*.d64
+*.t64
+*.prg
+*.crt
+*.tzx
+*.tap
+*.pcfx
+*.rvz
+*.wbfs
+*.dsk
+*.cas
+*.rom
+*.bios
+
+# Node.js / Site
+/site/.next/
+/site/node_modules/
+/site/out/
+*.tsbuildinfo
+.env*.local
+
+# ---------------------------------------------------------------------------
+# Nunca versionar: credenciais e configuracao do usuario
+# ---------------------------------------------------------------------------
+/app/Config/*.cfg
+/app/Config/
+/Config/
+*.cfg
+
+# ---------------------------------------------------------------------------
+# Arquivos de distribuicao e temporarios
+# ---------------------------------------------------------------------------
+*.zip
+*.7z
+*.rar
+/temp_cores_dl/

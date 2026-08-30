@@ -1,0 +1,351 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <vector>
+#include <filesystem>
+#include <algorithm>
+#include <fstream>
+#include <sstream>
+
+#include "archive_helper.h"
+#include "menu.h"
+
+namespace fs = std::filesystem;
+
+// Extraction must run to completion. The old 15s cap returned while tar.exe was
+// still writing, so callers scanned a half-extracted folder and then launched a
+// second extractor on top of the first, corrupting the result.
+#define EXTRACT_TIMEOUT_MS (10 * 60 * 1000) // 10 min, only to survive a wedged tool
+
+static bool RunHiddenCommand(const std::string& cmd)
+{
+	STARTUPINFOA si = { 0 };
+	PROCESS_INFORMATION pi = { 0 };
+	si.cb = sizeof(STARTUPINFOA);
+	si.dwFlags = STARTF_USESHOWWINDOW;
+	si.wShowWindow = SW_HIDE;
+
+	char cmd_buf[2048];
+	strncpy_s(cmd_buf, cmd.c_str(), sizeof(cmd_buf) - 1);
+
+	if (!CreateProcessA(NULL, cmd_buf, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+		return false;
+
+	DWORD wait = WaitForSingleObject(pi.hProcess, EXTRACT_TIMEOUT_MS);
+
+	if (wait == WAIT_TIMEOUT)
+	{
+		// Never leave it running in the background writing into the folder we
+		// are about to scan.
+		TerminateProcess(pi.hProcess, 1);
+		WaitForSingleObject(pi.hProcess, 5000);
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		return false;
+	}
+
+	DWORD exit_code = 1;
+	GetExitCodeProcess(pi.hProcess, &exit_code);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	return (exit_code == 0);
+}
+
+// Repacks in the wild routinely ship a cue whose FILE entries do not match what
+// is actually inside the archive: a data track saved under a different name,
+// audio tracks that were never included. A core given such a cue refuses the
+// whole disc and boots to its BIOS instead. Rather than give up, write a
+// corrected cue beside it in the cache and hand the core that.
+//
+// Two repairs, in order of confidence:
+//   1. The data track (first FILE) is missing but exactly one unreferenced
+//      image file sits in the same folder -> it is that file, renamed.
+//   2. An audio track is missing -> truncate there. Tracks on a real disc are
+//      contiguous, so keeping later ones would renumber everything after the
+//      gap and hand the game the wrong music.
+static std::string CueQuotedName(const std::string& line)
+{
+	size_t open_quote = line.find('"');
+	if (open_quote == std::string::npos) return "";
+	size_t close_quote = line.find('"', open_quote + 1);
+	if (close_quote == std::string::npos) return "";
+	return line.substr(open_quote + 1, close_quote - open_quote - 1);
+}
+
+static bool LineIsFileEntry(const std::string& line)
+{
+	size_t i = line.find_first_not_of(" \t");
+	if (i == std::string::npos) return false;
+	return line.compare(i, 4, "FILE") == 0;
+}
+
+static bool SanitizeCue(const fs::path& cue_path, std::string& out_cue_path)
+{
+	out_cue_path = cue_path.string();
+
+	std::ifstream in(cue_path);
+	if (!in) return false;
+
+	std::vector<std::string> lines;
+	std::string line;
+	while (std::getline(in, line))
+	{
+		if (!line.empty() && line.back() == '\r') line.pop_back();
+		lines.push_back(line);
+	}
+	in.close();
+	if (lines.empty()) return false;
+
+	const fs::path dir = cue_path.parent_path();
+
+	// Split into a header plus one block per FILE entry.
+	std::vector<std::string> header;
+	std::vector<std::vector<std::string>> blocks;
+
+	for (const auto& l : lines)
+	{
+		if (LineIsFileEntry(l)) blocks.push_back({ l });
+		else if (blocks.empty()) header.push_back(l);
+		else blocks.back().push_back(l);
+	}
+
+	if (blocks.empty()) return false;
+
+	// Names the cue already refers to, so a substitution never steals one.
+	std::vector<std::string> referenced;
+	for (const auto& b : blocks)
+	{
+		std::string n = CueQuotedName(b[0]);
+		std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+		if (!n.empty()) referenced.push_back(n);
+	}
+
+	bool modified = false;
+	size_t keep = blocks.size();
+
+	for (size_t i = 0; i < blocks.size(); i++)
+	{
+		std::string name = CueQuotedName(blocks[i][0]);
+		if (!name.empty() && fs::exists(dir / name)) continue;
+
+		if (i == 0)
+		{
+			// Repair 1: find the one image file nothing else claims.
+			std::string candidate;
+			int candidate_count = 0;
+
+			try
+			{
+				for (const auto& entry : fs::directory_iterator(dir))
+				{
+					if (entry.is_directory()) continue;
+
+					std::string ext = entry.path().extension().string();
+					std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+					if (ext != ".iso" && ext != ".bin" && ext != ".img") continue;
+
+					std::string fname = entry.path().filename().string();
+					std::string lower = fname;
+					std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+					if (std::find(referenced.begin(), referenced.end(), lower) != referenced.end())
+						continue;
+
+					candidate = fname;
+					candidate_count++;
+				}
+			}
+			catch (...) {}
+
+			if (candidate_count != 1) return false; // ambiguous: leave it alone
+
+			size_t open_quote = blocks[i][0].find('"');
+			size_t close_quote = blocks[i][0].find('"', open_quote + 1);
+			blocks[i][0] = blocks[i][0].substr(0, open_quote + 1) + candidate +
+						   blocks[i][0].substr(close_quote);
+			modified = true;
+			continue;
+		}
+
+		// Repair 2: first missing audio track ends the disc.
+		keep = i;
+		modified = true;
+		break;
+	}
+
+	if (!modified) return true; // cue was fine as shipped
+	if (keep == 0) return false;
+
+	fs::path fixed = dir / "mister_fixed.cue";
+	std::ofstream out(fixed, std::ios::binary);
+	if (!out) return false;
+
+	for (const auto& l : header) out << l << "\r\n";
+	for (size_t i = 0; i < keep; i++)
+		for (const auto& l : blocks[i]) out << l << "\r\n";
+	out.close();
+
+	out_cue_path = fixed.string();
+	return true;
+}
+
+bool ArchiveIsCompressed(const std::string& filepath)
+{
+	fs::path p(filepath);
+	std::string ext = p.extension().string();
+	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+	return (ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".tar" || ext == ".gz");
+}
+
+bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extracted_rom_path, std::string& out_core_dll)
+{
+	fs::path arch_path(archive_path);
+	if (!fs::exists(arch_path)) return false;
+
+	std::string stem = arch_path.stem().string();
+	std::string ext = arch_path.extension().string();
+	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+	// Special case: NeoGeo Arcade ROM sets (.zip) loaded directly by FBNeo/Geolith
+	if (archive_path.find("NeoGeo") != std::string::npos && ext == ".zip")
+	{
+		out_extracted_rom_path = archive_path;
+		out_core_dll = "cores/neogeo.dll";
+		return true;
+	}
+
+	std::string cache_dir = (fs::current_path() / "cache" / stem).string();
+	fs::create_directories(cache_dir);
+
+	// 1. Try Windows tar.exe (fast native extractor)
+	std::string tar_cmd = "tar.exe -xf \"" + archive_path + "\" -C \"" + cache_dir + "\"";
+	bool ok = RunHiddenCommand(tar_cmd);
+
+	// 2. Only if tar genuinely failed (RAR, or a format it cannot read) fall
+	//    back to PowerShell. Running both against the same folder corrupts the
+	//    result. RunHiddenCommand now guarantees tar is no longer alive here.
+	if (!ok)
+	{
+		// A single quote inside the path closes the PowerShell string early, so a
+		// ROM named after "Marvel's ..." or "Tony Hawk's ..." never extracted.
+		// Doubling it is how PowerShell escapes a quote inside a literal string.
+		auto ps_quote = [](const std::string& s) {
+			std::string out;
+			for (char c : s) { out += c; if (c == '\'') out += c; }
+			return out;
+		};
+		std::string ps_cmd = "powershell.exe -NoProfile -NonInteractive -Command \"try { Expand-Archive -LiteralPath '" + ps_quote(archive_path) + "' -DestinationPath '" + ps_quote(cache_dir) + "' -Force } catch {}\"";
+		RunHiddenCommand(ps_cmd);
+	}
+
+	if (!fs::exists(cache_dir) || fs::is_empty(cache_dir)) return false;
+
+	// 3. Scan the extracted directory. Ordered by priority, not by whatever the
+	//    filesystem happens to return first: a multi-track disc set contains a
+	//    playlist, a cue AND its raw tracks, and picking the wrong one boots a
+	//    core with no game.
+	static const std::vector<std::string> KNOWN_EXTS = {
+		".m3u",                          // multi-disc playlist wins outright
+		".cue", ".chd", ".toc", ".iso",  // disc images
+		".z64", ".n64", ".v64",
+		".sfc", ".smc",
+		".nes", ".fds",
+		".md", ".gen",
+		".sms", ".gg", ".sg",
+		".pce", ".sgx",
+		".neo",
+		".a26", ".a78", ".bin"
+	};
+
+	// Collect once, then pick by priority.
+	std::vector<fs::path> found;
+	try
+	{
+		for (const auto& entry : fs::recursive_directory_iterator(cache_dir))
+		{
+			if (!entry.is_directory()) found.push_back(entry.path());
+		}
+	}
+	catch (...)
+	{
+		return false;
+	}
+
+	try
+	{
+		for (const auto& target_ext : KNOWN_EXTS)
+		{
+			for (const auto& entry_path : found)
+			{
+				std::string f_ext = entry_path.extension().string();
+				std::transform(f_ext.begin(), f_ext.end(), f_ext.begin(), ::tolower);
+
+				if (f_ext == target_ext)
+				{
+					// A cue whose tracks do not all resolve makes the core boot
+					// to its BIOS with no disc. Repair what can be repaired and
+					// hand over the corrected copy.
+					std::string usable_path = entry_path.string();
+					if (f_ext == ".cue" && !SanitizeCue(entry_path, usable_path))
+						continue;
+
+					{
+						out_extracted_rom_path = usable_path;
+
+						// Determine matching core DLL
+						if (f_ext == ".z64" || f_ext == ".n64" || f_ext == ".v64")
+						{
+							int n64_c = MenuGetN64Core();
+							if (n64_c == 1) out_core_dll = "cores/n64_parallel.dll";
+							else if (n64_c == 2) out_core_dll = "cores/n64_mupen.dll";
+							else out_core_dll = "cores/n64.dll";
+						}
+						else if (f_ext == ".nes" || f_ext == ".fds") out_core_dll = "cores/nes.dll";
+						else if (f_ext == ".sfc" || f_ext == ".smc") out_core_dll = "cores/snes.dll";
+						else if (f_ext == ".md" || f_ext == ".gen") out_core_dll = "cores/genesis.dll";
+						else if (f_ext == ".sms" || f_ext == ".gg" || f_ext == ".sg") out_core_dll = "cores/sms.dll";
+						else if (f_ext == ".pce" || f_ext == ".sgx") out_core_dll = "cores/pce.dll";
+						else if (f_ext == ".neo") out_core_dll = "cores/neogeo.dll";
+						else if (f_ext == ".a26") out_core_dll = "cores/atari2600.dll";
+						// .a78 is Atari 7800. The bundled atari2600.dll is Stella,
+						// which does not play 7800 carts - we still resolve the
+						// file so the failure is reported honestly instead of
+						// looking like a broken extraction.
+						else if (f_ext == ".a78") out_core_dll = "cores/atari7800.dll";
+						else if (f_ext == ".bin")
+						{
+							if (archive_path.find("NeoGeo") != std::string::npos) out_core_dll = "cores/neogeo.dll";
+							else if (archive_path.find("Atari") != std::string::npos) out_core_dll = "cores/atari2600.dll";
+							else if (archive_path.find("Genesis") != std::string::npos) out_core_dll = "cores/genesis.dll";
+							else if (archive_path.find("NES") != std::string::npos) out_core_dll = "cores/nes.dll";
+							else if (archive_path.find("Saturn") != std::string::npos) out_core_dll = "cores/saturn.dll";
+							else if (archive_path.find("PlayStation") != std::string::npos) out_core_dll = "cores/psx.dll";
+							else out_core_dll = "cores/genesis.dll";
+						}
+						else if (f_ext == ".chd" || f_ext == ".iso" || f_ext == ".cue" ||
+								 f_ext == ".m3u" || f_ext == ".toc")
+						{
+							// Disc images for Neo Geo use the dedicated CD core.
+							if (archive_path.find("NeoGeo") != std::string::npos) out_core_dll = "cores/neocd_alt.dll";
+							else if (archive_path.find("Saturn") != std::string::npos) out_core_dll = "cores/saturn.dll";
+							else if (archive_path.find("MegaCD") != std::string::npos) out_core_dll = "cores/genesis.dll";
+							else if (archive_path.find("TurboGrafx") != std::string::npos) out_core_dll = "cores/pce.dll";
+							else out_core_dll = "cores/psx.dll";
+						}
+
+						return true;
+					}
+				}
+			}
+		}
+	}
+	catch (...)
+	{
+		return false;
+	}
+
+	return false;
+}
