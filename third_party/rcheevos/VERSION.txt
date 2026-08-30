@@ -1,0 +1,1 @@
+v12.4.0 (MIT) - https://github.com/RetroAchievements/rcheevos
