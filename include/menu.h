@@ -25,6 +25,7 @@ void MenuRun();
 void MenuProcessKey(MenuKey key);
 void MenuSetStatus(const char* status);
 const char* MenuGetStatus();
+const char* MenuGetTitle();
 
 int  MenuGetAspectMode();
 int  MenuGetFilterMode();

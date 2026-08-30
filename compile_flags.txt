@@ -1,0 +1,10 @@
+-Iinclude
+-Isrc
+-Ithird_party/libchdr/include
+-Ithird_party/libchdr
+-Ithird_party/rcheevos/include
+-Ithird_party/rcheevos/src
+-std=c++20
+-D_CRT_SECURE_NO_WARNINGS
+-DRC_CLIENT_SUPPORTS_HASH
+-DZSTD_DISABLE_ASM

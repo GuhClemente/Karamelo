@@ -1,0 +1,26 @@
+{
+  "configurations": [
+    {
+      "name": "Win32",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/third_party/libchdr/include",
+        "${workspaceFolder}/third_party/libchdr",
+        "${workspaceFolder}/third_party/rcheevos/include",
+        "${workspaceFolder}/third_party/rcheevos/src"
+      ],
+      "defines": [
+        "_CRT_SECURE_NO_WARNINGS",
+        "RC_CLIENT_SUPPORTS_HASH",
+        "ZSTD_DISABLE_ASM",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "compilerPath": "cl.exe",
+      "cStandard": "c17",
+      "cppStandard": "c++20",
+      "intelliSenseMode": "windows-msvc-x64"
+    }
+  ],
+  "version": 4
+}
