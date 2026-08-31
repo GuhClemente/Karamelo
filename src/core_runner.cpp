@@ -205,7 +205,7 @@ static std::string   g_pending_core_hint;
 
 // Forward declarations: these run on the core thread only.
 static bool CoreLoad(const char* core_dll_path);
-static bool CoreLoadGame(const char* rom_path);
+static bool CoreLoadGame(const char* rom_path, bool suppress_toast = false);
 static void CoreUnload();
 static void ProcessPendingCommand();
 static void ApplyDisplaySync();
@@ -1323,7 +1323,13 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	// real fix is to load the core first, read valid_extensions, and only then
 	// decide whether to extract - which needs the load order rearranged.
 	// ext=zip|chd|7z. The [CORE] line in the log shows this for any core.
+	std::string rom_stem = fs::path(rom_path).stem().string();
+	std::transform(rom_stem.begin(), rom_stem.end(), rom_stem.begin(), ::tolower);
+
+	const bool is_wrapped_chd = (rom_stem.find("-chd") != std::string::npos || rom_stem.find("_chd") != std::string::npos);
+
 	const bool core_reads_archive =
+		!is_wrapped_chd &&
 		!core_dll.empty() &&
 		(core_dll.find("arcade_fbneo") != std::string::npos ||
 		 core_dll.find("mame2003") != std::string::npos ||
@@ -1350,19 +1356,77 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		}
 	}
 
-	if (core_dll.empty() || !fs::exists(core_dll))
+	const bool is_arcade_rom =
+		(rom_path.find("Arcade") != std::string::npos ||
+		 core_dll.find("arcade_fbneo") != std::string::npos ||
+		 core_dll.find("mame2003") != std::string::npos ||
+		 core_dll.find("mame2010") != std::string::npos);
+
+	bool loaded = false;
+
+	if (is_arcade_rom)
 	{
-		// Name the core that is missing: "core not found" alone gave the user
-		// nothing to act on.
-		char msg[160];
-		snprintf(msg, sizeof(msg), "CORE AUSENTE: %s",
-			core_dll.empty() ? "nenhum core para este formato" : core_dll.c_str());
-		CoreSetToast(msg, 300);
-		InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
-		return 0;
+		// Build candidate core priority list starting with the preferred core
+		std::vector<std::string> candidate_cores;
+		if (!core_dll.empty() && fs::exists(core_dll))
+		{
+			candidate_cores.push_back(core_dll);
+		}
+
+		const std::string default_arcade_cores[] = {
+			"cores/arcade_fbneo.dll",
+			"cores/mame2003.dll",
+			"cores/mame2010.dll",
+			"cores/dreamcast.dll"
+		};
+
+		for (const auto& c : default_arcade_cores)
+		{
+			if (std::find(candidate_cores.begin(), candidate_cores.end(), c) == candidate_cores.end() && fs::exists(c))
+			{
+				candidate_cores.push_back(c);
+			}
+		}
+
+		for (size_t i = 0; i < candidate_cores.size(); i++)
+		{
+			const std::string& cand_dll = candidate_cores[i];
+			bool is_last_candidate = (i == candidate_cores.size() - 1);
+			CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Tentando core de arcade: %s para '%s'", cand_dll.c_str(), rom_path.c_str());
+
+			if (CoreLoad(cand_dll.c_str()))
+			{
+				// Suppress toast unless all candidates have failed
+				if (CoreLoadGame(rom_path.c_str(), !is_last_candidate))
+				{
+					core_dll = cand_dll;
+					loaded = true;
+					CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Sucesso no carregamento de arcade com: %s", cand_dll.c_str());
+					break;
+				}
+			}
+			CoreUnload();
+		}
+	}
+	else
+	{
+		if (core_dll.empty() || !fs::exists(core_dll))
+		{
+			char msg[160];
+			snprintf(msg, sizeof(msg), "CORE AUSENTE: %s",
+				core_dll.empty() ? "nenhum core para este formato" : core_dll.c_str());
+			CoreSetToast(msg, 300);
+			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+			return 0;
+		}
+
+		if (CoreLoad(core_dll.c_str()) && CoreLoadGame(rom_path.c_str(), false))
+		{
+			loaded = true;
+		}
 	}
 
-	if (!CoreLoad(core_dll.c_str()) || !CoreLoadGame(rom_path.c_str()))
+	if (!loaded)
 	{
 		CoreUnload();
 		InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
@@ -1729,7 +1793,7 @@ static bool CoreLoad(const char* core_dll_path)
 	return true;
 }
 
-static bool CoreLoadGame(const char* rom_path)
+static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 {
 	if (!is_core_loaded) return false;
 
@@ -1747,26 +1811,19 @@ static bool CoreLoadGame(const char* rom_path)
 
 	is_disc = (sys_info.need_fullpath || ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" || ext == ".pbp" || ext == ".toc" || ext == ".gcm" || ext == ".rvz");
 
-	// Must happen BEFORE retro_load_game: cores query GET_SAVE_DIRECTORY from
-	// inside it, and an empty loaded_system_dir there sends every save to the
-	// root of saves/. Do not move this below the load.
-	loaded_game_stem = p.stem().string();
+	fs::path orig_p(g_pending_rom.empty() ? rom_path : g_pending_rom);
+	loaded_game_stem = orig_p.stem().string();
 	EnterCriticalSection(&name_lock);
-	loaded_game_name = p.filename().string();
+	loaded_game_name = orig_p.filename().string();
 	LeaveCriticalSection(&name_lock);
 	EnterCriticalSection(&name_lock);
-	loaded_rom_dir = p.parent_path().string();
+	loaded_rom_dir = orig_p.parent_path().string();
 	LeaveCriticalSection(&name_lock);
-	loaded_system_dir = p.parent_path().filename().string();
+	loaded_system_dir = orig_p.parent_path().filename().string();
 	{
-		// Games extracted from an archive live in cache/<stem>/, whose folder
-		// name says nothing about the system - fall back to the core name.
-		std::string lower_path = fs::absolute(p).string();
-		std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::tolower);
-		bool from_cache = lower_path.find("\\cache\\") != std::string::npos;
-
-		if (from_cache || loaded_system_dir.empty() || loaded_system_dir == "." ||
-			loaded_system_dir == "roms" || loaded_system_dir == "cache")
+		// Fall back to the core name if directory says nothing
+		if (loaded_system_dir.empty() || loaded_system_dir == "." ||
+			loaded_system_dir == "roms" || loaded_system_dir == "cache" || loaded_system_dir == "app")
 		{
 			loaded_system_dir = loaded_core_name;
 		}
@@ -1778,7 +1835,13 @@ static bool CoreLoadGame(const char* rom_path)
 
 	uint8_t* rom_data = nullptr;
 
-	if (!is_disc)
+	const bool is_archive = (ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".tar" || ext == ".gz");
+	const bool is_arcade_or_disc = (sys_info.need_fullpath || is_disc || is_archive ||
+		loaded_core_name == "Arcade" || loaded_core_name == "MS-DOS" ||
+		loaded_core_name == "Dreamcast" || loaded_core_name == "GameCube" ||
+		loaded_core_name == "PlayStation 2" || loaded_core_name == "PSP");
+
+	if (!is_arcade_or_disc)
 	{
 		FILE* f = fopen(rom_path, "rb");
 		if (f)
@@ -1808,42 +1871,42 @@ static bool CoreLoadGame(const char* rom_path)
 	{
 		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] Core failed to load game: %s", rom_path);
 
-		// Name the file the user has to go find. "BIOS required" alone sent
-		// them hunting with no idea what for.
-		const char* needed = NULL;
-		const char* sys = loaded_core_name.c_str();
+		if (!suppress_toast)
+		{
+			// Name the file the user has to go find. "BIOS required" alone sent
+			// them hunting with no idea what for.
+			const char* needed = NULL;
+			const char* sys = loaded_core_name.c_str();
 
-		if (strstr(sys, "Mega CD") || (strstr(sys, "Genesis") && ext != ".md" && ext != ".gen" && ext != ".bin"))
-			needed = "bios_CD_U.bin (ou _E/_J)";
-		else if (strstr(sys, "TurboGrafx") || strstr(sys, "PC Engine"))
-			needed = "syscard3.pce";
-		else if (strstr(sys, "PlayStation"))
-			needed = "scph5501.bin (ou 5500/5502)";
-		else if (strstr(sys, "Saturn"))
-			needed = "sega_101.bin / mpr-17933.bin";
-		else if (strstr(sys, "NeoGeo CD"))
-			needed = "bios/neocd/*.rom";
-		else if (strstr(sys, "NeoGeo"))
-			needed = "neogeo.zip";
-		else if (strstr(sys, "Arcade") || strstr(sys, "Dreamcast"))
-			// Naomi and Atomiswave boards each need their own BIOS set, and the
-			// core looks for it in bios/, not inside the game zip - even when the
-			// game zip happens to contain a file of the same name.
-			needed = "naomi.zip / awbios.zip (Naomi/Atomiswave)";
+			if (strstr(sys, "Mega CD") || (strstr(sys, "Genesis") && ext != ".md" && ext != ".gen" && ext != ".bin"))
+				needed = "bios_CD_U.bin (ou _E/_J)";
+			else if (strstr(sys, "TurboGrafx") || strstr(sys, "PC Engine"))
+				needed = "syscard3.pce";
+			else if (strstr(sys, "PlayStation"))
+				needed = "scph5501.bin (ou 5500/5502)";
+			else if (strstr(sys, "Saturn"))
+				needed = "sega_101.bin / mpr-17933.bin";
+			else if (strstr(sys, "NeoGeo CD"))
+				needed = "bios/neocd/*.rom";
+			else if (strstr(sys, "NeoGeo"))
+				needed = "neogeo.zip";
+			else if (strstr(sys, "Arcade") || strstr(sys, "Dreamcast"))
+				needed = "naomi.zip / awbios.zip (Naomi/Atomiswave)";
 
-		if (strstr(sys, "Dreamcast") || strstr(sys, "GameCube"))
-		{
-			CoreSetToast("ATIVE 3D ACCELERATION EM SETTINGS > VIDEO", 300);
-		}
-		else if (needed)
-		{
-			char msg[192];
-			snprintf(msg, sizeof(msg), "BIOS AUSENTE EM bios/: %s", needed);
-			CoreSetToast(msg, 360);
-		}
-		else
-		{
-			CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
+			if (strstr(sys, "Dreamcast") || strstr(sys, "GameCube"))
+			{
+				CoreSetToast("ATIVE 3D ACCELERATION EM SETTINGS > VIDEO", 300);
+			}
+			else if (needed)
+			{
+				char msg[192];
+				snprintf(msg, sizeof(msg), "BIOS AUSENTE EM bios/: %s", needed);
+				CoreSetToast(msg, 360);
+			}
+			else
+			{
+				CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
+			}
 		}
 		return false;
 	}

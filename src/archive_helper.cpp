@@ -241,6 +241,17 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 	if (ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" ||
 		ext == ".pbp" || ext == ".toc")
 	{
+		if (in("Arcade"))
+		{
+			std::string f_lower = file_path;
+			std::transform(f_lower.begin(), f_lower.end(), f_lower.begin(), ::tolower);
+			if (f_lower.find("gdl-") != std::string::npos || f_lower.find("cvs2") != std::string::npos ||
+				f_lower.find("mvsc2") != std::string::npos || f_lower.find("naomi") != std::string::npos)
+			{
+				return "cores/dreamcast.dll";
+			}
+			return "cores/arcade_fbneo.dll";
+		}
 		if (in("NeoGeo")) return "cores/neocd_alt.dll";
 		if (in("Saturn")) return "cores/saturn.dll";
 		if (in("MegaCD")) return "cores/genesis.dll";
@@ -277,7 +288,64 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 
 	if (ext == ".zip" || ext == ".7z" || ext == ".rar")
 	{
-		if (in("Arcade")) return "cores/arcade_fbneo.dll";
+		if (in("Arcade"))
+		{
+			std::string stem = fs::path(file_path).stem().string();
+			std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
+
+			// 1. Sega NAOMI / Sammy Atomiswave 3D arcade games -> Flycast
+			if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
+				stem == "mslug6" || stem == "slasho" || stem == "hokuto" || stem == "fotns" ||
+				stem == "ikaruga" || stem == "dolphinblue" || stem == "kofnw" || stem == "kofxi" ||
+				stem == "ngbc" || stem == "ggx" || stem == "ggxx" || stem == "ggxxac" ||
+				stem == "monkeyba" || stem == "jambo" || stem == "dybb99" || stem == "samba" ||
+				stem == "hotd2" || stem == "csmash" || stem == "senko" || stem == "radirgy" ||
+				stem == "karous" || stem == "underdef" || stem == "trizeal" || stem == "mamoru" ||
+				stem == "illvelo" || stem == "spkrnch" || stem == "virtuafg" || stem == "vf4" ||
+				stem == "vf4evo" || stem == "vf4tuned" || stem == "vf4final" || stem == "ctrhunt" ||
+				stem == "gwing2" || stem == "zerogun2" || stem == "spawn" || stem == "claychal" ||
+				stem == "heavybox" || stem == "deathcml" || stem == "smarine" || stem == "alienfnt" ||
+				stem == "pstone" || stem == "pstone2" || stem == "gundmvg" || stem == "gundmfl" ||
+				stem == "meltyb" || stem == "meltyba" || stem == "capcsv" || stem == "toukon" ||
+				stem == "demolish" || stem == "dirtdvls" || stem == "slashout" || stem == "crzytaxi" ||
+				stem == "zombrvn" || stem == "18wheel" || stem == "airline" || stem == "alpilot" ||
+				stem == "clubk" || stem == "wldkicks" || stem == "ringout" || stem == "giantgr") {
+				return "cores/dreamcast.dll";
+			}
+
+			// 2. Midway Y/T-Unit & Williams games not supported in FBNeo -> MAME 2003
+			if (stem == "mk" || stem == "mk2" || stem == "mk2r14" || stem == "mk2r20" ||
+				stem == "mk2r21" || stem == "mk2r30" || stem == "mk2r31" || stem == "mk2r32" ||
+				stem == "mk2r42" || stem == "mk2r91" || stem == "mk3" || stem == "mk3r10" ||
+				stem == "mk3r20" || stem == "mk3r21" || stem == "mk3r22" || stem == "umk3" ||
+				stem == "umk3r10" || stem == "umk3r11" || stem == "umk3r12" || stem == "nbajam" ||
+				stem == "nbajamte" || stem == "nbajamr1" || stem == "nbajamr2" || stem == "nbahangt" ||
+				stem == "kinst" || stem == "kinst2" || stem == "openice" || stem == "wwfmania" ||
+				stem == "rampage" || stem == "ramprt" || stem == "tmnt" || stem == "tmnt2" ||
+				stem == "trog" || stem == "smash_tv" || stem == "smashtv" || stem == "archrivl" ||
+				stem == "crusnusa" || stem == "crusnwld" || stem == "crusnu40" || stem == "carnevil" ||
+				stem == "mace" || stem == "wargods" || stem == "nbaonfl" || stem == "nflblitz" ||
+				stem == "nflblitz99" || stem == "hydro" || stem == "offroad" || stem == "paperboy" ||
+				stem == "gauntlet" || stem == "gaunt2" || stem == "marble" || stem == "joust" ||
+				stem == "defender" || stem == "sinistar" || stem == "robotron" || stem == "tapper" ||
+				stem == "timber" || stem == "rootbeer" || stem == "spyhunt" || stem == "twotigers" ||
+				stem == "xenophobe" || stem == "pigskin" || stem == "highimp" || stem == "strkfc" ||
+				stem == "blasted" || stem == "bmaster" || stem == "clowns") {
+				return "cores/mame2003.dll";
+			}
+
+			// 3. Namco System 11/12 3D games -> MAME 2010
+			if (stem == "tekken" || stem == "tekken2" || stem == "tekken3" || stem == "tekkenub" ||
+				stem == "soulclbr" || stem == "souledge" || stem == "ridge4" || stem == "pointblk" ||
+				stem == "pointbl2" || stem == "gunbarl" || stem == "timecris" || stem == "timecrs2" ||
+				stem == "cryptkpr" || stem == "outfxies" || stem == "machbrkr" || stem == "sws97" ||
+				stem == "aquarush" || stem == "liblrn" || stem == "tenkomor" || stem == "derbyqd" ||
+				stem == "pacrev" || stem == "ehrgeiz" || stem == "dunkmnia") {
+				return "cores/mame2010.dll";
+			}
+
+			return "cores/arcade_fbneo.dll";
+		}
 		if (in("NeoGeo")) return "cores/neogeo.dll";
 		if (in("Atari5200")) return "cores/atari5200.dll";
 		if (in("Atari7800")) return "cores/atari7800.dll";
