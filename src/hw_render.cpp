@@ -402,6 +402,14 @@ void HwContextDestroy()
 	{
 		if (g_hw_cb.context_destroy) g_hw_cb.context_destroy();
 	}
+	if (HwMakeCurrent())
+	{
+		if (g_fbo && p_glDeleteFramebuffers) { p_glDeleteFramebuffers(1, &g_fbo); g_fbo = 0; }
+		if (g_depth_rb && p_glDeleteRenderbuffers) { p_glDeleteRenderbuffers(1, &g_depth_rb); g_depth_rb = 0; }
+		if (g_color_tex) { glDeleteTextures(1, &g_color_tex); g_color_tex = 0; }
+		g_surface_w = 0;
+		g_surface_h = 0;
+	}
 	g_context_live = false;
 	g_hw_active = false;
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
