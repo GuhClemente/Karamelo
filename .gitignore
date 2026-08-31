@@ -115,4 +115,5 @@
 *.7z
 *.rar
 /temp_cores_dl/
-
+/dist/*.*
+/dist
