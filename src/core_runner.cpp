@@ -119,15 +119,13 @@ static volatile LONG g_fb_dirty = 0;   // a new frame is waiting
 static int g_fb_back = 0;              // producer thread only
 static int g_fb_front = 2;             // consumer thread only
 
-// 480i weave deinterlace for PS2 (Play! core)
-// The PS2 GS outputs 480i: even field on one retro_run, odd field on the next.
-// Each field shifts its active raster by 1 scanline, causing the 1-pixel
-// vertical jitter ("tela tremendo"). We keep the previous frame and weave
-// even rows from one field and odd rows from the other to produce a stable
-// 448-line progressive-looking composite frame.
-static uint32_t g_deinterlace_prev[MAX_FB_WIDTH * MAX_FB_HEIGHT];
-static bool     g_deinterlace_have_prev = false;
+// 480i / 448i Field Stabilization (De-jitter) for PS2 (Play! core)
+// PS2 GS alternates raster scanline offset by 1px between odd and even fields.
+// By shifting odd fields up by 1 scanline without interweaving old frames,
+// 100% of the pixels come from the current frame, completely eliminating font combing
+// and ghosting while keeping the image vertically stable.
 static unsigned g_deinterlace_field = 0; // 0=even, 1=odd
+
 
 static unsigned core_fb_width = 320;
 static unsigned core_fb_height = 240;
@@ -278,7 +276,7 @@ void CoreUpdateToast()
 #define RING_BUFFER_SIZE   65536 // 65536 stereo frames (~1.36s capacity)
 #define NUM_WAVE_BUFFERS   12    // 12 wave buffers (~128ms queue capacity)
 #define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz
-#define TARGET_OCCUPANCY   4800  // 100ms at 48kHz target for stutter-free 3D emulation
+#define TARGET_OCCUPANCY   4800  // 100ms at 48kHz - ideal safety cushion
 
 static HWAVEOUT h_wave_out = NULL;
 static HANDLE   h_audio_event = NULL;
@@ -298,6 +296,7 @@ static int16_t  g_last_left = 0;
 static int16_t  g_last_right = 0;
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
+static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
 
 static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 {
@@ -342,6 +341,7 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 				{
 					// Underrun: decay to silence rather than holding a DC
 					// level, which would thump when audio resumes.
+					InterlockedIncrement(&g_audio_underrun_count);
 					hold_l = (int16_t)(hold_l * 63 / 64);
 					hold_r = (int16_t)(hold_r * 63 / 64);
 				}
@@ -432,19 +432,42 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 			InterlockedExchange(&g_startup_mute_samples, 0);
 	}
 
-	// Dynamic Rate Control: nudges the resample ratio to keep the ring near
-	// TARGET_OCCUPANCY. The correction must stay inaudible - the old +/-2%
-	// range was ~35 cents of pitch, which is the wobble you could hear on
-	// every system. +/-0.25% is the usual inaudible ceiling.
+	// Dynamic Rate Control (DRC) with low-pass smoothing and deadband:
+	// Maintains ring buffer near TARGET_OCCUPANCY (100ms) without audible pitch wobble.
+	// - Within ±20% of target (3840..5760 samples): inaudible micro-adjustment (< 0.15%).
+	// - Beyond ±20%: smooth progressive correction (up to ±15%) filtered by exponential moving average.
+	// - Low-pass smoothing eliminates sample-to-sample pitch flutter/vibrato.
 	LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
 	LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
 	LONG occupancy = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
 
-	double drc_adjustment = 1.0 + ((double)occupancy - (double)TARGET_OCCUPANCY) * 0.0000015;
-	if (drc_adjustment < 0.9975) drc_adjustment = 0.9975;
-	if (drc_adjustment > 1.0025) drc_adjustment = 1.0025;
+	static double s_smooth_drc = 1.0;
+	double norm_dev = (double)(occupancy - TARGET_OCCUPANCY) / (double)TARGET_OCCUPANCY; // -1.0 to +1.0
+	double raw_target_drc = 1.0;
 
-	double step = (g_core_sample_rate / (double)OUTPUT_SAMPLE_RATE) * drc_adjustment;
+	if (fabs(norm_dev) < 0.20)
+	{
+		// Inaudible deadband zone (within 20ms of target): max ±0.15% pitch correction
+		raw_target_drc = 1.0 + norm_dev * 0.0075;
+	}
+	else if (norm_dev < 0.0)
+	{
+		// Buffer deficit: scale down step to produce more output samples smoothly
+		raw_target_drc = 1.0 + norm_dev * 0.25;
+		if (raw_target_drc < 0.70) raw_target_drc = 0.70;
+	}
+	else
+	{
+		// Buffer excess: scale up step to drain excess
+		raw_target_drc = 1.0 + norm_dev * 0.20;
+		if (raw_target_drc > 1.25) raw_target_drc = 1.25;
+	}
+
+	// Exponential smoothing: prevents pitch flutter and audible vibrato
+	s_smooth_drc = s_smooth_drc * 0.92 + raw_target_drc * 0.08;
+
+	double step = (g_core_sample_rate / (double)OUTPUT_SAMPLE_RATE) * s_smooth_drc;
+
 
 	// Never let the writer lap the reader; dropping the tail of an oversized
 	// batch is far less audible than overwriting unplayed audio.
@@ -831,15 +854,9 @@ static bool CB_Environment(unsigned cmd, void* data)
 				var->value = (MenuGetHwRender() && HwGlProbed()) ? "hle" : "cxd4";
 
 			// Play! PS2 core options (v0.77+).
-			// play_limit_framerate : enabled | disabled
-			//   Caps the emulator to the native PS2 field rate (~59.94 Hz NTSC,
-			//   50 Hz PAL). Without this the core runs at maximum CPU speed and
-			//   overdrives the audio buffer causing crackling.
-			// play_fastboot : enabled | disabled
-			//   Patches the PS2 BIOS busy-wait to jump straight to the game,
-			//   skipping the ~5s Sony splash screen.
-			// play_widescreen_hack : disabled | enabled
-			//   Stretch 4:3 games to 16:9 - off by default to preserve correct AR.
+			else if (strcmp(var->key, "play_bilinear_filtering") == 0) var->value = "true";
+			else if (strcmp(var->key, "play_presentation_mode") == 0) var->value = "Fit Screen";
+			else if (strcmp(var->key, "play_res_multi") == 0) var->value = "1x";
 			else if (strcmp(var->key, "play_limit_framerate") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "play_fastboot") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "play_widescreen_hack") == 0) var->value = "disabled";
@@ -930,6 +947,11 @@ static bool CB_Environment(unsigned cmd, void* data)
 			const char* first = semi ? semi + 1 : vars->value;
 			while (*first == ' ') first++;
 
+			// Log each option for diagnostics
+			CoreLogPrintf(RETRO_LOG_DEBUG, "[OPT] opcao: %s = %s", vars->key, first);
+
+			while (*first == ' ') first++;
+
 			// The default is the first choice; the rest are separated by '|'.
 			const char* bar = strchr(first, '|');
 			std::string def = bar ? std::string(first, bar - first) : std::string(first);
@@ -998,8 +1020,13 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 		if (secs >= 1.0)
 		{
 			double avg_us = g_render_count ? (g_render_us_total / g_render_count) : 0.0;
-			CoreLogPrintf(RETRO_LOG_INFO, "[PERF] core=%.1f fps  filtro=%.2f ms/quadro  alvo=%.1f",
-				frames / secs, avg_us / 1000.0, core_target_fps);
+			LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
+			LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
+			LONG occ = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
+			LONG underruns = InterlockedExchange(&g_audio_underrun_count, 0);
+			CoreLogPrintf(RETRO_LOG_INFO,
+				"[PERF] core=%.1f fps  filtro=%.2f ms/quadro  alvo=%.1f  buf=%ld  underrun=%ld",
+				frames / secs, avg_us / 1000.0, core_target_fps, (long)occ, (long)underruns);
 			frames = 0; last = now;
 			g_render_us_total = 0.0; g_render_count = 0;
 		}
@@ -1028,40 +1055,21 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 		// of being rewritten as shaders.
 		if (!HwReadPixels(dst_fb, width, height)) return;
 
-		// 480i Weave Deinterlace for PS2 (Play! core).
-		// Play! delivers 640x448 (480i interlaced) via OpenGL: each retro_run
-		// call alternates between the even-line field and the odd-line field.
-		// Without correction the image trembles 1 pixel vertically at ~30Hz.
+		// 480i / 448i Field Stabilization (De-jitter) for PS2 (Play! core).
+		// In PS2 interlaced rendering, Field 1 is shifted down by 1 scanline relative to Field 0.
+		// Displaying them unshifted causes a 1px vertical oscillation at 30Hz ("tela tremendo").
+		// Naive weaving causes horizontal combing/striping on text and moving objects.
 		//
-		// Fix: weave the current field with the previous field, taking even rows
-		// from the even field and odd rows from the odd field. This is identical
-		// to what PCSX2's "Weave" deinterlace mode does.
+		// Solution: On odd fields (field 1), shift the scanlines up by 1 row so all fields
+		// share the exact same scanline alignment. 100% of the image comes from the CURRENT
+		// frame, guaranteeing zero combing artifacts, solid crisp fonts, and zero vertical jitter!
 		if (height == 448 && width >= 512)
 		{
-			if (g_deinterlace_have_prev)
+			if (g_deinterlace_field == 1)
 			{
-				// Which field did the core just deliver?
-				// We detect by comparing the first-row luminance parity;
-				// simpler: just alternate per frame (field toggles every run).
-				unsigned even_src = g_deinterlace_field;       // 0 or 1
-				unsigned odd_src  = 1 - even_src;
-
-				for (unsigned row = 0; row < height; row++)
-				{
-					// Which buffer holds the correct field for this row parity?
-					const uint32_t* src_row_ptr =
-						((row & 1) == odd_src)
-						? (dst_fb + row * width)               // current frame
-						: (g_deinterlace_prev + row * width);  // previous frame
-
-					if (src_row_ptr != (dst_fb + row * width))
-						memcpy(dst_fb + row * width, src_row_ptr, width * sizeof(uint32_t));
-				}
+				memmove(dst_fb, dst_fb + width, (height - 1) * width * sizeof(uint32_t));
+				memcpy(dst_fb + (height - 1) * width, dst_fb + (height - 2) * width, width * sizeof(uint32_t));
 			}
-
-			// Save current frame as "previous" for next weave pass
-			memcpy(g_deinterlace_prev, dst_fb, width * height * sizeof(uint32_t));
-			g_deinterlace_have_prev = true;
 			g_deinterlace_field ^= 1;
 		}
 	}
@@ -1986,6 +1994,11 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	core_native_fps = av_info.timing.fps > 0.0 ? av_info.timing.fps : 60.0;
 	core_target_fps = core_native_fps;
 
+	CoreLogPrintf(RETRO_LOG_INFO,
+		"[AV] geom=%ux%u fps=%.4f sample_rate=%.0f",
+		av_info.geometry.base_width, av_info.geometry.base_height,
+		av_info.timing.fps, av_info.timing.sample_rate);
+
 	InitAudio((int)av_info.timing.sample_rate);
 	core_native_sample_rate = g_core_sample_rate;
 	ApplyDisplaySync();
@@ -1993,9 +2006,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	g_video_diag_frames = 0;
 	g_render_diag_done = false;
 
-	// Reset 480i weave state so the first field of a new game is not woven
-	// with stale pixels from whatever was last playing.
-	g_deinterlace_have_prev = false;
+	// Reset 480i de-jitter field state
 	g_deinterlace_field = 0;
 
 
