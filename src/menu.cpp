@@ -837,6 +837,21 @@ void PopulateMainMenu() {
   scroll_top = 0;
 }
 
+// Entering the page with no pad plugged in should show the keyboard bindings.
+// Otherwise the page silently lists gamepad buttons to someone playing on the
+// keyboard - which is exactly how a player ends up unable to find the control
+// they are looking for. Only on entry, so toggling Dispositivo still works.
+static void ControllerPageOnEnter() {
+  int pads = 0;
+  for (DWORD i = 0; i < 4; i++) {
+    XINPUT_STATE st;
+    if (XInputGetState(i, &st) == ERROR_SUCCESS)
+      pads++;
+  }
+  if (pads == 0)
+    setting_pad_device = 1;
+}
+
 void PopulateControllerSettings() {
   items.clear();
   current_title = "Controller";
@@ -881,10 +896,13 @@ void PopulateControllerSettings() {
       val = "Stick";
 
     const char *label = InputBindLabel(i);
+    // Buttons take the core's name; the sticks do not. A row has 22 columns
+    // for label and value together and the label is what gets truncated, so
+    // "Right Analog Baixo" arrives clipped to "Right Analog Baix". The core's
+    // axis names carry no information our own compact ones lack - both say
+    // left or right stick - so the analog rows keep theirs.
     const char *from_core =
-        InputBindIsAnalog(i)
-            ? CoreGetAxisLabel(InputBindAnalogStick(i), InputBindAnalogAxis(i))
-            : CoreGetButtonLabel(InputBindRetroId(i));
+        InputBindIsAnalog(i) ? NULL : CoreGetButtonLabel(InputBindRetroId(i));
 
     if (from_core && from_core[0]) {
       if (InputBindIsAnalog(i)) {
@@ -2198,6 +2216,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       // under STATE_SETTINGS, so pressing it there did nothing at all.
       else if (item.action_id == 203) {
         current_state = STATE_CONTROLLER;
+        ControllerPageOnEnter();
         PopulateControllerSettings();
       }
     } else if (current_state == STATE_SETTINGS) {
@@ -2209,6 +2228,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateAudioSettings();
       } else if (item.action_id == 203) {
         current_state = STATE_CONTROLLER;
+        ControllerPageOnEnter();
         PopulateControllerSettings();
       } else if (item.action_id == 204) {
         current_state = STATE_NETPLAY;

@@ -222,10 +222,10 @@ const char* InputBindKeyName(int bind)
 
 	switch (vk)
 	{
-	case VK_UP:      strcpy(out, "Seta Cima");  return out;
-	case VK_DOWN:    strcpy(out, "Seta Baixo"); return out;
-	case VK_LEFT:    strcpy(out, "Seta Esq");   return out;
-	case VK_RIGHT:   strcpy(out, "Seta Dir");   return out;
+	case VK_UP:      strcpy(out, "Cima");  return out;
+	case VK_DOWN:    strcpy(out, "Baixo"); return out;
+	case VK_LEFT:    strcpy(out, "Esq");   return out;
+	case VK_RIGHT:   strcpy(out, "Dir");   return out;
 	case VK_RETURN:  strcpy(out, "Enter");      return out;
 	case VK_SPACE:   strcpy(out, "Espaco");     return out;
 	case VK_LSHIFT:  strcpy(out, "Shift Esq");  return out;
