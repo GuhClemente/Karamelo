@@ -138,7 +138,10 @@ static bool setting_fullscreen = false;
 static int setting_theme =
     0; // 0=Red/Burgundy, 1=Blue, 2=Green, 3=Amber, 4=Gray, 5=Dark
 static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
-static int setting_latency = 1;  // 0=16ms, 1=32ms, 2=64ms, 3=128ms
+static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
+// Audio buffer depth. Below 64ms the waveOut queue cannot stay ahead of the
+// mixer on a loaded machine; above 512ms the delay is audible against input.
+static const int kAudioLatencyMs[4] = { 64, 128, 256, 512 };
 static const char *kVideoDrivers[] = {
     "Software (CPU)",
     "OpenGL (GPU 3D)",
@@ -217,6 +220,7 @@ void MenuSetFullscreen(bool fs) {
     MenuSaveSettings();
 }
 int MenuGetDeadzone() { return (setting_deadzone + 1) * 5; }
+int MenuGetAudioLatencyMs() { return kAudioLatencyMs[ClampInt(setting_latency, 0, 3)]; }
 int MenuGetVideoDriver() { return setting_driver; }
 int MenuGetSyncMode() { return setting_sync; }
 int MenuGetVsync() { return setting_vsync; }
@@ -953,7 +957,7 @@ void PopulateAudioSettings() {
   current_title = "Audio";
   OsdSetSize(5);
 
-  const char *latencies[] = {"16 ms", "32 ms", "64 ms", "128 ms"};
+  const char *latencies[] = {"64 ms", "128 ms", "256 ms", "512 ms"};
 
   items.push_back({"Mute", CoreGetMute() ? "On" : "Off", false, false, 401});
   items.push_back({"Latency", latencies[setting_latency], false, false, 402});
