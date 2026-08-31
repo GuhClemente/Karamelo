@@ -42,3 +42,30 @@ TEST_CASE(ArchiveMagicBytes)
 	bool is_rar = (rar_hdr[0] == 'R' && rar_hdr[1] == 'a' && rar_hdr[2] == 'r' && rar_hdr[3] == '!');
 	ASSERT_TRUE(is_rar);
 }
+
+TEST_CASE(ArchiveResolveCoreIntelligentRouting)
+{
+	// 1. Direct extensions
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/GBA/pokemon.gba", ""), "cores/gba.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/GameBoy/resident_evil.gbc", ""), "cores/gb.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Genesis/streets_of_rage.md", ""), "cores/genesis.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/NDS/mario.nds", ""), "cores/nds.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/3DS/zelda.3ds", ""), "cores/3ds.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Amiga/lemmings.adf", ""), "cores/amiga.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/C64/gianna.d64", ""), "cores/c64.dll");
+
+	// 2. Intelligent Arcade Auto-Routing
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mvsc2.zip", "roms/Arcade"), "cores/dreamcast.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mslug6.zip", "roms/Arcade"), "cores/dreamcast.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mk.zip", "roms/Arcade"), "cores/mame2003.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/umk3.zip", "roms/Arcade"), "cores/mame2003.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/nbajam.zip", "roms/Arcade"), "cores/mame2003.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/tekken3.zip", "roms/Arcade"), "cores/mame2010.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/captcomm.zip", "roms/Arcade"), "cores/arcade_fbneo.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/sfiii3.zip", "roms/Arcade"), "cores/arcade_fbneo.dll");
+
+	// 3. Folder based archives
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/SNES/Chrono_Trigger.zip", "roms/SNES"), "cores/snes.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/MegaCD/Sonic_CD.7z", "roms/MegaCD"), "cores/genesis.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/PlayStation/Crash.zip", "roms/PlayStation"), "cores/psx.dll");
+}

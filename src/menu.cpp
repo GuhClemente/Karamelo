@@ -219,13 +219,71 @@ int MenuGetVideoDriver() { return setting_driver; }
 int MenuGetSyncMode() { return setting_sync; }
 int MenuGetVsync() { return setting_vsync; }
 int MenuGetN64Core() { return setting_n64_core; }
-static const char *GetArcadeCoreDll() {
+static const char *GetArcadeCoreDll(const std::string &file_path = "") {
   if (setting_arcade_core == 1)
     return "cores/mame2003.dll";
   if (setting_arcade_core == 2)
     return "cores/mame2010.dll";
   if (setting_arcade_core == 3)
     return "cores/dreamcast.dll";
+
+  // Auto mode (setting_arcade_core == 0): intelligently route arcade boards
+  if (!file_path.empty()) {
+    std::string stem = fs::path(file_path).stem().string();
+    std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
+
+    // 1. Sega NAOMI / Sammy Atomiswave 3D arcade games -> Flycast
+    if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
+        stem == "mslug6" || stem == "slasho" || stem == "hokuto" || stem == "fotns" ||
+        stem == "ikaruga" || stem == "dolphinblue" || stem == "kofnw" || stem == "kofxi" ||
+        stem == "ngbc" || stem == "ggx" || stem == "ggxx" || stem == "ggxxac" ||
+        stem == "monkeyba" || stem == "jambo" || stem == "dybb99" || stem == "samba" ||
+        stem == "hotd2" || stem == "csmash" || stem == "senko" || stem == "radirgy" ||
+        stem == "karous" || stem == "underdef" || stem == "trizeal" || stem == "mamoru" ||
+        stem == "illvelo" || stem == "spkrnch" || stem == "virtuafg" || stem == "vf4" ||
+        stem == "vf4evo" || stem == "vf4tuned" || stem == "vf4final" || stem == "ctrhunt" ||
+        stem == "gwing2" || stem == "zerogun2" || stem == "spawn" || stem == "claychal" ||
+        stem == "heavybox" || stem == "deathcml" || stem == "smarine" || stem == "alienfnt" ||
+        stem == "pstone" || stem == "pstone2" || stem == "gundmvg" || stem == "gundmfl" ||
+        stem == "meltyb" || stem == "meltyba" || stem == "capcsv" || stem == "toukon" ||
+        stem == "demolish" || stem == "dirtdvls" || stem == "slashout" || stem == "crzytaxi" ||
+        stem == "zombrvn" || stem == "18wheel" || stem == "airline" || stem == "alpilot" ||
+        stem == "clubk" || stem == "wldkicks" || stem == "ringout" || stem == "giantgr") {
+      return "cores/dreamcast.dll";
+    }
+
+    // 2. Midway Y/T-Unit & Williams games not supported in FBNeo -> MAME 2003
+    if (stem == "mk" || stem == "mk2" || stem == "mk2r14" || stem == "mk2r20" ||
+        stem == "mk2r21" || stem == "mk2r30" || stem == "mk2r31" || stem == "mk2r32" ||
+        stem == "mk2r42" || stem == "mk2r91" || stem == "mk3" || stem == "mk3r10" ||
+        stem == "mk3r20" || stem == "mk3r21" || stem == "mk3r22" || stem == "umk3" ||
+        stem == "umk3r10" || stem == "umk3r11" || stem == "umk3r12" || stem == "nbajam" ||
+        stem == "nbajamte" || stem == "nbajamr1" || stem == "nbajamr2" || stem == "nbahangt" ||
+        stem == "kinst" || stem == "kinst2" || stem == "openice" || stem == "wwfmania" ||
+        stem == "rampage" || stem == "ramprt" || stem == "tmnt" || stem == "tmnt2" ||
+        stem == "trog" || stem == "smash_tv" || stem == "smashtv" || stem == "archrivl" ||
+        stem == "crusnusa" || stem == "crusnwld" || stem == "crusnu40" || stem == "carnevil" ||
+        stem == "mace" || stem == "wargods" || stem == "nbaonfl" || stem == "nflblitz" ||
+        stem == "nflblitz99" || stem == "hydro" || stem == "offroad" || stem == "paperboy" ||
+        stem == "gauntlet" || stem == "gaunt2" || stem == "marble" || stem == "joust" ||
+        stem == "defender" || stem == "sinistar" || stem == "robotron" || stem == "tapper" ||
+        stem == "timber" || stem == "rootbeer" || stem == "spyhunt" || stem == "twotigers" ||
+        stem == "xenophobe" || stem == "pigskin" || stem == "highimp" || stem == "strkfc" ||
+        stem == "blasted" || stem == "bmaster" || stem == "clowns") {
+      return "cores/mame2003.dll";
+    }
+
+    // 3. Namco System 11/12 3D games -> MAME 2010
+    if (stem == "tekken" || stem == "tekken2" || stem == "tekken3" || stem == "tekkenub" ||
+        stem == "soulclbr" || stem == "souledge" || stem == "ridge4" || stem == "pointblk" ||
+        stem == "pointbl2" || stem == "gunbarl" || stem == "timecris" || stem == "timecrs2" ||
+        stem == "cryptkpr" || stem == "outfxies" || stem == "machbrkr" || stem == "sws97" ||
+        stem == "aquarush" || stem == "liblrn" || stem == "tenkomor" || stem == "derbyqd" ||
+        stem == "pacrev" || stem == "ehrgeiz" || stem == "dunkmnia") {
+      return "cores/mame2010.dll";
+    }
+  }
+
   return "cores/arcade_fbneo.dll";
 }
 
@@ -325,6 +383,15 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
   // used by PS1, PS2, PSP, 3DO, Saturn, Dreamcast, Amiga and GameCube alike.
   if (ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" ||
       ext == ".pbp" || ext == ".toc") {
+    if (in("Arcade")) {
+      std::string f_lower = file_path;
+      std::transform(f_lower.begin(), f_lower.end(), f_lower.begin(), ::tolower);
+      if (f_lower.find("gdl-") != std::string::npos || f_lower.find("cvs2") != std::string::npos ||
+          f_lower.find("mvsc2") != std::string::npos || f_lower.find("naomi") != std::string::npos) {
+        return "cores/dreamcast.dll";
+      }
+      return "cores/arcade_fbneo.dll";
+    }
     // Neo Geo CD discs go to the dedicated NeoCD core. Geolith is a
     // cartridge emulator; its CD mode emits nothing but black frames.
     if (in("NeoGeo"))
@@ -392,7 +459,7 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
   // likely to be an arcade set than a Neo Geo one.
   if (ext == ".zip" || ext == ".7z" || ext == ".rar") {
     if (in("Arcade"))
-      return GetArcadeCoreDll();
+      return GetArcadeCoreDll(file_path);
     if (in("NeoGeo"))
       return "cores/neogeo.dll";
     if (in("Atari5200"))
@@ -461,7 +528,7 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
       return "cores/ps2.dll";
     if (in("PlayStation"))
       return "cores/psx.dll";
-    return GetArcadeCoreDll();
+    return GetArcadeCoreDll(file_path);
   }
 
   return "";
@@ -1050,6 +1117,17 @@ void PopulateAbout() {
 
 void PopulateBrowse(const std::string &dirpath) {
   items.clear();
+
+  // Safety: never browse outside roms/
+  std::string lower_dir = dirpath;
+  std::transform(lower_dir.begin(), lower_dir.end(), lower_dir.begin(), ::tolower);
+  if (lower_dir.find("cache") != std::string::npos || lower_dir == "." || lower_dir == "app" ||
+      (lower_dir.find("roms") == std::string::npos && !dirpath.empty())) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    return;
+  }
+
   current_dir = dirpath;
 
   fs::path p(dirpath);
@@ -1079,6 +1157,17 @@ void PopulateBrowse(const std::string &dirpath) {
         std::string filename = entry.path().filename().string();
         if (filename.empty() || filename[0] == '.')
           continue;
+
+        std::string lower_fn = filename;
+        std::transform(lower_fn.begin(), lower_fn.end(), lower_fn.begin(), ::tolower);
+
+        if (lower_fn == "cache" || lower_fn == "config" || lower_fn == "scripts" ||
+            lower_fn == "wallpapers" || lower_fn == "bios" || lower_fn == "cores" ||
+            lower_fn == "saves" || lower_fn == "cheats" ||
+            lower_fn.ends_with(".exe") || lower_fn.ends_with(".pdb") ||
+            lower_fn.ends_with(".dll") || lower_fn.ends_with(".log")) {
+          continue;
+        }
 
         if (entry.is_directory()) {
           dirs.push_back({filename, ">", true, false, 0});
@@ -1112,16 +1201,21 @@ void PopulateBrowse(const std::string &dirpath) {
 }
 
 // Going up one level in the browser. Both the "<..>" row and Escape land here.
-//
-// They used to be separate copies, and had drifted: "<..>" put the cursor back
-// on the folder you came out of (or the system you had picked, at the top
-// level), while Escape rebuilt the list and left the cursor at index 0. Same
-// gesture, two different results.
 static void BrowseGoUp() {
   fs::path p(current_dir);
   std::string parent = p.parent_path().string();
 
-  if (parent.empty() || parent == "roms" || parent == ".") {
+  std::string lower_cur = current_dir;
+  std::transform(lower_cur.begin(), lower_cur.end(), lower_cur.begin(), ::tolower);
+
+  std::string lower_parent = parent;
+  std::transform(lower_parent.begin(), lower_parent.end(), lower_parent.begin(), ::tolower);
+
+  // If we are at the top of roms/ or in any invalid/cache dir, return to Main Menu
+  if (parent.empty() || parent == "roms" || parent == "." || parent == "app" ||
+      lower_cur == "roms" || lower_cur.find("cache") != std::string::npos ||
+      lower_cur.find("roms") == std::string::npos ||
+      lower_parent.find("roms") == std::string::npos) {
     current_state = STATE_MAIN;
     PopulateMainMenu();
     selected_idx = main_menu_saved_idx;
