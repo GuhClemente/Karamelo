@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <filesystem>
+#include <set>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include <windows.h>
 #include <xinput.h>
@@ -1153,7 +1155,77 @@ void PopulateBrowse(const std::string &dirpath) {
     std::vector<MenuItem> files;
 
     if (fs::exists(dirpath) && fs::is_directory(dirpath)) {
+      std::vector<fs::directory_entry> all_entries;
       for (const auto &entry : fs::directory_iterator(dirpath)) {
+        all_entries.push_back(entry);
+      }
+
+      std::unordered_set<std::string> hidden_companion_files;
+
+      // Pass 1: Parse .cue, .m3u, .gdi, .toc to hide companion raw binary tracks
+      for (const auto &entry : all_entries) {
+        if (entry.is_directory()) continue;
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+        if (ext == ".cue" || ext == ".gdi" || ext == ".toc") {
+          std::string stem = entry.path().stem().string();
+          std::string lower_stem = stem;
+          std::transform(lower_stem.begin(), lower_stem.end(), lower_stem.begin(), ::tolower);
+
+          // Read the descriptor file to find referenced tracks
+          FILE* f = fopen(entry.path().string().c_str(), "r");
+          if (f) {
+            char line[1024];
+            while (fgets(line, sizeof(line), f)) {
+              char* file_kw = strstr(line, "FILE ");
+              if (file_kw) {
+                char* p_start = file_kw + 5;
+                while (*p_start == ' ' || *p_start == '\t') p_start++;
+                if (*p_start == '\"') {
+                  p_start++;
+                  char* p_end = strchr(p_start, '\"');
+                  if (p_end) {
+                    std::string ref_fn(p_start, p_end);
+                    std::string lower_ref = fs::path(ref_fn).filename().string();
+                    std::transform(lower_ref.begin(), lower_ref.end(), lower_ref.begin(), ::tolower);
+                    hidden_companion_files.insert(lower_ref);
+                  }
+                }
+              }
+            }
+            fclose(f);
+          }
+
+          // Also hide same-stem companion tracks
+          hidden_companion_files.insert(lower_stem + ".bin");
+          hidden_companion_files.insert(lower_stem + ".iso");
+          hidden_companion_files.insert(lower_stem + ".img");
+          hidden_companion_files.insert(lower_stem + ".raw");
+        }
+        else if (ext == ".m3u") {
+          FILE* f = fopen(entry.path().string().c_str(), "r");
+          if (f) {
+            char line[1024];
+            while (fgets(line, sizeof(line), f)) {
+              std::string l = line;
+              while (!l.empty() && (l.back() == '\r' || l.back() == '\n' || l.back() == ' ' || l.back() == '\t'))
+                l.pop_back();
+              size_t start = 0;
+              while (start < l.size() && (l[start] == ' ' || l[start] == '\t')) start++;
+              if (start < l.size() && l[start] != '#') {
+                std::string ref_fn = fs::path(l.substr(start)).filename().string();
+                std::transform(ref_fn.begin(), ref_fn.end(), ref_fn.begin(), ::tolower);
+                hidden_companion_files.insert(ref_fn);
+              }
+            }
+            fclose(f);
+          }
+        }
+      }
+
+      // Pass 2: Populate list with directories and valid playable files only
+      for (const auto &entry : all_entries) {
         std::string filename = entry.path().filename().string();
         if (filename.empty() || filename[0] == '.')
           continue;
@@ -1161,11 +1233,23 @@ void PopulateBrowse(const std::string &dirpath) {
         std::string lower_fn = filename;
         std::transform(lower_fn.begin(), lower_fn.end(), lower_fn.begin(), ::tolower);
 
+        if (hidden_companion_files.count(lower_fn)) {
+          continue;
+        }
+
         if (lower_fn == "cache" || lower_fn == "config" || lower_fn == "scripts" ||
             lower_fn == "wallpapers" || lower_fn == "bios" || lower_fn == "cores" ||
             lower_fn == "saves" || lower_fn == "cheats" ||
             lower_fn.ends_with(".exe") || lower_fn.ends_with(".pdb") ||
-            lower_fn.ends_with(".dll") || lower_fn.ends_with(".log")) {
+            lower_fn.ends_with(".dll") || lower_fn.ends_with(".log") ||
+            lower_fn.ends_with(".txt") || lower_fn.ends_with(".nfo") ||
+            lower_fn.ends_with(".md") || lower_fn.ends_with(".ini") ||
+            lower_fn.ends_with(".cfg") || lower_fn.ends_with(".pdf") ||
+            lower_fn.ends_with(".doc") || lower_fn.ends_with(".docx") ||
+            lower_fn.ends_with(".png") || lower_fn.ends_with(".jpg") ||
+            lower_fn.ends_with(".jpeg") || lower_fn.ends_with(".url") ||
+            lower_fn.ends_with(".bat") || lower_fn.ends_with(".json") ||
+            lower_fn.ends_with(".xml")) {
           continue;
         }
 
