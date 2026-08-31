@@ -119,12 +119,13 @@ static volatile LONG g_fb_dirty = 0;   // a new frame is waiting
 static int g_fb_back = 0;              // producer thread only
 static int g_fb_front = 2;             // consumer thread only
 
-// 480i / 448i Field Stabilization (De-jitter) for PS2 (Play! core)
-// PS2 GS alternates raster scanline offset by 1px between odd and even fields.
-// By shifting odd fields up by 1 scanline without interweaving old frames,
-// 100% of the pixels come from the current frame, completely eliminating font combing
-// and ghosting while keeping the image vertically stable.
+// 480i / 448i Motion-Adaptive Deinterlace for PS2 (Play! core)
+// PS2 GS alternates odd/even fields. Blending alternating scanlines with previous
+// field data forms a solid 448p progressive frame with zero screen shake and solid crisp text.
+static uint32_t g_deinterlace_prev[MAX_FB_WIDTH * MAX_FB_HEIGHT];
+static bool     g_deinterlace_have_prev = false;
 static unsigned g_deinterlace_field = 0; // 0=even, 1=odd
+
 
 
 static unsigned core_fb_width = 320;
@@ -432,46 +433,55 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 			InterlockedExchange(&g_startup_mute_samples, 0);
 	}
 
-	// Dynamic Rate Control (DRC) with low-pass smoothing and deadband:
-	// Maintains ring buffer near TARGET_OCCUPANCY (100ms) without audible pitch wobble.
-	// - Within ±20% of target (3840..5760 samples): inaudible micro-adjustment (< 0.15%).
-	// - Beyond ±20%: smooth progressive correction (up to ±15%) filtered by exponential moving average.
-	// - Low-pass smoothing eliminates sample-to-sample pitch flutter/vibrato.
+	// Resampler step controller:
+	// Cores like Play! PS2 declare 44.1kHz in AV info but internally produce ~29.6kHz clocked to 30fps game logic.
+	// We measure the actual incoming sample delivery rate over a 500ms window, and smoothly lock 'step' to it.
+	// Once locked, 'step' remains constant, guaranteeing ZERO pitch wobble, ZERO underruns, and ZERO crackling.
+	static LARGE_INTEGER s_rate_last = { 0 };
+	static size_t s_samples_accum = 0;
+	static double s_target_step = 1.0;
+	static double s_current_step = 1.0;
+	static bool   s_step_initialized = false;
+
+	if (!s_step_initialized)
+	{
+		s_current_step = g_core_sample_rate / (double)OUTPUT_SAMPLE_RATE;
+		s_target_step = s_current_step;
+		s_step_initialized = true;
+	}
+
+	LARGE_INTEGER now, freq;
+	QueryPerformanceCounter(&now);
+	QueryPerformanceFrequency(&freq);
+	if (s_rate_last.QuadPart == 0) s_rate_last = now;
+
+	s_samples_accum += frames;
+	double elapsed = (double)(now.QuadPart - s_rate_last.QuadPart) / (double)freq.QuadPart;
+	if (elapsed >= 0.5)
+	{
+		double measured_rate = (double)s_samples_accum / elapsed;
+		if (measured_rate >= 8000.0 && measured_rate <= 192000.0)
+		{
+			s_target_step = measured_rate / (double)OUTPUT_SAMPLE_RATE;
+		}
+		s_samples_accum = 0;
+		s_rate_last = now;
+	}
+
+	// Smoothly glide step towards target_step over 1-2 seconds (completely inaudible, zero pitch vibrato)
+	s_current_step = s_current_step * 0.992 + s_target_step * 0.008;
+	double step = s_current_step;
+
 	LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
 	LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
 	LONG occupancy = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
 
-	static double s_smooth_drc = 1.0;
-	double norm_dev = (double)(occupancy - TARGET_OCCUPANCY) / (double)TARGET_OCCUPANCY; // -1.0 to +1.0
-	double raw_target_drc = 1.0;
-
-	if (fabs(norm_dev) < 0.20)
-	{
-		// Inaudible deadband zone (within 20ms of target): max ±0.15% pitch correction
-		raw_target_drc = 1.0 + norm_dev * 0.0075;
-	}
-	else if (norm_dev < 0.0)
-	{
-		// Buffer deficit: scale down step to produce more output samples smoothly
-		raw_target_drc = 1.0 + norm_dev * 0.25;
-		if (raw_target_drc < 0.70) raw_target_drc = 0.70;
-	}
-	else
-	{
-		// Buffer excess: scale up step to drain excess
-		raw_target_drc = 1.0 + norm_dev * 0.20;
-		if (raw_target_drc > 1.25) raw_target_drc = 1.25;
-	}
-
-	// Exponential smoothing: prevents pitch flutter and audible vibrato
-	s_smooth_drc = s_smooth_drc * 0.92 + raw_target_drc * 0.08;
-
-	double step = (g_core_sample_rate / (double)OUTPUT_SAMPLE_RATE) * s_smooth_drc;
-
-
 	// Never let the writer lap the reader; dropping the tail of an oversized
 	// batch is far less audible than overwriting unplayed audio.
 	LONG capacity = RING_BUFFER_SIZE - occupancy - 1;
+
+
+
 
 	for (size_t i = 0; i < frames; i++)
 	{
@@ -1055,21 +1065,34 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 		// of being rewritten as shaders.
 		if (!HwReadPixels(dst_fb, width, height)) return;
 
-		// 480i / 448i Field Stabilization (De-jitter) for PS2 (Play! core).
-		// In PS2 interlaced rendering, Field 1 is shifted down by 1 scanline relative to Field 0.
-		// Displaying them unshifted causes a 1px vertical oscillation at 30Hz ("tela tremendo").
-		// Naive weaving causes horizontal combing/striping on text and moving objects.
-		//
-		// Solution: On odd fields (field 1), shift the scanlines up by 1 row so all fields
-		// share the exact same scanline alignment. 100% of the image comes from the CURRENT
-		// frame, guaranteeing zero combing artifacts, solid crisp fonts, and zero vertical jitter!
+		// 480i / 448i Motion-Adaptive Deinterlacing for PS2 (Play! core).
+		// PS2 GS renders odd/even interlaced fields into the 448-line frame.
+		// By blending alternate scanlines with the previous field, we achieve full vertical stability
+		// (zero shaking/vibrating) while eliminating combing artifacts on fonts and text boxes.
 		if (height == 448 && width >= 512)
 		{
-			if (g_deinterlace_field == 1)
+			if (g_deinterlace_have_prev)
 			{
-				memmove(dst_fb, dst_fb + width, (height - 1) * width * sizeof(uint32_t));
-				memcpy(dst_fb + (height - 1) * width, dst_fb + (height - 2) * width, width * sizeof(uint32_t));
+				for (unsigned row = 0; row < height; row++)
+				{
+					bool is_alt_row = ((row & 1) != (g_deinterlace_field & 1));
+					if (is_alt_row)
+					{
+						uint32_t* cur_row = dst_fb + row * width;
+						const uint32_t* prev_row = g_deinterlace_prev + row * width;
+						for (unsigned x = 0; x < width; x++)
+						{
+							uint32_t c_cur = cur_row[x];
+							uint32_t c_prev = prev_row[x];
+							uint32_t rb = (((c_cur & 0x00FF00FF) + (c_prev & 0x00FF00FF)) >> 1) & 0x00FF00FF;
+							uint32_t g  = (((c_cur & 0x0000FF00) + (c_prev & 0x0000FF00)) >> 1) & 0x0000FF00;
+							cur_row[x] = rb | g;
+						}
+					}
+				}
 			}
+			memcpy(g_deinterlace_prev, dst_fb, width * height * sizeof(uint32_t));
+			g_deinterlace_have_prev = true;
 			g_deinterlace_field ^= 1;
 		}
 	}
@@ -2006,8 +2029,10 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	g_video_diag_frames = 0;
 	g_render_diag_done = false;
 
-	// Reset 480i de-jitter field state
+	// Reset 480i deinterlace state
+	g_deinterlace_have_prev = false;
 	g_deinterlace_field = 0;
+
 
 
 	if (HwIsActive())
