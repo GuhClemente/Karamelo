@@ -1089,7 +1089,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// bios/, cores/, saves/, wallpapers/ and the log are all opened by relative
 	// path, so the working directory has to be the executable's own folder.
-	// Launched from a shortcut or another drive, none of them resolved.
+	// In development mode (inside app\), parent repo has roms/, bios/, etc.
 	{
 		char exe_path[MAX_PATH];
 		DWORD n = GetModuleFileNameA(NULL, exe_path, MAX_PATH);
@@ -1099,7 +1099,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			if (slash)
 			{
 				*slash = '\0';
-				SetCurrentDirectoryA(exe_path);
+				std::string exe_dir = exe_path;
+				std::string lower_dir = exe_dir;
+				std::transform(lower_dir.begin(), lower_dir.end(), lower_dir.begin(), ::tolower);
+				
+				// If running from an 'app' build subdirectory and parent has roms/ folder, use parent
+				if ((lower_dir.ends_with("\\app") || lower_dir.ends_with("/app")) &&
+					fs::exists(fs::path(exe_dir).parent_path() / "roms"))
+				{
+					SetCurrentDirectoryA(fs::path(exe_dir).parent_path().string().c_str());
+				}
+				else
+				{
+					SetCurrentDirectoryA(exe_path);
+				}
 			}
 		}
 	}
