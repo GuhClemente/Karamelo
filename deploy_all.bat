@@ -66,13 +66,13 @@ rem SUCESSO TOTAL
 rem -------------------------------------------------------------
 echo.
 echo =====================================================================
-echo   [PIPELINE CONCLUIDO COM SUCESSO!]
+echo   [PIPELINE CONCLUIDO COM SUCESSO]
 echo =====================================================================
 echo.
 echo   Arquivo Publicado: %LOCAL_ZIP%
 echo   Destino no Servidor: %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 echo   Link Oficial de Download:
-echo   -> https://mister4all.com/downloads/MiSTer_4_ALL_v1.0_Win64.zip
+echo   https://mister4all.com/downloads/MiSTer_4_ALL_v1.0_Win64.zip
 echo.
 echo =====================================================================
 echo.
