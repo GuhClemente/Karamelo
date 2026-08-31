@@ -169,7 +169,7 @@ echo 1. COMO JOGAR:
 echo    - Coloque suas ROMs/ISOs na pasta correspondente dentro de "roms\"
 echo      (ex: roms\SNES, roms\Genesis, roms\PlayStation, etc.)
 echo    - Execute "MiSTer_4_ALL.exe"
-echo    - Use as setas do teclado ou o controle XInput para navegar e jogar!
+echo    - Use as setas do teclado ou o controle XInput para navegar e jogar
 echo.
 echo 2. CONTROLES PADRAO NO TECLADO:
 echo    - Abrir / Fechar Menu OSD: F1 ou ESC
@@ -198,7 +198,7 @@ echo    - O MiSTer 4 ALL e um projeto de preservacao e codigo aberto (Open Sourc
 echo    - Esta distribuicao NAO CONTEM nenhum arquivo de BIOS protegida ou ROM de jogo.
 echo    - O usuario deve utilizar seus proprios backups de jogos e BIOS legalmente adquiridos.
 echo.
-echo Desenvolvido com paixao para a comunidade retro gaming!
+echo Desenvolvido com paixao para a comunidade retro gaming.
 ) > "%DIST_DIR%\LEIAME.txt"
 
 rem 4. Create ZIP package
@@ -208,7 +208,7 @@ powershell -NoProfile -Command "Compress-Archive -Path '%DIST_DIR%' -Destination
 
 echo.
 echo =======================================================
-echo   PACOTE GERADO COM SUCESSO!
+echo   PACOTE GERADO COM SUCESSO
 echo =======================================================
 echo   Arquivo: dist\%DIST_NAME%.zip
 echo.
