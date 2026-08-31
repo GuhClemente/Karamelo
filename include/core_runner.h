@@ -79,4 +79,9 @@ bool CoreIsDiscGame();
 const char* CoreGetRomDir();
 const char* CoreGetOption(const char* key);
 
+// What the running core calls a control, or NULL when it never said. Lets the
+// Controller page show "Cross" on PSP where it would otherwise say "Botao B".
+const char* CoreGetButtonLabel(int retro_id);
+const char* CoreGetAxisLabel(int stick, int axis);
+
 #endif

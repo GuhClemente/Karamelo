@@ -168,6 +168,15 @@ static bool audio_muted = false;
 static int16_t joypad_buttons[4][16] = { 0 };
 static int16_t analog_sticks[4][2][2] = { 0 };
 
+// Labels the core supplies through SET_INPUT_DESCRIPTORS, so the Controller
+// page can name a control the way that system does - "Cross" on PSP instead of
+// a generic "Botao B". Port 0 only: that is what the menu edits. Written on
+// the core thread during load and read by the menu afterwards, never at once.
+static char g_desc_button[16][24] = { { 0 } };
+static char g_desc_axis[2][2][24] = { { { 0 } } };
+static bool g_desc_present = false;
+static void ClearInputDescriptors();
+
 // Toast Notification State. Written by the core thread, read by the UI thread
 // every frame, so it is a fixed buffer under a lock rather than a std::string:
 // reading a string while another thread reassigns it can fault.
@@ -1060,6 +1069,35 @@ static bool CB_Environment(unsigned cmd, void* data)
 		return true;
 	}
 
+	case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
+	{
+		// The core is telling us what each control is called on this system.
+		// Ignoring it is why every core showed the same generic RetroPad
+		// names. Port 0 only, which is what the Controller page edits.
+		const struct retro_input_descriptor* desc =
+			(const struct retro_input_descriptor*)data;
+		if (!desc) return true;
+		ClearInputDescriptors();
+		for (; desc->description; desc++)
+		{
+			if (desc->port != 0) continue;
+			if (desc->device == RETRO_DEVICE_JOYPAD && desc->id < 16)
+			{
+				strncpy(g_desc_button[desc->id], desc->description,
+					sizeof(g_desc_button[0]) - 1);
+				g_desc_present = true;
+			}
+			else if (desc->device == RETRO_DEVICE_ANALOG &&
+			         desc->index < 2 && desc->id < 2)
+			{
+				strncpy(g_desc_axis[desc->index][desc->id], desc->description,
+					sizeof(g_desc_axis[0][0]) - 1);
+				g_desc_present = true;
+			}
+		}
+		return true;
+	}
+
 	case RETRO_ENVIRONMENT_SET_VARIABLES:
 	{
 		// Cores declare their options here, each value shaped as
@@ -1358,17 +1396,25 @@ static void CB_InputPoll(void)
 		for (int bind = 0; bind < BIND_COUNT; bind++)
 		{
 			int code = InputBindGetPad(bind);
-			if (code > 0 && (w & code))
+			if (code <= 0 || !(w & code)) continue;
+
+			if (InputBindIsAnalog(bind))
 			{
-				jb[InputBindRetroId(bind)] = 1;
+				// Only reached if a player put a stick direction on a button;
+				// the physical sticks are read further down.
+				int stick = InputBindAnalogStick(bind);
+				int axis  = InputBindAnalogAxis(bind);
+				int val   = analog_sticks[pad][stick][axis]
+				          + InputBindAnalogSign(bind) * 32767;
+				if (val < -32767) val = -32767; else if (val > 32767) val = 32767;
+				analog_sticks[pad][stick][axis] = (int16_t)val;
+			}
+			else
+			{
+				int rid = InputBindRetroId(bind);
+				if (rid >= 0 && rid < 16) jb[rid] = 1;
 			}
 		}
-
-		// Additional extended controls (triggers and thumb buttons)
-		jb[RETRO_DEVICE_ID_JOYPAD_L2] = (w & PAD_BTN_LT) ? 1 : 0;
-		jb[RETRO_DEVICE_ID_JOYPAD_R2] = (w & PAD_BTN_RT) ? 1 : 0;
-		jb[RETRO_DEVICE_ID_JOYPAD_L3] = (w & PAD_BTN_L3) ? 1 : 0;
-		jb[RETRO_DEVICE_ID_JOYPAD_R3] = (w & PAD_BTN_R3) ? 1 : 0;
 
 		if (abs(state.Gamepad.sThumbLX) > deadzone_thresh)
 		{
@@ -1397,8 +1443,26 @@ static void CB_InputPoll(void)
 	{
 		int vk = InputBindGetKey(bind);
 		if (vk <= 0) continue;
-		if (GetAsyncKeyState(vk) & 0x8000)
-			joypad_buttons[0][InputBindRetroId(bind)] = 1;
+		if (!(GetAsyncKeyState(vk) & 0x8000)) continue;
+
+		if (InputBindIsAnalog(bind))
+		{
+			// A key is all-or-nothing, so it deflects the axis fully. Held
+			// together, an opposing pair cancels rather than fighting, which
+			// is what a real stick does when centred.
+			int stick = InputBindAnalogStick(bind);
+			int axis  = InputBindAnalogAxis(bind);
+			int sign  = InputBindAnalogSign(bind);
+			int cur   = analog_sticks[0][stick][axis];
+			int val   = cur + sign * 32767;
+			if (val < -32767) val = -32767; else if (val > 32767) val = 32767;
+			analog_sticks[0][stick][axis] = (int16_t)val;
+		}
+		else
+		{
+			int rid = InputBindRetroId(bind);
+			if (rid >= 0 && rid < 16) joypad_buttons[0][rid] = 1;
+		}
 	}
 
 	// 3. Netplay: ship this frame's local input and take the peer's as P2.
@@ -1867,6 +1931,26 @@ static bool RetroInitGuarded()
 	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
+static void ClearInputDescriptors()
+{
+	memset(g_desc_button, 0, sizeof(g_desc_button));
+	memset(g_desc_axis, 0, sizeof(g_desc_axis));
+	g_desc_present = false;
+}
+
+const char* CoreGetButtonLabel(int retro_id)
+{
+	if (!g_desc_present || retro_id < 0 || retro_id >= 16) return NULL;
+	return g_desc_button[retro_id][0] ? g_desc_button[retro_id] : NULL;
+}
+
+const char* CoreGetAxisLabel(int stick, int axis)
+{
+	if (!g_desc_present) return NULL;
+	if (stick < 0 || stick > 1 || axis < 0 || axis > 1) return NULL;
+	return g_desc_axis[stick][axis][0] ? g_desc_axis[stick][axis] : NULL;
+}
+
 static void SetPortDevicesGuarded()
 {
 	if (!p_retro_set_controller_port_device) return;
@@ -1903,6 +1987,10 @@ static void RetroDeinitGuarded()
 static bool CoreLoad(const char* core_dll_path)
 {
 	CoreUnload();
+
+	// A core that sends no descriptors must not inherit the previous one's
+	// names, so this is cleared on the way in rather than only on the way out.
+	ClearInputDescriptors();
 
 	h_core_dll = LoadLibraryA(core_dll_path);
 	if (!h_core_dll)
