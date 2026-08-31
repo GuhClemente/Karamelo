@@ -275,7 +275,8 @@ void CoreUpdateToast()
 // -------------------------------------------------------------
 #define OUTPUT_SAMPLE_RATE 48000
 #define RING_BUFFER_SIZE   65536 // 65536 stereo frames (~1.36s capacity)
-#define NUM_WAVE_BUFFERS   12    // 12 wave buffers (~128ms queue capacity)
+#define NUM_WAVE_BUFFERS   48    // upper bound: 48 * 512 frames = 512ms of queue
+#define MIN_WAVE_BUFFERS   6     // lower bound: 6 * 512 frames = 64ms
 #define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz
 #define TARGET_OCCUPANCY   4800  // 100ms at 48kHz - ideal safety cushion
 
@@ -286,6 +287,11 @@ static bool     audio_thread_running = false;
 
 static WAVEHDR  wave_headers[NUM_WAVE_BUFFERS];
 static int16_t  wave_buffer_data[NUM_WAVE_BUFFERS][SAMPLES_PER_BUFFER * 2];
+
+// How many of the NUM_WAVE_BUFFERS are actually queued. Set from the Audio
+// Latency setting when a game loads; the rest stay idle. A deeper queue rides
+// out longer hitches, a shallower one responds faster.
+static volatile LONG g_active_wave_buffers = 12;
 
 static int16_t  g_ring_buffer[RING_BUFFER_SIZE * 2];
 static volatile LONG g_ring_write_pos = 0;
@@ -325,7 +331,8 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 
 		if (!audio_thread_running || !h_wave_out) break;
 
-		for (int i = 0; i < NUM_WAVE_BUFFERS; i++)
+		const LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+		for (int i = 0; i < active; i++)
 		{
 			WAVEHDR* hdr = &wave_headers[i];
 			// Only refill a buffer the driver has finished with. Touching one
@@ -377,6 +384,16 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 
 static void InitAudio(int sample_rate)
 {
+	// Translate the Latency setting into a queue depth. Done before the
+	// already-initialised early return so changing it and loading another
+	// game takes effect without restarting the app.
+	{
+		int want = (MenuGetAudioLatencyMs() * OUTPUT_SAMPLE_RATE / 1000) / SAMPLES_PER_BUFFER;
+		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
+		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
+	}
+
 	g_core_sample_rate = sample_rate > 0 ? (double)sample_rate : 48000.0;
 	g_resample_phase = 0.0;
 	memset(g_hist_l, 0, sizeof(g_hist_l));
@@ -385,9 +402,15 @@ static void InitAudio(int sample_rate)
 
 	// Anti-pop: Zero ring buffer and activate soft startup ramp
 	InterlockedExchange(&g_startup_mute_samples, (LONG)(OUTPUT_SAMPLE_RATE * 0.15));
-	InterlockedExchange(&g_ring_write_pos, 0);
 	InterlockedExchange(&g_ring_read_pos, 0);
 	memset(g_ring_buffer, 0, sizeof(g_ring_buffer));
+
+	// Start the ring already at its target occupancy rather than empty. The
+	// buffer is zeroed, so this is silence, and the startup ramp covers it.
+	// Filling up to the target instead would mean running detuned for the
+	// whole climb - which is what the deeper settings made audible.
+	InterlockedExchange(&g_ring_write_pos,
+		InterlockedCompareExchange(&g_active_wave_buffers, 0, 0) * SAMPLES_PER_BUFFER);
 
 	if (audio_initialized)
 	{
@@ -406,7 +429,8 @@ static void InitAudio(int sample_rate)
 
 	if (waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT) == MMSYSERR_NOERROR)
 	{
-		for (int i = 0; i < NUM_WAVE_BUFFERS; i++)
+		const LONG prime = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+		for (int i = 0; i < prime; i++)
 		{
 			memset(&wave_headers[i], 0, sizeof(WAVEHDR));
 			memset(wave_buffer_data[i], 0, sizeof(wave_buffer_data[i]));
@@ -416,8 +440,8 @@ static void InitAudio(int sample_rate)
 			waveOutWrite(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
 		}
 
-		g_ring_write_pos = 0;
-		g_ring_read_pos = 0;
+		// Ring positions were already set above, including the target-occupancy
+		// preload; resetting them here would empty it on the first game.
 		audio_thread_running = true;
 		h_audio_thread = CreateThread(NULL, 0, AudioThreadProc, NULL, 0, NULL);
 		audio_initialized = true;
@@ -450,45 +474,6 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 			InterlockedExchange(&g_startup_mute_samples, 0);
 	}
 
-	// Resampler step controller:
-	// Cores like Play! PS2 declare 44.1kHz in AV info but internally produce ~29.6kHz clocked to 30fps game logic.
-	// We measure the actual incoming sample delivery rate over a 500ms window, and smoothly lock 'step' to it.
-	// Once locked, 'step' remains constant, guaranteeing ZERO pitch wobble, ZERO underruns, and ZERO crackling.
-	static LARGE_INTEGER s_rate_last = { 0 };
-	static size_t s_samples_accum = 0;
-	static double s_target_step = 1.0;
-	static double s_current_step = 1.0;
-	static bool   s_step_initialized = false;
-
-	if (!s_step_initialized)
-	{
-		s_current_step = g_core_sample_rate / (double)OUTPUT_SAMPLE_RATE;
-		s_target_step = s_current_step;
-		s_step_initialized = true;
-	}
-
-	LARGE_INTEGER now, freq;
-	QueryPerformanceCounter(&now);
-	QueryPerformanceFrequency(&freq);
-	if (s_rate_last.QuadPart == 0) s_rate_last = now;
-
-	s_samples_accum += frames;
-	double elapsed = (double)(now.QuadPart - s_rate_last.QuadPart) / (double)freq.QuadPart;
-	if (elapsed >= 0.5)
-	{
-		double measured_rate = (double)s_samples_accum / elapsed;
-		if (measured_rate >= 8000.0 && measured_rate <= 192000.0)
-		{
-			s_target_step = measured_rate / (double)OUTPUT_SAMPLE_RATE;
-		}
-		s_samples_accum = 0;
-		s_rate_last = now;
-	}
-
-	// Smoothly glide step towards target_step over 1-2 seconds (completely inaudible, zero pitch vibrato)
-	s_current_step = s_current_step * 0.992 + s_target_step * 0.008;
-	double step = s_current_step;
-
 	LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
 	LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
 	LONG occupancy = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
@@ -497,10 +482,134 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	// batch is far less audible than overwriting unplayed audio.
 	LONG capacity = RING_BUFFER_SIZE - occupancy - 1;
 
+	// Resampler rate control, in two stages.
+	//
+	// Stage one finds the rate the core really delivers, because a declaration
+	// cannot be trusted: Play! (PS2) announces 44.1kHz and delivers around
+	// 29.6kHz, clocked to game logic. Once consecutive measurements agree, the
+	// rate is LOCKED and never measured again.
+	//
+	// That lock is the fix. The previous controller re-measured every 500ms
+	// forever and slid the ratio toward each new reading. On every other core
+	// that was harmless, because the readings agreed - which is why only PS2
+	// wobbled. Play! runs at an uneven speed, so its readings disagreed window
+	// after window and the ratio drifted back and forth. A ratio that keeps
+	// moving is a pitch that keeps moving.
+	//
+	// Stage two holds the ring near half full with a trim of at most 0.5%.
+	// Occupancy is what actually has to stay stable, and it integrates whatever
+	// rate error is left, so a slow proportional correction settles instead of
+	// hunting the way a rate chase does.
+	static LARGE_INTEGER s_rate_last = { 0 };
+	static size_t s_samples_accum = 0;
+	static double s_prev_measure = 0.0;
+	static int    s_agree_count = 0;
+	static double s_locked_step = 0.0;   // 0 while still measuring
+	static double s_step = 0.0;
+
+	if (s_step <= 0.0) s_step = g_core_sample_rate / (double)OUTPUT_SAMPLE_RATE;
+
+	LARGE_INTEGER now, freq;
+	QueryPerformanceCounter(&now);
+	QueryPerformanceFrequency(&freq);
+	if (s_rate_last.QuadPart == 0) s_rate_last = now;
+
+	if (s_locked_step <= 0.0)
+	{
+		s_samples_accum += frames;
+		double elapsed = (double)(now.QuadPart - s_rate_last.QuadPart) / (double)freq.QuadPart;
+		if (elapsed >= 0.5)
+		{
+			double measured = (double)s_samples_accum / elapsed;
+			if (measured >= 8000.0 && measured <= 192000.0)
+			{
+				// Within 1% of the previous window counts as agreement.
+				if (s_prev_measure > 0.0 &&
+				    fabs(measured - s_prev_measure) < s_prev_measure * 0.01)
+				{
+					if (++s_agree_count >= 3)
+					{
+						s_locked_step = measured / (double)OUTPUT_SAMPLE_RATE;
+						FILE* lf = fopen("mister_flavor.log", "a");
+						if (lf)
+						{
+							fprintf(lf, "[INFO] [AUDIO] taxa travada em %.0f Hz (declarada %.0f Hz), passo %.5f\n",
+								measured, g_core_sample_rate, s_locked_step);
+							fclose(lf);
+						}
+					}
+				}
+				else
+				{
+					s_agree_count = 0;
+				}
+				s_prev_measure = measured;
+
+				// Glide toward the reading only while still searching.
+				s_step = s_step * 0.7 + (measured / (double)OUTPUT_SAMPLE_RATE) * 0.3;
+			}
+			s_samples_accum = 0;
+			s_rate_last = now;
+		}
+	}
+
+	double step = s_step;
+	if (s_locked_step > 0.0)
+	{
+		// One waveOut queue in reserve, not half the ring. The ring is 65536
+		// frames of headroom for bursts; aiming at the middle of it would mean
+		// holding 683ms of audio, and the slow climb toward that target is
+		// itself an audible drift. 12 buffers of 512 frames is 128ms, which is
+		// enough to ride out a hitch without adding noticeable delay.
+		const double target_fill = (double)(InterlockedCompareExchange(&g_active_wave_buffers, 0, 0)
+		                                    * SAMPLES_PER_BUFFER);
+
+		// Resync outright when the gap is gross. The trim below is deliberately
+		// too gentle to close a large gap quickly - at 0.5% it moves 240
+		// frames a second, so recovering from a stalled boot would mean half a
+		// minute of detune. A hard reseed is a discontinuity, but it only ever
+		// fires when playback is already broken (core booting below speed, a
+		// long stall), where silence is playing anyway. Padding with silence
+		// Too empty pads with silence; too full discards the excess, which is
+		// stale latency nobody wants to hear anyway.
+		const LONG seed = (LONG)target_fill;
+		if (occupancy < seed / 2 || occupancy > seed * 2)
+		{
+			// Re-read: the audio thread has been draining since the snapshot
+			// above, so the stale value would seed us behind the reader.
+			rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
+			for (LONG i = occupancy; i < seed; i++)
+			{
+				LONG idx = (rp + i) % RING_BUFFER_SIZE;
+				g_ring_buffer[idx * 2 + 0] = 0;
+				g_ring_buffer[idx * 2 + 1] = 0;
+			}
+			// wp and capacity have to move with it: the write loop below
+			// continues from wp and stores it back at the end, which would
+			// otherwise undo this.
+			wp = (rp + seed) % RING_BUFFER_SIZE;
+			occupancy = seed;
+			capacity = RING_BUFFER_SIZE - occupancy - 1;
+		}
+
+		double err = ((double)occupancy - target_fill) / target_fill;
+		if (err < -1.0) err = -1.0;
+		else if (err > 1.0) err = 1.0;
+
+		// Reading ahead of playback means the ring is filling, so the input
+		// needs to be consumed slightly faster - and vice versa. 0.5% is under
+		// the threshold where pitch change becomes audible.
+		step = s_locked_step * (1.0 + err * 0.005);
+	}
 
 
 
-	for (size_t i = 0; i < frames; i++)
+
+
+	// Stops consuming input the moment the ring is full. The old loop went on
+	// shifting the interpolator history for samples it then had no room to
+	// emit, so the phase and the history disagreed and the seam clicked.
+	for (size_t i = 0; i < frames && capacity > 0; i++)
 	{
 		int16_t cur_l = (int16_t)(data[i * 2 + 0] * vol_mult);
 		int16_t cur_r = (int16_t)(data[i * 2 + 1] * vol_mult);
@@ -509,10 +618,8 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		g_hist_l[0] = g_hist_l[1]; g_hist_l[1] = g_hist_l[2]; g_hist_l[2] = g_hist_l[3]; g_hist_l[3] = cur_l;
 		g_hist_r[0] = g_hist_r[1]; g_hist_r[1] = g_hist_r[2]; g_hist_r[2] = g_hist_r[3]; g_hist_r[3] = cur_r;
 
-		while (g_resample_phase < 1.0)
+		while (g_resample_phase < 1.0 && capacity > 0)
 		{
-			if (capacity <= 0) break;
-
 			int16_t out_l = HermiteInterpolate(g_hist_l[0], g_hist_l[1], g_hist_l[2], g_hist_l[3], g_resample_phase);
 			int16_t out_r = HermiteInterpolate(g_hist_r[0], g_hist_r[1], g_hist_r[2], g_hist_r[3], g_resample_phase);
 

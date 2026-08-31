@@ -34,6 +34,7 @@ int  MenuGetOsdTheme();
 bool MenuGetFullscreen();
 void MenuSetFullscreen(bool fs);
 int  MenuGetDeadzone();
+int  MenuGetAudioLatencyMs();
 int  MenuGetVideoDriver();
 int  MenuGetSyncMode();
 int  MenuGetVsync();
