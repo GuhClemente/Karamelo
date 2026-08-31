@@ -293,11 +293,26 @@ static volatile LONG g_ring_read_pos = 0;
 
 static double   g_core_sample_rate = 48000.0;
 static double   g_resample_phase = 0.0;
-static int16_t  g_last_left = 0;
-static int16_t  g_last_right = 0;
+static int16_t  g_hist_l[4] = { 0, 0, 0, 0 };
+static int16_t  g_hist_r[4] = { 0, 0, 0, 0 };
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
+
+// 4-point / 3rd-order Catmull-Rom Cubic Hermite Spline Interpolator:
+// Eliminates high-frequency imaging noise and triangular aliasing artifacts (the metallic buzz/hiss).
+static inline int16_t HermiteInterpolate(int16_t y0, int16_t y1, int16_t y2, int16_t y3, double x)
+{
+	double c0 = (double)y1;
+	double c1 = 0.5 * ((double)y2 - (double)y0);
+	double c2 = (double)y0 - 2.5 * (double)y1 + 2.0 * (double)y2 - 0.5 * (double)y3;
+	double c3 = 0.5 * ((double)y3 - (double)y0) + 1.5 * ((double)y1 - (double)y2);
+	double out = ((c3 * x + c2) * x + c1) * x + c0;
+	if (out < -32768.0) return -32768;
+	if (out > 32767.0) return 32767;
+	return (int16_t)out;
+}
+
 
 static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 {
@@ -327,28 +342,29 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			// playback outright, which is what produced the periodic gaps;
 			// short frames are padded by holding the last sample instead.
 			int16_t* dst = wave_buffer_data[i];
-			int16_t hold_l = 0, hold_r = 0;
+			static int16_t s_hold_l = 0;
+			static int16_t s_hold_r = 0;
 
 			for (int s = 0; s < SAMPLES_PER_BUFFER; s++)
 			{
 				if (available > 0)
 				{
-					hold_l = g_ring_buffer[rp * 2 + 0];
-					hold_r = g_ring_buffer[rp * 2 + 1];
+					s_hold_l = g_ring_buffer[rp * 2 + 0];
+					s_hold_r = g_ring_buffer[rp * 2 + 1];
 					rp = (rp + 1) % RING_BUFFER_SIZE;
 					available--;
 				}
 				else
 				{
-					// Underrun: decay to silence rather than holding a DC
-					// level, which would thump when audio resumes.
+					// Underrun: decay smoothly to silence from last sample
 					InterlockedIncrement(&g_audio_underrun_count);
-					hold_l = (int16_t)(hold_l * 63 / 64);
-					hold_r = (int16_t)(hold_r * 63 / 64);
+					s_hold_l = (int16_t)(s_hold_l * 63 / 64);
+					s_hold_r = (int16_t)(s_hold_r * 63 / 64);
 				}
-				dst[s * 2 + 0] = hold_l;
-				dst[s * 2 + 1] = hold_r;
+				dst[s * 2 + 0] = s_hold_l;
+				dst[s * 2 + 1] = s_hold_r;
 			}
+
 
 			InterlockedExchange(&g_ring_read_pos, rp);
 
@@ -363,8 +379,9 @@ static void InitAudio(int sample_rate)
 {
 	g_core_sample_rate = sample_rate > 0 ? (double)sample_rate : 48000.0;
 	g_resample_phase = 0.0;
-	g_last_left = 0;
-	g_last_right = 0;
+	memset(g_hist_l, 0, sizeof(g_hist_l));
+	memset(g_hist_r, 0, sizeof(g_hist_r));
+
 
 	// Anti-pop: Zero ring buffer and activate soft startup ramp
 	InterlockedExchange(&g_startup_mute_samples, (LONG)(OUTPUT_SAMPLE_RATE * 0.15));
@@ -488,12 +505,16 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		int16_t cur_l = (int16_t)(data[i * 2 + 0] * vol_mult);
 		int16_t cur_r = (int16_t)(data[i * 2 + 1] * vol_mult);
 
+		// Shift 4-point Hermite history
+		g_hist_l[0] = g_hist_l[1]; g_hist_l[1] = g_hist_l[2]; g_hist_l[2] = g_hist_l[3]; g_hist_l[3] = cur_l;
+		g_hist_r[0] = g_hist_r[1]; g_hist_r[1] = g_hist_r[2]; g_hist_r[2] = g_hist_r[3]; g_hist_r[3] = cur_r;
+
 		while (g_resample_phase < 1.0)
 		{
 			if (capacity <= 0) break;
 
-			int16_t out_l = (int16_t)(g_last_left + (cur_l - g_last_left) * g_resample_phase);
-			int16_t out_r = (int16_t)(g_last_right + (cur_r - g_last_right) * g_resample_phase);
+			int16_t out_l = HermiteInterpolate(g_hist_l[0], g_hist_l[1], g_hist_l[2], g_hist_l[3], g_resample_phase);
+			int16_t out_r = HermiteInterpolate(g_hist_r[0], g_hist_r[1], g_hist_r[2], g_hist_r[3], g_resample_phase);
 
 			g_ring_buffer[wp * 2 + 0] = out_l;
 			g_ring_buffer[wp * 2 + 1] = out_r;
@@ -503,16 +524,13 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 			g_resample_phase += step;
 		}
 
-		// Guarded because the capacity break above can exit the loop with the
-		// phase still below 1.0; unguarded that would go negative.
 		if (g_resample_phase >= 1.0) g_resample_phase -= 1.0;
-		g_last_left = cur_l;
-		g_last_right = cur_r;
 	}
 
 	InterlockedExchange(&g_ring_write_pos, wp);
 	SetEvent(h_audio_event);
 }
+
 
 // -------------------------------------------------------------
 // Libretro Virtual File System (VFS) Interface Implementation
@@ -1646,8 +1664,8 @@ static void RecoverAfterKilledCore()
 	audio_thread_running = false;
 
 	g_resample_phase = 0.0;
-	g_last_left = 0;
-	g_last_right = 0;
+	memset(g_hist_l, 0, sizeof(g_hist_l));
+	memset(g_hist_r, 0, sizeof(g_hist_r));
 	InterlockedExchange(&g_ring_write_pos, 0);
 	InterlockedExchange(&g_ring_read_pos, 0);
 
@@ -2125,8 +2143,8 @@ static void CoreUnload()
 	}
 
 	g_resample_phase = 0.0;
-	g_last_left = 0;
-	g_last_right = 0;
+	memset(g_hist_l, 0, sizeof(g_hist_l));
+	memset(g_hist_r, 0, sizeof(g_hist_r));
 	InterlockedExchange(&g_ring_write_pos, 0);
 	InterlockedExchange(&g_ring_read_pos, 0);
 }
