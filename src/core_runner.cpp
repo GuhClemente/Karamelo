@@ -119,6 +119,16 @@ static volatile LONG g_fb_dirty = 0;   // a new frame is waiting
 static int g_fb_back = 0;              // producer thread only
 static int g_fb_front = 2;             // consumer thread only
 
+// 480i weave deinterlace for PS2 (Play! core)
+// The PS2 GS outputs 480i: even field on one retro_run, odd field on the next.
+// Each field shifts its active raster by 1 scanline, causing the 1-pixel
+// vertical jitter ("tela tremendo"). We keep the previous frame and weave
+// even rows from one field and odd rows from the other to produce a stable
+// 448-line progressive-looking composite frame.
+static uint32_t g_deinterlace_prev[MAX_FB_WIDTH * MAX_FB_HEIGHT];
+static bool     g_deinterlace_have_prev = false;
+static unsigned g_deinterlace_field = 0; // 0=even, 1=odd
+
 static unsigned core_fb_width = 320;
 static unsigned core_fb_height = 240;
 static double   core_target_fps = 60.0;
@@ -266,12 +276,9 @@ void CoreUpdateToast()
 // -------------------------------------------------------------
 #define OUTPUT_SAMPLE_RATE 48000
 #define RING_BUFFER_SIZE   65536 // 65536 stereo frames (~1.36s capacity)
-#define NUM_WAVE_BUFFERS   8
-#define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz (~85ms queued)
-
-// Producer and consumer must aim at the SAME occupancy, otherwise the two
-// controllers oscillate against each other and the pitch audibly wobbles.
-#define TARGET_OCCUPANCY   2400  // 50ms at 48kHz
+#define NUM_WAVE_BUFFERS   12    // 12 wave buffers (~128ms queue capacity)
+#define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz
+#define TARGET_OCCUPANCY   4800  // 100ms at 48kHz target for stutter-free 3D emulation
 
 static HWAVEOUT h_wave_out = NULL;
 static HANDLE   h_audio_event = NULL;
@@ -822,6 +829,21 @@ static bool CB_Environment(unsigned cmd, void* data)
 				var->value = (MenuGetHwRender() && HwGlProbed()) ? "gliden64" : "angrylion";
 			else if (strcmp(var->key, "mupen64plus-rsp-plugin") == 0)
 				var->value = (MenuGetHwRender() && HwGlProbed()) ? "hle" : "cxd4";
+
+			// Play! PS2 core options (v0.77+).
+			// play_limit_framerate : enabled | disabled
+			//   Caps the emulator to the native PS2 field rate (~59.94 Hz NTSC,
+			//   50 Hz PAL). Without this the core runs at maximum CPU speed and
+			//   overdrives the audio buffer causing crackling.
+			// play_fastboot : enabled | disabled
+			//   Patches the PS2 BIOS busy-wait to jump straight to the game,
+			//   skipping the ~5s Sony splash screen.
+			// play_widescreen_hack : disabled | enabled
+			//   Stretch 4:3 games to 16:9 - off by default to preserve correct AR.
+			else if (strcmp(var->key, "play_limit_framerate") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "play_fastboot") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "play_widescreen_hack") == 0) var->value = "disabled";
+
 			// Anything we have no verified value for: report "unset" so the
 			// core keeps its own default. Returning true with a NULL value
 			// makes cores that do strcmp(var.value, ...) fault.
@@ -1005,6 +1027,43 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 		// filters, the OSD and the blit all stay on the software path instead
 		// of being rewritten as shaders.
 		if (!HwReadPixels(dst_fb, width, height)) return;
+
+		// 480i Weave Deinterlace for PS2 (Play! core).
+		// Play! delivers 640x448 (480i interlaced) via OpenGL: each retro_run
+		// call alternates between the even-line field and the odd-line field.
+		// Without correction the image trembles 1 pixel vertically at ~30Hz.
+		//
+		// Fix: weave the current field with the previous field, taking even rows
+		// from the even field and odd rows from the odd field. This is identical
+		// to what PCSX2's "Weave" deinterlace mode does.
+		if (height == 448 && width >= 512)
+		{
+			if (g_deinterlace_have_prev)
+			{
+				// Which field did the core just deliver?
+				// We detect by comparing the first-row luminance parity;
+				// simpler: just alternate per frame (field toggles every run).
+				unsigned even_src = g_deinterlace_field;       // 0 or 1
+				unsigned odd_src  = 1 - even_src;
+
+				for (unsigned row = 0; row < height; row++)
+				{
+					// Which buffer holds the correct field for this row parity?
+					const uint32_t* src_row_ptr =
+						((row & 1) == odd_src)
+						? (dst_fb + row * width)               // current frame
+						: (g_deinterlace_prev + row * width);  // previous frame
+
+					if (src_row_ptr != (dst_fb + row * width))
+						memcpy(dst_fb + row * width, src_row_ptr, width * sizeof(uint32_t));
+				}
+			}
+
+			// Save current frame as "previous" for next weave pass
+			memcpy(g_deinterlace_prev, dst_fb, width * height * sizeof(uint32_t));
+			g_deinterlace_have_prev = true;
+			g_deinterlace_field ^= 1;
+		}
 	}
 	else if (core_pixel_format == RETRO_PIXEL_FORMAT_XRGB8888)
 	{
@@ -1934,6 +1993,12 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	g_video_diag_frames = 0;
 	g_render_diag_done = false;
 
+	// Reset 480i weave state so the first field of a new game is not woven
+	// with stale pixels from whatever was last playing.
+	g_deinterlace_have_prev = false;
+	g_deinterlace_field = 0;
+
+
 	if (HwIsActive())
 	{
 		unsigned hw_w = av_info.geometry.max_width  ? av_info.geometry.max_width  : core_fb_width;
@@ -1960,8 +2025,6 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 static void CoreUnload()
 {
-	HwContextDestroy();
-
 	if (is_game_loaded)
 	{
 		RaOnGameUnload();
@@ -1980,6 +2043,9 @@ static void CoreUnload()
 		RetroDeinitGuarded();
 		is_core_loaded = false;
 	}
+
+	HwContextDestroy();
+	HwReleaseCurrent();
 
 	if (h_core_dll)
 	{

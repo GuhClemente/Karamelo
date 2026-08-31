@@ -264,8 +264,18 @@ bool HwMakeCurrent()
 
 	if (!wglMakeCurrent(g_gl_dc, g_gl_ctx))
 	{
-		HwLog("wglMakeCurrent falhou nesta thread (%lu)", GetLastError());
-		return false;
+		DWORD err = GetLastError();
+		HwLog("wglMakeCurrent falhou nesta thread (%lu) - reestabelecendo contexto", err);
+		wglMakeCurrent(NULL, NULL);
+		if (!wglMakeCurrent(g_gl_dc, g_gl_ctx))
+		{
+			HwShutdown();
+			if (HwInit())
+			{
+				return wglMakeCurrent(g_gl_dc, g_gl_ctx);
+			}
+			return false;
+		}
 	}
 	return true;
 }
