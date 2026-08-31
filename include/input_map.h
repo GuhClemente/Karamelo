@@ -21,6 +21,25 @@ enum InputBind
 	BIND_R,
 	BIND_START,
 	BIND_SELECT,
+	// Everything below was added after the first twelve. New entries go at the
+	// end: the index is what the config file stores, so reordering would
+	// silently reassign a player's saved bindings.
+	BIND_L2,
+	BIND_R2,
+	BIND_L3,
+	BIND_R3,
+	// Analog stick directions. These exist so a keyboard (or a d-pad) can
+	// drive the sticks - a physical stick feeds the axes directly and does not
+	// go through these. Without them nothing can move in a game that walks on
+	// the analog stick only, which is most 3D-era software.
+	BIND_LSTICK_UP,
+	BIND_LSTICK_DOWN,
+	BIND_LSTICK_LEFT,
+	BIND_LSTICK_RIGHT,
+	BIND_RSTICK_UP,
+	BIND_RSTICK_DOWN,
+	BIND_RSTICK_LEFT,
+	BIND_RSTICK_RIGHT,
 	BIND_COUNT
 };
 
@@ -49,8 +68,17 @@ enum PadButtonCode
 // Human label, e.g. "Cima" or "B (acao 1)".
 const char* InputBindLabel(int bind);
 
-// The libretro RETRO_DEVICE_ID_JOYPAD_* this binding drives.
+// The libretro RETRO_DEVICE_ID_JOYPAD_* this binding drives. Meaningless for
+// the analog bindings, which report -1.
 int InputBindRetroId(int bind);
+
+// Analog bindings drive an axis instead of a button.
+// Stick: 0 left, 1 right, -1 when the binding is a plain button.
+// Axis: 0 for X, 1 for Y. Sign: +1 towards right/up, -1 towards left/down.
+bool InputBindIsAnalog(int bind);
+int  InputBindAnalogStick(int bind);
+int  InputBindAnalogAxis(int bind);
+int  InputBindAnalogSign(int bind);
 
 // Keyboard bindings: Virtual-Key code and printable name ("Z", "Seta Cima", "Enter").
 int InputBindGetKey(int bind);

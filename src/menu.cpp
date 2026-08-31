@@ -861,12 +861,57 @@ void PopulateControllerSettings() {
   const char *deadzones[] = {"5%", "10%", "15%", "20%"};
   items.push_back({"Deadzone", deadzones[setting_deadzone], false, false, 508});
 
+  // Labels come from the running core when it supplied them, so the page reads
+  // in that system's own terms - "Cross" on PSP, not a generic "Botao B".
+  // Falls back to the generic name with no core loaded or a core that stayed
+  // silent. The buffers are static because the item list holds the pointers.
+  static char bind_labels[BIND_COUNT][28];
+
   for (int i = 0; i < BIND_COUNT; i++) {
     const char *val = (capture_bind == i)
                           ? "<pressione>"
                           : (setting_pad_device == 0 ? InputBindPadName(i)
                                                      : InputBindKeyName(i));
-    items.push_back({InputBindLabel(i), val, false, true, 700 + i});
+
+    // An unassigned analog row on a gamepad is not a gap to fill: the physical
+    // stick already drives that axis. A bare "-" there reads as broken, so say
+    // what is actually happening.
+    if (capture_bind != i && setting_pad_device == 0 && InputBindIsAnalog(i) &&
+        InputBindGetPad(i) <= 0)
+      val = "Stick";
+
+    const char *label = InputBindLabel(i);
+    const char *from_core =
+        InputBindIsAnalog(i)
+            ? CoreGetAxisLabel(InputBindAnalogStick(i), InputBindAnalogAxis(i))
+            : CoreGetButtonLabel(InputBindRetroId(i));
+
+    if (from_core && from_core[0]) {
+      if (InputBindIsAnalog(i)) {
+        // An axis label names the whole axis ("Analog X"), so the direction
+        // still has to be spelled out or two rows would read identically.
+        const int sign = InputBindAnalogSign(i);
+        const int axis = InputBindAnalogAxis(i);
+        const char *dir = axis == 1 ? (sign > 0 ? "Cima" : "Baixo")
+                                    : (sign > 0 ? "Dir" : "Esq");
+
+        // Cores name the axis, not the direction ("Left Analog X"). Appending
+        // the direction to that gives "Left Analog X Dir", which is both
+        // redundant and too wide for the OSD, so the trailing axis letter goes.
+        char base[24];
+        snprintf(base, sizeof(base), "%s", from_core);
+        size_t bl = strlen(base);
+        if (bl > 2 && base[bl - 2] == ' ' && (base[bl - 1] == 'X' || base[bl - 1] == 'Y'))
+          base[bl - 2] = '\0';
+
+        snprintf(bind_labels[i], sizeof(bind_labels[i]), "%s %s", base, dir);
+      } else {
+        snprintf(bind_labels[i], sizeof(bind_labels[i]), "%s", from_core);
+      }
+      label = bind_labels[i];
+    }
+
+    items.push_back({label, val, false, true, 700 + i});
   }
 
   items.push_back({"Restaurar", "Padrao", false, true, 799});

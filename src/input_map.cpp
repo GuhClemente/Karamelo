@@ -15,6 +15,9 @@ struct BindDef
 	int retro_id;
 	int default_vk;
 	int default_pad;
+	int stick;   // -1 = plain button, 0 = left stick, 1 = right stick
+	int axis;    // 0 = X, 1 = Y
+	int sign;    // +1 = right/up, -1 = left/down
 };
 
 // Defaults:
@@ -29,28 +32,53 @@ struct BindDef
 // Xbox Start -> Retro Start
 // Xbox Back -> Retro Select
 static const BindDef s_defs[BIND_COUNT] = {
-	{ "Cima",          "key_up",     "pad_up",     RETRO_DEVICE_ID_JOYPAD_UP,     VK_UP,     PAD_BTN_DPAD_UP },
-	{ "Baixo",         "key_down",   "pad_down",   RETRO_DEVICE_ID_JOYPAD_DOWN,   VK_DOWN,   PAD_BTN_DPAD_DOWN },
-	{ "Esquerda",      "key_left",   "pad_left",   RETRO_DEVICE_ID_JOYPAD_LEFT,   VK_LEFT,   PAD_BTN_DPAD_LEFT },
-	{ "Direita",       "key_right",  "pad_right",  RETRO_DEVICE_ID_JOYPAD_RIGHT,  VK_RIGHT,  PAD_BTN_DPAD_RIGHT },
-	{ "Botao B",       "key_b",      "pad_b",      RETRO_DEVICE_ID_JOYPAD_B,      'Z',       PAD_BTN_A },
-	{ "Botao A",       "key_a",      "pad_a",      RETRO_DEVICE_ID_JOYPAD_A,      'X',       PAD_BTN_B },
-	{ "Botao Y",       "key_y",      "pad_y",      RETRO_DEVICE_ID_JOYPAD_Y,      'A',       PAD_BTN_X },
-	{ "Botao X",       "key_x",      "pad_x",      RETRO_DEVICE_ID_JOYPAD_X,      'S',       PAD_BTN_Y },
-	{ "L (ombro)",     "key_l",      "pad_l",      RETRO_DEVICE_ID_JOYPAD_L,      'Q',       PAD_BTN_LB },
-	{ "R (ombro)",     "key_r",      "pad_r",      RETRO_DEVICE_ID_JOYPAD_R,      'W',       PAD_BTN_RB },
-	{ "Start",         "key_start",  "pad_start",  RETRO_DEVICE_ID_JOYPAD_START,  VK_RETURN, PAD_BTN_START },
-	{ "Select",        "key_select", "pad_select", RETRO_DEVICE_ID_JOYPAD_SELECT, VK_SPACE,  PAD_BTN_BACK },
+	{ "Cima",          "key_up",     "pad_up",     RETRO_DEVICE_ID_JOYPAD_UP,     VK_UP,     PAD_BTN_DPAD_UP, -1, 0, 0 },
+	{ "Baixo",         "key_down",   "pad_down",   RETRO_DEVICE_ID_JOYPAD_DOWN,   VK_DOWN,   PAD_BTN_DPAD_DOWN, -1, 0, 0 },
+	{ "Esquerda",      "key_left",   "pad_left",   RETRO_DEVICE_ID_JOYPAD_LEFT,   VK_LEFT,   PAD_BTN_DPAD_LEFT, -1, 0, 0 },
+	{ "Direita",       "key_right",  "pad_right",  RETRO_DEVICE_ID_JOYPAD_RIGHT,  VK_RIGHT,  PAD_BTN_DPAD_RIGHT, -1, 0, 0 },
+	{ "Botao B",       "key_b",      "pad_b",      RETRO_DEVICE_ID_JOYPAD_B,      'Z',       PAD_BTN_A, -1, 0, 0 },
+	{ "Botao A",       "key_a",      "pad_a",      RETRO_DEVICE_ID_JOYPAD_A,      'X',       PAD_BTN_B, -1, 0, 0 },
+	{ "Botao Y",       "key_y",      "pad_y",      RETRO_DEVICE_ID_JOYPAD_Y,      'A',       PAD_BTN_X, -1, 0, 0 },
+	{ "Botao X",       "key_x",      "pad_x",      RETRO_DEVICE_ID_JOYPAD_X,      'S',       PAD_BTN_Y, -1, 0, 0 },
+	{ "L (ombro)",     "key_l",      "pad_l",      RETRO_DEVICE_ID_JOYPAD_L,      'Q',       PAD_BTN_LB, -1, 0, 0 },
+	{ "R (ombro)",     "key_r",      "pad_r",      RETRO_DEVICE_ID_JOYPAD_R,      'W',       PAD_BTN_RB, -1, 0, 0 },
+	{ "Start",         "key_start",  "pad_start",  RETRO_DEVICE_ID_JOYPAD_START,  VK_RETURN, PAD_BTN_START, -1, 0, 0 },
+	{ "Select",        "key_select", "pad_select", RETRO_DEVICE_ID_JOYPAD_SELECT, VK_SPACE,  PAD_BTN_BACK, -1, 0, 0 },
+	{ "L2 (gatilho)",  "key_l2",     "pad_l2",     RETRO_DEVICE_ID_JOYPAD_L2,     'E',        PAD_BTN_LT,   -1, 0, 0 },
+	{ "R2 (gatilho)",  "key_r2",     "pad_r2",     RETRO_DEVICE_ID_JOYPAD_R2,     'R',        PAD_BTN_RT,   -1, 0, 0 },
+	{ "L3 (analog E)", "key_l3",     "pad_l3",     RETRO_DEVICE_ID_JOYPAD_L3,     'C',        PAD_BTN_L3,   -1, 0, 0 },
+	{ "R3 (analog D)", "key_r3",     "pad_r3",     RETRO_DEVICE_ID_JOYPAD_R3,     'V',        PAD_BTN_R3,   -1, 0, 0 },
+	// The left stick defaults to the arrow keys - the same keys as the d-pad.
+	// That is deliberate: on a keyboard, a game that only walks on the analog
+	// stick would otherwise leave the player unable to move at all. The
+	// duplication is visible here in the menu and can be rebound.
+	{ "Analog E Cima", "key_lsu",    "pad_lsu",    -1,                            VK_UP,      PAD_BTN_NONE,  0, 1,  1 },
+	{ "Analog E Baixo","key_lsd",    "pad_lsd",    -1,                            VK_DOWN,    PAD_BTN_NONE,  0, 1, -1 },
+	{ "Analog E Esq",  "key_lsl",    "pad_lsl",    -1,                            VK_LEFT,    PAD_BTN_NONE,  0, 0, -1 },
+	{ "Analog E Dir",  "key_lsr",    "pad_lsr",    -1,                            VK_RIGHT,   PAD_BTN_NONE,  0, 0,  1 },
+	{ "Analog D Cima", "key_rsu",    "pad_rsu",    -1,                            VK_NUMPAD8, PAD_BTN_NONE,  1, 1,  1 },
+	{ "Analog D Baixo","key_rsd",    "pad_rsd",    -1,                            VK_NUMPAD2, PAD_BTN_NONE,  1, 1, -1 },
+	{ "Analog D Esq",  "key_rsl",    "pad_rsl",    -1,                            VK_NUMPAD4, PAD_BTN_NONE,  1, 0, -1 },
+	{ "Analog D Dir",  "key_rsr",    "pad_rsr",    -1,                            VK_NUMPAD6, PAD_BTN_NONE,  1, 0,  1 },
 };
 
 static int s_keys[BIND_COUNT] = {
-	VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, 'Z', 'X', 'A', 'S', 'Q', 'W', VK_RETURN, VK_SPACE
+	VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, 'Z', 'X', 'A', 'S', 'Q', 'W', VK_RETURN, VK_SPACE,
+	'E', 'R', 'C', 'V',
+	VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT,
+	VK_NUMPAD8, VK_NUMPAD2, VK_NUMPAD4, VK_NUMPAD6
 };
 
 static int s_pads[BIND_COUNT] = {
 	PAD_BTN_DPAD_UP, PAD_BTN_DPAD_DOWN, PAD_BTN_DPAD_LEFT, PAD_BTN_DPAD_RIGHT,
 	PAD_BTN_A, PAD_BTN_B, PAD_BTN_X, PAD_BTN_Y,
-	PAD_BTN_LB, PAD_BTN_RB, PAD_BTN_START, PAD_BTN_BACK
+	PAD_BTN_LB, PAD_BTN_RB, PAD_BTN_START, PAD_BTN_BACK,
+	PAD_BTN_LT, PAD_BTN_RT, PAD_BTN_L3, PAD_BTN_R3,
+	// The physical sticks feed the axes directly, so the analog bindings start
+	// unassigned on a gamepad; they are there for anyone who wants to put a
+	// stick direction on a button.
+	PAD_BTN_NONE, PAD_BTN_NONE, PAD_BTN_NONE, PAD_BTN_NONE,
+	PAD_BTN_NONE, PAD_BTN_NONE, PAD_BTN_NONE, PAD_BTN_NONE
 };
 
 // Escape and F12 open and close the menu. Letting either be bound to a game
@@ -70,6 +98,30 @@ int InputBindRetroId(int bind)
 {
 	if (bind < 0 || bind >= BIND_COUNT) return 0;
 	return s_defs[bind].retro_id;
+}
+
+bool InputBindIsAnalog(int bind)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return false;
+	return s_defs[bind].stick >= 0;
+}
+
+int InputBindAnalogStick(int bind)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return -1;
+	return s_defs[bind].stick;
+}
+
+int InputBindAnalogAxis(int bind)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return 0;
+	return s_defs[bind].axis;
+}
+
+int InputBindAnalogSign(int bind)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return 0;
+	return s_defs[bind].sign;
 }
 
 int InputBindGetKey(int bind)
@@ -120,8 +172,15 @@ bool InputBindSetKey(int bind, int vk)
 
 	// A key already used elsewhere is handed over rather than duplicated:
 	// two buttons on one key means one of them can never be pressed alone.
+	//
+	// Only within the same group, though. A key on both a button and a stick
+	// direction is not ambiguous - they drive different things - and the
+	// default bindings rely on it: the arrows work the d-pad AND the left
+	// stick, so a keyboard can move in games that only walk on the stick.
+	const bool analog = InputBindIsAnalog(bind);
 	for (int i = 0; i < BIND_COUNT; i++)
-		if (i != bind && s_keys[i] == vk) s_keys[i] = 0;
+		if (i != bind && s_keys[i] == vk && InputBindIsAnalog(i) == analog)
+			s_keys[i] = 0;
 
 	s_keys[bind] = vk;
 	return true;
@@ -132,9 +191,11 @@ bool InputBindSetPad(int bind, int pad_code)
 	if (bind < 0 || bind >= BIND_COUNT) return false;
 	if (pad_code <= 0) return false;
 
-	// Transfer if duplicate
+	// Transfer if duplicate, within the same group only - see InputBindSetKey.
+	const bool analog = InputBindIsAnalog(bind);
 	for (int i = 0; i < BIND_COUNT; i++)
-		if (i != bind && s_pads[i] == pad_code) s_pads[i] = 0;
+		if (i != bind && s_pads[i] == pad_code && InputBindIsAnalog(i) == analog)
+			s_pads[i] = 0;
 
 	s_pads[bind] = pad_code;
 	return true;

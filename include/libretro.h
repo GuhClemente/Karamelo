@@ -300,6 +300,18 @@ typedef size_t (*retro_audio_sample_batch_t)(const int16_t *data, size_t frames)
 typedef void (*retro_input_poll_t)(void);
 typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device, unsigned index, unsigned id);
 
+/* Passed by the core through SET_INPUT_DESCRIPTORS so the frontend can label
+   each control the way that core names it. The array is terminated by an entry
+   whose description is NULL. */
+struct retro_input_descriptor
+{
+	unsigned port;
+	unsigned device;
+	unsigned index;
+	unsigned id;
+	const char *description;
+};
+
 #ifdef __cplusplus
 }
 #endif
