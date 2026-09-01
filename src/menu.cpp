@@ -1204,6 +1204,13 @@ void PopulateAbout() {
 }
 
 void PopulateUpdate() {
+  // This screen's action rows use ids 391-393, not the 3xx range Video
+  // Settings already owns - KEY_LEFT/KEY_RIGHT's dispatch chain matches
+  // action_id alone with no current_state check, so reusing 301/302/303
+  // here (as this used to) let pressing Left/Right instead of Select on
+  // "Retry"/"Download"/"Restart" silently cycle Aspect Ratio/CRT Shader/
+  // Wallpaper and switch the screen to Video Settings out from under
+  // STATE_UPDATE.
   items.clear();
   current_title = "Update";
   OsdSetSize(10);
@@ -1228,7 +1235,7 @@ void PopulateUpdate() {
     items.push_back({"Status", "Atualizado!", false, false, 0});
     items.push_back({"Voce ja possui a", "versao mais recente", false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Verificar Novamente", ">", false, true, 301});
+    items.push_back({"Verificar Novamente", ">", false, true, 391});
   } else if (state == UPDATER_STATE_AVAILABLE) {
     items.push_back({"Status", "Nova Versao!", false, false, 0});
     if (!info.notes.empty()) {
@@ -1237,7 +1244,7 @@ void PopulateUpdate() {
       items.push_back({"Novidades", note, false, false, 0});
     }
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Baixar e Atualizar", ">", false, true, 302});
+    items.push_back({"Baixar e Atualizar", ">", false, true, 392});
   } else if (state == UPDATER_STATE_DOWNLOADING) {
     int prog = UpdaterGetProgress();
     char prog_str[32];
@@ -1256,7 +1263,7 @@ void PopulateUpdate() {
     items.push_back({"Status", "Pronto!", false, false, 0});
     items.push_back({"Download Concluido", "", false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Reiniciar Agora", ">", false, true, 303});
+    items.push_back({"Reiniciar Agora", ">", false, true, 393});
   } else if (state == UPDATER_STATE_ERROR) {
     items.push_back({"Status", "Erro de conexao", false, false, 0});
     std::string err_msg = UpdaterGetStatusMessage();
@@ -2433,13 +2440,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
         selected_idx = 0;
       }
     } else if (current_state == STATE_UPDATE) {
-      if (item.action_id == 301) {
+      if (item.action_id == 391) {
         UpdaterCheckAsync(true);
         PopulateUpdate();
-      } else if (item.action_id == 302) {
+      } else if (item.action_id == 392) {
         UpdaterStartDownload();
         PopulateUpdate();
-      } else if (item.action_id == 303) {
+      } else if (item.action_id == 393) {
         CoreSetToast("REINICIANDO PARA ATUALIZAR...", 300);
         UpdaterApplyAndRestart();
       } else if (item.action_id == 399) {
