@@ -386,6 +386,35 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 	return "";
 }
 
+bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_dir)
+{
+	if (!fs::exists(archive_path)) return false;
+	fs::create_directories(dest_dir);
+
+	// 1. Try Windows tar.exe (fast native extractor)
+	std::string tar_cmd = "tar.exe -xf \"" + archive_path + "\" -C \"" + dest_dir + "\"";
+	bool ok = RunHiddenCommand(tar_cmd);
+
+	// 2. Only if tar genuinely failed (RAR, or a format it cannot read) fall
+	//    back to PowerShell. Running both against the same folder corrupts the
+	//    result. RunHiddenCommand now guarantees tar is no longer alive here.
+	if (!ok)
+	{
+		// A single quote inside the path closes the PowerShell string early, so a
+		// ROM named after "Marvel's ..." or "Tony Hawk's ..." never extracted.
+		// Doubling it is how PowerShell escapes a quote inside a literal string.
+		auto ps_quote = [](const std::string& s) {
+			std::string out;
+			for (char c : s) { out += c; if (c == '\'') out += c; }
+			return out;
+		};
+		std::string ps_cmd = "powershell.exe -NoProfile -NonInteractive -Command \"try { Expand-Archive -LiteralPath '" + ps_quote(archive_path) + "' -DestinationPath '" + ps_quote(dest_dir) + "' -Force } catch {}\"";
+		RunHiddenCommand(ps_cmd);
+	}
+
+	return fs::exists(dest_dir) && !fs::is_empty(dest_dir);
+}
+
 bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extracted_rom_path, std::string& out_core_dll)
 {
 	fs::path arch_path(archive_path);
@@ -404,30 +433,7 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 	}
 
 	std::string cache_dir = (fs::current_path() / "cache" / stem).string();
-	fs::create_directories(cache_dir);
-
-	// 1. Try Windows tar.exe (fast native extractor)
-	std::string tar_cmd = "tar.exe -xf \"" + archive_path + "\" -C \"" + cache_dir + "\"";
-	bool ok = RunHiddenCommand(tar_cmd);
-
-	// 2. Only if tar genuinely failed (RAR, or a format it cannot read) fall
-	//    back to PowerShell. Running both against the same folder corrupts the
-	//    result. RunHiddenCommand now guarantees tar is no longer alive here.
-	if (!ok)
-	{
-		// A single quote inside the path closes the PowerShell string early, so a
-		// ROM named after "Marvel's ..." or "Tony Hawk's ..." never extracted.
-		// Doubling it is how PowerShell escapes a quote inside a literal string.
-		auto ps_quote = [](const std::string& s) {
-			std::string out;
-			for (char c : s) { out += c; if (c == '\'') out += c; }
-			return out;
-		};
-		std::string ps_cmd = "powershell.exe -NoProfile -NonInteractive -Command \"try { Expand-Archive -LiteralPath '" + ps_quote(archive_path) + "' -DestinationPath '" + ps_quote(cache_dir) + "' -Force } catch {}\"";
-		RunHiddenCommand(ps_cmd);
-	}
-
-	if (!fs::exists(cache_dir) || fs::is_empty(cache_dir)) return false;
+	if (!ArchiveExtractAll(archive_path, cache_dir)) return false;
 
 	// 3. Scan the extracted directory. Ordered by priority, not by whatever the
 	//    filesystem happens to return first: a multi-track disc set contains a

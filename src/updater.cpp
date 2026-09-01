@@ -309,6 +309,25 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 	return success;
 }
 
+bool UpdaterHttpGetString(const std::string& url, std::string& out_body)
+{
+	out_body.clear();
+	return HttpFetchData(url, &out_body, NULL, NULL, 0, false);
+}
+
+bool UpdaterHttpDownloadToFile(const std::string& url, const std::string& dest_path)
+{
+	std::vector<uint8_t> data;
+	if (!HttpFetchData(url, NULL, &data, NULL, 0, false) || data.empty())
+		return false;
+
+	FILE* f = fopen(dest_path.c_str(), "wb");
+	if (!f) return false;
+	size_t written = fwrite(data.data(), 1, data.size(), f);
+	fclose(f);
+	return written == data.size();
+}
+
 // Background Worker Thread
 static DWORD WINAPI UpdaterThreadProc(LPVOID)
 {

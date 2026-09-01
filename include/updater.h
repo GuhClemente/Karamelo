@@ -46,4 +46,12 @@ const char*      UpdaterGetStatusMessage();
 // Version comparison utility: returns true if remote_ver is newer than current_ver
 bool UpdaterIsNewerVersion(const std::string& current_ver, const std::string& remote_ver);
 
+// Generic WinHTTP helpers, factored out of the self-update flow above so the
+// ports installer (GitHub releases downloads) does not need its own copy of
+// the same request/redirect/HTTPS boilerplate. Synchronous - call off the UI
+// thread. No progress tracking; the update flow's own progress bar uses the
+// internal HttpFetchData directly for that.
+bool UpdaterHttpGetString(const std::string& url, std::string& out_body);
+bool UpdaterHttpDownloadToFile(const std::string& url, const std::string& dest_path);
+
 #endif // UPDATER_H_INCLUDED
