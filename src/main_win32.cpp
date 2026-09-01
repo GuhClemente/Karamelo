@@ -1454,6 +1454,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	timeEndPeriod(1);
 
+	// Before CoreShutdown(): a hung core's recovery path (RecoverAfterKilledCore)
+	// deletes and recreates toast_lock on the assumption nothing else is using
+	// it, which is false while a port's background thread could still be
+	// calling CoreSetToast() through it.
+	PortShutdown();
 	CoreShutdown();
 	RaShutdown();
 	UpdaterShutdown();
