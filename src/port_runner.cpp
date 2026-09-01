@@ -22,6 +22,15 @@ extern HWND MainGetHwnd();
 static std::atomic<bool> s_port_running(false);
 static std::atomic<bool> s_installing(false);
 
+// Every detached background thread this file spawns (the download-install
+// thread, the process-exit-monitor thread) increments this at the top and
+// decrements it right before returning - after its last touch of any shared
+// state, CoreSetToast() included. Nothing previously waited for these
+// threads before the app could tear down toast_lock (RecoverAfterKilledCore,
+// on a hung-core kill happening at the same moment) or exit the process
+// while one was still mid-callback. PortShutdown() polls this to drain.
+static std::atomic<int> s_active_bg_threads(0);
+
 // A finished background install used to hand off to the launch sequence by
 // calling PortLaunch() recursively from the install thread itself. That put
 // CoreShutdown(), the window minimize/restore calls, and CreateProcessW all
@@ -748,7 +757,14 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     HANDLE hThread = pi.hThread;
 
     std::thread([hProcess, hThread, hwnd]() {
+        // The wait itself can run for as long as the user plays (hours) - it
+        // is not counted in s_active_bg_threads, or PortShutdown() would
+        // block app shutdown on the game still being open instead of just
+        // waiting out this thread's own brief cleanup tail below, which is
+        // the only part that touches shared state (OsdEnable(), and
+        // indirectly toast_lock through it) a hung-core recovery could race.
         WaitForSingleObject(hProcess, INFINITE);
+        s_active_bg_threads.fetch_add(1);
         CloseHandle(hThread);
         CloseHandle(hProcess);
 
@@ -761,6 +777,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
             SetFocus(hwnd);
         }
         OsdEnable();
+        s_active_bg_threads.fetch_sub(1);
     }).detach();
 
     return true;
@@ -799,6 +816,7 @@ bool PortLaunch(const std::string& port_id) {
         CoreSetToast(("BAIXANDO " + def->display_name + "...").c_str(), 600);
 
         PortDefinition def_copy = *def;
+        s_active_bg_threads.fetch_add(1);
         std::thread([def_copy]() {
             std::string error;
             bool ok = DownloadAndInstall(def_copy, error);
@@ -806,6 +824,7 @@ bool PortLaunch(const std::string& port_id) {
 
             if (!ok) {
                 CoreSetToast(("FALHA AO BAIXAR PORT: " + error).c_str(), 240);
+                s_active_bg_threads.fetch_sub(1);
                 return;
             }
 
@@ -819,6 +838,7 @@ bool PortLaunch(const std::string& port_id) {
             s_pending_launch_id = def_copy.id;
             LeaveCriticalSection(&s_pending_lock);
             s_has_pending_launch.store(true);
+            s_active_bg_threads.fetch_sub(1);
         }).detach();
 
         return true;
@@ -850,6 +870,22 @@ void PortPumpPendingLaunch() {
 
 bool PortIsRunning() {
     return s_port_running.load();
+}
+
+// Waits (briefly) for any in-flight download-install or just-exited-process
+// cleanup thread to finish, so the app doesn't tear down shared state (most
+// importantly toast_lock, via RecoverAfterKilledCore() on a simultaneous
+// hung-core kill) while one of them could still be calling CoreSetToast()
+// through it. Does NOT wait for a still-open native port to close - see the
+// comment on the exit-monitor thread in LaunchResolvedExecutable() for why
+// that would block shutdown on the user's game instead of on this file's own
+// brief cleanup work.
+void PortShutdown() {
+    DWORD waited_ms = 0;
+    while (s_active_bg_threads.load() > 0 && waited_ms < 5000) {
+        Sleep(50);
+        waited_ms += 50;
+    }
 }
 
 bool PortInstallOnly(const std::string& port_id, std::string& out_error) {

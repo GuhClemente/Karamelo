@@ -31,6 +31,13 @@ bool PortLaunch(const std::string& port_id);
 // Checks if an external port process is currently active
 bool PortIsRunning();
 
+// Waits briefly for any in-flight background thread (download-install, or a
+// just-exited port's cleanup) to finish. Call once at app shutdown, before
+// CoreShutdown() - a hung core's recovery path tears down toast_lock on the
+// assumption nothing else can be touching it, which is false while one of
+// these threads could still be calling CoreSetToast().
+void PortShutdown();
+
 // Must be called once per frame from the UI thread (the main message loop).
 // Performs the actual launch of a port whose background download just
 // finished - PortLaunch()'s install thread only signals that a launch is

@@ -699,6 +699,28 @@ void RaInit()
 
 void RaShutdown()
 {
+	// Stop the HTTP worker before touching g_client/the job queues it can
+	// still be pushing into - RaServerCall's WinHttpSetTimeouts allows up to
+	// 30s for a single send/receive, so a 5s wait routinely returned before
+	// the thread actually stopped. It never deletes anything the thread
+	// still touches (g_http_lock is never explicitly deleted, only leaked at
+	// process exit like the OS reclaims everything else), but letting the
+	// thread outlive this function risks it still writing into
+	// g_http_pending/g_http_done while those deques are torn down by CRT
+	// static destruction as the process actually exits.
+	if (InterlockedExchange(&g_http_running, 0))
+	{
+		if (g_http_event) SetEvent(g_http_event);
+		if (g_http_thread)
+		{
+			WaitForSingleObject(g_http_thread, 31000);
+			CloseHandle(g_http_thread);
+			g_http_thread = NULL;
+		}
+	}
+
+	if (g_http_event) { CloseHandle(g_http_event); g_http_event = NULL; }
+
 	EnterCriticalSection(&g_client_lock);
 	if (g_client)
 	{
@@ -706,19 +728,6 @@ void RaShutdown()
 		g_client = NULL;
 	}
 	LeaveCriticalSection(&g_client_lock);
-
-	if (InterlockedExchange(&g_http_running, 0))
-	{
-		if (g_http_event) SetEvent(g_http_event);
-		if (g_http_thread)
-		{
-			WaitForSingleObject(g_http_thread, 5000);
-			CloseHandle(g_http_thread);
-			g_http_thread = NULL;
-		}
-	}
-
-	if (g_http_event) { CloseHandle(g_http_event); g_http_event = NULL; }
 
 	rc_libretro_memory_destroy(&g_memory_regions);
 	g_memory_ready = false;
