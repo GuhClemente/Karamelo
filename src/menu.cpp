@@ -20,6 +20,7 @@
 #include "netplay.h"
 #include "osd.h"
 #include "retroachievements.h"
+#include "updater.h"
 
 namespace fs = std::filesystem;
 
@@ -31,7 +32,8 @@ enum MenuState {
   STATE_AUDIO,
   STATE_CONTROLLER,
   STATE_NETPLAY,
-  STATE_ABOUT
+  STATE_ABOUT,
+  STATE_UPDATE
 };
 
 struct MenuItem {
@@ -550,6 +552,7 @@ void PopulateNetplay();
 void PopulateAbout();
 void PopulateRetroAchievements();
 void PopulateAchievementList();
+void PopulateUpdate();
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
 static int neo_bios = 0;         // 0: Original, 1: UniBIOS
@@ -1184,6 +1187,79 @@ void PopulateAbout() {
   scroll_top = 0;
 }
 
+void PopulateUpdate() {
+  items.clear();
+  current_title = "Update";
+  OsdSetSize(10);
+
+  UpdaterState state = UpdaterGetState();
+  const UpdateInfo &info = UpdaterGetInfo();
+
+  items.push_back({"Versao Atual", "v" APP_VERSION, false, false, 0});
+
+  if (!info.version.empty()) {
+    items.push_back({"Versao Remota", "v" + info.version, false, false, 0});
+  } else {
+    items.push_back({"Versao Remota", "...", false, false, 0});
+  }
+
+  items.push_back({" ", "", false, false, 0});
+
+  if (state == UPDATER_STATE_CHECKING) {
+    items.push_back({"Status", "Verificando...", false, false, 0});
+    items.push_back({"Consultando servidor", "Aguarde", false, false, 0});
+  } else if (state == UPDATER_STATE_UP_TO_DATE) {
+    items.push_back({"Status", "Atualizado!", false, false, 0});
+    items.push_back({"Voce ja possui a", "versao mais recente", false, false, 0});
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({"Verificar Novamente", ">", false, true, 301});
+  } else if (state == UPDATER_STATE_AVAILABLE) {
+    items.push_back({"Status", "Nova Versao!", false, false, 0});
+    if (!info.notes.empty()) {
+      std::string note = info.notes;
+      if (note.length() > 24) note = note.substr(0, 22) + "..";
+      items.push_back({"Novidades", note, false, false, 0});
+    }
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({"Baixar e Atualizar", ">", false, true, 302});
+  } else if (state == UPDATER_STATE_DOWNLOADING) {
+    int prog = UpdaterGetProgress();
+    char prog_str[32];
+    snprintf(prog_str, sizeof(prog_str), "%d%%", prog);
+    items.push_back({"Status", "Baixando...", false, false, 0});
+    items.push_back({"Progresso", prog_str, false, false, 0});
+
+    char bar[26];
+    int filled = (prog * 16) / 100;
+    bar[0] = '[';
+    for (int b = 0; b < 16; b++) bar[b + 1] = (b < filled) ? '=' : ' ';
+    bar[17] = ']';
+    bar[18] = '\0';
+    items.push_back({bar, prog_str, false, false, 0});
+  } else if (state == UPDATER_STATE_READY) {
+    items.push_back({"Status", "Pronto!", false, false, 0});
+    items.push_back({"Download Concluido", "", false, false, 0});
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({"Reiniciar Agora", ">", false, true, 303});
+  } else if (state == UPDATER_STATE_ERROR) {
+    items.push_back({"Status", "Erro de conexao", false, false, 0});
+    std::string err_msg = UpdaterGetStatusMessage();
+    if (err_msg.length() > 24) err_msg = err_msg.substr(0, 22) + "..";
+    items.push_back({err_msg, "", false, false, 0});
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({"Tentar Novamente", ">", false, true, 301});
+  } else {
+    items.push_back({"Status", "Pronto", false, false, 0});
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({"Verificar Atualizacoes", ">", false, true, 301});
+  }
+
+  items.push_back({"Voltar", "", false, true, 399});
+
+  if (selected_idx >= (int)items.size()) selected_idx = (int)items.size() - 1;
+  if (selected_idx < 0) selected_idx = 0;
+}
+
 void PopulateBrowse(const std::string &dirpath) {
   items.clear();
 
@@ -1650,6 +1726,18 @@ void MenuRun() {
     StarsUpdate(640, 360);
   }
 
+  if (current_state == STATE_UPDATE) {
+    static UpdaterState s_last_updater_state = UPDATER_STATE_IDLE;
+    static int s_last_updater_progress = -1;
+    UpdaterState cur_s = UpdaterGetState();
+    int cur_p = UpdaterGetProgress();
+    if (cur_s != s_last_updater_state || cur_p != s_last_updater_progress) {
+      s_last_updater_state = cur_s;
+      s_last_updater_progress = cur_p;
+      PopulateUpdate();
+    }
+  }
+
   if (!OsdIsEnabled()) {
     return;
   }
@@ -2102,7 +2190,15 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateSettings();
       } else if (item.action_id == 30) // Update
       {
-        status_msg = APP_NAME " is up to date!";
+        main_menu_saved_idx = selected_idx;
+        current_state = STATE_UPDATE;
+        selected_idx = 0;
+        scroll_top = 0;
+        UpdaterState s = UpdaterGetState();
+        if (s == UPDATER_STATE_IDLE || s == UPDATER_STATE_ERROR) {
+          UpdaterCheckAsync(true);
+        }
+        PopulateUpdate();
       } else if (item.action_id >= 101 && item.action_id <= 135) {
         main_menu_saved_idx = selected_idx;
         if (item.action_id == 101) {
@@ -2286,6 +2382,21 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateAudioSettings();
         selected_idx = 0;
       }
+    } else if (current_state == STATE_UPDATE) {
+      if (item.action_id == 301) {
+        UpdaterCheckAsync(true);
+        PopulateUpdate();
+      } else if (item.action_id == 302) {
+        UpdaterStartDownload();
+        PopulateUpdate();
+      } else if (item.action_id == 303) {
+        CoreSetToast("REINICIANDO PARA ATUALIZAR...", 300);
+        UpdaterApplyAndRestart();
+      } else if (item.action_id == 399) {
+        current_state = STATE_MAIN;
+        PopulateMainMenu();
+        selected_idx = main_menu_saved_idx;
+      }
     } else if (current_state == STATE_BROWSE) {
       if (item.label == "<..>") {
         BrowseGoUp();
@@ -2314,7 +2425,6 @@ static void MenuProcessKeyImpl(MenuKey key) {
     }
     break;
   }
-
   case KEY_CANCEL:
     if (current_state == STATE_BROWSE) {
       BrowseGoUp();
@@ -2323,9 +2433,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
                current_state == STATE_NETPLAY || current_state == STATE_ABOUT) {
       current_state = STATE_SETTINGS;
       PopulateSettings();
+    } else if (current_state == STATE_UPDATE) {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
+      selected_idx = main_menu_saved_idx;
     } else if (current_state == STATE_SETTINGS) {
       current_state = STATE_MAIN;
       PopulateMainMenu();
+      selected_idx = main_menu_saved_idx;
     } else if (CoreIsRunning()) {
       OsdDisable();
     }

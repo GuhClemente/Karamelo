@@ -23,10 +23,12 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     tests\test_archive.cpp ^
     tests\test_netplay.cpp ^
     tests\test_math_video.cpp ^
+    tests\test_updater.cpp ^
     src\mister_math.cpp ^
     src\netplay_protocol.cpp ^
     src\archive_helper.cpp ^
-    /link /OUT:build\mister_tests.exe /SUBSYSTEM:CONSOLE
+    src\updater.cpp ^
+    /link /OUT:build\mister_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib shell32.lib user32.lib
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Unit test compilation failed.

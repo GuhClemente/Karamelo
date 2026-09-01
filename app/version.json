@@ -1,0 +1,11 @@
+﻿{
+    "exe_url":  "https://mister4all.com/downloads/MiSTer_4_ALL.exe",
+    "exe_size":  1194496,
+    "zip_url":  "https://mister4all.com/downloads/MiSTer_4_ALL_v0.9.0_Win64.zip",
+    "version":  "0.9.0",
+    "release_date":  "2026-08-31",
+    "notes":  "Versao de producao MiSTer 4 ALL",
+    "exe_sha256":  "",
+    "force_full_package":  false,
+    "title":  "MiSTer 4 ALL v0.9.0"
+}
