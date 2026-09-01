@@ -14,8 +14,8 @@ if not exist build mkdir build
 if not exist app mkdir app
 
 set APP_BASE=MiSTer_4_ALL
-set APP_VER=v1.0
-set APP_EXE=%APP_BASE%_%APP_VER%.exe
+for /f "tokens=3" %%v in ('findstr /c:"#define APP_VERSION " include\app_info.h') do set APP_VER=%%~v
+set APP_EXE=%APP_BASE%_v%APP_VER%.exe
 
 rem Close any running instances so the linker does not fail with LNK1104 (file in use)
 taskkill /F /IM "%APP_EXE%" >nul 2>&1
@@ -66,6 +66,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
     src\archive_helper.cpp ^
     src\netplay.cpp ^
     src\retroachievements.cpp ^
+    src\updater.cpp ^
     src\main_win32.cpp ^
     third_party\rcheevos\src\*.c ^
     third_party\rcheevos\src\rapi\*.c ^
@@ -74,29 +75,30 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
     build\resource.res ^
     build\unity.obj ^
     /link /OUT:app\%APP_EXE% ^
-    user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib opengl32.lib dwmapi.lib ^
+    user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib dwmapi.lib ^
     /SUBSYSTEM:WINDOWS /DEBUG /MAP:build\%APP_BASE%.map /OPT:REF /OPT:ICF
 
-if %ERRORLEVEL% equ 0 (
-    echo.
-    echo [BUILD SUCCESS] app\%APP_EXE%
-    echo.
-    echo ==================================================
-    echo [RUNNING AUTOMATED UNIT TESTS]
-    echo ==================================================
-    rem Delegate instead of keeping a second copy of the recipe. The copy that
-    rem lived here had gone stale: it never linked the production sources the
-    rem tests call, so it failed to build while run_tests.bat passed 17/17.
-    rem Absolute path: vcvars64.bat changes the working directory, so a bare
-    rem name is not found by the time we get here.
-    call "%~dp0run_tests.bat"
-    if errorlevel 1 (
-        echo [BUILD FAILED] Unit tests failed.
-        exit /b 1
-    )
-) else (
+if errorlevel 1 (
     echo.
     echo [BUILD FAILED] Compilation errors occurred.
+    exit /b 1
 )
 
-exit /b %ERRORLEVEL%
+echo.
+echo [BUILD SUCCESS] app\%APP_EXE%
+copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
+
+rem Gerar version.json automatico
+powershell -NoProfile -Command "$size = (Get-Item 'app\%APP_EXE%').Length; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'MiSTer 4 ALL v%APP_VER%'; release_date = $date; notes = 'Versao de producao MiSTer 4 ALL'; exe_url = 'https://mister4all.com/downloads/MiSTer_4_ALL.exe'; exe_size = $size; exe_sha256 = ''; zip_url = 'https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'app\version.json' -Value $json -Encoding UTF8"
+echo [VERSION.JSON] Gerado em app\version.json (v%APP_VER%)
+echo.
+echo ==================================================
+echo [RUNNING AUTOMATED UNIT TESTS]
+echo ==================================================
+call "%~dp0run_tests.bat"
+if errorlevel 1 (
+    echo [BUILD FAILED] Unit tests failed.
+    exit /b 1
+)
+
+exit /b 0

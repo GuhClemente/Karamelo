@@ -9,6 +9,23 @@ echo.
 
 cd /d "%~dp0"
 
+if "%~1" neq "" (
+    echo [0/4] Configurando versao de release para %~1...
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\bump_version.ps1 %~1
+    echo.
+)
+
+for /f "tokens=3" %%v in ('findstr /c:"#define APP_VERSION " include\app_info.h') do set APP_VER=%%~v
+set APP_BASE=MiSTer_4_ALL
+set APP_EXE=%APP_BASE%_v%APP_VER%.exe
+set DIST_NAME=%APP_BASE%_v%APP_VER%_Win64
+set DIST_DIR=%~dp0dist\%DIST_NAME%
+
+echo =======================================================
+echo   MiSTer 4 ALL v%APP_VER% - Packaging ^& Release Generator
+echo =======================================================
+echo.
+
 rem 1. Compile clean release binary
 echo [1/4] Compilando executavel de producao com /MT (Static CRT)...
 call compile_port.bat
@@ -18,8 +35,6 @@ if errorlevel 1 (
 )
 
 rem 2. Prepare distribution directories
-set DIST_NAME=MiSTer_4_ALL_v1.0_Win64
-set DIST_DIR=%~dp0dist\%DIST_NAME%
 
 echo.
 echo [2/4] Estruturando pacote de distribuicao em dist\%DIST_NAME%...
@@ -151,7 +166,7 @@ for %%S in (
 rem 3. Copy binaries and assets (Engines and wallpapers only - NO ROMs or BIOSes)
 echo.
 echo [3/4] Copiando executavel unico, motores e recursos...
-copy /Y "app\MiSTer_4_ALL_v1.0.exe" "%DIST_DIR%\MiSTer_4_ALL.exe" >nul
+copy /Y "app\%APP_EXE%" "%DIST_DIR%\MiSTer_4_ALL.exe" >nul
 copy /Y "app\cores\*.dll" "%DIST_DIR%\cores\" >nul 2>&1
 copy /Y "app\Wallpapers\*.*" "%DIST_DIR%\Wallpapers\" >nul 2>&1
 
@@ -161,7 +176,7 @@ del /s /q "%DIST_DIR%\*.bin" "%DIST_DIR%\*.iso" "%DIST_DIR%\*.cue" "%DIST_DIR%\*
 rem Create README with controls & guide
 (
 echo =====================================================================
-echo   MiSTer 4 ALL v1.0 - Windows x64 (C++20 Nativo)
+echo   MiSTer 4 ALL v%APP_VER% - Windows x64 (C++20 Nativo)
 echo   Site: https://mister4all.com ^| YouTube: @GuhClemente
 echo =====================================================================
 echo.
@@ -213,5 +228,12 @@ echo =======================================================
 echo   Arquivo: dist\%DIST_NAME%.zip
 echo.
 powershell -NoProfile -Command "$f = Get-Item '%~dp0dist\%DIST_NAME%.zip'; Write-Host ('   Tamanho: ' + [math]::Round($f.Length / 1MB, 2) + ' MB (' + $f.Length + ' bytes)'); $hash = Get-FileHash $f.FullName -Algorithm SHA256; Write-Host ('   SHA-256: ' + $hash.Hash)"
+
+rem 5. Prepare Standalone Executable & version.json for Auto-Updater
+copy /Y "app\%APP_EXE%" "dist\MiSTer_4_ALL.exe" >nul
+powershell -NoProfile -Command "$exe = Get-Item 'dist\MiSTer_4_ALL.exe'; $exeHash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'MiSTer 4 ALL v%APP_VER%'; release_date = $date; notes = 'Lancamento oficial do MiSTer 4 ALL com 35 sistemas nativos e Auto-Update.'; exe_url = 'https://mister4all.com/downloads/MiSTer_4_ALL.exe'; exe_size = $exe.Length; exe_sha256 = $exeHash; zip_url = 'https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'dist\version.json' -Value $json -Encoding UTF8"
+
+echo   Updater: dist\MiSTer_4_ALL.exe
+echo   Manifest: dist\version.json
 echo =======================================================
 echo.

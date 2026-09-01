@@ -20,6 +20,7 @@ namespace fs = std::filesystem;
 #include "core_runner.h"
 #include "netplay.h"
 #include "retroachievements.h"
+#include "updater.h"
 #include "hw_render.h"
 #include "resource.h"
 #include "mister_math.h"
@@ -1149,6 +1150,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	HwReleaseCurrent();
 
 	RaInit();
+	UpdaterInit();
 
 	// A path on the command line loads that game straight away. Useful for file
 	// associations and drag-and-drop, and it removes menu navigation as a
@@ -1286,6 +1288,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	CoreShutdown();
 	RaShutdown();
+	UpdaterShutdown();
 
 	if (h_mem_dc) DeleteDC(h_mem_dc);
 	if (h_bitmap) DeleteObject(h_bitmap);
