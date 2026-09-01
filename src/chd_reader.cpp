@@ -108,6 +108,16 @@ static void ClassifyTrack(const char* type, uint32_t* sector_size, uint32_t* dat
 	}
 }
 
+// Bounded local copies of libchdr's CDROM_TRACK_METADATA*_FORMAT macros
+// (third_party/libchdr/include/libchdr/chd.h - vendored, not ours to edit).
+// The vendored formats use unbounded %s, which lets a crafted/corrupt CHD's
+// TYPE/SUBTYPE/PGTYPE/PGSUB metadata field overflow the fixed 64-byte
+// buffers below; %63s caps each write to what type/subtype/pgtype/pgsub can
+// actually hold (63 chars + NUL).
+#define M4A_CDROM_TRACK_METADATA_FORMAT   "TRACK:%d TYPE:%63s SUBTYPE:%63s FRAMES:%d"
+#define M4A_CDROM_TRACK_METADATA2_FORMAT  "TRACK:%d TYPE:%63s SUBTYPE:%63s FRAMES:%d PREGAP:%d PGTYPE:%63s PGSUB:%63s POSTGAP:%d"
+#define M4A_GDROM_TRACK_METADATA_FORMAT   "TRACK:%d TYPE:%63s SUBTYPE:%63s FRAMES:%d PAD:%d PREGAP:%d PGTYPE:%63s PGSUB:%63s POSTGAP:%d"
+
 static bool ReadTrackTable(ChdTrackHandle* h)
 {
 	h->track_count = 0;
@@ -117,42 +127,47 @@ static bool ReadTrackTable(ChdTrackHandle* h)
 
 	for (uint32_t i = 0; i < MAX_TRACKS; i++)
 	{
-		char meta[512];
+		// Zero-initialized and read with sizeof(meta)-1 so meta[511] is
+		// always left as the zero-init NUL, guaranteeing termination even if
+		// chd_get_metadata() fills every requested byte with no NUL of its
+		// own (it makes no such guarantee - it just copies raw file bytes).
+		char meta[512] = { 0 };
 		uint32_t len = 0;
 		int num = 0, frames = 0, pregap = 0, postgap = 0;
 		uint32_t padding = 0;
 		char type[64] = { 0 }, subtype[64] = { 0 }, pgtype[64] = { 0 }, pgsub[64] = { 0 };
 
 		if (chd_get_metadata(h->chd, CDROM_TRACK_METADATA2_TAG, i,
-				meta, sizeof(meta), &len, NULL, NULL) == CHDERR_NONE)
+				meta, sizeof(meta) - 1, &len, NULL, NULL) == CHDERR_NONE)
 		{
-			if (sscanf(meta, CDROM_TRACK_METADATA2_FORMAT, &num, type, subtype,
+			if (sscanf(meta, M4A_CDROM_TRACK_METADATA2_FORMAT, &num, type, subtype,
 					&frames, &pregap, pgtype, pgsub, &postgap) != 8)
 				break;
 		}
 		else if (chd_get_metadata(h->chd, CDROM_TRACK_METADATA_TAG, i,
-				meta, sizeof(meta), &len, NULL, NULL) == CHDERR_NONE)
+				meta, sizeof(meta) - 1, &len, NULL, NULL) == CHDERR_NONE)
 		{
-			if (sscanf(meta, CDROM_TRACK_METADATA_FORMAT, &num, type, subtype, &frames) != 4)
+			if (sscanf(meta, M4A_CDROM_TRACK_METADATA_FORMAT, &num, type, subtype, &frames) != 4)
 				break;
 			pregap = 0;
 		}
 		else if (chd_get_metadata(h->chd, GDROM_TRACK_METADATA_TAG, i,
-				meta, sizeof(meta), &len, NULL, NULL) == CHDERR_NONE)
+				meta, sizeof(meta) - 1, &len, NULL, NULL) == CHDERR_NONE)
 		{
 			// Dreamcast discs are GD-ROMs and store their tracks under a
 			// different tag with an extra PAD field. Reading only the CD tags
 			// made every Dreamcast CHD report "sem metadados de faixa".
 			int pad = 0;
-			if (sscanf(meta, GDROM_TRACK_METADATA_FORMAT, &num, type, subtype,
+			if (sscanf(meta, M4A_GDROM_TRACK_METADATA_FORMAT, &num, type, subtype,
 					&frames, &pad, &pregap, pgtype, pgsub, &postgap) != 9)
 				break;
+			if (pad < 0) break;
 			padding = (uint32_t)pad;
 		}
 		else if (chd_get_metadata(h->chd, GDROM_OLD_METADATA_TAG, i,
-				meta, sizeof(meta), &len, NULL, NULL) == CHDERR_NONE)
+				meta, sizeof(meta) - 1, &len, NULL, NULL) == CHDERR_NONE)
 		{
-			if (sscanf(meta, CDROM_TRACK_METADATA_FORMAT, &num, type, subtype, &frames) != 4)
+			if (sscanf(meta, M4A_CDROM_TRACK_METADATA_FORMAT, &num, type, subtype, &frames) != 4)
 				break;
 			pregap = 0;
 		}
@@ -160,6 +175,14 @@ static bool ReadTrackTable(ChdTrackHandle* h)
 		{
 			break;
 		}
+
+		// A crafted/corrupt CHD can put a negative value in any of these -
+		// FRAMES:-1 cast straight to uint32_t would wrap to 0xFFFFFFFF and
+		// defeat ChdReadSector's only bounds check (offset_in_track >=
+		// t.frames), letting it read whatever frame that wraps to instead of
+		// cleanly rejecting the file. Reject the whole track table instead.
+		if (num < 0 || frames < 0 || pregap < 0 || postgap < 0)
+			break;
 
 		ChdTrack& t = h->tracks[h->track_count];
 		t.number = (uint32_t)num;

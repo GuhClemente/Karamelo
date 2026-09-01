@@ -135,12 +135,20 @@ int NetplayGetPingMs()
 	return ping_ms;
 }
 
+// NetplayStartHost/StartClient/Disconnect are called from the UI thread
+// (the Netplay menu) while NetplaySyncInputs()/NetplayUpdate() touch these
+// same globals - peer_sock included, mid send()/recv() - from the core
+// thread under net_lock. Without taking the same lock here, a disconnect
+// during an active session can close peer_sock (and hand its value back to
+// the OS to reuse) at the exact moment the core thread is using it.
 bool NetplayStartHost(int port)
 {
 	NetplayDisconnect();
 
+	EnterCriticalSection(&net_lock);
+
 	listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listen_sock == INVALID_SOCKET) return false;
+	if (listen_sock == INVALID_SOCKET) { LeaveCriticalSection(&net_lock); return false; }
 
 	// Without this, re-hosting within the TIME_WAIT window fails with
 	// WSAEADDRINUSE - about two minutes of "port busy" after every session.
@@ -158,6 +166,7 @@ bool NetplayStartHost(int port)
 	{
 		closesocket(listen_sock);
 		listen_sock = INVALID_SOCKET;
+		LeaveCriticalSection(&net_lock);
 		return false;
 	}
 
@@ -165,12 +174,14 @@ bool NetplayStartHost(int port)
 	{
 		closesocket(listen_sock);
 		listen_sock = INVALID_SOCKET;
+		LeaveCriticalSection(&net_lock);
 		return false;
 	}
 
 	net_role = NETPLAY_HOST;
 	net_state = NETPLAY_LISTENING;
 	status_str = "Hosting (Waiting for Player 2 on port " + std::to_string(port) + ")...";
+	LeaveCriticalSection(&net_lock);
 	CoreSetToast("NETPLAY: HOSTING SESSION", 120);
 	return true;
 }
@@ -179,8 +190,10 @@ bool NetplayStartClient(const char* host_ip, int port)
 {
 	NetplayDisconnect();
 
+	EnterCriticalSection(&net_lock);
+
 	peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (peer_sock == INVALID_SOCKET) return false;
+	if (peer_sock == INVALID_SOCKET) { LeaveCriticalSection(&net_lock); return false; }
 
 	sockaddr_in addr = { 0 };
 	addr.sin_family = AF_INET;
@@ -195,12 +208,15 @@ bool NetplayStartClient(const char* host_ip, int port)
 	net_role = NETPLAY_CLIENT;
 	net_state = NETPLAY_CONNECTING;
 	status_str = "Connecting to Host (" + std::string(host_ip) + ")...";
+	LeaveCriticalSection(&net_lock);
 	CoreSetToast("NETPLAY: CONNECTING TO HOST...", 120);
 	return true;
 }
 
 void NetplayDisconnect()
 {
+	EnterCriticalSection(&net_lock);
+
 	if (peer_sock != INVALID_SOCKET)
 	{
 		closesocket(peer_sock);
@@ -221,6 +237,8 @@ void NetplayDisconnect()
 	last_peer_tick = 0;
 	pending_tick = 0;
 	ping_ms = 0;
+
+	LeaveCriticalSection(&net_lock);
 }
 
 void NetplayUpdate()

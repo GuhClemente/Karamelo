@@ -195,6 +195,15 @@ static ToastLockInit g_toast_lock_init;
 static HANDLE h_core_thread = NULL;
 static volatile LONG core_thread_running = 0;
 
+// Set around every LoadLibraryA/FreeLibrary call the core thread makes.
+// TerminateThread()-ing the core thread while it owns the process-wide
+// loader lock (i.e. mid-LoadLibrary/FreeLibrary) wedges that lock forever -
+// every later LoadLibrary/FreeLibrary/CreateThread anywhere in the process,
+// including the next core load, then hangs with no explanation. CoreShutdown()
+// checks this before giving up and terminating, so it waits out a module
+// operation instead of interrupting one.
+static volatile LONG g_core_in_module_op = 0;
+
 // Async load state, owned by the core thread once it starts.
 #define CORE_STATE_IDLE    0
 #define CORE_STATE_LOADING 1
@@ -2056,6 +2065,8 @@ static void RecoverAfterKilledCore()
 	InitializeCriticalSection(&options_lock);
 	DeleteCriticalSection(&name_lock);
 	InitializeCriticalSection(&name_lock);
+	DeleteCriticalSection(&toast_lock);
+	InitializeCriticalSection(&toast_lock);
 
 	HwContextDestroy();
 
@@ -2068,6 +2079,22 @@ static void RecoverAfterKilledCore()
 	// mapping costs memory, not correctness - a different core still loads.
 	h_core_dll = NULL;
 
+	// Stop-then-close, same order as CoreUnload: AudioThreadProc is a separate
+	// live thread the core-thread kill above never touched. Closing h_wave_out
+	// out from under it while it can still be mid-waveOutWrite() races the
+	// handle close against that thread's own use of it.
+	if (audio_thread_running)
+	{
+		audio_thread_running = false;
+		if (h_audio_event) SetEvent(h_audio_event);
+		if (h_audio_thread)
+		{
+			WaitForSingleObject(h_audio_thread, 1000);
+			CloseHandle(h_audio_thread);
+			h_audio_thread = NULL;
+		}
+	}
+
 	if (h_wave_out)
 	{
 		waveOutReset(h_wave_out);
@@ -2076,8 +2103,6 @@ static void RecoverAfterKilledCore()
 		audio_initialized = false;
 	}
 	if (h_audio_event) { CloseHandle(h_audio_event); h_audio_event = NULL; }
-	if (h_audio_thread) { CloseHandle(h_audio_thread); h_audio_thread = NULL; }
-	audio_thread_running = false;
 
 	g_resample_phase = 0.0;
 	memset(g_hist_l, 0, sizeof(g_hist_l));
@@ -2103,7 +2128,26 @@ void CoreShutdown()
 		// app freezing when a game was closed.
 		if (WaitForSingleObject(h_core_thread, 3000) == WAIT_TIMEOUT)
 		{
-			TerminateThread(h_core_thread, 0);
+			// TerminateThread()-ing the core thread while it owns the process
+			// loader lock (mid-LoadLibrary/FreeLibrary) wedges that lock
+			// forever - worse than the freeze this timeout exists to avoid,
+			// since no thread anywhere in the process can ever LoadLibrary/
+			// FreeLibrary/CreateThread again. LoadLibrary/FreeLibrary normally
+			// finish in well under a second, so give a module op in flight a
+			// real chance to finish before resorting to TerminateThread.
+			int extra_waited_ms = 0;
+			while (InterlockedCompareExchange(&g_core_in_module_op, 0, 0) &&
+				extra_waited_ms < 5000)
+			{
+				if (WaitForSingleObject(h_core_thread, 200) != WAIT_TIMEOUT)
+					break;
+				extra_waited_ms += 200;
+			}
+
+			if (WaitForSingleObject(h_core_thread, 0) == WAIT_TIMEOUT)
+			{
+				TerminateThread(h_core_thread, 0);
+			}
 			CloseHandle(h_core_thread);
 			h_core_thread = NULL;
 			RecoverAfterKilledCore();
@@ -2223,6 +2267,12 @@ static void RetroUnloadGameGuarded()
 	__except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 
+static bool RetroGetSystemAvInfoGuarded(struct retro_system_av_info* av_info)
+{
+	__try { if (p_retro_get_system_av_info) p_retro_get_system_av_info(av_info); return true; }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
 static void RetroDeinitGuarded()
 {
 	__try { if (p_retro_deinit) p_retro_deinit(); }
@@ -2237,7 +2287,9 @@ static bool CoreLoad(const char* core_dll_path)
 	// names, so this is cleared on the way in rather than only on the way out.
 	ClearInputDescriptors();
 
+	InterlockedExchange(&g_core_in_module_op, 1);
 	h_core_dll = LoadLibraryA(core_dll_path);
+	InterlockedExchange(&g_core_in_module_op, 0);
 	if (!h_core_dll)
 	{
 		printf("[CoreRunner] Failed to load DLL: %s\n", core_dll_path);
@@ -2273,7 +2325,9 @@ static bool CoreLoad(const char* core_dll_path)
 	// null-call it later.
 	if (!p_retro_init || !p_retro_run || !p_retro_load_game || !p_retro_get_system_av_info)
 	{
+		InterlockedExchange(&g_core_in_module_op, 1);
 		FreeLibrary(h_core_dll);
+		InterlockedExchange(&g_core_in_module_op, 0);
 		h_core_dll = NULL;
 		return false;
 	}
@@ -2281,13 +2335,17 @@ static bool CoreLoad(const char* core_dll_path)
 	if (!RetroSetEnvironmentGuarded())
 	{
 		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] retro_set_environment falhou: %s", core_dll_path);
+		InterlockedExchange(&g_core_in_module_op, 1);
 		FreeLibrary(h_core_dll);
+		InterlockedExchange(&g_core_in_module_op, 0);
 		h_core_dll = NULL;
 		return false;
 	}
 	if (!RetroInitGuarded())
 	{
+		InterlockedExchange(&g_core_in_module_op, 1);
 		FreeLibrary(h_core_dll);
+		InterlockedExchange(&g_core_in_module_op, 0);
 		h_core_dll = NULL;
 		return false;
 	}
@@ -2474,7 +2532,15 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	SetPortDevicesGuarded();
 
 	struct retro_system_av_info av_info = { 0 };
-	p_retro_get_system_av_info(&av_info);
+	if (!RetroGetSystemAvInfoGuarded(&av_info))
+	{
+		CoreLogPrintf(RETRO_LOG_ERROR,
+			"[CoreRunner] Core faulted inside retro_get_system_av_info: %s", rom_path);
+		if (!suppress_toast)
+			CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
+		RetroUnloadGameGuarded();
+		return false;
+	}
 
 	core_fb_width = av_info.geometry.base_width > 0 ? av_info.geometry.base_width : 320;
 	core_fb_height = av_info.geometry.base_height > 0 ? av_info.geometry.base_height : 240;
@@ -2549,7 +2615,9 @@ static void CoreUnload()
 
 	if (h_core_dll)
 	{
+		InterlockedExchange(&g_core_in_module_op, 1);
 		FreeLibrary(h_core_dll);
+		InterlockedExchange(&g_core_in_module_op, 0);
 		h_core_dll = NULL;
 	}
 

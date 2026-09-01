@@ -688,8 +688,12 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     // 1. Auto-copy ROM if this port needs one and doesn't have it yet.
     if (def && def->needs_rom) PortAutoSetupRom(port_id);
 
-    // 2. Stop any active Libretro core
-    if (CoreIsRunning()) {
+    // 2. Stop any active Libretro core. CoreIsRunning() alone is false while
+    // a ROM/core is still on its way up (CORE_STATE_LOADING) - checking only
+    // that let a native port launch alongside a core load still running on
+    // its own thread in the background, instead of stopping it first like
+    // every other path into this function assumes happens here.
+    if (CoreIsRunning() || CoreIsLoading()) {
         CoreShutdown();
     }
 
