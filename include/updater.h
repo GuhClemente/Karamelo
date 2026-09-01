@@ -40,8 +40,11 @@ bool UpdaterApplyAndRestart();
 // Polling & Status
 UpdaterState     UpdaterGetState();
 int              UpdaterGetProgress(); // 0 to 100
-const UpdateInfo& UpdaterGetInfo();
-const char*      UpdaterGetStatusMessage();
+// Both return a copy taken under the lock, not a reference/pointer into the
+// live global - callers used to be able to read a value the updater thread
+// was concurrently overwriting.
+UpdateInfo  UpdaterGetInfo();
+std::string UpdaterGetStatusMessage();
 
 // Version comparison utility: returns true if remote_ver is newer than current_ver
 bool UpdaterIsNewerVersion(const std::string& current_ver, const std::string& remote_ver);

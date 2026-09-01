@@ -31,4 +31,17 @@ bool PortLaunch(const std::string& port_id);
 // Checks if an external port process is currently active
 bool PortIsRunning();
 
+// Must be called once per frame from the UI thread (the main message loop).
+// Performs the actual launch of a port whose background download just
+// finished - PortLaunch()'s install thread only signals that a launch is
+// pending, it never performs one itself, so CoreShutdown()/window/process
+// calls stay on the UI thread the rest of the app already assumes owns them.
+void PortPumpPendingLaunch();
+
+// Downloads and extracts a known port without launching it. Used by the
+// --install-port headless command-line mode so ports/ can be pre-populated
+// without going through the menu UI. Returns true immediately if the port
+// is already installed. Sets out_error on failure.
+bool PortInstallOnly(const std::string& port_id, std::string& out_error);
+
 #endif

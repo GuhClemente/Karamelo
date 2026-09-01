@@ -161,8 +161,16 @@ static bool SanitizeCue(const fs::path& cue_path, std::string& out_cue_path)
 
 			if (candidate_count != 1) return false; // ambiguous: leave it alone
 
+			// A FILE line with no closing quote (or no quotes at all) leaves
+			// close_quote at npos; substr(npos) throws std::out_of_range,
+			// which nothing here catches - it used to propagate out of this
+			// function entirely. Same treatment as an ambiguous match above:
+			// leave the line alone rather than fail the whole repair.
 			size_t open_quote = blocks[i][0].find('"');
-			size_t close_quote = blocks[i][0].find('"', open_quote + 1);
+			size_t close_quote = (open_quote == std::string::npos)
+				? std::string::npos : blocks[i][0].find('"', open_quote + 1);
+			if (open_quote == std::string::npos || close_quote == std::string::npos)
+				return false;
 			blocks[i][0] = blocks[i][0].substr(0, open_quote + 1) + candidate +
 						   blocks[i][0].substr(close_quote);
 			modified = true;

@@ -1173,9 +1173,12 @@ void PopulateAbout() {
     }
   }
 
-  char sys_str[32], core_str[32];
+  char sys_str[32], core_str[32], ports_str[32];
   snprintf(sys_str, sizeof(sys_str), "%d Sistemas", APP_SYSTEM_COUNT);
   snprintf(core_str, sizeof(core_str), "%d Cores", APP_CORE_ENGINES);
+  // Counted the same way Systems/Cores are - queried for real rather than a
+  // second hardcoded figure that this list would just as quietly outgrow.
+  snprintf(ports_str, sizeof(ports_str), "%d Jogos", (int)PortGetAvailableList().size());
 
   items.push_back({APP_NAME, "v" APP_VERSION " " APP_ARCH, false, false, 0});
   items.push_back({"Author", "Guh Clemente", false, false, 0});
@@ -1184,13 +1187,14 @@ void PopulateAbout() {
   items.push_back({"Engine", "Libretro", false, false, 0});
   items.push_back({"Systems", sys_str, false, false, 0});
   items.push_back({"Cores", core_str, false, false, 0});
+  items.push_back({"Ports & Recomp", ports_str, false, false, 0});
   items.push_back({"Netplay", "2P TCP/IP", false, false, 0});
   items.push_back({"Conquistas", RaIsEnabled() ? "Ativado" : "Desativado",
                    false, false, 0});
   items.push_back({"License", "Open Source", false, false, 0});
   items.push_back({"Back", "", false, true, 999});
 
-  selected_idx = 10;
+  selected_idx = 11;
   scroll_top = 0;
 }
 
@@ -2440,14 +2444,19 @@ static void MenuProcessKeyImpl(MenuKey key) {
         // Ports & Recomp entries are not filesystem paths under roms/ - the
         // label is the port's display name, matched back against the same
         // list PopulateBrowse built it from to find the launchable id.
+        //
+        // PortLaunch() is called unconditionally here, whether or not the
+        // port is installed yet - it already knows how to tell the two
+        // cases apart (download-then-launch vs. launch directly). An
+        // earlier version of this handler gated on p.is_installed itself
+        // and only called PortLaunch() for the already-installed case,
+        // which made every [BAIXAR] entry in this menu a dead button: the
+        // download path PortLaunch() implements for a missing install was
+        // simply never reached from here.
         auto plist = PortGetAvailableList();
         for (const auto &p : plist) {
           if (p.name == item.label) {
-            if (p.is_installed) {
-              PortLaunch(p.id);
-            } else {
-              CoreSetToast("PORT NAO INSTALADO EM ports/", 200);
-            }
+            PortLaunch(p.id);
             break;
           }
         }

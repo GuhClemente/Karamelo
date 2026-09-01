@@ -1107,6 +1107,76 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 	}
 
+	// Headless port install: "MiSTer_4_ALL.exe --install-port <id>" downloads
+	// and extracts a known port and exits, before any window is created, so
+	// ports/ can be pre-populated (packaging, CI, or just getting ahead of a
+	// slow download) without touching the menu UI at all.
+	if (__argc > 2 && _stricmp(__argv[1], "--install-port") == 0)
+	{
+		PortInit();
+		std::string install_error;
+		bool ok = PortInstallOnly(__argv[2], install_error);
+		FILE* lf = fopen("mister_flavor.log", "a");
+		if (lf)
+		{
+			fprintf(lf, "[INFO] [PORT-INSTALL] %s -> %s%s%s\n", __argv[2],
+				ok ? "OK" : "FALHOU", install_error.empty() ? "" : ": ", install_error.c_str());
+			fclose(lf);
+		}
+		return ok ? 0 : 1;
+	}
+
+	// Headless end-to-end test: "MiSTer_4_ALL.exe --launch-port <id>" calls
+	// PortLaunch() exactly the way the "Ports & Recomp" menu entry does -
+	// download-if-needed, then launch - and pumps PortPumpPendingLaunch()
+	// itself since there is no window/message loop running yet to do it.
+	// Exists to exercise that exact call path (including the background
+	// install thread and the pending-launch handoff) without needing the
+	// menu UI at all, since driving the actual menu risks stealing input
+	// focus from whatever else is running on the machine.
+	if (__argc > 2 && _stricmp(__argv[1], "--launch-port") == 0)
+	{
+		PortInit();
+		bool started = PortLaunch(__argv[2]);
+		FILE* lf = fopen("mister_flavor.log", "a");
+
+		DWORD waited_ms = 0;
+		while (started && !PortIsRunning() && waited_ms < 180000)
+		{
+			PortPumpPendingLaunch();
+			Sleep(200);
+			waited_ms += 200;
+		}
+
+		if (lf)
+		{
+			fprintf(lf, "[INFO] [PORT-LAUNCH-TEST] %s -> PortLaunch()=%s running_after_wait=%s (%lums)\n",
+				__argv[2], started ? "true" : "false", PortIsRunning() ? "true" : "false", waited_ms);
+			fclose(lf);
+		}
+		return (started && PortIsRunning()) ? 0 : 1;
+	}
+
+	// Diagnostic-only: logs what PortGetAvailableList() actually resolved for
+	// every known port (id, exe path, installed state) and exits. Exists so
+	// the executable-picking logic can be checked against real downloaded
+	// files without spawning a game or going through the menu.
+	if (__argc > 1 && _stricmp(__argv[1], "--list-ports") == 0)
+	{
+		PortInit();
+		FILE* lf = fopen("mister_flavor.log", "a");
+		if (lf)
+		{
+			for (const auto& p : PortGetAvailableList())
+			{
+				fprintf(lf, "[INFO] [PORT-LIST] %s installed=%d exe=%s\n",
+					p.id.c_str(), p.is_installed ? 1 : 0, p.exe_path.c_str());
+			}
+			fclose(lf);
+		}
+		return 0;
+	}
+
 	WNDCLASSEX wc = { 0 };
 	wc.cbSize = sizeof(WNDCLASSEX);
 	wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -1229,6 +1299,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 		PollGamepad();
 		PollMouseStylus();
+		PortPumpPendingLaunch();
 
 		if (MenuGetFullscreen() != g_is_fullscreen)
 		{

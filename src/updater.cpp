@@ -552,18 +552,27 @@ int UpdaterGetProgress()
 	return p;
 }
 
-const UpdateInfo& UpdaterGetInfo()
+UpdateInfo UpdaterGetInfo()
 {
+	// Copy while the lock is held and return the copy, not a reference/pointer
+	// into the live global - the previous version released the lock and then
+	// handed back exactly that, so the lock protected nothing at all: a
+	// caller reading info.version/info.notes could still race
+	// UpdaterThreadProc's "g_info = parsed_info;" and see a torn std::string.
 	EnterCriticalSection(&g_updater_lock);
-	const UpdateInfo& info = g_info;
+	UpdateInfo info = g_info;
 	LeaveCriticalSection(&g_updater_lock);
 	return info;
 }
 
-const char* UpdaterGetStatusMessage()
+std::string UpdaterGetStatusMessage()
 {
+	// Same fix as UpdaterGetInfo() above: the old const char* pointed straight
+	// into g_status_msg's buffer after the lock was already released, and a
+	// concurrent reassignment of g_status_msg could free that buffer out from
+	// under the caller. Returning a copy closes that window.
 	EnterCriticalSection(&g_updater_lock);
-	const char* msg = g_status_msg.c_str();
+	std::string msg = g_status_msg;
 	LeaveCriticalSection(&g_updater_lock);
 	return msg;
 }
