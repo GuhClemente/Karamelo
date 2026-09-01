@@ -954,6 +954,48 @@ void PopulateControllerSettings() {
   scroll_top = 0;
 }
 
+// Puts every persisted setting (video/audio/controller/per-system options)
+// back to the same value it has at first launch, then saves. Netplay's saved
+// IP and RetroAchievements login are deliberately left alone - those are
+// account/network info, not display or gameplay settings, and clearing them
+// would log the user out or lose their friend's address as a side effect of
+// "fix my messed-up video settings."
+static void ResetAllSettingsToDefault() {
+  setting_aspect = 0;
+  setting_filter = 0;
+  setting_pad_device = 0;
+  setting_wallpaper = 1;
+  setting_fullscreen = false;
+  setting_theme = 0;
+  setting_deadzone = 1;
+  setting_latency = 1;
+  setting_driver = 1;
+  setting_sync = 1;
+  setting_vsync = 1;
+  setting_n64_core = 0;
+  setting_arcade_core = 0;
+  setting_osd_timeout = 0;
+  setting_sms_fm = 0;
+  setting_nds_layout = 0;
+  setting_nds_gap = 0;
+  setting_nds_hybrid = 0;
+  setting_cd_precache = 0;
+  setting_cd_latency = 0;
+  neo_sys = 0;
+  neo_bios = 0;
+  neo_cd_type = 0;
+  neo_cd_region = 0;
+  neo_memcard = 0;
+  neo_dip_settings = 0;
+  neo_dip_freeplay = 0;
+
+  InputBindResetDefaults();
+  CoreSetVolume(100);
+  CoreSetMute(false);
+
+  MenuSaveSettings();
+}
+
 void PopulateSettings() {
   items.clear();
   current_title = "Settings";
@@ -965,6 +1007,7 @@ void PopulateSettings() {
   items.push_back({"Netplay (Online)", ">", false, true, 204});
   items.push_back({"RetroAchievements", ">", false, true, 206});
   items.push_back({"About", ">", false, true, 205});
+  items.push_back({"Restaurar Padroes de Fabrica", ">", false, true, 210});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -2392,6 +2435,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
       } else if (item.action_id == 205) {
         current_state = STATE_ABOUT;
         PopulateAbout();
+      } else if (item.action_id == 210) {
+        ResetAllSettingsToDefault();
+        PopulateSettings();
+        CoreSetToast("CONFIGURACOES RESTAURADAS AO PADRAO", 180);
       }
     } else if (current_state == STATE_CONTROLLER) {
       if (item.action_id == 500) {
