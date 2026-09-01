@@ -767,7 +767,14 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 }
 
 bool PortLaunch(const std::string& port_id) {
-    if (s_port_running.load()) return false;
+    // Unlike the s_installing check right below, this one used to return
+    // false with no toast at all - selecting any port while another one was
+    // still open (or its "still running" bookkeeping hadn't cleared yet)
+    // looked exactly like the menu doing nothing, with no way to tell why.
+    if (s_port_running.load()) {
+        CoreSetToast("JA HA UM PORT ABERTO - FECHE-O PRIMEIRO", 150);
+        return false;
+    }
 
     if (s_installing.load()) {
         CoreSetToast("JA HA UM DOWNLOAD DE PORT EM ANDAMENTO", 150);
