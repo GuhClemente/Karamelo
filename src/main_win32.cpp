@@ -9,6 +9,9 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <stdarg.h>
+#include <thread>
+#include <atomic>
 
 #include "osd.h"
 #include "menu.h"
@@ -1175,6 +1178,97 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			fclose(lf);
 		}
 		return 0;
+	}
+
+	// Headless core lifecycle smoke test: "MiSTer_4_ALL.exe --core-selftest
+	// <core.dll> <rom_path>" loads a core+ROM through the exact same
+	// CoreRequestLoad()/CoreShutdown() path the menu uses, with no window or
+	// message loop needed - the core thread's own run loop and timers are
+	// self-contained. Exists to exercise (and time) the crash-recovery path
+	// in CoreShutdown()/RecoverAfterKilledCore() against a real hung core
+	// DLL, and to confirm the engine can still load a *different* core
+	// afterward instead of staying wedged - without needing to reproduce a
+	// real core hang by hand.
+	if (__argc > 3 && _stricmp(__argv[1], "--core-selftest") == 0)
+	{
+		FILE* lf = fopen("mister_flavor.log", "a");
+		auto log = [&](const char* fmt, ...) {
+			if (!lf) return;
+			va_list ap; va_start(ap, fmt);
+			fprintf(lf, "[INFO] [CORE-SELFTEST] ");
+			vfprintf(lf, fmt, ap);
+			fprintf(lf, "\n");
+			va_end(ap);
+			fflush(lf);
+		};
+
+		DWORD t0 = GetTickCount();
+		bool started = CoreRequestLoad(__argv[3], __argv[2]);
+
+		DWORD waited_ms = 0;
+		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 10000)
+		{
+			Sleep(50);
+			waited_ms += 50;
+		}
+		bool running = CoreIsRunning();
+		log("load: dll=%s rom=%s started=%d running=%d load_ms=%lu",
+			__argv[2], __argv[3], started ? 1 : 0, running ? 1 : 0, GetTickCount() - t0);
+
+		if (running)
+		{
+			Sleep(300); // let several real frames run through retro_run()
+		}
+
+		DWORD shutdown_t0 = GetTickCount();
+		CoreShutdown();
+		DWORD shutdown_ms = GetTickCount() - shutdown_t0;
+		log("shutdown: ms=%lu running_after=%d loading_after=%d",
+			shutdown_ms, CoreIsRunning() ? 1 : 0, CoreIsLoading() ? 1 : 0);
+
+		// If toast_lock (or any other lock RecoverAfterKilledCore resets) was
+		// left stuck by the kill above, this deadlocks - on a worker thread
+		// with its own timeout, so a stuck lock is reported instead of
+		// hanging this whole self-test forever.
+		std::atomic<bool> toast_done{false};
+		std::thread([&toast_done]() {
+			CoreSetToast("core-selftest", 1);
+			CoreGetToast();
+			CoreIsToastActive();
+			toast_done.store(true);
+		}).detach();
+		DWORD toast_wait = 0;
+		while (!toast_done.load() && toast_wait < 2000) { Sleep(20); toast_wait += 20; }
+		log("post-recovery lock check: toast_ok=%d (%lums)", toast_done.load() ? 1 : 0, toast_wait);
+
+		// The real proof a hung core didn't leave the engine wedged: load a
+		// second, different core+ROM right after, with its own timeout.
+		bool retry_started = false, retry_running = false;
+		if (__argc > 5)
+		{
+			DWORD t1 = GetTickCount();
+			retry_started = CoreRequestLoad(__argv[5], __argv[4]);
+			DWORD waited2 = 0;
+			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 10000)
+			{
+				Sleep(50);
+				waited2 += 50;
+			}
+			retry_running = CoreIsRunning();
+			log("recovery-check load: dll=%s rom=%s started=%d running=%d load_ms=%lu",
+				__argv[4], __argv[5], retry_started ? 1 : 0, retry_running ? 1 : 0, GetTickCount() - t1);
+			if (retry_running)
+			{
+				DWORD t2 = GetTickCount();
+				CoreShutdown();
+				log("recovery-check shutdown: ms=%lu", GetTickCount() - t2);
+			}
+		}
+
+		bool pass = started && running && (__argc <= 5 || (retry_started && retry_running));
+		log("RESULT=%s", pass ? "PASS" : "FAIL");
+		if (lf) fclose(lf);
+		return pass ? 0 : 1;
 	}
 
 	WNDCLASSEX wc = { 0 };
