@@ -67,6 +67,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
     src\netplay.cpp ^
     src\retroachievements.cpp ^
     src\updater.cpp ^
+    src\port_runner.cpp ^
     src\main_win32.cpp ^
     third_party\rcheevos\src\*.c ^
     third_party\rcheevos\src\rapi\*.c ^
@@ -75,7 +76,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
     build\resource.res ^
     build\unity.obj ^
     /link /OUT:app\%APP_EXE% ^
-    user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib dwmapi.lib ^
+    user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib dwmapi.lib ole32.lib ^
     /SUBSYSTEM:WINDOWS /DEBUG /MAP:build\%APP_BASE%.map /OPT:REF /OPT:ICF
 
 if errorlevel 1 (

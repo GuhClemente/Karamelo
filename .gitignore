@@ -37,6 +37,14 @@
 **/roms/
 **/games/
 
+# Native PC ports / recomps (Dr. Mario 64, etc.) - downloaded executables and
+# assets, the same reasoning as cores/bios/roms above: large third-party
+# binaries that do not belong in the repo. port_runner.cpp/.h are the code
+# that manages this folder and are tracked normally; only its contents are not.
+/app/ports/
+/ports/
+**/ports/
+
 # ROM, Disc & BIOS image extensions
 *.chd
 *.iso
