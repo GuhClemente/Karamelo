@@ -157,7 +157,11 @@ static const int kVideoDriverCount = 2;
 static int setting_driver = 1; // Default to OpenGL (GPU 3D)
 static int setting_sync = 1;  // 0=Native (Game Rate), 1=Sync to Display
 static int setting_vsync = 1; // 0=Disabled, 1=Enabled
-static int setting_n64_core = 0;
+// ParaLLEl N64 confirmed exposing memory to RetroAchievements correctly
+// (n64.dll, formerly the default, does not - see the comment on the
+// n64_cores label array in PopulateVideoSettings). Defaulting to it instead
+// gives every fresh install working achievements out of the box.
+static int setting_n64_core = 1;
 static int setting_arcade_core = 0; // 0=FBNeo, 1=MAME 2003, 2=MAME 2010
 static int setting_osd_timeout = 0; // index into kOsdTimeouts
 static int setting_sms_fm = 0; // 0=auto, 1=desligado, 2=ligado
@@ -972,7 +976,7 @@ static void ResetAllSettingsToDefault() {
   setting_driver = 1;
   setting_sync = 1;
   setting_vsync = 1;
-  setting_n64_core = 0;
+  setting_n64_core = 1; // ParaLLEl N64 - see the comment on its declaration
   setting_arcade_core = 0;
   setting_osd_timeout = 0;
   setting_sms_fm = 0;
@@ -1039,7 +1043,7 @@ void PopulateVideoSettings() {
   // v1.0 - a rebuilt binary that names no engine and exports no memory, which
   // is why it earns no achievements. Labels are kept under the 13 characters
   // the OSD value column shows.
-  const char *n64_cores[] = {"Padrao s/ RA", "ParaLLEl N64", "Mupen64+ Next"};
+  const char *n64_cores[] = {"n64.dll s/RA", "ParaLLEl N64", "Mupen64+ Next"};
   items.push_back({"N64 Core", n64_cores[setting_n64_core], false, false, 309});
 
   const char *arcade_cores[] = {"FinalBurn Neo", "MAME 2003", "MAME 2010",
