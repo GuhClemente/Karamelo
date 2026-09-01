@@ -145,13 +145,15 @@ static int setting_latency = 1;  // index into kAudioLatencyMs below; default 12
 // Audio buffer depth. Below 64ms the waveOut queue cannot stay ahead of the
 // mixer on a loaded machine; above 512ms the delay is audible against input.
 static const int kAudioLatencyMs[4] = { 64, 128, 256, 512 };
+// Vulkan and DirectX 11 used to be listed here too, but hw_render.cpp only
+// ever implements OpenGL/WGL - picking either one silently ran OpenGL
+// anyway, with no indication anything different had happened. Only list
+// backends that actually exist until a real Vulkan/D3D11 backend lands.
 static const char *kVideoDrivers[] = {
     "Software (CPU)",
-    "OpenGL (GPU 3D)",
-    "Vulkan (GPU 3D)",
-    "DirectX 11 (GPU)"
+    "OpenGL (GPU 3D)"
 };
-static const int kVideoDriverCount = 4;
+static const int kVideoDriverCount = 2;
 static int setting_driver = 1; // Default to OpenGL (GPU 3D)
 static int setting_sync = 1;  // 0=Native (Game Rate), 1=Sync to Display
 static int setting_vsync = 1; // 0=Disabled, 1=Enabled
@@ -1626,7 +1628,10 @@ static void MenuLoadSettings() {
     else if (!strcmp(key, "latency"))
       setting_latency = ClampInt(iv, 0, 3);
     else if (!strcmp(key, "driver"))
-      setting_driver = ClampInt(iv, 0, 4);
+      // Clamped to the real range, not the old 0-4: a config saved before
+      // Vulkan/DirectX were removed from the menu could still have driver=2
+      // or 3 on disk, which would index kVideoDrivers[] out of bounds.
+      setting_driver = ClampInt(iv, 0, kVideoDriverCount - 1);
     else if (!strcmp(key, "sync"))
       setting_sync = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "vsync"))
