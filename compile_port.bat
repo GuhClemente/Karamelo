@@ -43,8 +43,13 @@ rem /std:c++20 enables modern C++20 standard with concepts, spans and optimizer 
 rem /Oi enables compiler intrinsic functions (SSE2/AVX vectorization).
 rem /Ot favors maximum CPU execution speed.
 rem /fp:fast enables high-performance floating-point math for CRT shaders and resamplers.
+rem /GR- disables RTTI - nothing in this codebase uses dynamic_cast/typeid (confirmed by
+rem grep before adding this), so this is free: it drops the type-name strings and vtable
+rem metadata RTTI would otherwise leave sitting in the binary for anyone to read.
+rem /guard:cf (paired with /GUARD:CF at link) adds Control Flow Guard instrumentation -
+rem free hardening against control-flow-hijacking exploits, no separate tool required.
 
-cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
+cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf /Zi ^
     /I include ^
     /I third_party\rcheevos\include ^
     /I third_party\rcheevos\src ^
@@ -77,7 +82,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /Zi ^
     build\unity.obj ^
     /link /OUT:app\%APP_EXE% ^
     user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib dwmapi.lib ole32.lib ^
-    /SUBSYSTEM:WINDOWS /DEBUG /MAP:build\%APP_BASE%.map /OPT:REF /OPT:ICF
+    /SUBSYSTEM:WINDOWS /DEBUG /PDBALTPATH:%%_PDB%% /GUARD:CF /MAP:build\%APP_BASE%.map /OPT:REF /OPT:ICF
 
 if errorlevel 1 (
     echo.

@@ -73,7 +73,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // Verified against theboy181/drmario64_recomp_plus's actual release -
         // the one entry here launched end-to-end (download, extract, ROM
         // auto-copy, launch) rather than only checked against the API.
-        { "DrMario64", "Dr. Mario 64 (Recompiled 60 FPS)",
+        { "DrMario64", "Dr. Mario 64",
           "theboy181/drmario64_recomp_plus", "drmario64_recomp.exe",
           true, { "dr", "mario" } },
 
@@ -85,21 +85,21 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // roms/Nintendo64/ (e.g. "mario"+"64" would also match Mario Kart
         // 64's own ROM); those ports show their own ROM picker on first run
         // instead, which is the normal flow for most of them anyway.
-        { "Zelda64Recomp", "Zelda 64: Recompiled (OoT/MM)",
+        { "Zelda64Recomp", "Zelda64Recomp",
           "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" } },
-        { "Goemon64Recomp", "Goemon 64 (Recompiled)",
+        { "Goemon64Recomp", "Goemon 64",
           "klorfmorf/Goemon64Recomp", "", true, { "goemon" } },
-        { "DinosaurPlanet", "Dinosaur Planet (Recompiled)",
+        { "DinosaurPlanet", "Dinosaur Planet",
           "DinosaurPlanetRecomp/dino-recomp", "", true, { "dinosaur" } },
-        { "HarvestMoon64Recomp", "Harvest Moon 64 (Recompiled)",
+        { "HarvestMoon64Recomp", "Harvest Moon 64",
           "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" } },
-        { "SnowboardKids2Recomp", "Snowboard Kids 2 (Recompiled)",
+        { "SnowboardKids2Recomp", "Snowboard Kids 2",
           "cdlewis/snowboardkids2-recomp", "", true, { "snowboard", "kids", "2" } },
         // No rom_keywords: "pokemon"+"stadium" alone would also match a
         // Pokemon Stadium *2* ROM, and this recomp (per the repo's own
         // description) targets Stadium 1 (US v1.0) specifically. Wrong game
         // copied in silently is worse than just letting the port ask.
-        { "PokemonStadiumRecomp", "Pokemon Stadium (Recompiled)",
+        { "PokemonStadiumRecomp", "Pokemon Stadium",
           "mstan/PokemonStadiumRecomp", "", true, {} },
         // "Duke Nukem: Zero Hour" (sonicdcer/DNZHRecomp) was here but the
         // GitHub account that hosted it (sonicdcer) has been deleted -
@@ -110,23 +110,23 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // sonicdcer/MarioKart64Recomp and sonicdcer/Starfox64Recomp hit the
         // same dead account; harbourmasters/spaghettikart and harbourmasters/
         // starship below already cover Mario Kart 64 and Star Fox 64 instead.
-        { "Banjo64Recomp", "Banjo 64 (Recompiled)",
+        { "Banjo64Recomp", "Banjo 64",
           "BanjoRecomp/BanjoRecomp", "", true, { "banjo" } },
-        { "BM64Recomp", "Bomberman 64 (Recompiled)",
+        { "BM64Recomp", "Bomberman 64",
           "RevoSucks/BM64Recomp", "", true, { "bomberman" } },
-        { "ChameleonTwistRecomp", "Chameleon Twist (Recompiled)",
+        { "ChameleonTwistRecomp", "Chameleon Twist",
           "Rainchus/ChameleonTwist1-JP-Recomp", "", true, { "chameleon" } },
-        { "MegaMan64Recomp", "Mega Man 64 (Recompiled)",
+        { "MegaMan64Recomp", "Mega Man 64",
           "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" } },
-        { "Quest64Recomp", "Quest 64 (Recompiled)",
+        { "Quest64Recomp", "Quest 64",
           "Rainchus/Quest64-Recomp", "", true, { "quest" } },
-        { "BMHeroRecomp", "Bomberman Hero (Recompiled)",
+        { "BMHeroRecomp", "Bomberman Hero",
           "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" } },
-        { "ShipOfHarkinian", "Zelda OoT (Ship of Harkinian)",
+        { "ShipOfHarkinian", "Ship of Harkinian",
           "harbourmasters/shipwright", "", true, { "zelda", "ocarina" } },
-        { "2Ship2Harkinian", "Zelda MM (2 Ship 2 Harkinian)",
+        { "2Ship2Harkinian", "2 Ship 2 Harkinian",
           "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" } },
-        { "Starship", "Star Fox 64 (Starship)",
+        { "Starship", "Starship",
           "harbourmasters/starship", "", true, { "star", "fox" } },
         // Not the same game as the two Star Fox 64 (N64) entries above -
         // "built from the UltraStarFox codebase" per the repo's own
@@ -138,16 +138,16 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // would live in roms/SNES/, a folder PortAutoSetupRom does not search
         // at all (it only looks under roms/Nintendo64 and roms/N64) - the
         // scan would find nothing here regardless of keywords.
-        { "StarFoxEnhanced", "Star Fox (SNES, Enhanced)",
+        { "StarFoxEnhanced", "Star Fox Enhanced",
           "kandowontu/starfox-enhanced", "", true, {} },
-        { "SpaghettiKart", "Mario Kart 64 (SpaghettiKart)",
+        { "SpaghettiKart", "SpaghettiKart",
           "harbourmasters/spaghettikart", "", true, { "mario", "kart" } },
-        { "Ghostship", "Super Mario 64 (Ghostship)",
+        { "Ghostship", "Ghostship",
           "harbourmasters/ghostship", "", true, {} },
         // fgsfdsfgs/perfect_dark was the original repo; it has since moved to
         // this org. GitHub's API currently still resolves the old name via
         // redirect, but that isn't guaranteed to keep working.
-        { "PerfectDark", "Perfect Dark (Recompiled)",
+        { "PerfectDark", "Perfect Dark",
           "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" } },
         { "SM64CoopDX", "Super Mario 64 CoopDX",
           "coop-deluxe/sm64coopdx", "", true, {} },
@@ -172,39 +172,39 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         //     not a game - it is a small tool that downloads/compiles a
         //     Super Metroid port from source and needs a build toolchain.
         //     mstan/SuperMetroidRecomp below is an actual playable port.
-        { "AnimalCrossingGC", "Animal Crossing (GameCube, Recompiled)",
+        { "AnimalCrossingGC", "Animal Crossing",
           "flyngmt/ACGC-PC-Port", "", true, {} },
-        { "NutsAndBolts", "Banjo-Kazooie: Nuts & Bolts (Recompiled)",
+        { "NutsAndBolts", "Banjo-Kazooie: Nuts & Bolts",
           "masterspike52/reNut", "", true, {} },
-        { "DBZBudokai", "Dragon Ball Z Budokai (Recompiled)",
+        { "DBZBudokai", "Dragon Ball Z Budokai",
           "WistfulHopes/DBZ1", "", true, {} },
         { "InfiniteMario64", "Infinite Mario 64",
           "Brawmario/infinite-mario-64-ever", "", true, {} },
-        { "JakAndDaxter", "Jak & Daxter (OpenGOAL)",
+        { "JakAndDaxter", "Jak & Daxter",
           "open-goal/jak-project", "", true, {} },
-        { "SeveredChains", "LoD: Severed Chains (Legend of Dragoon)",
+        { "SeveredChains", "Severed Chains",
           "Legend-of-Dragoon-Modding/Severed-Chains", "", true, {} },
-        { "REDRIVER2", "REDRIVER 2 (Driver 2, Recompiled)",
+        { "REDRIVER2", "REDRIVER 2",
           "OpenDriver2/REDRIVER2", "", true, {} },
-        { "SymphonyRecomp", "Castlevania: Symphony of the Night (Recompiled)",
+        { "SymphonyRecomp", "Castlevania: Symphony of the Night",
           "BlackLabelHQ/SymphonyRecomp", "", true, {} },
         { "Sonic1Forever", "Sonic 1 Forever",
           "ElspethThePict/S1Forever", "", true, {} },
-        { "Sonic3AIR", "Sonic 3 A.I.R. (Angel Island Revisited)",
+        { "Sonic3AIR", "Sonic 3 A.I.R.",
           "Eukaryot/sonic3air", "", true, {} },
-        { "SonicUnleashedRecomp", "Sonic Unleashed (Recompiled)",
+        { "SonicUnleashedRecomp", "Sonic Unleashed",
           "hedge-dev/UnleashedRecomp", "", true, {} },
-        { "SpaceStationSiliconValley", "Space Station Silicon Valley (Recompiled)",
+        { "SpaceStationSiliconValley", "Space Station Silicon Valley",
           "Cellenseres/SSSV_Recomp", "", true, { "silicon", "valley" } },
         { "SMBRemastered", "Super Mario Bros. Remastered",
           "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {} },
-        { "SuperMarioWorldRecomp", "Super Mario World (Recompiled)",
+        { "SuperMarioWorldRecomp", "Super Mario World",
           "mstan/SuperMarioWorldRecomp", "", true, {} },
-        { "SuperMetroidRecomp", "Super Metroid (Recompiled)",
+        { "SuperMetroidRecomp", "Super Metroid",
           "mstan/SuperMetroidRecomp", "", true, { "metroid" } },
-        { "VivaPinataTiP", "Viva Pinata: Trouble in Paradise (Recompiled)",
+        { "VivaPinataTiP", "Viva Pinata: Trouble in Paradise",
           "SolarCookies/TiP-Recomp", "", true, {} },
-        { "WipeoutPhantomEdition", "WipEout Phantom Edition (Recompiled)",
+        { "WipeoutPhantomEdition", "WipEout Phantom Edition",
           "wipeout-phantom-edition/wipeout-phantom-edition", "", true, {} },
     };
     return defs;
@@ -591,6 +591,13 @@ std::vector<PortGameInfo> PortGetAvailableList() {
             if (fs::exists(hinted)) exe = hinted;
         }
 
+        // Games are never bundled with the app itself (no ROMs, no ports/
+        // shipped in the project or the release zip - see .gitignore) - the
+        // whole point of this list is that PortLaunch() downloads whatever
+        // isn't here yet the moment it's selected. Every entry stays visible
+        // whether or not it's on disk right now; is_installed only exists so
+        // callers know not to bother showing a status label for it (there
+        // is none anymore - selecting an entry just works, download or not).
         info.exe_path = exe;
         info.working_dir = dir.empty() ? ("ports/" + def.id) : dir;
         info.is_installed = !exe.empty();

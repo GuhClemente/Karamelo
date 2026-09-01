@@ -28,7 +28,7 @@ echo.
 
 rem 1. Compile clean release binary
 echo [1/4] Compilando executavel de producao com /MT (Static CRT)...
-call compile_port.bat
+call "%~dp0compile_port.bat"
 if errorlevel 1 (
     echo [ERRO] Falha na compilacao. O pacote nao pode ser criado.
     exit /b 1
@@ -169,6 +169,22 @@ echo [3/4] Copiando executavel unico, motores e recursos...
 copy /Y "app\%APP_EXE%" "%DIST_DIR%\MiSTer_4_ALL.exe" >nul
 copy /Y "app\cores\*.dll" "%DIST_DIR%\cores\" >nul 2>&1
 copy /Y "app\Wallpapers\*.*" "%DIST_DIR%\Wallpapers\" >nul 2>&1
+
+rem Optional: compress the distributed exe with UPX (open source, MIT
+rem license - https://upx.github.io), only our own exe, never the third-
+rem party core DLLs (see the audit discussion on why those shouldn't be
+rem touched). This is compression, not real anti-reverse-engineering - UPX
+rem is trivially reversed with "upx -d" - but it's free, well-known, and
+rem does shrink the download. Entirely optional: skips itself cleanly if
+rem upx.exe isn't on PATH, no install attempted here.
+where upx >nul 2>&1
+if not errorlevel 1 (
+    echo    Comprimindo MiSTer_4_ALL.exe com UPX...
+    upx --best --lzma "%DIST_DIR%\MiSTer_4_ALL.exe" >nul
+) else (
+    echo    UPX nao encontrado no PATH - pulando compressao ^(opcional^).
+    echo    Baixe em https://upx.github.io se quiser essa etapa ativa.
+)
 
 rem Safety verification: ensure no copyrighted rom/bios files were copied
 del /s /q "%DIST_DIR%\*.bin" "%DIST_DIR%\*.iso" "%DIST_DIR%\*.cue" "%DIST_DIR%\*.chd" "%DIST_DIR%\*.nes" "%DIST_DIR%\*.sfc" "%DIST_DIR%\*.smc" "%DIST_DIR%\*.md" "%DIST_DIR%\*.gen" "%DIST_DIR%\*.z64" "%DIST_DIR%\*.n64" "%DIST_DIR%\*.gba" "%DIST_DIR%\*.gb" "%DIST_DIR%\*.gbc" "%DIST_DIR%\*.nds" "%DIST_DIR%\*.3ds" "%DIST_DIR%\*.gcm" "%DIST_DIR%\*.cso" "%DIST_DIR%\*.pbp" >nul 2>&1

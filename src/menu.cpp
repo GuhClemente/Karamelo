@@ -633,8 +633,11 @@ static bool SystemHasCore(int action_id) {
   if (action_id == 117)
     dll = GetArcadeCoreDll();
   if (action_id == 140) {
-    std::error_code ec;
-    return fs::exists("ports", ec) || fs::exists("app/ports", ec);
+    // Same list PopulateBrowse() and the About screen's count use, rather
+    // than a second, looser check (the old fs::exists("ports") was always
+    // true anyway - PortInit() creates the folder unconditionally on
+    // startup, whether or not anything has been downloaded into it yet).
+    return !PortGetAvailableList().empty();
   }
   if (!dll)
     return true;
@@ -1289,10 +1292,12 @@ void PopulateBrowse(const std::string &dirpath) {
   if (dirpath == "ports" || lower_dir == "ports") {
     current_title = "Ports & Recomp";
     items.push_back({"<..>", "", true, false, 0});
+    // PortGetAvailableList() only returns titles already resolved to a real
+    // executable on disk, so every row here is ready to play right now -
+    // no "[JOGAR]"/"[BAIXAR]" status needed, just the game name.
     auto plist = PortGetAvailableList();
     for (const auto& p : plist) {
-      std::string status = p.is_installed ? "[JOGAR]" : "[BAIXAR]";
-      items.push_back({p.name, status, false, true, 800});
+      items.push_back({p.name, "", false, true, 800});
     }
     if (plist.empty()) {
       items.push_back({"[Nenhum Port Encontrado]", "", false, false, 0});
@@ -2445,14 +2450,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
         // label is the port's display name, matched back against the same
         // list PopulateBrowse built it from to find the launchable id.
         //
-        // PortLaunch() is called unconditionally here, whether or not the
-        // port is installed yet - it already knows how to tell the two
-        // cases apart (download-then-launch vs. launch directly). An
-        // earlier version of this handler gated on p.is_installed itself
-        // and only called PortLaunch() for the already-installed case,
-        // which made every [BAIXAR] entry in this menu a dead button: the
-        // download path PortLaunch() implements for a missing install was
-        // simply never reached from here.
+        // Every row here already resolved to a real executable (see
+        // PortGetAvailableList()), so this always takes PortLaunch()'s
+        // launch-directly path in practice. It is still called
+        // unconditionally rather than re-checking is_installed here too -
+        // PortLaunch() is the single place that decides download-then-launch
+        // vs. launch directly, and duplicating that check in the UI is how
+        // an earlier version of this handler ended up calling it wrong.
         auto plist = PortGetAvailableList();
         for (const auto &p : plist) {
           if (p.name == item.label) {
