@@ -269,10 +269,27 @@ bool HwMakeCurrent()
 		wglMakeCurrent(NULL, NULL);
 		if (!wglMakeCurrent(g_gl_dc, g_gl_ctx))
 		{
+			// The old context is unreachable (both attempts above failed), so
+			// there is no context left to call context_destroy() through - a
+			// dead context can't make any GL call, notification included.
+			// What we CAN and must do is tell the core about the replacement
+			// context HwInit() is about to build, the same way a deliberate
+			// context loss does via HwContextReset(): without this the core
+			// never learns its GL objects (shaders, VBOs, its own textures)
+			// belonged to a context that no longer exists, and keeps issuing
+			// calls against them instead of rebuilding.
+			g_context_live = false;
+
 			HwShutdown();
-			if (HwInit())
+			if (HwInit() && wglMakeCurrent(g_gl_dc, g_gl_ctx))
 			{
-				return wglMakeCurrent(g_gl_dc, g_gl_ctx);
+				if (g_hw_cb.context_reset)
+				{
+					g_hw_cb.context_reset();
+					g_context_live = true;
+					HwLog("contexto reconstruido apos falha de wglMakeCurrent; context_reset entregue ao core");
+				}
+				return true;
 			}
 			return false;
 		}
