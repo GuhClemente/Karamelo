@@ -17,26 +17,18 @@ set LOCAL_EXE=dist\MiSTer_4_ALL.exe
 set LOCAL_JSON=dist\version.json
 
 rem -------------------------------------------------------------
-rem PASSO 1 & 2: Compilacao C++20 (/MT) e Testes Unitarios
+rem PASSO 1: Compilacao, Testes e Empacotamento
 rem -------------------------------------------------------------
-echo [1/3] Compilando motor C++20 com /MT e executando testes unitarios...
-call "%~dp0compile_port.bat"
-if errorlevel 1 (
-    echo.
-    echo [FALHA] Erro na compilacao ou testes. Deploy cancelado.
-    pause
-    exit /b 1
-)
-
-rem -------------------------------------------------------------
-rem PASSO 3: Empacotamento Limpo da Distribuicao
-rem -------------------------------------------------------------
-echo.
-echo [2/3] Gerando pacote oficial de distribuicao...
+rem package_release.bat's own step [1/4] already calls compile_port.bat
+rem (compile + run the unit tests) before packaging - calling it again here
+rem first just recompiled and re-ran the whole test suite a second time,
+rem invisibly, since compile_port.bat's own "cls" wiped the first run off
+rem the screen before anyone could see it had already happened.
+echo [1/2] Compilando, testando e empacotando a release...
 call "%~dp0package_release.bat" %*
 if errorlevel 1 (
     echo.
-    echo [FALHA] Erro ao empacotar a release. Deploy cancelado.
+    echo [FALHA] Erro na compilacao, testes ou empacotamento. Deploy cancelado.
     pause
     exit /b 1
 )
@@ -54,16 +46,16 @@ if not exist "%LOCAL_ZIP%" (
 )
 
 rem -------------------------------------------------------------
-rem PASSO 4: Upload via SCP para o Servidor VPS / Coolify
+rem PASSO 2: Upload via SCP para o Servidor VPS / Coolify
 rem -------------------------------------------------------------
 echo.
-echo [3/3] Enviando pacote (v%APP_VER%), executavel e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
+echo [2/2] Enviando pacote (v%APP_VER%), executavel e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
 echo.
 
 scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 if errorlevel 1 (
     echo.
-    echo [AVISO] Falha no upload via SCP (caso nao esteja configurado com chave SSH).
+    echo [AVISO] Falha no upload via SCP - verifique se a chave SSH esta configurada.
     echo Os arquivos estao prontos na pasta dist\ para upload manual no Coolify:
     echo   - dist\version.json
     echo   - dist\MiSTer_4_ALL.exe
