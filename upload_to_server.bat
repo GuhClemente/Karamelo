@@ -19,7 +19,7 @@ set LOCAL_JSON=dist\version.json
 
 if not exist "%LOCAL_ZIP%" (
     echo [1/2] Pacote nao encontrado. Gerando pacote primeiro...
-    call package_release.bat
+    call "%~dp0package_release.bat"
     if errorlevel 1 (
         echo [ERRO] Falha ao gerar o pacote. Upload cancelado.
         pause

@@ -20,7 +20,7 @@ rem -------------------------------------------------------------
 rem PASSO 1 & 2: Compilacao C++20 (/MT) e Testes Unitarios
 rem -------------------------------------------------------------
 echo [1/3] Compilando motor C++20 com /MT e executando testes unitarios...
-call compile_port.bat
+call "%~dp0compile_port.bat"
 if errorlevel 1 (
     echo.
     echo [FALHA] Erro na compilacao ou testes. Deploy cancelado.
@@ -33,7 +33,7 @@ rem PASSO 3: Empacotamento Limpo da Distribuicao
 rem -------------------------------------------------------------
 echo.
 echo [2/3] Gerando pacote oficial de distribuicao...
-call package_release.bat %*
+call "%~dp0package_release.bat" %*
 if errorlevel 1 (
     echo.
     echo [FALHA] Erro ao empacotar a release. Deploy cancelado.
