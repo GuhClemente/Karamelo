@@ -21,6 +21,7 @@
 #include "osd.h"
 #include "retroachievements.h"
 #include "updater.h"
+#include "port_runner.h"
 
 namespace fs = std::filesystem;
 
@@ -631,6 +632,10 @@ static bool SystemHasCore(int action_id) {
     dll = GetN64CoreDll();
   if (action_id == 117)
     dll = GetArcadeCoreDll();
+  if (action_id == 140) {
+    std::error_code ec;
+    return fs::exists("ports", ec) || fs::exists("app/ports", ec);
+  }
   if (!dll)
     return true;
 
@@ -810,6 +815,8 @@ void PopulateMainMenu() {
       items.push_back({"PlayStation 2 (PS2)", ">", true, true, 116});
     if (SystemHasCore(120))
       items.push_back({"PlayStation Portable (PSP)", ">", true, true, 120});
+    if (SystemHasCore(140))
+      items.push_back({"Ports & Recomp", ">", true, true, 140});
     if (SystemHasCore(110))
       items.push_back({"Saturn", ">", true, true, 110});
     if (SystemHasCore(126))
@@ -832,7 +839,7 @@ void PopulateMainMenu() {
     // Counted here rather than written down somewhere else: this is the list.
     g_system_count = 0;
     for (const auto &it : items)
-      if (it.action_id >= 101 && it.action_id <= 135)
+      if ((it.action_id >= 101 && it.action_id <= 135) || it.action_id == 140)
         g_system_count++;
   }
 
@@ -1263,17 +1270,34 @@ void PopulateUpdate() {
 void PopulateBrowse(const std::string &dirpath) {
   items.clear();
 
-  // Safety: never browse outside roms/
+  // Safety: allow roms/ and ports/
   std::string lower_dir = dirpath;
   std::transform(lower_dir.begin(), lower_dir.end(), lower_dir.begin(), ::tolower);
   if (lower_dir.find("cache") != std::string::npos || lower_dir == "." || lower_dir == "app" ||
-      (lower_dir.find("roms") == std::string::npos && !dirpath.empty())) {
+      (lower_dir.find("roms") == std::string::npos && lower_dir.find("ports") == std::string::npos && !dirpath.empty())) {
     current_state = STATE_MAIN;
     PopulateMainMenu();
     return;
   }
 
   current_dir = dirpath;
+
+  if (dirpath == "ports" || lower_dir == "ports") {
+    current_title = "Ports & Recomp";
+    items.push_back({"<..>", "", true, false, 0});
+    auto plist = PortGetAvailableList();
+    for (const auto& p : plist) {
+      std::string status = p.is_installed ? "[JOGAR]" : "[BAIXAR]";
+      items.push_back({p.name, status, false, true, 800});
+    }
+    if (plist.empty()) {
+      items.push_back({"[Nenhum Port Encontrado]", "", false, false, 0});
+    }
+    OsdSetSize((int)items.size());
+    selected_idx = 1;
+    scroll_top = 0;
+    return;
+  }
 
   fs::path p(dirpath);
   std::string folder_name = p.filename().string();
@@ -1438,11 +1462,12 @@ static void BrowseGoUp() {
   std::string lower_parent = parent;
   std::transform(lower_parent.begin(), lower_parent.end(), lower_parent.begin(), ::tolower);
 
-  // If we are at the top of roms/ or in any invalid/cache dir, return to Main Menu
-  if (parent.empty() || parent == "roms" || parent == "." || parent == "app" ||
+  // If we are at the top of roms/ or ports/ or in any invalid/cache dir, return to Main Menu
+  if (lower_cur == "ports" || lower_cur.find("ports") != std::string::npos ||
+      parent.empty() || parent == "roms" || parent == "." || parent == "app" ||
       lower_cur == "roms" || lower_cur.find("cache") != std::string::npos ||
-      lower_cur.find("roms") == std::string::npos ||
-      lower_parent.find("roms") == std::string::npos) {
+      (lower_cur.find("roms") == std::string::npos && lower_cur.find("ports") == std::string::npos) ||
+      (lower_parent.find("roms") == std::string::npos && lower_parent.find("ports") == std::string::npos)) {
     current_state = STATE_MAIN;
     PopulateMainMenu();
     selected_idx = main_menu_saved_idx;
@@ -2308,6 +2333,17 @@ static void MenuProcessKeyImpl(MenuKey key) {
           PopulateBrowse("roms/PCFX");
         }
       }
+      // 140 (Ports & Recomp) is not in the 101-135 system range above, so it
+      // has to be its own sibling branch here - nested inside that block (as
+      // it was before) it could never be reached, because the block's own
+      // "item.action_id >= 101 && <= 135" guard is false for 140 and the
+      // whole chain inside it, 140 included, never runs. Pressing Enter on
+      // the menu entry did nothing at all, which is what this fixes.
+      else if (item.action_id == 140) {
+        main_menu_saved_idx = selected_idx;
+        current_state = STATE_BROWSE;
+        PopulateBrowse("ports");
+      }
       // "Define Buttons" is on the in-game menu, but its handler only existed
       // under STATE_SETTINGS, so pressing it there did nothing at all.
       else if (item.action_id == 203) {
@@ -2400,6 +2436,21 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (current_state == STATE_BROWSE) {
       if (item.label == "<..>") {
         BrowseGoUp();
+      } else if (current_dir == "ports") {
+        // Ports & Recomp entries are not filesystem paths under roms/ - the
+        // label is the port's display name, matched back against the same
+        // list PopulateBrowse built it from to find the launchable id.
+        auto plist = PortGetAvailableList();
+        for (const auto &p : plist) {
+          if (p.name == item.label) {
+            if (p.is_installed) {
+              PortLaunch(p.id);
+            } else {
+              CoreSetToast("PORT NAO INSTALADO EM ports/", 200);
+            }
+            break;
+          }
+        }
       } else if (item.is_folder) {
         fs::path next_p = fs::path(current_dir) / item.label;
         PopulateBrowse(next_p.string());

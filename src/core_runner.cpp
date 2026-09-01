@@ -3,6 +3,8 @@
 #include <vector>
 #include <windows.h>
 #include <mmsystem.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
 #include <xinput.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -282,12 +284,26 @@ void CoreUpdateToast()
 // -------------------------------------------------------------
 // High-Performance Audio Resampling & Output Engine
 // -------------------------------------------------------------
-#define OUTPUT_SAMPLE_RATE 48000
 #define RING_BUFFER_SIZE   65536 // 65536 stereo frames (~1.36s capacity)
 #define NUM_WAVE_BUFFERS   48    // upper bound: 48 * 512 frames = 512ms of queue
 #define MIN_WAVE_BUFFERS   6     // lower bound: 6 * 512 frames = 64ms
 #define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz
-#define TARGET_OCCUPANCY   4800  // 100ms at 48kHz - ideal safety cushion
+
+// A card whose shared-mode mix format is natively 44.1kHz still accepts a
+// 48kHz waveOutOpen() - the OS mixer resamples - but that is a second
+// conversion stage stacked on top of the one this file already does from the
+// core's rate. DetectPreferredOutputSampleRate() asks the device what it
+// actually wants, once, so most machines end up doing only one conversion
+// instead of two. 48000 is the fallback for anything that cannot be asked
+// (COM unavailable, no default device, a locked-down session).
+static int g_output_sample_rate = 48000;
+
+// Recurring underruns escalate the queue depth (see EscalateWaveQueue); this
+// bounds how far above NUM_WAVE_BUFFERS*SAMPLES_PER_BUFFER/rate it can go in
+// milliseconds, purely for the log line - the loop itself clamps to the array.
+#define UNDERRUN_ESCALATE_WINDOW_MS    2000 // how often the underrun count is judged
+#define UNDERRUN_ESCALATE_THRESHOLD    3    // this many starved passes in the window...
+#define UNDERRUN_ESCALATE_STEP_BUFFERS 4    // ...grows the queue by this many buffers
 
 static HWAVEOUT h_wave_out = NULL;
 static HANDLE   h_audio_event = NULL;
@@ -302,6 +318,11 @@ static int16_t  wave_buffer_data[NUM_WAVE_BUFFERS][SAMPLES_PER_BUFFER * 2];
 // out longer hitches, a shallower one responds faster.
 static volatile LONG g_active_wave_buffers = 12;
 
+// Passes (not samples) that starved during the current judging window, and
+// when that window started. Touched only by the audio thread.
+static DWORD s_escalate_window_start = 0;
+static LONG  s_escalate_window_underruns = 0;
+
 static int16_t  g_ring_buffer[RING_BUFFER_SIZE * 2];
 static volatile LONG g_ring_write_pos = 0;
 static volatile LONG g_ring_read_pos = 0;
@@ -313,6 +334,84 @@ static int16_t  g_hist_r[4] = { 0, 0, 0, 0 };
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
+
+// Resampler rate-control state. This used to live as function-local statics
+// inside SendAudioSamples, which meant a lock from one game's audio survived
+// into the next: load a PS2 title, its measured ~29.6kHz got locked in, then
+// load anything else (another PS2 game with a different real rate, or a
+// different system entirely) and it kept playing at the first game's ratio
+// with no recalibration, because the "already locked" check never saw a
+// reason to re-measure. Living here instead lets InitAudio - which already
+// runs on every game load - reset it via ResetAudioRateController().
+static LARGE_INTEGER s_rate_last = { 0 };
+static size_t   s_samples_accum = 0;
+static double   s_prev_measure = 0.0;
+static int      s_agree_count = 0;
+static double   s_locked_step = 0.0;   // 0 while still measuring
+static double   s_step = 0.0;
+
+// Post-lock trim state. See the hysteresis block in SendAudioSamples for why
+// this exists separately from the lock above.
+static double   s_tempo_ema = 1.0;
+static bool     s_trim_active = true;
+static double   s_stable_time = 0.0;
+static LARGE_INTEGER s_tempo_last_time = { 0 };
+
+static void ResetAudioRateController()
+{
+	s_rate_last.QuadPart = 0;
+	s_samples_accum = 0;
+	s_prev_measure = 0.0;
+	s_agree_count = 0;
+	s_locked_step = 0.0;
+	s_step = 0.0;
+	s_tempo_ema = 1.0;
+	s_trim_active = true;
+	s_stable_time = 0.0;
+	s_tempo_last_time.QuadPart = 0;
+}
+
+// Queries the default render device's shared-mode mix format once, so
+// InitAudio can open waveOut at the rate the card actually runs instead of
+// an assumed 48000. Every failure path falls back to 48000, which every
+// device accepts (the OS mixer resamples for it, same as it always has).
+static int DetectPreferredOutputSampleRate()
+{
+	int result = 48000;
+	HRESULT hr_init = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	bool need_uninit = SUCCEEDED(hr_init);
+
+	IMMDeviceEnumerator* enumerator = NULL;
+	IMMDevice* device = NULL;
+	IAudioClient* client = NULL;
+	WAVEFORMATEX* mix_format = NULL;
+
+	HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL,
+		__uuidof(IMMDeviceEnumerator), (void**)&enumerator);
+	if (SUCCEEDED(hr))
+		hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+	if (SUCCEEDED(hr))
+		hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&client);
+	if (SUCCEEDED(hr))
+		hr = client->GetMixFormat(&mix_format);
+	if (SUCCEEDED(hr) && mix_format && mix_format->nSamplesPerSec >= 8000 && mix_format->nSamplesPerSec <= 192000)
+		result = (int)mix_format->nSamplesPerSec;
+
+	if (mix_format)  CoTaskMemFree(mix_format);
+	if (client)      client->Release();
+	if (device)      device->Release();
+	if (enumerator)  enumerator->Release();
+	if (need_uninit) CoUninitialize();
+
+	FILE* lf = fopen("mister_flavor.log", "a");
+	if (lf)
+	{
+		fprintf(lf, "[INFO] [AUDIO] dispositivo de saida: %d Hz%s\n",
+			result, (result == 48000 && FAILED(hr)) ? " (fallback, deteccao falhou)" : "");
+		fclose(lf);
+	}
+	return result;
+}
 
 // 4-point / 3rd-order Catmull-Rom Cubic Hermite Spline Interpolator:
 // Eliminates high-frequency imaging noise and triangular aliasing artifacts (the metallic buzz/hiss).
@@ -329,6 +428,45 @@ static inline int16_t HermiteInterpolate(int16_t y0, int16_t y1, int16_t y2, int
 }
 
 
+// Grows the queue depth when the ring keeps running dry - a slow machine, a
+// background scan stealing CPU, a driver with a wide scheduling jitter. The
+// Latency menu setting only ever picks the *starting* depth; this is what
+// lets the same build hold up on hardware weaker than whatever it was tuned
+// on, without the user ever finding the setting. Called only from the audio
+// thread, which is the sole owner of h_wave_out and wave_headers.
+static void EscalateWaveQueue()
+{
+	LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+	LONG want = active + UNDERRUN_ESCALATE_STEP_BUFFERS;
+	if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+	if (want <= active) return;
+
+	for (LONG i = active; i < want; i++)
+	{
+		if (!(wave_headers[i].dwFlags & WHDR_PREPARED))
+		{
+			memset(&wave_headers[i], 0, sizeof(WAVEHDR));
+			memset(wave_buffer_data[i], 0, sizeof(wave_buffer_data[i]));
+			wave_headers[i].lpData = (LPSTR)wave_buffer_data[i];
+			wave_headers[i].dwBufferLength = sizeof(wave_buffer_data[i]);
+			waveOutPrepareHeader(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
+		}
+		wave_headers[i].dwFlags &= ~WHDR_DONE;
+		waveOutWrite(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
+	}
+
+	InterlockedExchange(&g_active_wave_buffers, want);
+
+	FILE* lf = fopen("mister_flavor.log", "a");
+	if (lf)
+	{
+		fprintf(lf, "[INFO] [AUDIO] underruns recorrentes; fila ampliada de %ldms para %ldms\n",
+			(long)((long long)active * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate),
+			(long)((long long)want * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate));
+		fclose(lf);
+	}
+}
+
 static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 {
 	(void)lpParam;
@@ -341,6 +479,7 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 		if (!audio_thread_running || !h_wave_out) break;
 
 		const LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+		bool pass_underran = false;
 		for (int i = 0; i < active; i++)
 		{
 			WAVEHDR* hdr = &wave_headers[i];
@@ -374,6 +513,7 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 				{
 					// Underrun: decay smoothly to silence from last sample
 					InterlockedIncrement(&g_audio_underrun_count);
+					pass_underran = true;
 					s_hold_l = (int16_t)(s_hold_l * 63 / 64);
 					s_hold_r = (int16_t)(s_hold_r * 63 / 64);
 				}
@@ -387,17 +527,40 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			hdr->dwFlags &= ~WHDR_DONE;
 			waveOutWrite(h_wave_out, hdr, sizeof(WAVEHDR));
 		}
+
+		DWORD now_tick = GetTickCount();
+		if (s_escalate_window_start == 0) s_escalate_window_start = now_tick;
+		if (pass_underran) s_escalate_window_underruns++;
+		if (now_tick - s_escalate_window_start >= UNDERRUN_ESCALATE_WINDOW_MS)
+		{
+			if (s_escalate_window_underruns >= UNDERRUN_ESCALATE_THRESHOLD)
+				EscalateWaveQueue();
+			s_escalate_window_start = now_tick;
+			s_escalate_window_underruns = 0;
+		}
 	}
 	return 0;
 }
 
 static void InitAudio(int sample_rate)
 {
+	// Resolved once, before anything below uses it to convert milliseconds to
+	// buffer counts - a stale 48000 assumption here would mis-size the very
+	// first game's queue depth and startup mute window on a 44.1kHz device.
+	{
+		static bool s_output_rate_detected = false;
+		if (!s_output_rate_detected)
+		{
+			g_output_sample_rate = DetectPreferredOutputSampleRate();
+			s_output_rate_detected = true;
+		}
+	}
+
 	// Translate the Latency setting into a queue depth. Done before the
 	// already-initialised early return so changing it and loading another
 	// game takes effect without restarting the app.
 	{
-		int want = (MenuGetAudioLatencyMs() * OUTPUT_SAMPLE_RATE / 1000) / SAMPLES_PER_BUFFER;
+		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
 		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
 		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
@@ -408,9 +571,15 @@ static void InitAudio(int sample_rate)
 	memset(g_hist_l, 0, sizeof(g_hist_l));
 	memset(g_hist_r, 0, sizeof(g_hist_r));
 
+	// Every game load gets its own calibration: the core just changed (or
+	// reloaded), and any previous lock/tempo state belonged to whatever ran
+	// before it.
+	ResetAudioRateController();
+	s_escalate_window_start = 0;
+	s_escalate_window_underruns = 0;
 
 	// Anti-pop: Zero ring buffer and activate soft startup ramp
-	InterlockedExchange(&g_startup_mute_samples, (LONG)(OUTPUT_SAMPLE_RATE * 0.15));
+	InterlockedExchange(&g_startup_mute_samples, (LONG)(g_output_sample_rate * 0.15));
 	InterlockedExchange(&g_ring_read_pos, 0);
 	memset(g_ring_buffer, 0, sizeof(g_ring_buffer));
 
@@ -429,14 +598,32 @@ static void InitAudio(int sample_rate)
 	WAVEFORMATEX wfx = { 0 };
 	wfx.wFormatTag = WAVE_FORMAT_PCM;
 	wfx.nChannels = 2;
-	wfx.nSamplesPerSec = OUTPUT_SAMPLE_RATE;
+	wfx.nSamplesPerSec = g_output_sample_rate;
 	wfx.wBitsPerSample = 16;
 	wfx.nBlockAlign = (wfx.nChannels * wfx.wBitsPerSample) / 8;
 	wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
 
 	h_audio_event = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-	if (waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT) == MMSYSERR_NOERROR)
+	if (waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR)
+	{
+		// The exact device rate can still be rejected outright (a WDM driver
+		// advertising a shared-mode format waveOut's older API path does not
+		// know how to open). Fall back to the one rate every Windows audio
+		// driver since XP is required to accept, rather than leaving audio
+		// silently dead for the rest of the session.
+		g_output_sample_rate = 48000;
+		wfx.nSamplesPerSec = g_output_sample_rate;
+		wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
+		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
+		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
+		InterlockedExchange(&g_ring_write_pos, want * SAMPLES_PER_BUFFER);
+		waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT);
+	}
+
+	if (h_wave_out)
 	{
 		const LONG prime = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
 		for (int i = 0; i < prime; i++)
@@ -468,8 +655,8 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	LONG mute_countdown = InterlockedCompareExchange(&g_startup_mute_samples, 0, 0);
 	if (mute_countdown > 0)
 	{
-		LONG total_ramp = (LONG)(OUTPUT_SAMPLE_RATE * 0.15);
-		LONG mute_period = (LONG)(OUTPUT_SAMPLE_RATE * 0.05);
+		LONG total_ramp = (LONG)(g_output_sample_rate * 0.15);
+		LONG mute_period = (LONG)(g_output_sample_rate * 0.05);
 		float startup_gain = 0.0f;
 		if (mute_countdown <= (total_ramp - mute_period))
 		{
@@ -496,27 +683,25 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	// Stage one finds the rate the core really delivers, because a declaration
 	// cannot be trusted: Play! (PS2) announces 44.1kHz and delivers around
 	// 29.6kHz, clocked to game logic. Once consecutive measurements agree, the
-	// rate is LOCKED and never measured again.
+	// rate is LOCKED - this is the coarse pass that gets close fast, so the
+	// listener isn't hearing a multi-second warble while windows disagree.
 	//
-	// That lock is the fix. The previous controller re-measured every 500ms
-	// forever and slid the ratio toward each new reading. On every other core
-	// that was harmless, because the readings agreed - which is why only PS2
-	// wobbled. Play! runs at an uneven speed, so its readings disagreed window
-	// after window and the ratio drifted back and forth. A ratio that keeps
-	// moving is a pitch that keeps moving.
-	//
-	// Stage two holds the ring near half full with a trim of at most 0.5%.
-	// Occupancy is what actually has to stay stable, and it integrates whatever
-	// rate error is left, so a slow proportional correction settles instead of
-	// hunting the way a rate chase does.
-	static LARGE_INTEGER s_rate_last = { 0 };
-	static size_t s_samples_accum = 0;
-	static double s_prev_measure = 0.0;
-	static int    s_agree_count = 0;
-	static double s_locked_step = 0.0;   // 0 while still measuring
-	static double s_step = 0.0;
-
-	if (s_step <= 0.0) s_step = g_core_sample_rate / (double)OUTPUT_SAMPLE_RATE;
+	// Stage two used to be a permanent 0.5% trim once locked, driven straight
+	// off the instantaneous occupancy error. That is fine for a rate that
+	// never moves again, but this file loads a new game (a new lock) into
+	// static state that outlives the game, and even within one session the
+	// real rate is not a constant: it is however fast that specific machine's
+	// CPU actually carries the core's game logic, which shifts with thermal
+	// throttling, background load, or the game itself hitting a heavier scene.
+	// So stage two now runs the way PCSX2's own SPU2 stretcher does it (see
+	// pcsx2/Host/AudioStream.cpp, UpdateStretchTempo): smooth the occupancy
+	// ratio into a slow-moving average, and only ever act on it once the
+	// average has drifted far enough, for long enough, that doing nothing
+	// would mean an audible gap or a hard reseed. Below that, playback runs
+	// bit-exact at the locked step - no trim at all, which is the difference
+	// between "silent unless something is actually wrong" and a permanent,
+	// low-level pitch wobble nobody asked for.
+	if (s_step <= 0.0) s_step = g_core_sample_rate / (double)g_output_sample_rate;
 
 	LARGE_INTEGER now, freq;
 	QueryPerformanceCounter(&now);
@@ -538,7 +723,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 				{
 					if (++s_agree_count >= 3)
 					{
-						s_locked_step = measured / (double)OUTPUT_SAMPLE_RATE;
+						s_locked_step = measured / (double)g_output_sample_rate;
 						FILE* lf = fopen("mister_flavor.log", "a");
 						if (lf)
 						{
@@ -555,7 +740,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 				s_prev_measure = measured;
 
 				// Glide toward the reading only while still searching.
-				s_step = s_step * 0.7 + (measured / (double)OUTPUT_SAMPLE_RATE) * 0.3;
+				s_step = s_step * 0.7 + (measured / (double)g_output_sample_rate) * 0.3;
 			}
 			s_samples_accum = 0;
 			s_rate_last = now;
@@ -599,20 +784,74 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 			wp = (rp + seed) % RING_BUFFER_SIZE;
 			occupancy = seed;
 			capacity = RING_BUFFER_SIZE - occupancy - 1;
+
+			// The gap that just got closed was, by definition, not something
+			// the slow average had any hope of tracking - restart it at the
+			// fresh occupancy instead of decaying toward it over the next
+			// couple of seconds while still applying a stale trim.
+			s_tempo_ema = 1.0;
+			s_stable_time = 0.0;
 		}
 
-		double err = ((double)occupancy - target_fill) / target_fill;
-		if (err < -1.0) err = -1.0;
-		else if (err > 1.0) err = 1.0;
+		double raw_ratio = (target_fill > 0.0) ? ((double)occupancy / target_fill) : 1.0;
 
-		// Reading ahead of playback means the ring is filling, so the input
-		// needs to be consumed slightly faster - and vice versa. 0.5% is under
-		// the threshold where pitch change becomes audible.
-		step = s_locked_step * (1.0 + err * 0.005);
+		double dt = (s_tempo_last_time.QuadPart != 0)
+			? (double)(now.QuadPart - s_tempo_last_time.QuadPart) / (double)freq.QuadPart
+			: 0.0;
+		s_tempo_last_time = now;
+		if (dt > 0.0 && dt < 2.0)
+		{
+			// Continuous-time EMA rather than a fixed-size window of calls:
+			// SendAudioSamples fires once per emulated frame, and how much
+			// real time that spans depends on the core (50 vs 60Hz, PS2's own
+			// uneven pacing) - a window sized in calls would average a
+			// different span of wall-clock time per core. This does not.
+			double alpha = 1.0 - exp(-dt / 1.5); // ~1.5s time constant
+			s_tempo_ema += (raw_ratio - s_tempo_ema) * alpha;
+		}
+
+		// Hysteresis on top of the average: once occupancy has sat close to
+		// target for a couple of seconds, stop trimming altogether and play
+		// the locked step bit-exact. Only resume once the drift is large
+		// enough that the alternative is a gap or another hard reseed. This
+		// mirrors PCSX2's stretcher, which spends most of a session at
+		// tempo==1.0 (stretch "inactive") for the same reason: a correction
+		// applied at every callback, even a small one, is itself a signal a
+		// listener can pick up on over a long enough session.
+		if (s_trim_active)
+		{
+			if (fabs(s_tempo_ema - 1.0) < 0.003)
+			{
+				s_stable_time += (dt > 0.0 && dt < 2.0) ? dt : 0.0;
+				if (s_stable_time > 2.0) s_trim_active = false;
+			}
+			else
+			{
+				s_stable_time = 0.0;
+			}
+		}
+		else if (fabs(s_tempo_ema - 1.0) > 0.02)
+		{
+			s_trim_active = true;
+			s_stable_time = 0.0;
+		}
+
+		if (s_trim_active)
+		{
+			double err = raw_ratio - 1.0;
+			if (err < -1.0) err = -1.0;
+			else if (err > 1.0) err = 1.0;
+
+			// Reading ahead of playback means the ring is filling, so the
+			// input needs to be consumed slightly faster - and vice versa.
+			// 0.5% is under the threshold where pitch change becomes audible.
+			step = s_locked_step * (1.0 + err * 0.005);
+		}
+		else
+		{
+			step = s_locked_step;
+		}
 	}
-
-
-
 
 
 	// Stops consuming input the moment the ring is full. The old loop went on

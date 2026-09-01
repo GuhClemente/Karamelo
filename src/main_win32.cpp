@@ -21,6 +21,7 @@ namespace fs = std::filesystem;
 #include "netplay.h"
 #include "retroachievements.h"
 #include "updater.h"
+#include "port_runner.h"
 #include "hw_render.h"
 #include "resource.h"
 #include "mister_math.h"
@@ -75,6 +76,7 @@ static uint32_t* pixel_buffer = nullptr;
 static HBITMAP h_bitmap = nullptr;
 static HDC h_mem_dc = nullptr;
 static HWND g_hwnd = nullptr;
+HWND MainGetHwnd() { return g_hwnd; }
 static bool g_running = true;
 static bool g_is_fullscreen = false;
 
@@ -1151,6 +1153,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	RaInit();
 	UpdaterInit();
+	PortInit();
 
 	// A path on the command line loads that game straight away. Useful for file
 	// associations and drag-and-drop, and it removes menu navigation as a
