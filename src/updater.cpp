@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <winhttp.h>
 #include <shellapi.h>
+#include <bcrypt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,7 @@
 
 #pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "bcrypt.lib")
 
 namespace fs = std::filesystem;
 
@@ -167,6 +169,56 @@ static std::string GetCurrentExecutablePath()
 	return std::string(path);
 }
 
+// SHA-256 of a file on disk, lowercase hex - via BCrypt (CNG), built into
+// Windows since Vista, no third-party crypto dependency needed. Returns
+// empty on any failure (missing file, API error) so the caller treats that
+// the same as "hash unknown" rather than crashing on a malformed digest.
+static std::string Sha256File(const std::string& path)
+{
+	std::string result;
+
+	FILE* f = fopen(path.c_str(), "rb");
+	if (!f) return result;
+
+	BCRYPT_ALG_HANDLE alg = NULL;
+	BCRYPT_HASH_HANDLE hash = NULL;
+	std::vector<uint8_t> hash_obj;
+	bool ok = false;
+
+	if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0) == 0)
+	{
+		DWORD obj_len = 0, cb = 0;
+		BCryptGetProperty(alg, BCRYPT_OBJECT_LENGTH, (PUCHAR)&obj_len, sizeof(obj_len), &cb, 0);
+		hash_obj.resize(obj_len ? obj_len : 256);
+
+		if (BCryptCreateHash(alg, &hash, hash_obj.data(), (ULONG)hash_obj.size(), NULL, 0, 0) == 0)
+		{
+			std::vector<uint8_t> buf(65536);
+			size_t n;
+			ok = true;
+			while ((n = fread(buf.data(), 1, buf.size(), f)) > 0)
+			{
+				if (BCryptHashData(hash, buf.data(), (ULONG)n, 0) != 0) { ok = false; break; }
+			}
+
+			if (ok)
+			{
+				uint8_t digest[32];
+				if (BCryptFinishHash(hash, digest, sizeof(digest), 0) == 0)
+				{
+					char hex[65];
+					for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", digest[i]);
+					result.assign(hex, 64);
+				}
+			}
+			BCryptDestroyHash(hash);
+		}
+	}
+	if (alg) BCryptCloseAlgorithmProvider(alg, 0);
+	fclose(f);
+	return result;
+}
+
 // WinHTTP Helper
 static bool HttpFetchData(const std::string& url, std::string* out_str, std::vector<uint8_t>* out_bin,
                           size_t* total_size_out, size_t known_total_size, bool track_progress)
@@ -280,7 +332,16 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 					if (dest_file)
 					{
 						fclose(dest_file);
-						if (read_ok && downloaded > 1024)
+						// A dropped connection just stops WinHttpQueryDataAvailable
+						// returning more data - read_ok stays true and downloaded
+						// was merely "more than 1024 bytes", which a truncated
+						// download clears easily. Require it to match the size the
+						// server (or the manifest) actually promised whenever that
+						// size is known, so a partial file can't be applied as if
+						// it were the complete update.
+						bool size_ok = (expected_total > 0) ? (downloaded >= expected_total)
+						                                     : (downloaded > 1024);
+						if (read_ok && size_ok)
 						{
 							success = true;
 							if (track_progress)
@@ -411,6 +472,7 @@ static DWORD WINAPI UpdaterThreadProc(LPVOID)
 			g_progress = 0;
 			g_status_msg = "Baixando nova versao...";
 			std::string dl_url = g_info.exe_url;
+			std::string expected_sha256 = g_info.exe_sha256;
 			size_t expected_size = g_info.exe_size;
 			LeaveCriticalSection(&g_updater_lock);
 
@@ -421,6 +483,29 @@ static DWORD WINAPI UpdaterThreadProc(LPVOID)
 
 			size_t total_size = 0;
 			bool dl_ok = HttpFetchData(dl_url, NULL, NULL, &total_size, expected_size, true);
+
+			// The manifest's exe_sha256 was parsed but never checked against
+			// what actually landed on disk - a MITM'd plain-HTTP fallback
+			// manifest, or a compromised/misconfigured server, could point
+			// exe_url at a tampered binary and this would apply it purely
+			// because a file existed. Verify whenever the manifest supplied a
+			// hash to check against.
+			std::string new_exe_path;
+			if (dl_ok && !expected_sha256.empty())
+			{
+				new_exe_path = GetExecutableDirectory() + "\\MiSTer_4_ALL.new";
+				std::string actual_sha256 = Sha256File(new_exe_path);
+
+				std::string expected_lower = expected_sha256, actual_lower = actual_sha256;
+				std::transform(expected_lower.begin(), expected_lower.end(), expected_lower.begin(), ::tolower);
+				std::transform(actual_lower.begin(), actual_lower.end(), actual_lower.begin(), ::tolower);
+
+				if (actual_lower.empty() || actual_lower != expected_lower)
+				{
+					dl_ok = false;
+					remove(new_exe_path.c_str());
+				}
+			}
 
 			EnterCriticalSection(&g_updater_lock);
 			if (dl_ok)
@@ -462,10 +547,15 @@ void UpdaterShutdown()
 	if (g_updater_running)
 	{
 		InterlockedExchange(&g_updater_running, 0);
+		bool thread_exited = true;
 		if (g_updater_event)
 		{
 			SetEvent(g_updater_event);
-			WaitForSingleObject(g_updater_thread, 1000);
+			// HttpFetchData sets a 30s WinHTTP send/receive timeout, so the
+			// worker can legitimately still be inside a single WinHTTP call
+			// (about to EnterCriticalSection(&g_updater_lock)) well past a
+			// short wait. Cover that worst case rather than guessing low.
+			thread_exited = (WaitForSingleObject(g_updater_thread, 31000) != WAIT_TIMEOUT);
 			CloseHandle(g_updater_event);
 			g_updater_event = NULL;
 		}
@@ -474,7 +564,11 @@ void UpdaterShutdown()
 			CloseHandle(g_updater_thread);
 			g_updater_thread = NULL;
 		}
-		DeleteCriticalSection(&g_updater_lock);
+		// Deleting a CRITICAL_SECTION a still-running thread might enter is
+		// undefined behavior. If the wait above timed out, leak it instead -
+		// the process is exiting either way, and the OS reclaims it; the
+		// alternative is a crash or hang during shutdown.
+		if (thread_exited) DeleteCriticalSection(&g_updater_lock);
 	}
 }
 
@@ -513,13 +607,34 @@ bool UpdaterApplyAndRestart()
 	FILE* f = fopen(bat_path.c_str(), "w");
 	if (!f) return false;
 
+	std::string old_exe = target_exe + ".old";
+
 	fprintf(f, "@echo off\r\n");
 	fprintf(f, "timeout /t 1 /nobreak >nul\r\n");
-	fprintf(f, ":retry\r\n");
+	// Rename (not copy) the live exe out of the way first, ONCE, outside the
+	// retry loop below - a rename is a near-instant metadata change, not a
+	// byte-by-byte overwrite, so a crash or power loss right after it leaves
+	// the ORIGINAL exe intact and recoverable at "%s.old" instead of target_exe
+	// itself ending up half-overwritten with no working copy anywhere.
+	// Retrying this same del+ren every loop (the old structure) would delete
+	// that backup again on iteration 2 while target_exe was already gone
+	// (renamed on iteration 1), destroying the one safety net this exists
+	// for the moment a single copy attempt failed.
+	fprintf(f, ":retry_rename\r\n");
+	fprintf(f, "if not exist \"%s\" goto renamed\r\n", target_exe.c_str());
+	fprintf(f, "del /f /q \"%s\" >nul 2>&1\r\n", old_exe.c_str());
+	fprintf(f, "ren \"%s\" \"%s\" >nul 2>&1\r\n", target_exe.c_str(),
+		(fs::path(old_exe).filename().string()).c_str());
+	fprintf(f, "if exist \"%s\" (\r\n", target_exe.c_str());
+	fprintf(f, "    timeout /t 1 /nobreak >nul\r\n");
+	fprintf(f, "    goto retry_rename\r\n");
+	fprintf(f, ")\r\n");
+	fprintf(f, ":renamed\r\n");
+	fprintf(f, ":retry_copy\r\n");
 	fprintf(f, "copy /y \"%s\" \"%s\" >nul 2>&1\r\n", new_exe.c_str(), target_exe.c_str());
 	fprintf(f, "if errorlevel 1 (\r\n");
 	fprintf(f, "    timeout /t 1 /nobreak >nul\r\n");
-	fprintf(f, "    goto retry\r\n");
+	fprintf(f, "    goto retry_copy\r\n");
 	fprintf(f, ")\r\n");
 	fprintf(f, "del /f /q \"%s\" >nul 2>&1\r\n", new_exe.c_str());
 	fprintf(f, "start \"\" \"%s\"\r\n", target_exe.c_str());

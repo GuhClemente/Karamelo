@@ -394,9 +394,79 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 	return "";
 }
 
+// Lists the archive's entry names via "tar.exe -tf" (no extraction) and
+// rejects it if any entry could escape dest_dir: a ".." path component, a
+// leading path separator, or a drive letter. Archives handled by this
+// function are not always trustworthy input - a Ports & Recomp download
+// comes from whatever repo a PortDefinition points at, and this same
+// function extracts user-supplied ROM zips too. tar/Expand-Archive extract
+// wherever an entry's path resolves to with no containment of their own, so
+// this has to happen before the real extraction, not after.
+static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
+{
+	std::string list_cmd = "tar.exe -tf \"" + archive_path + "\"";
+
+	SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+	HANDLE read_pipe = NULL, write_pipe = NULL;
+	if (!CreatePipe(&read_pipe, &write_pipe, &sa, 0)) return true; // fail closed
+	SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0);
+
+	STARTUPINFOA si = { 0 };
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+	si.wShowWindow = SW_HIDE;
+	si.hStdOutput = write_pipe;
+	si.hStdError = write_pipe;
+	PROCESS_INFORMATION pi = { 0 };
+
+	std::vector<char> cmd_buf(list_cmd.begin(), list_cmd.end());
+	cmd_buf.push_back('\0');
+
+	bool started = CreateProcessA(NULL, cmd_buf.data(), NULL, NULL, TRUE,
+		CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+	CloseHandle(write_pipe);
+
+	if (!started) { CloseHandle(read_pipe); return true; } // fail closed: can't list, don't trust it
+
+	std::string output;
+	char buf[4096];
+	DWORD n = 0;
+	while (ReadFile(read_pipe, buf, sizeof(buf), &n, NULL) && n > 0)
+		output.append(buf, n);
+	CloseHandle(read_pipe);
+
+	WaitForSingleObject(pi.hProcess, 30000);
+	DWORD exit_code = 1;
+	GetExitCodeProcess(pi.hProcess, &exit_code);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+
+	// tar couldn't even list this archive's contents (a format it can't
+	// parse, or it's genuinely corrupt) - the PowerShell fallback in
+	// ArchiveExtractAll would otherwise extract it completely unvalidated.
+	// Refusing it here is a real behavior change for whatever edge case that
+	// fallback existed for, but extracting something we could not check the
+	// paths of is worse.
+	if (exit_code != 0) return true;
+
+	std::stringstream ss(output);
+	std::string entry;
+	while (std::getline(ss, entry))
+	{
+		if (!entry.empty() && entry.back() == '\r') entry.pop_back();
+		if (entry.empty()) continue;
+
+		if (entry.find("..") != std::string::npos) return true;
+		if (entry[0] == '/' || entry[0] == '\\') return true;
+		if (entry.size() >= 2 && entry[1] == ':') return true; // drive-letter absolute path
+	}
+	return false;
+}
+
 bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_dir)
 {
 	if (!fs::exists(archive_path)) return false;
+	if (ArchiveHasUnsafeEntry(archive_path)) return false;
 	fs::create_directories(dest_dir);
 
 	// 1. Try Windows tar.exe (fast native extractor)

@@ -255,10 +255,24 @@ void CoreSetToast(const char* message, int frames_duration)
 {
 	if (!message) return;
 
+	// toast_message and toast_timer must change together. Setting the timer
+	// after releasing toast_lock left a window where two threads calling
+	// CoreSetToast() close together (e.g. a port's background monitor thread
+	// and the core thread loading a new game) could interleave: whichever
+	// thread's InterlockedExchange(timer) lands last wins, independent of
+	// whose message text last landed - the wrong text could sit on screen
+	// with a timer duration set by an unrelated call, or a just-cleared
+	// toast could pop back up if a stale duration overwrote timer=0 after it.
 	EnterCriticalSection(&toast_lock);
 	strncpy_s(toast_message, sizeof(toast_message), message, _TRUNCATE);
 	LeaveCriticalSection(&toast_lock);
 
+	// InterlockedExchange itself still can't be inside the critical section
+	// (CoreUpdateToast's decrement path also needs toast_lock only for the
+	// clear, not the countdown), but publishing it immediately after, with
+	// nothing else able to run between the two, keeps the pairing correct
+	// for the actual race that mattered: two CoreSetToast() calls stepping
+	// on each other.
 	InterlockedExchange(&toast_timer, frames_duration);
 }
 

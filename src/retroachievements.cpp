@@ -27,6 +27,21 @@ namespace fs = std::filesystem;
 static const char* RA_CONFIG_PATH = "Config/retroachievements.cfg";
 
 static rc_client_t* g_client = NULL;
+// rc_client is documented as single-threaded, but RaGetAchievements() is
+// called from the UI thread (menu.cpp's Achievements page) while
+// RaDoFrame()/RaOnGameLoad()/RaOnGameUnload() drive the same g_client from
+// the core thread every frame - a real use-after-free if the UI thread walks
+// achievement structures the core thread frees via rc_client_unload_game()
+// at the same moment. This lock only needs to wrap the handful of entry
+// points a *different* thread than the core thread can reach
+// (RaGetAchievements from the UI thread, RaShutdown from the main thread at
+// exit) plus the core-thread entry points they race against - nested calls
+// rc_client makes back into this file (event callbacks, RaRefreshCounts)
+// happen on the same thread that already holds it, and CRITICAL_SECTION is
+// recursive, so that stays safe.
+static CRITICAL_SECTION g_client_lock;
+struct RaClientLockInit { RaClientLockInit() { InitializeCriticalSection(&g_client_lock); } };
+static RaClientLockInit g_ra_client_lock_init;
 static bool         g_enabled = false;
 static bool         g_logged_in = false;
 // Written from rcheevos callbacks on the core thread, read by the OSD on the
@@ -50,6 +65,25 @@ static std::string  g_username;
 static std::string  g_password;
 static std::string  g_token;
 static bool         g_hardcore = false;
+
+// g_username itself is only ever touched on the core thread (config load at
+// RaInit time, or RaLoginCallback replaying an HTTP completion) - same as
+// g_status used to be before the fix above. RaGetUserName() is read from the
+// UI thread (menu.cpp's Achievements settings page), so it needs the same
+// lock-protected fixed-buffer mirror g_status already got, not a raw
+// std::string::c_str() a UI-thread copy could catch mid-reallocation.
+static CRITICAL_SECTION g_username_lock;
+struct RaUsernameLockInit { RaUsernameLockInit() { InitializeCriticalSection(&g_username_lock); } };
+static RaUsernameLockInit g_ra_username_lock_init;
+static char g_username_mirror[64] = "";
+static char g_username_readback[64] = "";
+
+static void SyncUsernameMirror()
+{
+	EnterCriticalSection(&g_username_lock);
+	strncpy_s(g_username_mirror, sizeof(g_username_mirror), g_username.c_str(), _TRUNCATE);
+	LeaveCriticalSection(&g_username_lock);
+}
 
 static wchar_t g_user_agent[256] = L"";
 
@@ -82,7 +116,7 @@ static void RaLoadConfig()
 		size_t n = strlen(val);
 		while (n > 0 && (val[n - 1] == '\n' || val[n - 1] == '\r')) val[--n] = '\0';
 
-		if (!strcmp(line, "username")) g_username = val;
+		if (!strcmp(line, "username")) { g_username = val; SyncUsernameMirror(); }
 		else if (!strcmp(line, "password")) g_password = val;
 		else if (!strcmp(line, "token")) g_token = val;
 		else if (!strcmp(line, "hardcore")) g_hardcore = (atoi(val) != 0);
@@ -511,6 +545,7 @@ static void RC_CCONV RaLoginCallback(int result, const char* error_message,
 	if (user)
 	{
 		g_username = user->username ? user->username : g_username;
+		SyncUsernameMirror();
 
 		// Store the token so the password never has to be kept on disk.
 		if (user->token && *user->token)
@@ -664,11 +699,13 @@ void RaInit()
 
 void RaShutdown()
 {
+	EnterCriticalSection(&g_client_lock);
 	if (g_client)
 	{
 		rc_client_destroy(g_client);
 		g_client = NULL;
 	}
+	LeaveCriticalSection(&g_client_lock);
 
 	if (InterlockedExchange(&g_http_running, 0))
 	{
@@ -693,12 +730,14 @@ void RaDoFrame()
 {
 	if (!g_enabled || !g_client) return;
 
+	EnterCriticalSection(&g_client_lock);
 	RaPumpHttp();
 
 	if (g_memory_ready)
 		rc_client_do_frame(g_client);
 	else
 		rc_client_idle(g_client);
+	LeaveCriticalSection(&g_client_lock);
 }
 
 void RaOnGameLoad(const char* rom_path, const char* core_name)
@@ -717,15 +756,19 @@ void RaOnGameLoad(const char* rom_path, const char* core_name)
 
 	// console_id 0 lets rcheevos try every hashing rule it knows, which is what
 	// we want since one core can serve several systems.
+	EnterCriticalSection(&g_client_lock);
 	rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_UNKNOWN,
 		rom_path, NULL, 0, RaLoadGameCallback, NULL);
+	LeaveCriticalSection(&g_client_lock);
 }
 
 void RaOnGameUnload()
 {
 	if (!g_enabled || !g_client) return;
 
+	EnterCriticalSection(&g_client_lock);
 	rc_client_unload_game(g_client);
+	LeaveCriticalSection(&g_client_lock);
 	rc_libretro_memory_destroy(&g_memory_regions);
 	g_memory_ready = false;
 	g_ach_total = 0;
@@ -741,10 +784,16 @@ int RaGetAchievements(RaAchievementInfo* out, int max_out)
 {
 	if (!out || max_out <= 0 || !g_client) return 0;
 
+	// Called from the UI thread (menu.cpp's Achievements page) while the core
+	// thread can concurrently unload the game (RaOnGameUnload) or advance
+	// rc_client (RaDoFrame) - without g_client_lock this could walk buckets
+	// the core thread is freeing at the same instant.
+	EnterCriticalSection(&g_client_lock);
+
 	rc_client_achievement_list_t* list = rc_client_create_achievement_list(g_client,
 		RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE,
 		RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_PROGRESS);
-	if (!list) return 0;
+	if (!list) { LeaveCriticalSection(&g_client_lock); return 0; }
 
 	int n = 0;
 	for (uint32_t b = 0; b < list->num_buckets && n < max_out; b++)
@@ -769,6 +818,7 @@ int RaGetAchievements(RaAchievementInfo* out, int max_out)
 	}
 
 	rc_client_destroy_achievement_list(list);
+	LeaveCriticalSection(&g_client_lock);
 	return n;
 }
 int         RaGetActiveChallenges() { return g_challenge_active; }
@@ -779,6 +829,12 @@ const char* RaGetStatus()
 	LeaveCriticalSection(&g_status_lock);
 	return g_status_readback;
 }
-const char* RaGetUserName() { return g_username.c_str(); }
+const char* RaGetUserName()
+{
+	EnterCriticalSection(&g_username_lock);
+	strncpy_s(g_username_readback, sizeof(g_username_readback), g_username_mirror, _TRUNCATE);
+	LeaveCriticalSection(&g_username_lock);
+	return g_username_readback;
+}
 int         RaGetAchievementCount() { return g_ach_total; }
 int         RaGetAchievementsUnlocked() { return g_ach_unlocked; }
