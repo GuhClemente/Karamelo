@@ -703,9 +703,15 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	// low-level pitch wobble nobody asked for.
 	if (s_step <= 0.0) s_step = g_core_sample_rate / (double)g_output_sample_rate;
 
-	LARGE_INTEGER now, freq;
+	// The counter frequency is fixed for the life of the process (Microsoft's
+	// own guidance is to query it once), so caching it here avoids a wasted
+	// call on every single one of these - this function runs once per
+	// emulated frame, i.e. 50-60+ times a second during gameplay.
+	static LARGE_INTEGER freq = { 0 };
+	if (freq.QuadPart == 0) QueryPerformanceFrequency(&freq);
+
+	LARGE_INTEGER now;
 	QueryPerformanceCounter(&now);
-	QueryPerformanceFrequency(&freq);
 	if (s_rate_last.QuadPart == 0) s_rate_last = now;
 
 	if (s_locked_step <= 0.0)
@@ -2259,7 +2265,13 @@ static bool CoreLoad(const char* core_dll_path)
 	p_retro_get_memory_data = (retro_get_memory_data_t)GetProcAddress(h_core_dll, "retro_get_memory_data");
 	p_retro_get_memory_size = (retro_get_memory_size_t)GetProcAddress(h_core_dll, "retro_get_memory_size");
 
-	if (!p_retro_init || !p_retro_run || !p_retro_load_game)
+	// p_retro_get_system_av_info is required by the libretro API just like the
+	// three below it - CoreLoadGame() calls it unconditionally further down
+	// with no null check of its own (unlike every other core entry point in
+	// this file, which is either SEH-guarded or null-checked at its call
+	// site). A core DLL missing it is malformed; reject it here rather than
+	// null-call it later.
+	if (!p_retro_init || !p_retro_run || !p_retro_load_game || !p_retro_get_system_av_info)
 	{
 		FreeLibrary(h_core_dll);
 		h_core_dll = NULL;
