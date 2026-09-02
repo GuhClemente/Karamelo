@@ -104,7 +104,9 @@ pub fn write_regs(device: &mut device::Device, address: u64, value: u32, mask: u
                     savestates::process_savestates(device);
                 }
                 if !netplay::in_rollback(device.netplay.as_ref()) {
-                    let _ = device.ui.video.fps_tx.as_ref().unwrap().send(true);
+                    if let Some(tx) = device.ui.video.fps_tx.as_ref() {
+                        let _ = tx.send(true);
+                    }
                 }
             }
         }

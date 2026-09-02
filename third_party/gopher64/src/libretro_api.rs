@@ -217,7 +217,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const retro_game_info) -> bool {
             None => raw_slice.to_vec(),
         };
 
-        let mut dev = Device::new(false);
+        let mut dev = Device::new(true);
 
         // 1. Initialize ROM & Cartridge
         device::cart::rom::init(&mut dev, &rom_contents);
@@ -291,6 +291,9 @@ pub unsafe extern "C" fn retro_reset() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_run() {
     let _ = std::panic::catch_unwind(|| {
+        let rt_guard = RUNTIME.lock().unwrap();
+        let _enter = rt_guard.as_ref().map(|rt| rt.enter());
+
         let mut guard = match G_DEVICE.lock() {
             Ok(g) => g,
             Err(_) => return,
