@@ -528,7 +528,7 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
     if (in("Dreamcast"))
       return "cores/dreamcast.dll";
     if (in("MSX"))
-      return "cores/msx.dll";
+      return "cores/bluemsx.dll";
     if (in("Amiga"))
       return "cores/amiga.dll";
     if (in("3DO"))
@@ -585,7 +585,7 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
     if (in("DOS") || in("MSDOS"))
       return "cores/dosbox_pure.dll";
     if (in("MSX"))
-      return "cores/msx.dll";
+      return "cores/bluemsx.dll";
     if (in("Amiga"))
       return "cores/amiga.dll";
     if (in("C64") || in("Commodore"))
@@ -674,7 +674,7 @@ static const SystemCore kSystemCores[] = {
     {119, "cores/gb.dll"},
     {120, "cores/psp.dll"},
     {121, "cores/dosbox_pure.dll"},
-    {122, "cores/msx.dll"},
+    {122, "cores/bluemsx.dll"},
     {123, "cores/amiga.dll"},
     {124, "cores/c64.dll"},
     {125, "cores/spectrum.dll"},
