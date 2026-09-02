@@ -495,9 +495,17 @@ fn write_save(ui: &mut ui::Ui, save_type: SaveTypes) {
             };
         }
     }
-    tokio::spawn(async move {
-        if let Err(e) = tokio::fs::write(save_path, save_data).await {
-            eprintln!("Error writing save: {}", e);
-        }
-    });
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        handle.spawn(async move {
+            if let Err(e) = tokio::fs::write(save_path, save_data).await {
+                eprintln!("Error writing save: {}", e);
+            }
+        });
+    } else {
+        std::thread::spawn(move || {
+            if let Err(e) = std::fs::write(save_path, save_data) {
+                eprintln!("Error writing save: {}", e);
+            }
+        });
+    }
 }
