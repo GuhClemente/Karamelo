@@ -15,6 +15,7 @@
 #include <filesystem>
 
 #include "core_runner.h"
+#include "hw_render.h"
 
 namespace fs = std::filesystem;
 

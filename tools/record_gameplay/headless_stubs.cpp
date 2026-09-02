@@ -13,7 +13,7 @@
 
 int  MenuGetDeadzone() { return 0; }
 int  MenuGetAudioLatencyMs() { return 64; }
-int  MenuGetHwRender() { return 0; }
+int  MenuGetHwRender() { return 1; }
 
 NetplayState NetplayGetState() { return NETPLAY_DISCONNECTED; }
 void NetplaySyncInputs(int16_t[16], int16_t[2][2], int16_t out_p2_buttons[16], int16_t out_p2_analog[2][2])
