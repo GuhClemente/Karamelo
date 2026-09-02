@@ -1009,6 +1009,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			case VK_RIGHT: MenuProcessKey(KEY_RIGHT); break;
 			case VK_PRIOR: MenuProcessKey(KEY_PAGEUP); break;
 			case VK_NEXT: MenuProcessKey(KEY_PAGEDOWN); break;
+			case VK_HOME: MenuProcessKey(KEY_HOME); break;
+			case VK_END: MenuProcessKey(KEY_END); break;
 			case VK_RETURN:
 			case VK_SPACE:
 			case 'Z':

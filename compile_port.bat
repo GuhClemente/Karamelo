@@ -93,6 +93,8 @@ if errorlevel 1 (
 echo.
 echo [BUILD SUCCESS] app\%APP_EXE%
 copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
+if not exist app\cores mkdir app\cores
+if exist cores\*.dll copy /Y cores\*.dll app\cores\ >nul 2>&1
 
 rem Gerar version.json automatico
 powershell -NoProfile -Command "$size = (Get-Item 'app\%APP_EXE%').Length; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'MiSTer 4 ALL v%APP_VER%'; release_date = $date; notes = 'Versao de producao MiSTer 4 ALL'; exe_url = 'https://mister4all.com/downloads/MiSTer_4_ALL.exe'; exe_size = $size; exe_sha256 = ''; zip_url = 'https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'app\version.json' -Value $json -Encoding UTF8"
