@@ -2534,6 +2534,14 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			{
 				CoreSetToast("ATIVE 3D ACCELERATION EM SETTINGS > VIDEO", 300);
 			}
+			else if (strstr(sys, "Nintendo 3DS"))
+			{
+				// A retro_load_game failure on this core is overwhelmingly an
+				// encrypted eShop title Citra can't decrypt without the user's
+				// own console keys - "failed to load" alone left them with no
+				// idea a key file was even the missing piece.
+				CoreSetToast("3DS CIFRADO: falta saves/3DS/Citra/sysdata/aes_keys.txt", 360);
+			}
 			else if (needed)
 			{
 				char msg[192];
