@@ -370,10 +370,15 @@ static const char *GetArcadeCoreDll(const std::string &file_path = "") {
 }
 
 static const char *GetN64CoreDll() {
-  if (setting_n64_core == 1)
+  std::error_code ec;
+  if (setting_n64_core == 1 && fs::exists("cores/n64_parallel.dll", ec))
     return "cores/n64_parallel.dll";
-  if (setting_n64_core == 2)
+  if (setting_n64_core == 2 && fs::exists("cores/n64_mupen.dll", ec))
     return "cores/n64_mupen.dll";
+  if (fs::exists("cores/n64_gopher.dll", ec))
+    return "cores/n64_gopher.dll";
+  if (fs::exists("cores/n64.dll", ec))
+    return "cores/n64.dll";
   return "cores/n64_gopher.dll";
 }
 int MenuGetHwRender() { return (setting_driver != 0) ? 1 : 0; }
@@ -701,10 +706,13 @@ static bool SystemHasCore(int action_id) {
       break;
     }
 
-  if (!known)
-    return true; // not a system row
-  if (action_id == 107)
-    dll = GetN64CoreDll();
+  if (action_id == 107) {
+    std::error_code ec;
+    return fs::exists("cores/n64_gopher.dll", ec) ||
+           fs::exists("cores/n64.dll", ec) ||
+           fs::exists("cores/n64_parallel.dll", ec) ||
+           fs::exists("cores/n64_mupen.dll", ec);
+  }
   if (action_id == 117)
     dll = GetArcadeCoreDll();
   if (action_id == 140) {
@@ -2027,6 +2035,24 @@ static void MenuProcessKeyImpl(MenuKey key) {
 
   case KEY_PAGEDOWN:
     selected_idx = (selected_idx + 5 < total) ? selected_idx + 5 : total - 1;
+    break;
+
+  case KEY_HOME:
+    if (total > 0) {
+      selected_idx = 0;
+      while (selected_idx < total && items[selected_idx].label == " ")
+        selected_idx++;
+      if (selected_idx >= total)
+        selected_idx = 0;
+    }
+    break;
+
+  case KEY_END:
+    if (total > 0) {
+      selected_idx = total - 1;
+      while (selected_idx > 0 && items[selected_idx].label == " ")
+        selected_idx--;
+    }
     break;
 
   case KEY_LEFT:
