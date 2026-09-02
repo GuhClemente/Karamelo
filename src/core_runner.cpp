@@ -1854,8 +1854,10 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
 	// --- Load phase (this is the part that used to freeze the window) ---
+	EnterCriticalSection(&name_lock);
 	std::string rom_path = g_pending_rom;
 	std::string core_dll = g_pending_core_hint;
+	LeaveCriticalSection(&name_lock);
 
 	// Arcade cores read the archive themselves: the .zip IS the ROM set, a
 	// bundle of chip dumps only the core knows how to assemble. Extracting it
@@ -2181,8 +2183,10 @@ bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint)
 
 	CoreShutdown();
 
+	EnterCriticalSection(&name_lock);
 	g_pending_rom = rom_path;
 	g_pending_core_hint = core_dll_hint ? core_dll_hint : "";
+	LeaveCriticalSection(&name_lock);
 
 	// Wipe the framebuffers before loading. They still held the last frame of
 	// the previous game, so starting a new one showed the old one frozen on
@@ -2437,7 +2441,14 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 	is_disc = (sys_info.need_fullpath || ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" || ext == ".pbp" || ext == ".toc" || ext == ".gcm" || ext == ".rvz");
 
-	fs::path orig_p(g_pending_rom.empty() ? rom_path : g_pending_rom);
+	// rom_path is CoreExecutionThreadProc's own local copy of g_pending_rom,
+	// captured once under name_lock at thread start (see there). Re-reading
+	// the global here instead used to let a second CoreRequestLoad() - fired
+	// while this thread was still finishing up after CoreShutdown()'s bounded
+	// wait gave up on a wedged previous core - overwrite g_pending_rom out
+	// from under this session, so a new game's save file could inherit the
+	// *next* game's platform folder instead of its own.
+	fs::path orig_p(rom_path);
 	loaded_game_stem = orig_p.stem().string();
 	EnterCriticalSection(&name_lock);
 	loaded_game_name = orig_p.filename().string();
