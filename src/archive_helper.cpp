@@ -274,6 +274,8 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 		return "cores/psx.dll";
 	}
 
+	if (ext == ".mx1" || ext == ".mx2") return "cores/msx.dll";
+
 	if (ext == ".bin" || ext == ".rom" || ext == ".dsk" || ext == ".cas")
 	{
 		if (in("NeoGeo")) return "cores/neogeo.dll";
@@ -534,6 +536,7 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 		".ws", ".wsc", ".ngp", ".ngc",
 		".adf", ".hdf", ".lha", ".d64", ".t64", ".prg", ".crt",
 		".tzx", ".tap", ".z80", ".sna", ".dsk", ".cas",
+		".mx1", ".mx2",
 		".bin", ".rom"
 	};
 
