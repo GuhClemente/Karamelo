@@ -220,6 +220,75 @@ static void MenuSaveSettings();
 int MenuGetAspectMode() { return setting_aspect; }
 int MenuGetFilterMode() { return setting_filter; }
 int MenuGetWallpaperMode() { return setting_wallpaper; }
+
+// Every .raw file in wallpapers/ becomes a selectable "Custom" wallpaper slot,
+// on top of the 4 built-in procedural ones (None/Static Noise/Parallax
+// Stars/Cyber Grid). Scanned once and sorted so the same index always means
+// the same file for both the menu label and main_win32.cpp's pixel loader.
+static std::vector<std::string> g_wallpaper_custom_files;
+static bool g_wallpaper_scanned = false;
+
+static void ScanCustomWallpapers() {
+  if (g_wallpaper_scanned) return;
+  g_wallpaper_scanned = true;
+  g_wallpaper_custom_files.clear();
+  std::error_code ec;
+
+  const char *search_dirs[] = {"Wallpapers", "wallpapers", "app/Wallpapers"};
+  std::string target_dir;
+  for (const char *dir : search_dirs) {
+    if (fs::exists(dir, ec) && fs::is_directory(dir, ec)) {
+      target_dir = dir;
+      break;
+    }
+  }
+
+  if (!target_dir.empty()) {
+    for (auto &entry : fs::directory_iterator(target_dir, ec)) {
+      if (!entry.is_regular_file(ec)) continue;
+      std::string ext = entry.path().extension().string();
+      for (auto &c : ext) c = (char)tolower((unsigned char)c);
+      if (ext == ".raw") g_wallpaper_custom_files.push_back(entry.path().string());
+    }
+    std::sort(g_wallpaper_custom_files.begin(), g_wallpaper_custom_files.end());
+  }
+}
+
+int MenuGetWallpaperCustomCount() {
+  ScanCustomWallpapers();
+  return (int)g_wallpaper_custom_files.size();
+}
+
+const char *MenuGetWallpaperCustomPath(int index) {
+  ScanCustomWallpapers();
+  if (index < 0 || index >= (int)g_wallpaper_custom_files.size()) return nullptr;
+  return g_wallpaper_custom_files[index].c_str();
+}
+
+static const char *WallpaperDisplayLabel(int mode) {
+  static const char *kBase[] = {"None", "Static Noise", "Parallax Stars", "Cyber Grid"};
+  if (mode >= 0 && mode < 4) return kBase[mode];
+  const char *path = MenuGetWallpaperCustomPath(mode - 4);
+  if (!path) return "None";
+  static char buf[32];
+  std::string stem = fs::path(path).stem().string();
+  if (stem == "sabor_mister_chef") {
+    snprintf(buf, sizeof(buf), "Flavor Chef");
+  } else if (stem == "sabor_mister_arcade") {
+    snprintf(buf, sizeof(buf), "Flavor Arcade");
+  } else {
+    for (char &c : stem) {
+      if (c == '_') c = ' ';
+    }
+    if (!stem.empty() && stem[0] >= 'a' && stem[0] <= 'z') stem[0] = (char)toupper(stem[0]);
+    if (stem.size() > 14) stem = stem.substr(0, 14);
+    snprintf(buf, sizeof(buf), "%s", stem.c_str());
+  }
+  return buf;
+}
+
+// 3 = last built-in procedural mode's index; the custom slots start at 4.
+static int WallpaperMaxMode() { return 3 + MenuGetWallpaperCustomCount(); }
 int MenuGetOsdTheme() { return setting_theme; }
 bool MenuGetFullscreen() { return setting_fullscreen; }
 void MenuSetFullscreen(bool fs) {
@@ -1023,8 +1092,6 @@ void PopulateVideoSettings() {
   OsdSetSize(13);
 
   const char *aspects[] = {"Original", "4:3", "16:9"};
-  const char *wallpapers[] = {"None",       "Static Noise", "Parallax Stars",
-                              "Cyber Grid", "Flavor Chef",  "Flavor Arcade"};
   const char *displays[] = {"Windowed", "Fullscreen"};
   const char *themes[] = {"Red", "Blue", "Green", "Amber", "Gray", "Dark"};
 
@@ -1032,7 +1099,7 @@ void PopulateVideoSettings() {
   items.push_back(
       {"CRT Shader", FilterLabel(setting_filter), false, false, 302});
   items.push_back(
-      {"Wallpaper", wallpapers[setting_wallpaper], false, false, 303});
+      {"Wallpaper", WallpaperDisplayLabel(setting_wallpaper), false, false, 303});
   items.push_back(
       {"Display", displays[setting_fullscreen ? 1 : 0], false, false, 304});
   items.push_back({"OSD Color", themes[setting_theme], false, false, 305});
@@ -1666,7 +1733,7 @@ static void MenuLoadSettings() {
     else if (!strcmp(key, "filter"))
       setting_filter = MigrateFilter(ClampInt(iv, 0, 9));
     else if (!strcmp(key, "wallpaper"))
-      setting_wallpaper = ClampInt(iv, 0, 5);
+      setting_wallpaper = ClampInt(iv, 0, WallpaperMaxMode());
     else if (!strcmp(key, "fullscreen"))
       setting_fullscreen = (iv != 0);
     else if (!strcmp(key, "theme"))
@@ -1993,7 +2060,9 @@ static void MenuProcessKeyImpl(MenuKey key) {
       selected_idx = cur;
     } else if (item.action_id == 303) // Wallpaper
     {
-      setting_wallpaper = (setting_wallpaper + delta + 6) % 6;
+      int count = WallpaperMaxMode() + 1;
+      if (count > 0)
+        setting_wallpaper = (setting_wallpaper + delta + count) % count;
       PopulateVideoSettings();
       selected_idx = 2;
     } else if (item.action_id == 304) // Fullscreen
