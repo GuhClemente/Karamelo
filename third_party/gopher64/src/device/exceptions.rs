@@ -1,0 +1,181 @@
+use crate::device;
+use crate::ui;
+
+pub fn check_pending_interrupts(device: &mut device::Device) {
+    if (device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG]
+        & (device::cop0::COP0_STATUS_IE
+            | device::cop0::COP0_STATUS_EXL
+            | device::cop0::COP0_STATUS_ERL))
+        != device::cop0::COP0_STATUS_IE
+    {
+        // interrupts disabled globally, or error/exception is already set
+        return;
+    }
+
+    if device.mi.regs[device::mi::MI_INTR_REG] & device.mi.regs[device::mi::MI_INTR_MASK_REG] != 0 {
+        device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] |= device::cop0::COP0_CAUSE_IP2;
+    }
+
+    if (device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG]
+        & device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG]
+        & device::cop0::COP0_CAUSE_IP_MASK)
+        == 0
+    {
+        // interrupt disabled, or no pending interrupts
+        return;
+    }
+
+    if device.cpu.cop0.is_event {
+        interrupt_exception(device);
+    } else {
+        device::events::create_event(device, device::events::EVENT_TYPE_INT, 0);
+    }
+}
+
+pub fn interrupt_exception(device: &mut device::Device) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] &= !device::cop0::COP0_CAUSE_EXCCODE_MASK;
+    exception_general(device, 0x180);
+}
+
+pub fn floating_point_exception(device: &mut device::Device) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_FPE;
+
+    exception_general(device, 0x180)
+}
+
+pub fn trap_exception(device: &mut device::Device) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_TR;
+
+    exception_general(device, 0x180)
+}
+
+pub fn syscall_exception(device: &mut device::Device) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_SYS;
+
+    exception_general(device, 0x180)
+}
+
+pub fn break_exception(device: &mut device::Device) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_BP;
+
+    exception_general(device, 0x180)
+}
+
+pub fn reserved_exception(device: &mut device::Device, cop: u64) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_RI | cop;
+
+    exception_general(device, 0x180)
+}
+
+pub fn cop_unusable_exception(device: &mut device::Device, cop: u64) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_CPU | cop;
+
+    exception_general(device, 0x180)
+}
+
+pub fn tlb_miss_exception(
+    device: &mut device::Device,
+    address: u64,
+    access_type: device::memory::AccessType,
+) {
+    if access_type == device::memory::AccessType::Read {
+        device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_TLBL
+    } else {
+        device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] = device::cop0::COP0_CAUSE_EXCCODE_TLBS
+    }
+
+    device.cpu.cop0.regs[device::cop0::COP0_BADVADDR_REG] = address;
+    device::memory::masked_write_64(
+        &mut device.cpu.cop0.regs[device::cop0::COP0_CONTEXT_REG],
+        address >> 9,
+        device::cop0::COP0_CONTEXT_BADVPN2_MASK,
+    );
+    device::memory::masked_write_64(
+        &mut device.cpu.cop0.regs[device::cop0::COP0_XCONTEXT_REG],
+        address >> 9,
+        device::cop0::COP0_XCONTEXT_BADVPN2_MASK,
+    );
+    device::memory::masked_write_64(
+        &mut device.cpu.cop0.regs[device::cop0::COP0_XCONTEXT_REG],
+        address >> 31,
+        device::cop0::COP0_XCONTEXT_REGION_MASK,
+    );
+    device::memory::masked_write_64(
+        &mut device.cpu.cop0.regs[device::cop0::COP0_ENTRYHI_REG],
+        address,
+        0xFFFFE000,
+    );
+
+    let mut vector_offset = 0x180;
+    let mut valid = true;
+    for i in device.cpu.cop0.tlb_entries {
+        if address & !3 >= i.start_even && address & !3 <= i.end_even {
+            valid = i.v_even != 0;
+            if valid && access_type == device::memory::AccessType::Write && i.d_even == 0 {
+                device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] =
+                    device::cop0::COP0_CAUSE_EXCCODE_MOD;
+                valid = false;
+            }
+            break;
+        }
+        if address & !3 >= i.start_odd && address & !3 <= i.end_odd {
+            valid = i.v_odd != 0;
+            if valid && access_type == device::memory::AccessType::Write && i.d_odd == 0 {
+                device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] =
+                    device::cop0::COP0_CAUSE_EXCCODE_MOD;
+                valid = false;
+            }
+            break;
+        }
+    }
+
+    if device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG] & device::cop0::COP0_STATUS_EXL == 0
+        && valid
+    {
+        vector_offset = 0;
+    }
+
+    exception_general(device, vector_offset)
+}
+
+pub fn reset_event(device: &mut device::Device) {
+    device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] &= !device::cop0::COP0_CAUSE_IP4;
+
+    device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG] |= device::cop0::COP0_STATUS_ERL
+        | device::cop0::COP0_STATUS_SR
+        | device::cop0::COP0_STATUS_BEV;
+    device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG] &= !device::cop0::COP0_STATUS_TS;
+
+    device.cpu.cop0.regs[device::cop0::COP0_ERROREPC_REG] = device.cpu.pc;
+    device.cpu.pc = 0xBFC00000;
+    device.cpu.branch_state.state = device::cpu::State::Step;
+    device.rsp.regs2[device::rsp_interface::SP_PC_REG] = 0;
+
+    device::pif::reset_pif(device, true);
+
+    ui::video::onscreen_message("Game reset", ui::video::MESSAGE_LENGTH_MESSAGE_SHORT);
+}
+
+fn exception_general(device: &mut device::Device, vector_offset: u32) {
+    if device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG] & device::cop0::COP0_STATUS_EXL == 0 {
+        device.cpu.cop0.regs[device::cop0::COP0_EPC_REG] = device.cpu.pc;
+        if device::cpu::in_delay_slot(device) {
+            device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] |= device::cop0::COP0_CAUSE_BD;
+            device.cpu.cop0.regs[device::cop0::COP0_EPC_REG] -= 4;
+        } else {
+            device.cpu.cop0.regs[device::cop0::COP0_CAUSE_REG] &= !device::cop0::COP0_CAUSE_BD;
+        }
+    }
+
+    device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG] |= device::cop0::COP0_STATUS_EXL;
+
+    if device.cpu.cop0.regs[device::cop0::COP0_STATUS_REG] & device::cop0::COP0_STATUS_BEV == 0 {
+        device.cpu.pc = device::cpu_instructions::se32((0x80000000 + vector_offset) as i32);
+    } else {
+        device.cpu.pc = device::cpu_instructions::se32((0xBFC00200 + vector_offset) as i32);
+    }
+
+    device.cpu.branch_state.state = device::cpu::State::Exception;
+
+    device::cop0::add_cycles(device, 2);
+}

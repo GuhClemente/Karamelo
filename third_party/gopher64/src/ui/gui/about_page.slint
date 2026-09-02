@@ -1,0 +1,98 @@
+// Copyright © SixtyFPS GmbH <info@slint.dev>
+// SPDX-License-Identifier: MIT
+
+import { Button, HorizontalBox, VerticalBox } from "std-widgets.slint";
+import { Page } from "page.slint";
+
+export global AboutData {
+    in property <string> version;
+    in property <bool> has_update;
+}
+
+export component NewVersionButton {
+    callback newversion_button_clicked;
+    HorizontalBox {
+        alignment: center;
+        Button {
+            text: @tr("New version available! Click here to download");
+            primary: true;
+            clicked => {
+                newversion_button_clicked();
+            }
+        }
+    }
+}
+
+export component About inherits Page {
+    callback wiki_button_clicked;
+    callback discord_button_clicked;
+    callback newversion_button_clicked;
+    callback patreon_button_clicked;
+    callback github_sponsors_button_clicked;
+    callback source_code_button_clicked;
+    title: @tr("About");
+
+    VerticalBox {
+        alignment: start;
+        HorizontalBox {
+            alignment: center;
+            Button {
+                text: @tr("Wiki");
+                clicked => {
+                    wiki_button_clicked();
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+            Button {
+                text: @tr("Discord Server");
+                clicked => {
+                    discord_button_clicked();
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+            Button {
+                text: @tr("Source Code");
+                clicked => {
+                    source_code_button_clicked();
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+            Button {
+                text: @tr("Donate (via Patreon)");
+                clicked => {
+                    patreon_button_clicked();
+                }
+            }
+
+            Button {
+                text: @tr("Donate (via GitHub)");
+                clicked => {
+                    github_sponsors_button_clicked();
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: center;
+            Text {
+                text: AboutData.version;
+            }
+        }
+
+        if AboutData.has_update:NewVersionButton {
+            newversion_button_clicked => {
+                newversion_button_clicked();
+            }
+        }
+        Rectangle { }
+    }
+}
