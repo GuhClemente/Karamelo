@@ -555,15 +555,6 @@ static void RenderFrame()
 		// The core runs on its own thread; here we only present its framebuffer.
 		if (!g_use_present)
 			CoreRender(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, MenuGetAspectMode(), MenuGetFilterMode());
-
-		// Drawn even with the OSD open. A failed load re-enables the OSD, so
-		// hiding the toast behind it meant every failure - missing BIOS,
-		// unsupported format, absent core - happened in complete silence and
-		// looked like the menu had simply ignored the click.
-		if (CoreIsToastActive())
-		{
-			DrawToast(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, theme);
-		}
 	}
 	else
 	{
@@ -649,6 +640,16 @@ static void RenderFrame()
 				pixel_buffer[i] = 0x00000000;
 			}
 		}
+	}
+
+	// Drawn regardless of whether the core is running. A failed load never
+	// reaches CoreIsRunning()==true, so gating this on that (as it used to be)
+	// meant every failure - missing BIOS, unsupported format, absent core,
+	// encrypted ROM - set a real toast message that was then never drawn: the
+	// menu just silently reappeared over the wallpaper with no explanation.
+	if (CoreIsToastActive())
+	{
+		DrawToast(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, theme);
 	}
 
 	// Render Centered OSD Card + Floating Header
