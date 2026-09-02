@@ -1,0 +1,32 @@
+// Copyright © SixtyFPS GmbH <info@slint.dev>
+// SPDX-License-Identifier: MIT
+
+import { ScrollView, HorizontalBox, VerticalBox } from "std-widgets.slint";
+
+export component Page inherits VerticalBox {
+    in property <string> title: "title";
+
+    accessible-role: tab-panel;
+    accessible-label: root.title;
+
+    HorizontalBox {
+        Text {
+            font-size: 20px;
+            text <=> root.title;
+        }
+
+        Rectangle { }
+    }
+
+    ScrollView {
+        mouse-drag-pan-enabled: true;
+        vertical-stretch: 1;
+
+        VerticalBox {
+            padding: 8px;
+            alignment: start;
+
+            @children
+        }
+    }
+}

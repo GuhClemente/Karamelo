@@ -1,0 +1,423 @@
+// Copyright © SixtyFPS GmbH <info@slint.dev>
+// SPDX-License-Identifier: MIT
+
+import {
+    Palette,
+    StandardButton,
+    VerticalBox,
+    HorizontalBox,
+} from "std-widgets.slint";
+import {
+    LocalGame,
+    ControllerConfig,
+    Netplay,
+    Cheats,
+    RetroAchievements,
+    Settings,
+    About,
+} from "pages.slint";
+import { SideBar } from "side_bar.slint";
+import { SettingsData } from "settings_page.slint";
+import { RAData } from "retroachievements_page.slint";
+import { AboutData } from "about_page.slint";
+import { ControllerData } from "controller_page.slint";
+import { State } from "localgame_page.slint";
+import { CheatsData } from "cheat_page.slint";
+import { InputProfileDialog, InputProfileData } from "input_profile.slint";
+import { NetplayData } from "netplay_page.slint";
+export { VruDialog }from "vru_dialog.slint";
+import { NetplayCreate } from "netplay_create.slint";
+import { NetplayJoin } from "netplay_join.slint";
+import { NetplayWait, NetplayWaitData } from "netplay_wait.slint";
+
+export component AppWindow inherits Window {
+    callback wiki_button_clicked;
+    callback discord_button_clicked;
+    callback newversion_button_clicked;
+    callback recent_rom_button_clicked(string);
+    callback patreon_button_clicked;
+    callback github_sponsors_button_clicked;
+    callback source_code_button_clicked;
+    callback open_rom_button_clicked;
+    callback saves_folder_button_clicked;
+    callback input_profile_button_clicked;
+    callback input_profile_creation_button_clicked;
+    callback transferpak_toggled(int, bool);
+    callback create_session_button_clicked;
+    callback join_session_button_clicked;
+    callback netplay_discord_button_clicked;
+    callback netplay_feedback_button_clicked;
+    callback netplay_begin_game(int);
+    callback netplay_send_chat_message(string);
+    callback netplay_refresh_sessions;
+    callback netplay_create_session(string, string, string, string, string, string, bool, bool);
+    callback netplay_select_rom(string);
+    callback netplay_join_session(string, string, string, string);
+    callback netplay_close;
+    callback cheats_select_rom_clicked(string);
+    callback cheats_clear_clicked;
+    callback cheat_toggled(string, string, string, bool);
+    callback ra_button_clicked(string);
+    callback ra_games_clicked;
+    callback ra_show_profile_clicked;
+    callback ra_toggled(bool, bool, bool, bool, bool);
+    callback controller_window_created;
+    in property version <=> AboutData.version;
+    in property has_update <=> AboutData.has_update;
+    in-out property ra_username <=> RAData.ra_username;
+    in-out property ra_password <=> RAData.ra_password;
+    in-out property ra_logging_in <=> RAData.ra_logging_in;
+    in-out property ra_show_profile <=> RAData.ra_show_profile;
+    in-out property ra_current_user_message <=> RAData.current_user_message;
+    in-out property ra_enabled <=> RAData.enabled;
+    in-out property ra_hardcore <=> RAData.hardcore;
+    in-out property ra_challenge <=> RAData.challenge;
+    in-out property ra_leaderboard <=> RAData.leaderboard;
+    in-out property ra_rich_presence <=> RAData.rich_presence;
+    in-out property ra_casual_only <=> RAData.ra_casual_only;
+    out property ra_not_logged_in <=> RAData.not_logged_in;
+    in-out property integer_scaling <=> SettingsData.integer_scaling;
+    in-out property ssaa <=> SettingsData.ssaa;
+    in-out property theme <=> SettingsData.theme;
+    in-out property fullscreen <=> SettingsData.fullscreen;
+    in-out property widescreen <=> SettingsData.widescreen;
+    in-out property vsync <=> SettingsData.vsync;
+    in-out property apply_crt_shader <=> SettingsData.apply_crt_shader;
+    in-out property overclock_n64_cpu <=> SettingsData.overclock_n64_cpu;
+    in-out property disable_expansion_pak <=> SettingsData.disable_expansion_pak;
+    in-out property resolution <=> SettingsData.resolution;
+    in-out property emulate_usb <=> SettingsData.emulate_usb;
+    in-out property rewind <=> SettingsData.rewind;
+    in-out property emulate_vru <=> SettingsData.emulate_vru;
+    in-out property rom_dir <=> SettingsData.rom_dir;
+    in-out property controller_enabled <=> ControllerData.controller_enabled;
+    in-out property controller_changed <=> ControllerData.controller_changed;
+    in-out property transferpak <=> ControllerData.transferpak;
+    in-out property gb_rom_paths <=> ControllerData.gb_rom_paths;
+    in-out property gb_ram_paths <=> ControllerData.gb_ram_paths;
+    in-out property selected_profile_binding <=> ControllerData.selected_profile_binding;
+    in-out property input_profiles <=> ControllerData.input_profiles;
+    in-out property controller_names <=> ControllerData.controller_names;
+    in-out property controller_paths <=> ControllerData.controller_paths;
+    in-out property selected_controller <=> ControllerData.selected_controller;
+    in-out property game_running <=> State.game_running;
+    in-out property is_android <=> State.is_android;
+    in-out property recent_roms <=> State.recent_roms;
+    in-out property cheat_game_name <=> CheatsData.cheat_game_name;
+    in-out property cheat_game_crc <=> CheatsData.cheat_game_crc;
+    in-out property cheats <=> CheatsData.cheats;
+
+    in-out property input_deadzone <=> InputProfileData.deadzone;
+    in-out property input_profile_name <=> InputProfileData.profile_name;
+    in-out property input_dinput <=> InputProfileData.dinput;
+    in-out property show_input_profile <=> InputProfileData.show_input_profile;
+
+    in-out property show_netplay_wait_session <=> NetplayData.show_wait_session;
+    in-out property show_netplay_create_session <=> NetplayData.show_create_session;
+    in-out property show_netplay_join_session <=> NetplayData.show_join_session;
+
+    in-out property netplay_game_name <=> NetplayData.game_name;
+    in-out property netplay_game_hash <=> NetplayData.game_hash;
+    in-out property netplay_game_cheats <=> NetplayData.game_cheats;
+    in-out property netplay_pending_session <=> NetplayData.pending_session;
+    in-out property netplay_rom_path <=> NetplayData.rom_path;
+    in-out property netplay_current_session <=> NetplayData.current_session;
+    in-out property netplay_sessions <=> NetplayData.sessions;
+    in-out property netplay_pending_refresh <=> NetplayData.pending_refresh;
+    in-out property netplay_session_name <=> NetplayData.session_name;
+    in-out property netplay_player_name <=> NetplayData.player_name;
+    in-out property netplay_motd <=> NetplayWaitData.motd;
+    in-out property netplay_can_start <=> NetplayWaitData.can_start;
+    in-out property netplay_players <=> NetplayWaitData.players;
+    in-out property netplay_chat_text <=> NetplayWaitData.chat_text;
+    in-out property netplay_input_delay <=> NetplayWaitData.input_delay;
+    in-out property netplay_recommended_delay <=> NetplayWaitData.recommended_delay;
+    in-out property netplay_game_pal <=> NetplayWaitData.game_pal;
+    in-out property netplay_connected_peers_count <=> NetplayWaitData.connected_peers_count;
+
+    private property <string> popup_message;
+    private property <bool> popup_has_close;
+    private property <bool> is-portrait: root.width < root.height;
+    private property <length> bar-thickness: 56px;
+    private property <length> safe-left: root.safe-area-insets.left;
+    private property <length> safe-top: root.safe-area-insets.top;
+    private property <length> safe-right: root.safe-area-insets.right;
+    private property <length> safe-bottom: root.safe-area-insets.bottom;
+    private property <length> safe-width: root.width - root.safe-left - root.safe-right;
+    private property <length> safe-height: root.height - root.safe-top - root.safe-bottom;
+    function apply_theme() {
+        if (root.theme == 1) {
+            Palette.color-scheme = ColorScheme.dark;
+        } else if (root.theme == 2) {
+            Palette.color-scheme = ColorScheme.light;
+        } else {
+            Palette.color-scheme = ColorScheme.unknown;
+        }
+    }
+    init => {
+        apply_theme();
+    }
+    changed theme => {
+        apply_theme();
+    }
+
+    min-width: 320px;
+    min-height: 240px;
+    preferred-width: 800px;
+    preferred-height: 650px;
+    title: "Gopher64";
+    icon: @image-url("../../../data/icon/gopher64.png");
+
+    side-bar := SideBar {
+        portrait: root.is-portrait;
+        title: "Gopher64";
+        model: [
+            {
+                icon: @image-url("../../../data/ui/icons/local_game.svg"),
+                label: @tr("Menu" => "Local Game"),
+            },
+            {
+                icon: @image-url("../../../data/ui/icons/controller.svg"),
+                label: @tr("Menu" => "Controller Config"),
+            },
+            {
+                icon: @image-url("../../../data/ui/icons/netplay.svg"),
+                label: @tr("Menu" => "Netplay"),
+            },
+            {
+                icon: @image-url("../../../data/ui/icons/cheats.svg"),
+                label: @tr("Menu" => "Cheats"),
+            },
+            {
+                icon: @image-url("../../../data/ui/icons/achievements.svg"),
+                label: @tr("Menu" => "RetroAchievements"),
+            },
+            {
+                icon: @image-url("../../../data/ui/icons/settings.svg"),
+                label: @tr("Menu" => "Settings"),
+            },
+            {
+                icon: @image-url("../../../data/ui/icons/about.svg"),
+                label: @tr("Menu" => "About"),
+            },
+        ];
+        x: root.safe-left;
+        y: root.is-portrait ? parent.height - root.bar-thickness - root.safe-bottom : root.safe-top;
+        width: root.is-portrait ? root.safe-width : root.bar-thickness;
+        height: root.is-portrait ? root.bar-thickness : root.safe-height;
+    }
+
+    content-area := Rectangle {
+        clip: true;
+        x: root.is-portrait ? root.safe-left : root.safe-left + root.bar-thickness;
+        y: root.safe-top;
+        width: root.is-portrait ? root.safe-width : root.safe-width - root.bar-thickness;
+        height: root.is-portrait ? root.safe-height - root.bar-thickness : root.safe-height;
+
+        if(side-bar.current-item == 0): LocalGame {
+            width: 100%;
+            height: 100%;
+            open_rom_button_clicked => {
+                open_rom_button_clicked();
+            }
+            saves_folder_button_clicked => {
+                saves_folder_button_clicked();
+            }
+            newversion_button_clicked => {
+                newversion_button_clicked();
+            }
+            recent_rom_button_clicked(rom) => {
+                recent_rom_button_clicked(rom);
+            }
+        }
+        if(side-bar.current-item == 1 && !show_input_profile): ControllerConfig {
+            width: 100%;
+            height: 100%;
+            input_profile_button_clicked => {
+                input_profile_button_clicked();
+            }
+            transferpak_toggled(player, enabled) => {
+                transferpak_toggled(player,enabled);
+            }
+            controller_window_created => {
+                controller_window_created();
+            }
+        }
+        if(side-bar.current-item == 1 && show_input_profile): InputProfileDialog {
+            width: 100%;
+            height: 100%;
+            profile_creation_button_clicked => {
+                input_profile_creation_button_clicked();
+            }
+        }
+        if(side-bar.current-item == 2 && !show_netplay_wait_session && !show_netplay_create_session && !show_netplay_join_session): Netplay {
+            width: 100%;
+            height: 100%;
+            create_session_button_clicked => {
+                create_session_button_clicked();
+            }
+            join_session_button_clicked => {
+                join_session_button_clicked();
+            }
+            netplay_discord_button_clicked => {
+                netplay_discord_button_clicked();
+            }
+            netplay_feedback_button_clicked => {
+                netplay_feedback_button_clicked();
+            }
+        }
+        if(side-bar.current-item == 2 && show_netplay_wait_session): NetplayWait {
+            width: 100%;
+            height: 100%;
+            send_chat_message(message) => {
+                netplay_send_chat_message(message);
+            }
+            begin_game(a) => {
+                netplay_begin_game(a);
+            }
+            close => {
+                netplay_close();
+            }
+        }
+        if(side-bar.current-item == 2 && show_netplay_create_session && !show_netplay_wait_session): NetplayCreate {
+            width: 100%;
+            height: 100%;
+            select_rom(rom_dir) => {
+                netplay_select_rom(rom_dir);
+            }
+            create_session(a, b, c, d, e, f, g, h) => {
+                netplay_create_session(a,b,c,d,e,f,g,h);
+            }
+            close => {
+                netplay_close();
+            }
+        }
+        if(side-bar.current-item == 2 && show_netplay_join_session && !show_netplay_wait_session): NetplayJoin {
+            width: 100%;
+            height: 100%;
+            refresh_sessions => {
+                netplay_refresh_sessions();
+            }
+            select_rom(rom_dir) => {
+                netplay_select_rom(rom_dir);
+            }
+            join_session(a, b, c, d) => {
+                netplay_join_session(a,b,c,d);
+            }
+            close => {
+                netplay_close();
+            }
+        }
+        if(side-bar.current-item == 3): Cheats {
+            width: 100%;
+            height: 100%;
+            cheats_select_rom_clicked(rom_dir) => {
+                cheats_select_rom_clicked(rom_dir);
+            }
+            cheats_clear_clicked => {
+                cheats_clear_clicked();
+            }
+            cheat_toggled(game_crc, cheat_name, option, enabled) => {
+                cheat_toggled(game_crc,cheat_name,option,enabled);
+            }
+        }
+        if(side-bar.current-item == 4): RetroAchievements {
+            width: 100%;
+            height: 100%;
+            ra_button_clicked(password) => {
+                ra_button_clicked(password);
+            }
+            ra_toggled(enabled, hardcore, challenge, leaderboard, rich_presence) => {
+                ra_toggled(enabled,hardcore,challenge,leaderboard,rich_presence);
+            }
+            ra_games_clicked => {
+                ra_games_clicked();
+            }
+            ra_show_profile_clicked => {
+                ra_show_profile_clicked();
+            }
+        }
+        if(side-bar.current-item == 5): Settings {
+            width: 100%;
+            height: 100%;
+        }
+        if(side-bar.current-item == 6): About {
+            width: 100%;
+            height: 100%;
+            wiki_button_clicked => {
+                wiki_button_clicked();
+            }
+            discord_button_clicked => {
+                discord_button_clicked();
+            }
+            newversion_button_clicked => {
+                newversion_button_clicked();
+            }
+            patreon_button_clicked => {
+                patreon_button_clicked();
+            }
+            github_sponsors_button_clicked => {
+                github_sponsors_button_clicked();
+            }
+            source_code_button_clicked => {
+                source_code_button_clicked();
+            }
+        }
+        popup := PopupWindow {
+            close-policy: no-auto-close;
+            Rectangle {
+                height: 100%;
+                width: 100%;
+                background: Palette.background;
+                VerticalBox {
+                    alignment: center;
+                    HorizontalBox {
+                        alignment: center;
+                        Text {
+                            text: popup_message;
+                        }
+                    }
+
+                    if (popup_has_close):HorizontalBox {
+                        alignment: center;
+                        StandardButton {
+                            kind: ok;
+                            clicked() => {
+                                popup.close();
+                            }
+                        }
+                    }
+                }
+            }
+
+            x: content-area.x;
+            y: content-area.y;
+            height: content-area.height;
+            width: content-area.width;
+        }
+    }
+
+    public function show_message(message: string, has_close: bool) {
+        popup_message = message;
+        popup_has_close = has_close;
+        popup.show();
+    }
+    public function close_message() {
+        popup.close();
+    }
+    public function clear_netplay_data() {
+        NetplayData.player_name = "";
+        NetplayData.game_name = "";
+        NetplayData.password = "";
+        NetplayData.session_name = "";
+        NetplayWaitData.chat_text = "";
+        NetplayWaitData.input_delay = 0;
+        NetplayWaitData.recommended_delay = 0;
+        NetplayWaitData.players = [];
+        NetplayWaitData.connected_peers_count = 0;
+        NetplayData.pending_session = false;
+        NetplayData.pending_refresh = false;
+        NetplayData.sessions = [];
+        NetplayData.current_session = -1;
+    }
+}

@@ -124,3 +124,12 @@
 /temp_cores_dl/
 /dist/*.*
 /dist
+
+# ---------------------------------------------------------------------------
+# Rust / Cargo build artifacts (evita inflar o repo com gigabytes de binários)
+# ---------------------------------------------------------------------------
+**/target/
+/third_party/gopher64/target/
+*.rlib
+*.rmeta
+*.d
