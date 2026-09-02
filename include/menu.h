@@ -30,6 +30,11 @@ const char* MenuGetTitle();
 int  MenuGetAspectMode();
 int  MenuGetFilterMode();
 int  MenuGetWallpaperMode();
+
+// Every .raw file found in wallpapers/, sorted, indexed 0..count-1. Used by
+// main_win32.cpp to load the same file the menu's custom slots point to.
+int  MenuGetWallpaperCustomCount();
+const char* MenuGetWallpaperCustomPath(int index);
 int  MenuGetOsdTheme();
 bool MenuGetFullscreen();
 void MenuSetFullscreen(bool fs);

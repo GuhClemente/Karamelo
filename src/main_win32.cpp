@@ -569,20 +569,8 @@ static void RenderFrame()
 	{
 		int wall_mode = MenuGetWallpaperMode();
 
-		static uint32_t wall_chef[CANVAS_WIDTH * CANVAS_HEIGHT] = { 0 };
-		static uint32_t wall_arcade[CANVAS_WIDTH * CANVAS_HEIGHT] = { 0 };
-		static bool custom_walls_loaded = false;
-
-		if (!custom_walls_loaded)
-		{
-			FILE* fc = fopen("wallpapers/sabor_mister_chef.raw", "rb");
-			if (fc) { fread(wall_chef, sizeof(uint32_t), CANVAS_WIDTH * CANVAS_HEIGHT, fc); fclose(fc); }
-
-			FILE* fa = fopen("wallpapers/sabor_mister_arcade.raw", "rb");
-			if (fa) { fread(wall_arcade, sizeof(uint32_t), CANVAS_WIDTH * CANVAS_HEIGHT, fa); fclose(fa); }
-
-			custom_walls_loaded = true;
-		}
+		static uint32_t custom_wall[CANVAS_WIDTH * CANVAS_HEIGHT] = { 0 };
+		static int loaded_custom_mode = -1;
 
 		if (wall_mode == 1) // TV Static Noise (From National MiSTer Screenshots!)
 		{
@@ -635,13 +623,24 @@ static void RenderFrame()
 				}
 			}
 		}
-		else if (wall_mode == 4) // Flavor Chef (Gourmet Retro)
+		else if (wall_mode >= 4) // Custom .raw wallpapers
 		{
-			memcpy(pixel_buffer, wall_chef, CANVAS_WIDTH * CANVAS_HEIGHT * sizeof(uint32_t));
-		}
-		else if (wall_mode == 5) // Flavor Arcade (Spicy 60FPS)
-		{
-			memcpy(pixel_buffer, wall_arcade, CANVAS_WIDTH * CANVAS_HEIGHT * sizeof(uint32_t));
+			if (wall_mode != loaded_custom_mode)
+			{
+				memset(custom_wall, 0, sizeof(custom_wall));
+				const char* wall_path = MenuGetWallpaperCustomPath(wall_mode - 4);
+				if (wall_path && wall_path[0])
+				{
+					FILE* fw = fopen(wall_path, "rb");
+					if (fw)
+					{
+						fread(custom_wall, sizeof(uint32_t), CANVAS_WIDTH * CANVAS_HEIGHT, fw);
+						fclose(fw);
+					}
+				}
+				loaded_custom_mode = wall_mode;
+			}
+			memcpy(pixel_buffer, custom_wall, CANVAS_WIDTH * CANVAS_HEIGHT * sizeof(uint32_t));
 		}
 		else // None (Pure Deep Black)
 		{
