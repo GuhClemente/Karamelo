@@ -135,7 +135,7 @@ fn set_rng() -> rand::rngs::Xoshiro256PlusPlus {
     rand::rngs::Xoshiro256PlusPlus::try_from_rng(&mut rand::rngs::SysRng).unwrap()
 }
 
-fn init_rng_rtc(device: &mut Device) {
+pub fn init_rng_rtc(device: &mut Device) {
     let mut rng_seed = set_rng().next_u64();
     if let Some(netplay) = &mut device.netplay {
         if netplay.player_number == 0 {
@@ -159,7 +159,7 @@ fn init_rng_rtc(device: &mut Device) {
     }
 }
 
-fn swap_rom(contents: Vec<u8>) -> Option<Vec<u8>> {
+pub fn swap_rom(contents: Vec<u8>) -> Option<Vec<u8>> {
     let test = u32::from_be_bytes(contents[0..4].try_into().unwrap());
     if test == 0x80371240 {
         // z64

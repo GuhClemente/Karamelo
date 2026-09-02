@@ -124,10 +124,15 @@ pub fn init(device: &mut device::Device, netplay: bool) {
         )
     }
 
-    fps_counter(&mut device.ui);
+    if !LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+        fps_counter(&mut device.ui);
+    }
 }
 
 fn fps_counter(ui: &mut ui::Ui) {
+    if LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
     let mut fps_rx = ui.video.fps_rx.take().unwrap();
     let mut vis_rx = ui.video.vis_rx.take().unwrap();
     tokio::spawn(async move {
