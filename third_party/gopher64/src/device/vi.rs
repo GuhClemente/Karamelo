@@ -126,20 +126,29 @@ pub fn update_screen(device: &mut device::Device) {
         reset_pace_deadline(device);
     }
 
-    if !netplay::in_rollback(device.netplay.as_ref())
-        && device
-            .speed_limiter
-            .frame_counter
-            .is_multiple_of(device.speed_limiter.limit_freq)
-        && device.speed_limiter.enabled
-    {
-        speed_limiter(device);
+    if !ui::video::LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+        if !netplay::in_rollback(device.netplay.as_ref())
+            && device
+                .speed_limiter
+                .frame_counter
+                .is_multiple_of(device.speed_limiter.limit_freq)
+            && device.speed_limiter.enabled
+        {
+            speed_limiter(device);
+        }
     }
 
     if !netplay::in_rollback(device.netplay.as_ref()) {
         ui::video::update_screen();
         device.speed_limiter.frame_counter += 1;
-        let _ = device.ui.video.vis_tx.as_ref().unwrap().send(true);
+        if let Some(tx) = device.ui.video.vis_tx.as_ref() {
+            let _ = tx.send(true);
+        }
+    }
+
+    if ui::video::LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+        device.cpu.running = false;
+        return;
     }
 
     if device.netplay.is_some() {
@@ -184,9 +193,7 @@ pub fn vertical_interrupt_event(device: &mut device::Device) {
             device::events::EVENT_TYPE_UPDATE_SCREEN,
             (v_start - v_intr) as u64 * device.vi.count_per_scanline,
         );
-    }
-
-    if ui::video::LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+    } else if ui::video::LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
         ui::video::render_frame();
         device.cpu.running = false;
     }

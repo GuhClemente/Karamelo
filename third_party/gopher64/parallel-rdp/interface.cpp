@@ -436,8 +436,7 @@ void rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   achievement_challenge_indicator_font =
       TTF_OpenFontIO(SDL_IOFromConstMem(font, font_size), true, 12.0);
   if (!message_font || !achievement_challenge_indicator_font) {
-    rdp_close();
-    return;
+    LOGE("Warning: fonts could not be loaded, continuing without OSD text.\n");
   }
 
   wsi->begin_frame();
