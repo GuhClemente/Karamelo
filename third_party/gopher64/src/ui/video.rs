@@ -177,9 +177,6 @@ unsafe extern "C" {
 static CONVERTED_FRAME_BUFFER: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(Vec::new());
 
 pub fn update_screen() {
-    if LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-        return;
-    }
     unsafe { rdp_update_screen() }
 }
 
@@ -214,6 +211,19 @@ pub fn render_frame() {
                         width,
                         height,
                         (width * 4) as usize,
+                    );
+                }
+            } else {
+                let mut buf = CONVERTED_FRAME_BUFFER.lock().unwrap();
+                if buf.len() < 320 * 240 {
+                    buf.resize(320 * 240, 0);
+                }
+                unsafe {
+                    cb(
+                        buf.as_ptr() as *const std::ffi::c_void,
+                        320,
+                        240,
+                        320 * 4,
                     );
                 }
             }
