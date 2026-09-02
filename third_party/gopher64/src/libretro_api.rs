@@ -98,6 +98,7 @@ static ENV_CB: Mutex<Option<retro_environment_t>> = Mutex::new(None);
 static INPUT_POLL_CB: Mutex<Option<retro_input_poll_t>> = Mutex::new(None);
 static INPUT_STATE_CB: Mutex<Option<retro_input_state_t>> = Mutex::new(None);
 static G_DEVICE: Mutex<Option<Box<Device>>> = Mutex::new(None);
+static RUNTIME: Mutex<Option<tokio::runtime::Runtime>> = Mutex::new(None);
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_api_version() -> c_uint {
@@ -179,124 +180,172 @@ pub unsafe extern "C" fn retro_get_system_av_info(av_info: *mut retro_system_av_
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_init() {
     ui::video::LIBRETRO_MODE.store(true, Ordering::Relaxed);
+    let mut rt_guard = RUNTIME.lock().unwrap();
+    if rt_guard.is_none() {
+        if let Ok(rt) = tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+            *rt_guard = Some(rt);
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_deinit() {
     retro_unload_game();
+    let mut rt_guard = RUNTIME.lock().unwrap();
+    *rt_guard = None;
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_load_game(game: *const retro_game_info) -> bool {
-    if game.is_null() || (*game).data.is_null() || (*game).size == 0 {
-        return false;
+    let result = std::panic::catch_unwind(|| {
+        if game.is_null() {
+            return false;
+        }
+        let game_ref = unsafe { &*game };
+        if game_ref.data.is_null() || game_ref.size == 0 {
+            return false;
+        }
+
+        ui::video::LIBRETRO_MODE.store(true, Ordering::Relaxed);
+
+        // Ensure Tokio runtime is active
+        retro_init();
+
+        let raw_slice = unsafe { std::slice::from_raw_parts(game_ref.data as *const u8, game_ref.size) };
+        let rom_contents = match device::swap_rom(raw_slice.to_vec()) {
+            Some(c) => c,
+            None => raw_slice.to_vec(),
+        };
+
+        let mut dev = Device::new(false);
+
+        // 1. Initialize ROM & Cartridge
+        device::cart::rom::init(&mut dev, &rom_contents);
+
+        // 2. Initialize RDRAM
+        device::rdram::init(&mut dev);
+
+        // 3. Initialize Headless Video (Parallel-RDP Vulkan)
+        ui::video::init(&mut dev, false);
+
+        // 4. Initialize Audio & Input
+        ui::audio::init(&mut dev);
+        ui::input::init(&mut dev.ui);
+
+        // 5. Initialize RNG & RTC timing
+        device::init_rng_rtc(&mut dev);
+
+        // 6. Initialize N64 subcomponents in exact order
+        device::mi::init(&mut dev);
+        device::pif::init(&mut dev);
+        device::memory::init(&mut dev);
+        device::cache::init(&mut dev);
+        device::rsp_interface::init(&mut dev);
+        device::rdp::init(&mut dev);
+        device::vi::init(&mut dev);
+        device::cpu::init(&mut dev);
+
+        // 7. Initialize Save Storage and format EEPROM/SRAM/Flash/Mempak
+        ui::storage::init(&mut dev.ui, &dev.cart.rom);
+        ui::storage::format_saves(&mut dev);
+
+        *G_DEVICE.lock().unwrap() = Some(dev);
+        true
+    });
+
+    match result {
+        Ok(ok) => ok,
+        Err(err) => {
+            eprintln!("[Gopher64] Panic during retro_load_game: {:?}", err);
+            false
+        }
     }
-
-    ui::video::LIBRETRO_MODE.store(true, Ordering::Relaxed);
-
-    let rom_slice = std::slice::from_raw_parts((*game).data as *const u8, (*game).size);
-
-    let mut dev = Device::new(false);
-
-    // Initialize ROM & Cartridge
-    device::cart::rom::init(&mut dev, rom_slice);
-
-    // Initialize N64 subsystems in order
-    device::rdram::init(&mut dev);
-    device::mi::init(&mut dev);
-    device::pif::init(&mut dev);
-    device::memory::init(&mut dev);
-    device::cache::init(&mut dev);
-    device::rsp_interface::init(&mut dev);
-    device::rdp::init(&mut dev);
-    device::vi::init(&mut dev);
-    device::cpu::init(&mut dev);
-
-    // Video init (initializes headless offscreen Vulkan parallel-rdp)
-    ui::video::init(&mut dev, false);
-
-    *G_DEVICE.lock().unwrap() = Some(dev);
-    true
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_unload_game() {
-    if let Ok(mut guard) = G_DEVICE.lock() {
-        if let Some(mut dev) = guard.take() {
-            ui::video::close(&dev.ui);
-            ui::audio::close(&mut dev.ui);
+    let _ = std::panic::catch_unwind(|| {
+        if let Ok(mut guard) = G_DEVICE.lock() {
+            if let Some(mut dev) = guard.take() {
+                ui::video::close(&dev.ui);
+                ui::audio::close(&mut dev.ui);
+            }
         }
-    }
+    });
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_reset() {
-    if let Ok(mut guard) = G_DEVICE.lock() {
-        if let Some(dev) = guard.as_mut() {
-            device::cpu::init(dev);
-            device::rsp_interface::init(dev);
-            device::rdp::init(dev);
-            device::vi::init(dev);
+    let _ = std::panic::catch_unwind(|| {
+        if let Ok(mut guard) = G_DEVICE.lock() {
+            if let Some(dev) = guard.as_mut() {
+                device::cpu::init(dev);
+                device::rsp_interface::init(dev);
+                device::rdp::init(dev);
+                device::vi::init(dev);
+            }
         }
-    }
+    });
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_run() {
-    let mut guard = match G_DEVICE.lock() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
-    let Some(dev) = guard.as_mut() else {
-        return;
-    };
+    let _ = std::panic::catch_unwind(|| {
+        let mut guard = match G_DEVICE.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        let Some(dev) = guard.as_mut() else {
+            return;
+        };
 
-    // Poll controllers
-    let poll_opt = *INPUT_POLL_CB.lock().unwrap();
-    if let Some(poll_cb) = poll_opt {
-        unsafe { poll_cb(); }
-    }
-
-    let state_opt = *INPUT_STATE_CB.lock().unwrap();
-    if let Some(state_cb) = state_opt {
-        for port in 0..4 {
-            let mut keys: u32 = 0;
-            unsafe {
-                // D-Pad
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT) != 0 { keys |= 1 << 0; }
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT) != 0 { keys |= 1 << 1; }
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN) != 0 { keys |= 1 << 2; }
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP) != 0 { keys |= 1 << 3; }
-                // Start, Z, B, A
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START) != 0 { keys |= 1 << 4; }
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2) != 0 { keys |= 1 << 5; } // Z trigger
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y) != 0 { keys |= 1 << 6; } // B
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B) != 0 { keys |= 1 << 7; } // A
-                // C-buttons (Right analog stick or RetroPad buttons)
-                let rx = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
-                let ry = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
-                if rx > 16384 || state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A) != 0 { keys |= 1 << 8; } // C-Right
-                if rx < -16384 || state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X) != 0 { keys |= 1 << 9; } // C-Left
-                if ry > 16384 || state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2) != 0 { keys |= 1 << 10; } // C-Down
-                if ry < -16384 { keys |= 1 << 11; } // C-Up
-                // R, L triggers
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R) != 0 { keys |= 1 << 12; } // R
-                if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L) != 0 { keys |= 1 << 13; } // L
-                // Analog Stick (Left analog)
-                let ax = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
-                let ay = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
-                let norm_x = (ax as f64 * 85.0 / 32767.0).round() as i8;
-                let norm_y = (-ay as f64 * 85.0 / 32767.0).round() as i8;
-                keys |= (norm_x as u8 as u32) << 16;
-                keys |= (norm_y as u8 as u32) << 24;
-            }
-
-            ui::input::LIBRETRO_INPUT[port as usize].store(keys, Ordering::Relaxed);
+        // Poll controllers
+        let poll_opt = *INPUT_POLL_CB.lock().unwrap();
+        if let Some(poll_cb) = poll_opt {
+            unsafe { poll_cb(); }
         }
-    }
 
-    // Step CPU until vertical interrupt finishes frame
-    device::cpu::run(dev);
+        let state_opt = *INPUT_STATE_CB.lock().unwrap();
+        if let Some(state_cb) = state_opt {
+            for port in 0..4 {
+                let mut keys: u32 = 0;
+                unsafe {
+                    // D-Pad
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT) != 0 { keys |= 1 << 0; }
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT) != 0 { keys |= 1 << 1; }
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN) != 0 { keys |= 1 << 2; }
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP) != 0 { keys |= 1 << 3; }
+                    // Start, Z, B, A
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START) != 0 { keys |= 1 << 4; }
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2) != 0 { keys |= 1 << 5; } // Z trigger
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y) != 0 { keys |= 1 << 6; } // B
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B) != 0 { keys |= 1 << 7; } // A
+                    // C-buttons (Right analog stick or RetroPad buttons)
+                    let rx = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
+                    let ry = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
+                    if rx > 16384 || state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A) != 0 { keys |= 1 << 8; } // C-Right
+                    if rx < -16384 || state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X) != 0 { keys |= 1 << 9; } // C-Left
+                    if ry > 16384 || state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2) != 0 { keys |= 1 << 10; } // C-Down
+                    if ry < -16384 { keys |= 1 << 11; } // C-Up
+                    // R, L triggers
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R) != 0 { keys |= 1 << 12; } // R
+                    if state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L) != 0 { keys |= 1 << 13; } // L
+                    // Analog Stick (Left analog)
+                    let ax = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+                    let ay = state_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
+                    let norm_x = (ax as f64 * 85.0 / 32767.0).round() as i8;
+                    let norm_y = (-ay as f64 * 85.0 / 32767.0).round() as i8;
+                    keys |= (norm_x as u8 as u32) << 16;
+                    keys |= (norm_y as u8 as u32) << 24;
+                }
+
+                ui::input::LIBRETRO_INPUT[port as usize].store(keys, Ordering::Relaxed);
+            }
+        }
+
+        // Step CPU until vertical interrupt finishes frame
+        device::cpu::run(dev);
+    });
 }
 
 // RetroAchievements Direct Memory Access
