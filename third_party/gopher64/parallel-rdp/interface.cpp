@@ -359,6 +359,13 @@ static void rdp_new_processor() {
 
 static ImageHandle create_message_image(Vulkan::Device &device, int width,
                                         TTF_Font *font, const char *message) {
+  // font is null when rdp_init() could not load the OSD fonts (missing/
+  // corrupt font file) - it now logs and continues instead of aborting, so
+  // every caller must tolerate an empty result instead of this dereferencing
+  // a null font or a null render surface.
+  if (!font)
+    return ImageHandle();
+
   if (strstr(message, "\n"))
     width = 0;
 
@@ -366,6 +373,9 @@ static ImageHandle create_message_image(Vulkan::Device &device, int width,
   SDL_Color bg = {0, 0, 0, 0};
   SDL_Surface *surface =
       TTF_RenderText_LCD_Wrapped(font, message, 0, fg, bg, width);
+  if (!surface)
+    return ImageHandle();
+
   ImageCreateInfo info = ImageCreateInfo::immutable_2d_image(
       surface->w, surface->h, VK_FORMAT_B8G8R8A8_UNORM, false);
   ImageInitialData initial_data = {};
@@ -664,15 +674,17 @@ static void render_frame(Vulkan::Device &device) {
                                               message->message.c_str());
         SDL_AddTimer(message->milliseconds, pop_message_callback, NULL);
       }
-      cmd->set_texture(0, 0, message->image->get_view(),
-                       Vulkan::StockSampler::NearestClamp);
-      vp.x = floor(vp.x + (vp.width - message->image->get_width()) / 2);
-      vp.y = vp.y + vp.height - message->image->get_height();
-      vp.height = message->image->get_height();
-      vp.width = message->image->get_width();
-      cmd->set_viewport(vp);
+      if (message->image) {
+        cmd->set_texture(0, 0, message->image->get_view(),
+                         Vulkan::StockSampler::NearestClamp);
+        vp.x = floor(vp.x + (vp.width - message->image->get_width()) / 2);
+        vp.y = vp.y + vp.height - message->image->get_height();
+        vp.height = message->image->get_height();
+        vp.width = message->image->get_width();
+        cmd->set_viewport(vp);
 
-      cmd->draw(3);
+        cmd->draw(3);
+      }
     } else if (achievement_progress_indicator_image) {
       draw_indicator(cmd, achievement_progress_indicator_image, vp);
     } else if (achievement_challenge_indicator_image &&
