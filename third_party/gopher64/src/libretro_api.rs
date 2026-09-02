@@ -100,6 +100,30 @@ static INPUT_STATE_CB: Mutex<Option<retro_input_state_t>> = Mutex::new(None);
 static G_DEVICE: Mutex<Option<Box<Device>>> = Mutex::new(None);
 static RUNTIME: Mutex<Option<tokio::runtime::Runtime>> = Mutex::new(None);
 
+// retro_run() holds this guard for the whole frame, including the call into
+// device::cpu::run() - the one place in this file most likely to panic on an
+// emulation edge case. A panic there is caught by retro_run()'s catch_unwind
+// and does not crash the process, but it poisons G_DEVICE, and a plain
+// .lock() then returns Err forever after. Every G_DEVICE access in this file
+// goes through this helper instead, which recovers the guard on poison (the
+// device's last-known state, not a clean reset - retro_reset() is still the
+// way to get a known-good state back) so one panic does not permanently
+// freeze every future retro_run() for the rest of the process's life.
+fn device_lock() -> std::sync::MutexGuard<'static, Option<Box<Device>>> {
+    G_DEVICE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+// retro_run() holds this guard (to keep the Tokio enter-guard alive) across
+// the same panic-prone device::cpu::run() call, so it is poisoned by the
+// same class of panic as G_DEVICE above and needs the same recovery.
+fn runtime_lock() -> std::sync::MutexGuard<'static, Option<tokio::runtime::Runtime>> {
+    RUNTIME
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_api_version() -> c_uint {
     RETRO_API_VERSION
@@ -157,14 +181,13 @@ pub unsafe extern "C" fn retro_get_system_av_info(av_info: *mut retro_system_av_
     if av_info.is_null() {
         return;
     }
-    let is_pal = if let Ok(guard) = G_DEVICE.lock() {
+    let is_pal = {
+        let guard = device_lock();
         if let Some(dev) = guard.as_ref() {
             dev.cart.pal
         } else {
             false
         }
-    } else {
-        false
     };
 
     (*av_info).geometry.base_width = 320;
@@ -180,7 +203,7 @@ pub unsafe extern "C" fn retro_get_system_av_info(av_info: *mut retro_system_av_
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_init() {
     ui::video::LIBRETRO_MODE.store(true, Ordering::Relaxed);
-    let mut rt_guard = RUNTIME.lock().unwrap();
+    let mut rt_guard = runtime_lock();
     if rt_guard.is_none() {
         if let Ok(rt) = tokio::runtime::Builder::new_multi_thread().enable_all().build() {
             *rt_guard = Some(rt);
@@ -191,7 +214,7 @@ pub unsafe extern "C" fn retro_init() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_deinit() {
     retro_unload_game();
-    let mut rt_guard = RUNTIME.lock().unwrap();
+    let mut rt_guard = runtime_lock();
     *rt_guard = None;
 }
 
@@ -249,7 +272,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const retro_game_info) -> bool {
         ui::storage::init(&mut dev.ui, &dev.cart.rom);
         ui::storage::format_saves(&mut dev);
 
-        *G_DEVICE.lock().unwrap() = Some(dev);
+        *device_lock() = Some(dev);
         true
     });
 
@@ -265,11 +288,10 @@ pub unsafe extern "C" fn retro_load_game(game: *const retro_game_info) -> bool {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_unload_game() {
     let _ = std::panic::catch_unwind(|| {
-        if let Ok(mut guard) = G_DEVICE.lock() {
-            if let Some(mut dev) = guard.take() {
-                ui::video::close(&dev.ui);
-                ui::audio::close(&mut dev.ui);
-            }
+        let mut guard = device_lock();
+        if let Some(mut dev) = guard.take() {
+            ui::video::close(&dev.ui);
+            ui::audio::close(&mut dev.ui);
         }
     });
 }
@@ -277,27 +299,23 @@ pub unsafe extern "C" fn retro_unload_game() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_reset() {
     let _ = std::panic::catch_unwind(|| {
-        if let Ok(mut guard) = G_DEVICE.lock() {
-            if let Some(dev) = guard.as_mut() {
-                device::cpu::init(dev);
-                device::rsp_interface::init(dev);
-                device::rdp::init(dev);
-                device::vi::init(dev);
-            }
+        let mut guard = device_lock();
+        if let Some(dev) = guard.as_mut() {
+            device::cpu::init(dev);
+            device::rsp_interface::init(dev);
+            device::rdp::init(dev);
+            device::vi::init(dev);
         }
     });
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_run() {
-    let _ = std::panic::catch_unwind(|| {
-        let rt_guard = RUNTIME.lock().unwrap();
+    let result = std::panic::catch_unwind(|| {
+        let rt_guard = runtime_lock();
         let _enter = rt_guard.as_ref().map(|rt| rt.enter());
 
-        let mut guard = match G_DEVICE.lock() {
-            Ok(g) => g,
-            Err(_) => return,
-        };
+        let mut guard = device_lock();
         let Some(dev) = guard.as_mut() else {
             return;
         };
@@ -349,6 +367,10 @@ pub unsafe extern "C" fn retro_run() {
         // Step CPU until vertical interrupt finishes frame
         device::cpu::run(dev);
     });
+
+    if let Err(err) = result {
+        eprintln!("[Gopher64] Panic during retro_run: {:?}", err);
+    }
 }
 
 // RetroAchievements Direct Memory Access
@@ -356,12 +378,9 @@ pub unsafe extern "C" fn retro_run() {
 pub unsafe extern "C" fn retro_get_memory_data(id: c_uint) -> *mut c_void {
     match id {
         RETRO_MEMORY_SYSTEM_RAM => {
-            if let Ok(mut guard) = G_DEVICE.lock() {
-                if let Some(dev) = guard.as_mut() {
-                    dev.rdram.mem.as_mut_ptr() as *mut c_void
-                } else {
-                    std::ptr::null_mut()
-                }
+            let mut guard = device_lock();
+            if let Some(dev) = guard.as_mut() {
+                dev.rdram.mem.as_mut_ptr() as *mut c_void
             } else {
                 std::ptr::null_mut()
             }
@@ -374,12 +393,9 @@ pub unsafe extern "C" fn retro_get_memory_data(id: c_uint) -> *mut c_void {
 pub unsafe extern "C" fn retro_get_memory_size(id: c_uint) -> usize {
     match id {
         RETRO_MEMORY_SYSTEM_RAM => {
-            if let Ok(guard) = G_DEVICE.lock() {
-                if let Some(dev) = guard.as_ref() {
-                    dev.rdram.size as usize
-                } else {
-                    0
-                }
+            let guard = device_lock();
+            if let Some(dev) = guard.as_ref() {
+                dev.rdram.size as usize
             } else {
                 0
             }
