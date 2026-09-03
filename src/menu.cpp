@@ -56,6 +56,12 @@ static int scroll_top = 0;
 // exactly "the selection just landed here."
 static int s_scroll_item_idx = -1;
 static DWORD s_scroll_since = 0;
+
+// Same idea for the vertical title band on the left edge (OsdSetTitle) -
+// a title longer than the 14 characters that fit in the fixed-height card
+// used to just cut off mid-word with no indication, same as the row names.
+static std::string s_title_scroll_last;
+static DWORD s_title_scroll_since = 0;
 static int main_menu_saved_idx = 0;
 static std::string current_title = "MiSTer 4 ALL";
 static std::string current_dir = "roms";
@@ -1946,8 +1952,35 @@ void MenuRun() {
   }
 
   OsdClear();
-  OsdSetTitle(current_title.c_str(),
-              (current_state != STATE_MAIN) ? OSD_ARROW_LEFT : 0);
+
+  // The vertical title band fits ~14 rotated characters top to bottom before
+  // OsdSetTitle's own bounds check silently drops the rest - marquee-scroll
+  // it the same way the row names below scroll, instead of leaving longer
+  // titles permanently cut off.
+  const int kVisibleCharsVert = 14;
+  if (current_title != s_title_scroll_last) {
+    s_title_scroll_last = current_title;
+    s_title_scroll_since = GetTickCount();
+  }
+  if (kScrollDelays[setting_name_scroll] > 0 &&
+      (int)current_title.size() > kVisibleCharsVert) {
+    DWORD delay_ms = (DWORD)kScrollDelays[setting_name_scroll] * 1000;
+    DWORD elapsed = GetTickCount() - s_title_scroll_since;
+    if (elapsed > delay_ms) {
+      int gap = kVisibleCharsVert / 2;
+      int cycle = (int)current_title.size() - kVisibleCharsVert + gap;
+      int step = (int)((elapsed - delay_ms) / 180) % cycle;
+      std::string padded = current_title + std::string(gap, ' ');
+      OsdSetTitle(padded.substr(step, kVisibleCharsVert).c_str(),
+                  (current_state != STATE_MAIN) ? OSD_ARROW_LEFT : 0);
+    } else {
+      OsdSetTitle(current_title.c_str(),
+                  (current_state != STATE_MAIN) ? OSD_ARROW_LEFT : 0);
+    }
+  } else {
+    OsdSetTitle(current_title.c_str(),
+                (current_state != STATE_MAIN) ? OSD_ARROW_LEFT : 0);
+  }
 
   int max_visible = OsdGetSize();
   if (max_visible <= 0)
