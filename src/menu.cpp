@@ -49,6 +49,13 @@ static MenuState current_state = STATE_MAIN;
 static std::vector<MenuItem> items;
 static int selected_idx = 0;
 static int scroll_top = 0;
+
+// Marquee-scroll state for the selected row's name, when it is too long to
+// fit and setting_name_scroll hasn't disabled it. Reset whenever the tracked
+// item index changes - including back to one visited earlier - which is
+// exactly "the selection just landed here."
+static int s_scroll_item_idx = -1;
+static DWORD s_scroll_since = 0;
 static int main_menu_saved_idx = 0;
 static std::string current_title = "MiSTer 4 ALL";
 static std::string current_dir = "roms";
@@ -112,6 +119,10 @@ static const int kBindRow0 = 3;
 static const int kOsdTimeouts[] = {0, 5, 10, 15, 30, 60};
 static const int kOsdTimeoutCount = 6;
 
+// 0 = never marquee-scroll a long name, just leave it clipped as before.
+static const int kScrollDelays[] = {0, 2, 3, 5, 8, 10};
+static const int kScrollDelayCount = 6;
+
 // Refreshed on every key the menu handles; MenuRun compares against it.
 static DWORD g_last_input_tick = 0;
 
@@ -162,6 +173,7 @@ static int setting_vsync = 1; // 0=Disabled, 1=Enabled
 static int setting_n64_core = 0;
 static int setting_arcade_core = 0; // 0=FBNeo, 1=MAME 2003, 2=MAME 2010
 static int setting_osd_timeout = 0; // index into kOsdTimeouts
+static int setting_name_scroll = 3; // index into kScrollDelays; default 5s
 static int setting_sms_fm = 0; // 0=auto, 1=desligado, 2=ligado
 // melonDS screen arrangement. The stored values are exactly the strings the
 // core declares; anything else leaves it on its default silently.
@@ -1068,6 +1080,7 @@ static void ResetAllSettingsToDefault() {
   setting_n64_core = 0; // Gopher64 - see the comment on its declaration
   setting_arcade_core = 0;
   setting_osd_timeout = 0;
+  setting_name_scroll = 3;
   setting_sms_fm = 0;
   setting_nds_layout = 0;
   setting_nds_gap = 0;
@@ -1159,6 +1172,13 @@ void PopulateVideoSettings() {
   else
     snprintf(hz, sizeof(hz), "%.2f Hz", CoreGetDisplayFps());
   items.push_back({"Monitor", hz, false, false, 0});
+
+  char scroll_lbl[16];
+  if (kScrollDelays[setting_name_scroll] == 0)
+    snprintf(scroll_lbl, sizeof(scroll_lbl), "Desativado");
+  else
+    snprintf(scroll_lbl, sizeof(scroll_lbl), "%ds", kScrollDelays[setting_name_scroll]);
+  items.push_back({"Rolagem Nome", scroll_lbl, false, false, 313});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -1680,6 +1700,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "n64_core", setting_n64_core);
   AppendSetting(out, "arcade_core", setting_arcade_core);
   AppendSetting(out, "osd_timeout", setting_osd_timeout);
+  AppendSetting(out, "name_scroll", setting_name_scroll);
   AppendSetting(out, "hw_render", (setting_driver != 0) ? 1 : 0);
   AppendSetting(out, "sms_fm", setting_sms_fm);
   AppendSetting(out, "nds_layout", setting_nds_layout);
@@ -1783,6 +1804,8 @@ static void MenuLoadSettings() {
       setting_arcade_core = ClampInt(iv, 0, 3);
     else if (!strcmp(key, "osd_timeout"))
       setting_osd_timeout = ClampInt(iv, 0, kOsdTimeoutCount - 1);
+    else if (!strcmp(key, "name_scroll"))
+      setting_name_scroll = ClampInt(iv, 0, kScrollDelayCount - 1);
     else if (!strcmp(key, "hw_render"))
     {
       if (iv != 0 && setting_driver == 0) setting_driver = 1;
@@ -1974,7 +1997,34 @@ void MenuRun() {
         snprintf(line_buf, sizeof(line_buf), " %-22.22s \x16",
                  item.label.c_str());
       } else {
-        snprintf(line_buf, sizeof(line_buf), " %s", item.label.c_str());
+        // The OSD row is a fixed pixel width - a name longer than it just got
+        // silently clipped before, extension included, with no way to read
+        // the rest. Marquee-scroll the SELECTED row once it has sat still for
+        // setting_name_scroll seconds, instead of leaving it truncated.
+        const int kVisibleChars = 26;
+        if (is_selected && kScrollDelays[setting_name_scroll] > 0 &&
+            (int)item.label.size() > kVisibleChars) {
+          if (item_idx != s_scroll_item_idx) {
+            s_scroll_item_idx = item_idx;
+            s_scroll_since = GetTickCount();
+          }
+          DWORD delay_ms = (DWORD)kScrollDelays[setting_name_scroll] * 1000;
+          DWORD elapsed = GetTickCount() - s_scroll_since;
+          if (elapsed > delay_ms) {
+            // A blank gap half a screen wide between the tail and the loop
+            // back to the start, so the seam reads as a pause, not a glitch.
+            int gap = kVisibleChars / 2;
+            int cycle = (int)item.label.size() - kVisibleChars + gap;
+            int step = (int)((elapsed - delay_ms) / 180) % cycle;
+            std::string padded = item.label + std::string(gap, ' ');
+            snprintf(line_buf, sizeof(line_buf), " %s",
+                     padded.substr(step, kVisibleChars).c_str());
+          } else {
+            snprintf(line_buf, sizeof(line_buf), " %s", item.label.c_str());
+          }
+        } else {
+          snprintf(line_buf, sizeof(line_buf), " %s", item.label.c_str());
+        }
       }
     }
 
@@ -2215,6 +2265,19 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
       selected_idx = 8;
+    } else if (item.action_id == 313) // Name scroll delay
+    {
+      setting_name_scroll =
+          (setting_name_scroll + delta + kScrollDelayCount) % kScrollDelayCount;
+      char msg[64];
+      if (kScrollDelays[setting_name_scroll] == 0)
+        snprintf(msg, sizeof(msg), "ROLAGEM DE NOME: DESATIVADA");
+      else
+        snprintf(msg, sizeof(msg), "ROLAGEM DE NOME APOS %ds PARADO",
+                 kScrollDelays[setting_name_scroll]);
+      CoreSetToast(msg, 150);
+      PopulateVideoSettings();
+      selected_idx = 12;
     } else if (item.action_id == 311) // Arcade core
     {
       setting_arcade_core = (setting_arcade_core + delta + 4) % 4;
