@@ -3082,77 +3082,160 @@ void CoreRender(uint32_t* dest_buffer, int dest_w, int dest_h, int aspect_mode, 
 	// ---------------------------------------------------------
 	if (filter_mode == 3)
 	{
-		// Same treatment as the linear path below: this one warps every pixel in
-		// floating point and was the most expensive of the lot at 19 ms a frame.
-		auto warp_band = [&](int y_from, int y_to)
+		// The warp geometry (which source pixel each output pixel samples, its
+		// vignette/scanline multiplier, or whether it's outside the tube and
+		// gets the bezel color) depends only on target_w/target_h/offset_x/
+		// offset_y/dest_w/dest_h/fbw/fbh - not on the frame's actual pixel
+		// content. Those dimensions only change on a window resize or a core
+		// resolution change, essentially never frame-to-frame, so recomputing
+		// this per pixel every single frame (the float warp math below) was
+		// pure waste - 19 ms a frame at a large canvas size, most of it spent
+		// re-deriving the same lookup table this cache now builds once and
+		// reuses until a dimension actually changes.
+		struct CrtLutEntry { int32_t src_idx; float mul; }; // src_idx < 0 = bezel
+		struct CrtLutCache {
+			std::vector<CrtLutEntry> entries;
+			int target_w = -1, target_h = -1, offset_x = -1, offset_y = -1;
+			int dest_w = -1, dest_h = -1, fbw = -1, fbh = -1;
+		};
+		static CrtLutCache lut;
+
+		bool dims_changed = (lut.target_w != target_w || lut.target_h != target_h ||
+			lut.offset_x != offset_x || lut.offset_y != offset_y ||
+			lut.dest_w != dest_w || lut.dest_h != dest_h ||
+			lut.fbw != fbw || lut.fbh != fbh);
+
+		if (dims_changed)
+		{
+			lut.entries.assign((size_t)target_w * target_h, CrtLutEntry{ -1, 1.0f });
+
+			auto build_band = [&](int y_from, int y_to)
+			{
+				for (int y = y_from; y < y_to; y++)
+				{
+					int dst_y = offset_y + y;
+					float ny = ((float)y / (float)target_h) * 2.0f - 1.0f;
+					CrtLutEntry* row = &lut.entries[(size_t)y * target_w];
+
+					for (int x = 0; x < target_w; x++)
+					{
+						int dst_x = offset_x + x;
+						if (dst_y < 0 || dst_y >= dest_h || dst_x < 0 || dst_x >= dest_w)
+							continue; // stays the -1/bezel-skip default, never sampled below
+
+						float nx = ((float)x / (float)target_w) * 2.0f - 1.0f;
+						float dist = nx * nx + ny * ny;
+						float cnx = nx * (1.0f + dist * 0.08f);
+						float cny = ny * (1.0f + dist * 0.08f);
+
+						if (fabsf(cnx) > 1.02f || fabsf(cny) > 1.02f)
+						{
+							row[x].src_idx = -2; // -2 = draw the bezel color; -1 = skip entirely
+							continue;
+						}
+
+						float vignette = (1.0f - cnx * cnx * 0.15f) * (1.0f - cny * cny * 0.15f);
+						if (vignette < 0.2f) vignette = 0.2f;
+						if (y & 1) vignette *= 0.75f; // odd-row scanline darkening, folded in
+
+						int src_x = (int)(((cnx + 1.0f) * 0.5f) * (float)fbw);
+						int src_y = (int)(((cny + 1.0f) * 0.5f) * (float)fbh);
+						if (src_x < 0) src_x = 0; else if (src_x >= fbw) src_x = fbw - 1;
+						if (src_y < 0) src_y = 0; else if (src_y >= fbh) src_y = fbh - 1;
+
+						row[x].src_idx = src_y * fbw + src_x;
+						row[x].mul = vignette;
+					}
+				}
+			};
+
+			unsigned warp_hw = std::thread::hardware_concurrency();
+			int warp_bands = (warp_hw > 1) ? (int)((warp_hw > 8) ? 8 : warp_hw) : 1;
+			if (target_h < 64) warp_bands = 1;
+
+			if (warp_bands <= 1)
+			{
+				build_band(0, target_h);
+			}
+			else
+			{
+				const int wstep = (target_h + warp_bands - 1) / warp_bands;
+				std::vector<std::thread> wpool;
+				wpool.reserve((size_t)warp_bands - 1);
+				for (int b = 1; b < warp_bands; b++)
+				{
+					const int a = b * wstep;
+					const int z = (a + wstep < target_h) ? a + wstep : target_h;
+					if (a < z) wpool.emplace_back(build_band, a, z);
+				}
+				build_band(0, (wstep < target_h) ? wstep : target_h);
+				for (auto& t : wpool) t.join();
+			}
+
+			lut.target_w = target_w; lut.target_h = target_h;
+			lut.offset_x = offset_x; lut.offset_y = offset_y;
+			lut.dest_w = dest_w; lut.dest_h = dest_h;
+			lut.fbw = fbw; lut.fbh = fbh;
+		}
+
+		// Hot path: no trig-like math left, just a lookup and a multiply.
+		auto sample_band = [&](int y_from, int y_to)
 		{
 			for (int y = y_from; y < y_to; y++)
 			{
 				int dst_y = offset_y + y;
 				if (dst_y < 0 || dst_y >= dest_h) continue;
-
-				float ny = ((float)y / (float)target_h) * 2.0f - 1.0f;
+				const CrtLutEntry* row = &lut.entries[(size_t)y * target_w];
 
 				for (int x = 0; x < target_w; x++)
 				{
 					int dst_x = offset_x + x;
 					if (dst_x < 0 || dst_x >= dest_w) continue;
 
-					float nx = ((float)x / (float)target_w) * 2.0f - 1.0f;
-					float dist = nx * nx + ny * ny;
-					float cnx = nx * (1.0f + dist * 0.08f);
-					float cny = ny * (1.0f + dist * 0.08f);
-
-					if (fabsf(cnx) > 1.02f || fabsf(cny) > 1.02f)
+					int32_t idx = row[x].src_idx;
+					if (idx == -1) continue;
+					if (idx == -2)
 					{
 						dest_buffer[dst_y * dest_w + dst_x] = 0x00040404; // CRT bezel edge
 						continue;
 					}
 
-					float vignette = (1.0f - cnx * cnx * 0.15f) * (1.0f - cny * cny * 0.15f);
-					if (vignette < 0.2f) vignette = 0.2f;
-
-					int src_x = (int)(((cnx + 1.0f) * 0.5f) * (float)fbw);
-					int src_y = (int)(((cny + 1.0f) * 0.5f) * (float)fbh);
-					if (src_x < 0) src_x = 0; else if (src_x >= fbw) src_x = fbw - 1;
-					if (src_y < 0) src_y = 0; else if (src_y >= fbh) src_y = fbh - 1;
-
-					uint32_t col = src_fb[(size_t)src_y * fbw + src_x];
+					uint32_t col = src_fb[(size_t)idx];
 					uint32_t r = (col >> 16) & 0xFF;
 					uint32_t g = (col >> 8) & 0xFF;
 					uint32_t b = col & 0xFF;
 
-					if (y & 1) { r = (r * 3) / 4; g = (g * 3) / 4; b = (b * 3) / 4; }
-					r = (uint32_t)(r * vignette);
-					g = (uint32_t)(g * vignette);
-					b = (uint32_t)(b * vignette);
+					float mul = row[x].mul;
+					r = (uint32_t)(r * mul);
+					g = (uint32_t)(g * mul);
+					b = (uint32_t)(b * mul);
 
 					dest_buffer[dst_y * dest_w + dst_x] = (r << 16) | (g << 8) | b;
 				}
 			}
 		};
 
-		unsigned warp_hw = std::thread::hardware_concurrency();
-		int warp_bands = (warp_hw > 1) ? (int)((warp_hw > 8) ? 8 : warp_hw) : 1;
-		if (target_h < 64) warp_bands = 1;
+		unsigned hw = std::thread::hardware_concurrency();
+		int bands = (hw > 1) ? (int)((hw > 8) ? 8 : hw) : 1;
+		if (target_h < 64) bands = 1;
 
-		if (warp_bands <= 1)
+		if (bands <= 1)
 		{
-			warp_band(0, target_h);
+			sample_band(0, target_h);
 		}
 		else
 		{
-			const int wstep = (target_h + warp_bands - 1) / warp_bands;
-			std::vector<std::thread> wpool;
-			wpool.reserve((size_t)warp_bands - 1);
-			for (int b = 1; b < warp_bands; b++)
+			const int step = (target_h + bands - 1) / bands;
+			std::vector<std::thread> pool;
+			pool.reserve((size_t)bands - 1);
+			for (int b = 1; b < bands; b++)
 			{
-				const int a = b * wstep;
-				const int z = (a + wstep < target_h) ? a + wstep : target_h;
-				if (a < z) wpool.emplace_back(warp_band, a, z);
+				const int a = b * step;
+				const int z = (a + step < target_h) ? a + step : target_h;
+				if (a < z) pool.emplace_back(sample_band, a, z);
 			}
-			warp_band(0, (wstep < target_h) ? wstep : target_h);
-			for (auto& t : wpool) t.join();
+			sample_band(0, (step < target_h) ? step : target_h);
+			for (auto& t : pool) t.join();
 		}
 		return;
 	}
