@@ -1905,6 +1905,24 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		{
 			rom_path = extracted_rom;
 			if (!extracted_core.empty()) core_dll = extracted_core;
+
+			// fMSX's fmsx_mode core option defaults to "MSX2+" (the first of
+			// MSX2+|MSX1|MSX2), and that specific default is broken in this
+			// build: retro_run() executes normally (correct fps, no errors)
+			// but every frame comes back solid black, on both MSX1 and MSX2
+			// titles - confirmed with record_gameplay against a plain
+			// cartridge game with zero disk/BIOS dependency. Explicitly
+			// requesting either "MSX1" or "MSX2" instead of leaving the
+			// default in place renders correctly. .mx2 unambiguously means
+			// MSX2; everything else (.mx1, bare .rom/.bin used by both
+			// generations) requests MSX1, the safer base case since MSX2
+			// hardware runs MSX1-only carts fine but not the reverse.
+			if (core_dll.find("msx.dll") != std::string::npos)
+			{
+				std::string extracted_ext = fs::path(rom_path).extension().string();
+				std::transform(extracted_ext.begin(), extracted_ext.end(), extracted_ext.begin(), ::tolower);
+				CoreSetOption("fmsx_mode", extracted_ext == ".mx2" ? "MSX2" : "MSX1");
+			}
 		}
 		else
 		{
