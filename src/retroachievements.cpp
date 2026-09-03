@@ -363,6 +363,28 @@ static bool InitMemoryForConsole(uint32_t console_id, const char* why)
 {
 	if (console_id == RC_CONSOLE_UNKNOWN) return false;
 
+	// fMSX does not implement RETRO_ENVIRONMENT_GET_MEMORY_MAPS (confirmed by
+	// "mapa=inferido" in every MSX [MEM] log line), so rc_libretro has to guess
+	// the whole region from a single CoreGetMemoryData()/Size() pair. That
+	// guess does not match fMSX's real layout: every MSX ROM the server
+	// actually recognised (as opposed to "jogo fora do banco de dados", which
+	// never reaches this function - see g_guessed_console staying UNKNOWN for
+	// MSX in ConsoleIdFromCoreName) went on to either crash retro_run() deep
+	// in msx.dll or render visibly corrupted sprites once achievement address
+	// validation started reading through the inferred region. Until that
+	// mapping is fixed, achievement memory tracking has to stay off for MSX -
+	// a wrong reward system is a much smaller loss than the game itself.
+	if (console_id == RC_CONSOLE_MSX)
+	{
+		FILE* lf = fopen("mister_flavor.log", "a");
+		if (lf)
+		{
+			fprintf(lf, "[INFO] [MEM] %s: console=MSX mapa=inferido recusado (layout incompativel conhecido)\n", why);
+			fclose(lf);
+		}
+		return false;
+	}
+
 	rc_libretro_memory_destroy(&g_memory_regions);
 
 	const struct retro_memory_map* mmap =
