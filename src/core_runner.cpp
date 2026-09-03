@@ -1880,6 +1880,15 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	std::string core_dll = g_pending_core_hint;
 	LeaveCriticalSection(&name_lock);
 
+	// CoreLoadGame() below derives loaded_rom_dir (what the OSD's "Load" row
+	// reopens) from whatever path it is handed. For an archive that gets
+	// extracted, that path is the per-game folder under app/cache/ - browsing
+	// it shows only this one game's own extracted files, which reads as "Load
+	// does nothing" since there is nothing else there to pick. Keep the
+	// original library folder (app/roms/<system>) so it can be restored once
+	// loading succeeds, regardless of which of the two paths below got there.
+	const std::string original_rom_dir = fs::path(rom_path).parent_path().string();
+
 	// Arcade cores read the archive themselves: the .zip IS the ROM set, a
 	// bundle of chip dumps only the core knows how to assemble. Extracting it
 	// and handing over one inner file is meaningless - and worse, the core was
@@ -2019,6 +2028,15 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		CoreUnload();
 		InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
 		return 0;
+	}
+
+	// Restore the real library folder now that CoreLoadGame() has (possibly)
+	// overwritten it with the extraction cache path - see original_rom_dir above.
+	if (!original_rom_dir.empty())
+	{
+		EnterCriticalSection(&name_lock);
+		loaded_rom_dir = original_rom_dir;
+		LeaveCriticalSection(&name_lock);
 	}
 
 	RaOnGameLoad(rom_path.c_str(), loaded_core_name.c_str());
