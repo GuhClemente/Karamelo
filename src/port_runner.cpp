@@ -552,7 +552,13 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     if (is_bare_exe) {
         // Some releases ship the whole game as one executable with no
         // archive around it - nothing to extract, just place it.
-        std::string exe_name = asset.name.empty() ? (def.id + ".exe") : asset.name;
+        // asset.name comes straight from the GitHub Releases API JSON with no
+        // validation of its own; .filename() keeps only the last path
+        // component, so a "../"-laden or absolute name can't write outside
+        // dest_dir (the same intent as ArchiveHasUnsafeEntry for archive
+        // extraction, applied here to a single downloaded file's name).
+        std::string safe_name = fs::path(asset.name).filename().string();
+        std::string exe_name = safe_name.empty() ? (def.id + ".exe") : safe_name;
         std::string exe_path = dest_dir + "/" + exe_name;
         if (!UpdaterHttpDownloadToFile(asset.url, exe_path)) { out_error = "falha no download"; return false; }
     } else {
@@ -732,7 +738,13 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
     BOOL ok;
     if (is_script) {
-        std::wstring cmdline = L"cmd.exe /c \"" + wexe + L"\"";
+        // Doubled quotes, not a single pair: cmd.exe's own quote-stripping-and-
+        // reparse rule for `/c "..."` (it strips exactly one outer pair when the
+        // whole argument starts and ends with a quote) would otherwise leave a
+        // filename containing &, |, or ^ able to inject a second command. The
+        // doubled quotes survive that one strip, so the path stays inside its
+        // own quoted token instead of being reparsed as bare command text.
+        std::wstring cmdline = L"cmd.exe /c \"\"" + wexe + L"\"\"";
         std::vector<wchar_t> buf(cmdline.begin(), cmdline.end());
         buf.push_back(L'\0');
         ok = CreateProcessW(NULL, buf.data(), NULL, NULL, FALSE, 0, NULL, wdir.c_str(), &si, &pi);

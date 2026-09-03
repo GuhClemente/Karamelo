@@ -150,6 +150,18 @@ static std::string loaded_game_stem = "";
 // elsewhere is a dangling pointer the moment the string reallocates, so both
 // sides go through this lock.
 static CRITICAL_SECTION name_lock;
+
+// loaded_game_stem shares that exact hazard (CoreTakeScreenshot reads it from
+// the UI thread while CoreLoadGame writes it on the core thread) but has no
+// public getter of its own - it is only ever used inside this file. Take a
+// safe copy under the lock instead of reading the string directly.
+static std::string GetLoadedGameStemSafe()
+{
+	EnterCriticalSection(&name_lock);
+	std::string copy = loaded_game_stem;
+	LeaveCriticalSection(&name_lock);
+	return copy;
+}
 struct NameLockInit { NameLockInit() { InitializeCriticalSection(&name_lock); } };
 static NameLockInit g_name_lock_init;
 
@@ -2297,6 +2309,31 @@ static void RetroDeinitGuarded()
 	__except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 
+static bool RetroResetGuarded()
+{
+	__try { if (p_retro_reset) p_retro_reset(); return true; }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+// Returns 0 on exception, same sentinel callers already treat as "invalid size".
+static size_t RetroSerializeSizeGuarded()
+{
+	__try { return p_retro_serialize_size ? p_retro_serialize_size() : 0; }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
+}
+
+static bool RetroSerializeGuarded(void* data, size_t size)
+{
+	__try { return p_retro_serialize ? p_retro_serialize(data, size) : false; }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+static bool RetroUnserializeGuarded(const void* data, size_t size)
+{
+	__try { return p_retro_unserialize ? p_retro_unserialize(data, size) : false; }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
 static bool CoreLoad(const char* core_dll_path)
 {
 	CoreUnload();
@@ -2449,8 +2486,8 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	// from under this session, so a new game's save file could inherit the
 	// *next* game's platform folder instead of its own.
 	fs::path orig_p(rom_path);
-	loaded_game_stem = orig_p.stem().string();
 	EnterCriticalSection(&name_lock);
+	loaded_game_stem = orig_p.stem().string();
 	loaded_game_name = orig_p.filename().string();
 	LeaveCriticalSection(&name_lock);
 	EnterCriticalSection(&name_lock);
@@ -2700,8 +2737,10 @@ static void DoReset()
 {
 	if (CoreIsRunning() && p_retro_reset)
 	{
-		p_retro_reset();
-		CoreSetToast("CORE RESTARTED", 90);
+		if (RetroResetGuarded())
+			CoreSetToast("CORE RESTARTED", 90);
+		else
+			CoreSetToast("ERROR: CORE CRASHED ON RESET", 120);
 	}
 }
 
@@ -2713,7 +2752,7 @@ static bool DoSaveState(int slot)
 		return false;
 	}
 
-	size_t sz = p_retro_serialize_size();
+	size_t sz = RetroSerializeSizeGuarded();
 	if (sz == 0)
 	{
 		CoreSetToast("ERROR: INVALID STATE SIZE", 120);
@@ -2723,7 +2762,7 @@ static bool DoSaveState(int slot)
 	void* buf = malloc(sz);
 	if (!buf) return false;
 
-	if (!p_retro_serialize(buf, sz))
+	if (!RetroSerializeGuarded(buf, sz))
 	{
 		free(buf);
 		CoreSetToast("ERROR SAVING STATE", 120);
@@ -2734,7 +2773,7 @@ static bool DoSaveState(int slot)
 	fs::create_directories(save_dir);
 
 	char slot_filename[512];
-	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", loaded_game_stem.c_str(), slot);
+	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", GetLoadedGameStemSafe().c_str(), slot);
 	fs::path save_file = save_dir / slot_filename;
 
 	FILE* f = fopen(save_file.string().c_str(), "wb");
@@ -2765,7 +2804,7 @@ static bool DoLoadState(int slot)
 
 	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir);
 	char slot_filename[512];
-	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", loaded_game_stem.c_str(), slot);
+	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", GetLoadedGameStemSafe().c_str(), slot);
 	fs::path save_file = save_dir / slot_filename;
 
 	FILE* f = fopen(save_file.string().c_str(), "rb");
@@ -2793,7 +2832,7 @@ static bool DoLoadState(int slot)
 	fread(buf, 1, sz, f);
 	fclose(f);
 
-	bool ok = p_retro_unserialize(buf, sz);
+	bool ok = RetroUnserializeGuarded(buf, sz);
 	free(buf);
 
 	if (ok)
@@ -2879,7 +2918,7 @@ bool CoreTakeScreenshot()
 	strftime(date_str, sizeof(date_str), "%Y%m%d_%H%M%S", tm_now);
 
 	char filename[512];
-	snprintf(filename, sizeof(filename), "screenshots/%s_%s.bmp", loaded_game_stem.c_str(), date_str);
+	snprintf(filename, sizeof(filename), "screenshots/%s_%s.bmp", GetLoadedGameStemSafe().c_str(), date_str);
 
 	FILE* f = fopen(filename, "wb");
 	if (!f) return false;
@@ -3532,13 +3571,15 @@ double CoreGetDisplayFps() { return g_display_fps; }
 void* CoreGetMemoryData(unsigned id)
 {
 	if (!is_core_loaded || !p_retro_get_memory_data) return NULL;
-	return p_retro_get_memory_data(id);
+	__try { return p_retro_get_memory_data(id); }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return NULL; }
 }
 
 size_t CoreGetMemorySize(unsigned id)
 {
 	if (!is_core_loaded || !p_retro_get_memory_size) return 0;
-	return p_retro_get_memory_size(id);
+	__try { return p_retro_get_memory_size(id); }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
 }
 
 bool CoreIsDiscGame()

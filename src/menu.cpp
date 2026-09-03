@@ -549,6 +549,10 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
   if (ext == ".zip" || ext == ".7z" || ext == ".rar") {
     if (in("Arcade"))
       return GetArcadeCoreDll(file_path);
+    // Checked before the plain "NeoGeo" match below - "NeoGeoPocket" contains
+    // "NeoGeo" as a substring, so the generic check would always win first.
+    if (in("NGP") || in("NeoGeoPocket"))
+      return "cores/ngp.dll";
     if (in("NeoGeo"))
       return "cores/neogeo.dll";
     if (in("Atari5200"))
@@ -599,8 +603,6 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
       return "cores/spectrum.dll";
     if (in("3DO"))
       return "cores/3do.dll";
-    if (in("NGP") || in("NeoGeoPocket"))
-      return "cores/ngp.dll";
     if (in("WonderSwan") || in("WSwan"))
       return "cores/wswan.dll";
     if (in("PCFX") || in("PC-FX"))
@@ -1392,11 +1394,11 @@ void PopulateUpdate() {
     if (err_msg.length() > 24) err_msg = err_msg.substr(0, 22) + "..";
     items.push_back({err_msg, "", false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Tentar Novamente", ">", false, true, 301});
+    items.push_back({"Tentar Novamente", ">", false, true, 391});
   } else {
     items.push_back({"Status", "Pronto", false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Verificar Atualizacoes", ">", false, true, 301});
+    items.push_back({"Verificar Atualizacoes", ">", false, true, 391});
   }
 
   items.push_back({"Voltar", "", false, true, 399});
@@ -2220,14 +2222,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetToast(setting_vsync == 1 ? "V-SYNC ENABLED" : "V-SYNC DISABLED",
                    120);
       PopulateVideoSettings();
-      selected_idx = 6;
+      selected_idx = 9;
     } else if (item.action_id == 307) // Sincronia
     {
       setting_sync = (setting_sync + delta + 2) % 2;
       CoreSetDisplaySync(setting_sync == 1, CoreGetDisplayFps());
       CoreSetToast(setting_sync == 1 ? "SYNC: DISPLAY" : "SYNC: NATIVE", 120);
       PopulateVideoSettings();
-      selected_idx = 7;
+      selected_idx = 10;
     } else if (item.action_id == 306) // Video Driver
     {
       setting_driver = (setting_driver + delta + kVideoDriverCount) % kVideoDriverCount;
