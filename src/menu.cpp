@@ -209,6 +209,16 @@ static void ApplyPersistedCoreOptions() {
   CoreSetOption("genesis_plus_gx_cd_latency",
                 onoff[setting_cd_latency ? 0 : 1]);
 }
+
+// Only reached for a loose (non-archived) MSX file - archived content gets
+// the equivalent check in core_runner.cpp after extraction, since only then
+// is the real inner extension known. See the comment there for why fMSX's
+// "MSX2+" default is not trusted.
+static void ApplyMsxMachineTypeOption(const std::string &core_dll,
+                                       const std::string &ext) {
+  if (core_dll.find("msx.dll") == std::string::npos) return;
+  CoreSetOption("fmsx_mode", ext == ".mx2" ? "MSX2" : "MSX1");
+}
 static int setting_language = 0; // 0=Português, 1=English
 static std::string join_ip_input = "127.0.0.1";
 
@@ -2639,6 +2649,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         // blocked the message pump for as long as the extraction took.
         // The core is resolved the same way for every entry point.
         std::string core_dll = MenuResolveCoreForPath(full_rom_path, current_dir);
+        ApplyMsxMachineTypeOption(core_dll, ext);
 
         // Returns immediately; the worker thread reports back through
         // CoreIsLoading() / CoreIsRunning().
@@ -2684,6 +2695,10 @@ bool MenuLaunchGamePath(const std::string &full_rom_path) {
 
   if (core_dll.empty())
     return false;
+
+  std::string ext = p.extension().string();
+  std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+  ApplyMsxMachineTypeOption(core_dll, ext);
 
   ApplyPersistedCoreOptions();
 
