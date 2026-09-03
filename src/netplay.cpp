@@ -110,29 +110,52 @@ void NetplayShutdown()
 	WSACleanup();
 }
 
+// local_ip_str/status_str are reassigned under net_lock from the core thread
+// (NetplaySyncInputs's send-error path calls NetplayDisconnect()) as well as
+// the UI thread, so handing out .c_str() of the live std::string without the
+// lock is the same dangling-pointer-on-reallocation hazard already fixed for
+// core_runner.cpp's loaded_game_name/loaded_rom_dir - copy into a thread_local
+// buffer under the lock instead.
 const char* NetplayGetLocalIp()
 {
-	return local_ip_str.c_str();
+	static thread_local char buf[64];
+	EnterCriticalSection(&net_lock);
+	strncpy_s(buf, sizeof(buf), local_ip_str.c_str(), _TRUNCATE);
+	LeaveCriticalSection(&net_lock);
+	return buf;
 }
 
 NetplayRole NetplayGetRole()
 {
-	return net_role;
+	EnterCriticalSection(&net_lock);
+	NetplayRole role = net_role;
+	LeaveCriticalSection(&net_lock);
+	return role;
 }
 
 NetplayState NetplayGetState()
 {
-	return net_state;
+	EnterCriticalSection(&net_lock);
+	NetplayState state = net_state;
+	LeaveCriticalSection(&net_lock);
+	return state;
 }
 
 const char* NetplayGetStatusString()
 {
-	return status_str.c_str();
+	static thread_local char buf[160];
+	EnterCriticalSection(&net_lock);
+	strncpy_s(buf, sizeof(buf), status_str.c_str(), _TRUNCATE);
+	LeaveCriticalSection(&net_lock);
+	return buf;
 }
 
 int NetplayGetPingMs()
 {
-	return ping_ms;
+	EnterCriticalSection(&net_lock);
+	int ms = ping_ms;
+	LeaveCriticalSection(&net_lock);
+	return ms;
 }
 
 // NetplayStartHost/StartClient/Disconnect are called from the UI thread

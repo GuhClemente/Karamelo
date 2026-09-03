@@ -356,6 +356,9 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 
 			return "cores/arcade_fbneo.dll";
 		}
+		// Checked before the plain "NeoGeo" match below - "NeoGeoPocket" contains
+		// "NeoGeo" as a substring, so the generic check would always win first.
+		if (in("NGP") || in("NeoGeoPocket")) return "cores/ngp.dll";
 		if (in("NeoGeo")) return "cores/neogeo.dll";
 		if (in("Atari5200")) return "cores/atari5200.dll";
 		if (in("Atari7800")) return "cores/atari7800.dll";
@@ -381,7 +384,6 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 		if (in("C64") || in("Commodore")) return "cores/c64.dll";
 		if (in("Spectrum") || in("ZXSpectrum")) return "cores/spectrum.dll";
 		if (in("3DO")) return "cores/3do.dll";
-		if (in("NGP") || in("NeoGeoPocket")) return "cores/ngp.dll";
 		if (in("WonderSwan") || in("WSwan")) return "cores/wswan.dll";
 		if (in("PCFX") || in("PC-FX")) return "cores/pcfx.dll";
 		if (in("Saturn")) return "cores/saturn.dll";

@@ -378,7 +378,8 @@ bool HwEnsureSurface(unsigned width, unsigned height)
 	p_glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
 		GL_TEXTURE_2D, g_color_tex, 0);
 
-	if (g_hw_cb.depth && p_glGenRenderbuffers)
+	if (g_hw_cb.depth && p_glGenRenderbuffers && p_glBindRenderbuffer &&
+		p_glRenderbufferStorage && p_glFramebufferRenderbuffer)
 	{
 		p_glGenRenderbuffers(1, &g_depth_rb);
 		p_glBindRenderbuffer(GL_RENDERBUFFER, g_depth_rb);
