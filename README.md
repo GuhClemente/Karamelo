@@ -152,7 +152,8 @@ Verificados por MD5 contra [docs.libretro.com/library/fmsx](https://docs.libretr
 | `MSX2PEXT.ROM` | `7c8243c71d8f143b2531f01afa6a05dc` |
 
 Opcionais, não necessários pra rodar jogos comuns: `DISK.ROM` (disquete/BDOS),
-`FMPAC.ROM` (cartucho de som FM), `MSXDOS2.ROM`, `PAINTER.ROM`, `KANJI.ROM`.
+`FMPAC.ROM` (cartucho de som FM), `MSXDOS2.ROM`, `PAINTER.ROM`, `KANJI.ROM` —
+todos presentes e conferidos por MD5.
 
 --- | :--- | :--- |
 | **NeoGeo CD** (`neocd_alt.dll`) | `bios/neocd/` | `neocd_f.rom`, `neocd_t.rom`, `neocd_z.rom`, `uni-bioscd.rom`, `ng-lo.rom` |
