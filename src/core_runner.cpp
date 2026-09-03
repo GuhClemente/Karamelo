@@ -1847,17 +1847,26 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 // -------------------------------------------------------------
 // SEH cannot live in a function that has C++ objects needing unwinding, so the
 // guarded call gets its own tiny function.
-static bool RunOneFrameGuarded()
+// Plain POD, not std::string/etc: __try cannot share a function with a C++
+// object that needs unwinding, so whatever this reports has to travel out as
+// data the caller (which has no __try of its own) can log with full context.
+struct FrameRunResult { bool ok; DWORD exc_code; void* exc_addr; };
+
+static FrameRunResult RunOneFrameGuarded()
 {
+	FrameRunResult r = { true, 0, NULL };
 	__try
 	{
 		p_retro_run();
-		return true;
 	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
+	__except (
+		r.exc_code = GetExceptionCode(),
+		r.exc_addr = GetExceptionInformation()->ExceptionRecord->ExceptionAddress,
+		EXCEPTION_EXECUTE_HANDLER)
 	{
-		return false;
+		r.ok = false;
 	}
+	return r;
 }
 
 static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
@@ -2040,14 +2049,19 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 
 	while (InterlockedCompareExchange(&core_thread_running, 0, 0) && is_game_loaded)
 	{
-		if (!RunOneFrameGuarded())
+		FrameRunResult run = RunOneFrameGuarded();
+		if (!run.ok)
 		{
 			consecutive_crashes++;
+			// This is the line that turns the next "it crashed" report into
+			// something actionable instead of guesswork re-derived from PERF/
+			// AUDIO log fallout after the fact.
+			CoreLogPrintf(RETRO_LOG_ERROR,
+				"[CoreRunner] retro_run() excecao 0x%08lX no endereco %p (core=%s rom=%s) [%d/%d]",
+				run.exc_code, run.exc_addr, core_dll.c_str(), rom_path.c_str(),
+				consecutive_crashes, kMaxConsecutiveCrashes);
 			if (consecutive_crashes >= kMaxConsecutiveCrashes)
 			{
-				CoreLogPrintf(RETRO_LOG_ERROR,
-					"[CoreRunner] Core travou %d vezes seguidas em retro_run(); encerrando jogo.",
-					consecutive_crashes);
 				CoreSetToast("ERROR: CORE TRAVOU REPETIDAMENTE - JOGO ENCERRADO", 300);
 				break;
 			}
