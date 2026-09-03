@@ -2026,12 +2026,37 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	double fps = (core_target_fps > 1.0 && core_target_fps < 1000.0) ? core_target_fps : 60.0;
 	LONGLONG tick = (LONGLONG)((double)freq.QuadPart / fps);
 
+	// A core that faults inside retro_run() usually does so because something
+	// in its own state got corrupted - retrying just re-enters retro_run()
+	// against that same broken state, which typically faults again on the very
+	// next frame. Looping on that forever (as this used to) burns the frame
+	// budget on repeated SEH unwinds and eventually escalates into a failure
+	// SEH cannot trap at all (heap-corruption fast-fail, stack exhaustion),
+	// taking the whole process down with no toast and no log line to explain
+	// why. A handful of consecutive faults is fatal for this session: bail out
+	// to the menu instead of gambling on a fault that clears itself.
+	int consecutive_crashes = 0;
+	const int kMaxConsecutiveCrashes = 5;
+
 	while (InterlockedCompareExchange(&core_thread_running, 0, 0) && is_game_loaded)
 	{
 		if (!RunOneFrameGuarded())
 		{
+			consecutive_crashes++;
+			if (consecutive_crashes >= kMaxConsecutiveCrashes)
+			{
+				CoreLogPrintf(RETRO_LOG_ERROR,
+					"[CoreRunner] Core travou %d vezes seguidas em retro_run(); encerrando jogo.",
+					consecutive_crashes);
+				CoreSetToast("ERROR: CORE TRAVOU REPETIDAMENTE - JOGO ENCERRADO", 300);
+				break;
+			}
 			CoreSetToast("WARNING: RECOVERED FROM INTERNAL EXCEPTION", 180);
 			Sleep(16);
+		}
+		else
+		{
+			consecutive_crashes = 0;
 		}
 
 		RaDoFrame();
