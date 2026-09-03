@@ -2056,14 +2056,20 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	// A core that faults inside retro_run() usually does so because something
 	// in its own state got corrupted - retrying just re-enters retro_run()
 	// against that same broken state, which typically faults again on the very
-	// next frame. Looping on that forever (as this used to) burns the frame
-	// budget on repeated SEH unwinds and eventually escalates into a failure
-	// SEH cannot trap at all (heap-corruption fast-fail, stack exhaustion),
-	// taking the whole process down with no toast and no log line to explain
-	// why. A handful of consecutive faults is fatal for this session: bail out
-	// to the menu instead of gambling on a fault that clears itself.
+	// next frame. Field reports against a specific MSX title confirmed this
+	// twice over: the SAME faulting address hit on every one of 5 retries, and
+	// the app still went down hard both times even with the retry cap in
+	// place - the access violation itself is only the byte that finally landed
+	// on an unmapped page; a bad write earlier in that same faulting frame can
+	// have already scribbled over unrelated process memory before the OS ever
+	// raises anything. Every additional retry against already-faulted state is
+	// another chance to extend that corruption into something no __try can
+	// catch (heap-corruption fast-fail, stack exhaustion) - including in code
+	// that has nothing to do with the core, like our own cleanup path. One
+	// fault is enough to call the session unrecoverable; retrying has never
+	// once self-healed it and was only raising the stakes.
 	int consecutive_crashes = 0;
-	const int kMaxConsecutiveCrashes = 5;
+	const int kMaxConsecutiveCrashes = 1;
 
 	while (InterlockedCompareExchange(&core_thread_running, 0, 0) && is_game_loaded)
 	{
