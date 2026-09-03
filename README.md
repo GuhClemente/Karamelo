@@ -123,6 +123,7 @@ foram verificados por MD5 e confirmados bootando.
 | **Saturn** | `bios/` | `sega_101.bin`, `mpr-17933.bin` | ✅ |
 | **GameCube** | `bios/dolphin-emu/Sys/` | pacote de dados do Dolphin (5,6 MB) | ⚠️ core instável |
 | **Master System / GG** | `bios/` | `bios_U.sms`, `bios_E.sms`, `bios_J.sms`, `bios.gg` | opcional |
+| **MSX** | `bios/` | `MSX.ROM`, `MSX2.ROM`, `MSX2EXT.ROM`, `MSX2P.ROM`, `MSX2PEXT.ROM` | ✅ ver nota |
 
 **Escolha pelo hash, não pelo nome.** Sets de BIOS trazem muitas variantes com
 nomes parecidos — o set de Mega CD tinha treze arquivos, incluindo um marcado
@@ -136,6 +137,22 @@ completar o conjunto.
 
 **NeoGeo CD tem subdiretório próprio.** Os `.rom` soltos em `bios/` fazem o core
 falhar com *"No BIOS detected!"*; eles têm de estar em `bios/neocd/`.
+
+**MSX (fMSX) precisa de 5 arquivos, um por modo/geração.** `MSX.ROM` (MSX1),
+`MSX2.ROM` + `MSX2EXT.ROM` (MSX2) e `MSX2P.ROM` + `MSX2PEXT.ROM` (MSX2+) são
+cada um "Required" para o respectivo modo — o core não tem fallback entre eles.
+Verificados por MD5 contra [docs.libretro.com/library/fmsx](https://docs.libretro.com/library/fmsx/#bios):
+
+| Arquivo | MD5 esperado |
+| :--- | :--- |
+| `MSX.ROM` | `364a1a579fe5cb8dba54519bcfcdac0d` |
+| `MSX2.ROM` | `ec3a01c91f24fbddcbcab0ad301bc9ef` |
+| `MSX2EXT.ROM` | `2183c2aff17cf4297bdb496de78c2e8a` |
+| `MSX2P.ROM` | `847cc025ffae665487940ff2639540e5` |
+| `MSX2PEXT.ROM` | `7c8243c71d8f143b2531f01afa6a05dc` |
+
+Opcionais, não necessários pra rodar jogos comuns: `DISK.ROM` (disquete/BDOS),
+`FMPAC.ROM` (cartucho de som FM), `MSXDOS2.ROM`, `PAINTER.ROM`, `KANJI.ROM`.
 
 --- | :--- | :--- |
 | **NeoGeo CD** (`neocd_alt.dll`) | `bios/neocd/` | `neocd_f.rom`, `neocd_t.rom`, `neocd_z.rom`, `uni-bioscd.rom`, `ng-lo.rom` |
