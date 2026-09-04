@@ -22,6 +22,7 @@
 /app/*.log*
 /app/*.exe
 /app/*.pdb
+/app/last_wer_check.txt
 
 # Cores, BIOS and ROMs (NUNCA versionar: violacao de direitos autorais)
 /app/cores/
