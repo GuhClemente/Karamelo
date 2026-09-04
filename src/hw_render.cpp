@@ -430,9 +430,15 @@ void HwContextReset()
 
 void HwContextDestroy()
 {
+	if (!g_hw_active) return;
+
 	if (g_context_live && HwMakeCurrent())
 	{
-		if (g_hw_cb.context_destroy) g_hw_cb.context_destroy();
+		if (g_hw_cb.context_destroy)
+		{
+			__try { g_hw_cb.context_destroy(); }
+			__except (EXCEPTION_EXECUTE_HANDLER) {}
+		}
 	}
 	if (HwMakeCurrent())
 	{
