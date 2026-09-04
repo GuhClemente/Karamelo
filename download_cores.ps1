@@ -18,9 +18,10 @@ $cores = @{
     "spectrum.dll"    = "fuse_libretro.dll.zip"
 }
 
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $destDirs = @(
-    "C:\SaborMister\app\cores",
-    "C:\SaborMister\cores"
+    (Join-Path $repoRoot "app\cores"),
+    (Join-Path $repoRoot "cores")
 )
 
 foreach ($dir in $destDirs) {
@@ -30,7 +31,7 @@ foreach ($dir in $destDirs) {
 }
 
 $baseUrl = "https://buildbot.libretro.com/nightly/windows/x86_64/latest/"
-$tempDir = "C:\SaborMister\temp_cores_dl"
+$tempDir = Join-Path $repoRoot "temp_cores_dl"
 if (-not (Test-Path $tempDir)) {
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 }
