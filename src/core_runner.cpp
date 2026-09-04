@@ -1429,14 +1429,6 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "pcsx2_fastmem") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_mtvu") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_instant_vu1") == 0) var->value = "enabled";
-			else if (strcmp(var->key, "pcsx2_fastcdvd") == 0) var->value = "enabled";
-			else if (strcmp(var->key, "pcsx2_preload_frame_data") == 0) var->value = "enabled";
-			else if (strcmp(var->key, "pcsx2_blending_accuracy") == 0) var->value = "Basic";
-			else if (strcmp(var->key, "pcsx2_gpu_palette_conversion") == 0) var->value = "enabled";
-			else if (strcmp(var->key, "pcsx2_enable_hw_hacks") == 0) var->value = "enabled";
-			else if (strcmp(var->key, "pcsx2_auto_flush") == 0) var->value = "disabled";
-			else if (strcmp(var->key, "pcsx2_ee_cycle_rate") == 0) var->value = "0";
-			else if (strcmp(var->key, "pcsx2_ee_cycle_skip") == 0) var->value = "0";
 
 			// If no explicit override matched: hand back what the core itself declared as default.
 			else
