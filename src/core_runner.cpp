@@ -1880,6 +1880,16 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	std::string core_dll = g_pending_core_hint;
 	LeaveCriticalSection(&name_lock);
 
+	// Flycast supports "zip" directly (ext=...|zip|7z|...) and needs to for a
+	// Naomi title: extracting the zip down to just its .chd, as happens below
+	// for any archive whose first-guess core doesn't read archives itself,
+	// throws away whatever else the romset carried alongside the GD-ROM image.
+	// A bare .chd loads fine as generic Dreamcast content and boots straight
+	// to Flycast's own BIOS dashboard instead of the actual game. Keep the
+	// original zip path so the arcade candidate loop can hand Flycast the
+	// whole thing instead of the reduced extraction.
+	const std::string original_rom_path = rom_path;
+
 	// CoreLoadGame() below derives loaded_rom_dir (what the OSD's "Load" row
 	// reopens) from whatever path it is handed. For an archive that gets
 	// extracted, that path is the per-game folder under app/cache/ - browsing
@@ -1888,6 +1898,16 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	// original library folder (app/roms/<system>) so it can be restored once
 	// loading succeeds, regardless of which of the two paths below got there.
 	const std::string original_rom_dir = fs::path(rom_path).parent_path().string();
+
+	// Same idea as original_rom_dir, for is_arcade_rom below: extraction can
+	// re-resolve core_dll to "dreamcast.dll" for a Naomi title whose GD-ROM
+	// image is just a .chd with nothing arcade-specific in its own path
+	// (app/cache/<name>/track.chd, not app/roms/Arcade/<name>.zip). By the
+	// time is_arcade_rom is computed neither rom_path nor core_dll says
+	// "Arcade" anymore, so a Naomi zip that resolved to Flycast skipped the
+	// candidate-core loop entirely and loaded straight into Flycast's own
+	// Dreamcast BIOS dashboard instead of ever being tried as arcade content.
+	const bool original_was_arcade = (rom_path.find("Arcade") != std::string::npos);
 
 	// Arcade cores read the archive themselves: the .zip IS the ROM set, a
 	// bundle of chip dumps only the core knows how to assemble. Extracting it
@@ -1954,7 +1974,8 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	}
 
 	const bool is_arcade_rom =
-		(rom_path.find("Arcade") != std::string::npos ||
+		(original_was_arcade ||
+		 rom_path.find("Arcade") != std::string::npos ||
 		 core_dll.find("arcade_fbneo") != std::string::npos ||
 		 core_dll.find("mame2003") != std::string::npos ||
 		 core_dll.find("mame2010") != std::string::npos);
@@ -1989,14 +2010,26 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		{
 			const std::string& cand_dll = candidate_cores[i];
 			bool is_last_candidate = (i == candidate_cores.size() - 1);
-			CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Tentando core de arcade: %s para '%s'", cand_dll.c_str(), rom_path.c_str());
+
+			// Flycast reads zip/7z natively and needs to for a Naomi title:
+			// the .chd extraction above throws away whatever else the romset
+			// carried alongside the GD-ROM image, and a bare .chd loads fine
+			// as generic Dreamcast content but boots straight to Flycast's
+			// own BIOS dashboard instead of recognising the actual game.
+			// Give it the intact original archive instead.
+			const std::string& load_path =
+				(cand_dll.find("dreamcast") != std::string::npos && ArchiveIsCompressed(original_rom_path))
+					? original_rom_path : rom_path;
+
+			CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Tentando core de arcade: %s para '%s'", cand_dll.c_str(), load_path.c_str());
 
 			if (CoreLoad(cand_dll.c_str()))
 			{
 				// Suppress toast unless all candidates have failed
-				if (CoreLoadGame(rom_path.c_str(), !is_last_candidate))
+				if (CoreLoadGame(load_path.c_str(), !is_last_candidate))
 				{
 					core_dll = cand_dll;
+					rom_path = load_path;
 					loaded = true;
 					CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Sucesso no carregamento de arcade com: %s", cand_dll.c_str());
 					break;
