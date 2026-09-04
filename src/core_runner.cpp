@@ -16,6 +16,8 @@
 #include <string>
 #include <filesystem>
 #include <algorithm>
+#include <unordered_set>
+#include <fstream>
 
 #include "libretro.h"
 #include "core_runner.h"
@@ -1869,6 +1871,47 @@ static FrameRunResult RunOneFrameGuarded()
 	return r;
 }
 
+// Known Sega Naomi/Naomi 2/Atomiswave arcade romset short names - see
+// app/gamedb/naomi_atomiswave.json for provenance (pulled from MAME's own
+// driver source, not a guess). None of MAME2003/FBNeo/MAME2010 emulate this
+// hardware at all, so for a title in this list the usual try-every-core
+// fallback dance is pure wasted time (and, worse, a wasted probation crash
+// each try) before it ever reaches the one core that actually can: Flycast.
+// Anything not in this small, curated list still goes through the normal
+// loop unaffected - a newly dumped or unlisted title is never left unrouted,
+// just not fast-tracked.
+static const std::unordered_set<std::string>& NaomiAtomiswaveRomsets()
+{
+	static std::unordered_set<std::string> s_names;
+	static bool s_loaded = false;
+	if (!s_loaded)
+	{
+		s_loaded = true;
+		std::ifstream f("gamedb/naomi_atomiswave.json");
+		if (f)
+		{
+			std::string json((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+			size_t key = json.find("\"shortnames\"");
+			size_t open = (key != std::string::npos) ? json.find('[', key) : std::string::npos;
+			size_t close = (open != std::string::npos) ? json.find(']', open) : std::string::npos;
+			if (open != std::string::npos && close != std::string::npos)
+			{
+				size_t pos = open;
+				while (true)
+				{
+					size_t q1 = json.find('"', pos);
+					if (q1 == std::string::npos || q1 > close) break;
+					size_t q2 = json.find('"', q1 + 1);
+					if (q2 == std::string::npos || q2 > close) break;
+					s_names.insert(json.substr(q1 + 1, q2 - q1 - 1));
+					pos = q2 + 1;
+				}
+			}
+		}
+	}
+	return s_names;
+}
+
 static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 {
 	(void)lpParam;
@@ -2003,6 +2046,23 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			if (std::find(candidate_cores.begin(), candidate_cores.end(), c) == candidate_cores.end() && fs::exists(c))
 			{
 				candidate_cores.push_back(c);
+			}
+		}
+
+		// A known Naomi/Atomiswave title: none of the MAME/FBNeo candidates
+		// above emulate this hardware at all, so trying them first is a
+		// guaranteed, wasted round trip (and a wasted probation crash) before
+		// ever reaching the one core that can. Move Flycast to the front.
+		{
+			std::string stem = fs::path(original_rom_path).stem().string();
+			std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
+			if (NaomiAtomiswaveRomsets().count(stem))
+			{
+				auto it = std::find(candidate_cores.begin(), candidate_cores.end(), std::string("cores/dreamcast.dll"));
+				if (it != candidate_cores.end() && it != candidate_cores.begin())
+				{
+					std::rotate(candidate_cores.begin(), it, it + 1);
+				}
 			}
 		}
 
