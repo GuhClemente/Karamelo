@@ -2410,7 +2410,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		{
 			std::string stem = fs::path(original_rom_path).stem().string();
 			std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
-			if (NaomiAtomiswaveRomsets().count(stem))
+			if (stem == "cvs2gd" || stem == "cvs2gd-chd" || stem == "cvs2mf" || NaomiAtomiswaveRomsets().count(stem))
 			{
 				auto it = std::find(candidate_cores.begin(), candidate_cores.end(), std::string("cores/dreamcast.dll"));
 				if (it != candidate_cores.end() && it != candidate_cores.begin())
@@ -2431,9 +2431,26 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			// as generic Dreamcast content but boots straight to Flycast's
 			// own BIOS dashboard instead of recognising the actual game.
 			// Give it the intact original archive instead.
-			const std::string& load_path =
+			std::string effective_load_path =
 				(cand_dll.find("dreamcast") != std::string::npos && ArchiveIsCompressed(original_rom_path))
 					? original_rom_path : rom_path;
+
+			// Handle Naomi GD-ROM aliases for Flycast (e.g. cvs2gd / cvs2gd-chd -> cvs2mf / cvs2)
+			if (cand_dll.find("dreamcast") != std::string::npos)
+			{
+				std::string stem = fs::path(effective_load_path).stem().string();
+				std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
+				if (stem == "cvs2gd" || stem == "cvs2gd-chd")
+				{
+					fs::path p_dir = fs::path(effective_load_path).parent_path();
+					if (fs::exists(p_dir / "cvs2mf.zip"))
+						effective_load_path = (p_dir / "cvs2mf.zip").string();
+					else if (fs::exists(p_dir / "cvs2.zip"))
+						effective_load_path = (p_dir / "cvs2.zip").string();
+				}
+			}
+
+			const std::string& load_path = effective_load_path;
 
 			CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Tentando core de arcade: %s para '%s'", cand_dll.c_str(), load_path.c_str());
 
