@@ -1,0 +1,20 @@
+﻿==========================================================================
+ DOS - DOSBox Pure
+==========================================================================
+
+Core usado: cores/dosbox_pure.dll
+
+Formatos aceitos nesta pasta:
+  .zip/.7z/.rar contendo a pasta do jogo (executaveis, configs etc.)
+
+BIOS / firmware:
+  Nenhuma BIOS necessaria.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

@@ -1,0 +1,22 @@
+﻿==========================================================================
+ ZXSpectrum - Fuse
+==========================================================================
+
+Core usado: cores/spectrum.dll
+
+Formatos aceitos nesta pasta:
+  .tzx/.tap/.z80/.sna soltos, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nenhuma BIOS necessaria para Spectrum 48K/128K/+2/+3 padrao.
+Clones russos Pentagon/Scorpion precisam de ROMs extras em
+app/bios/fuse/ - nao e o uso normal.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

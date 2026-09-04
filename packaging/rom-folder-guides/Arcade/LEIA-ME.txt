@@ -1,0 +1,27 @@
+﻿==========================================================================
+ Arcade - FinalBurn Neo / MAME 2003 / MAME 2010 / Flycast (Naomi)
+==========================================================================
+
+Core usado: cores/arcade_fbneo.dll, cores/mame2003.dll, cores/mame2010.dll ou cores/dreamcast.dll
+
+Formatos aceitos nesta pasta:
+  Somente .zip/.7z/.rar - o pacote inteiro do romset, exatamente como
+sai do MAME/FBNeo. Nao solte arquivos individuais aqui.
+
+BIOS / firmware:
+  O app testa varios cores em sequencia sozinho ate um aceitar o
+jogo (silencioso - voce nao precisa escolher manualmente). Jogos
+de placa Neo Geo (MVS) usam neogeo.zip (ja presente); jogos Naomi/
+Atomiswave (o app reconhece varios pelo nome do arquivo) vao
+direto pro Flycast, que precisa de naomi.zip/awbios.zip em
+app/bios/dc/ (ja presentes). Cada romset pode ter sua propria
+exigencia de BIOS embutida dentro do proprio .zip.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

@@ -1,0 +1,22 @@
+﻿==========================================================================
+ 3DS - Citra
+==========================================================================
+
+Core usado: cores/3ds.dll
+
+Formatos aceitos nesta pasta:
+  .3ds/.cia soltos, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nao usa BIOS tradicional (emulacao HLE). So precisa de
+app/saves/3DS/Citra/sysdata/aes_keys.txt para decriptar alguns
+jogos comerciais - ja presente.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

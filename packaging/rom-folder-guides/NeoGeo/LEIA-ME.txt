@@ -1,0 +1,24 @@
+﻿==========================================================================
+ NeoGeo - Geolith / NeoCD
+==========================================================================
+
+Core usado: cores/neogeo.dll (cartucho AES/MVS) ou cores/neocd_alt.dll (CD)
+
+Formatos aceitos nesta pasta:
+  .neo soltos, .bin, .zip (AES/MVS); .chd/.cue/.iso/.m3u/.toc (CD,
+vai para o core dedicado NeoCD - o Geolith so reconhece cartucho)
+
+BIOS / firmware:
+  AES/MVS: BIOS presente (neo-epo.bin, uni-bios, etc. em
+app/bios/). CD: BIOS presente em app/bios/neocd/ (subpasta
+obrigatoria - os arquivos soltos direto em app/bios/ nao
+funcionam para o core de CD).
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

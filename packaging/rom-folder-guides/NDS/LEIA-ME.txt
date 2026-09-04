@@ -1,0 +1,22 @@
+﻿==========================================================================
+ NDS - melonDS
+==========================================================================
+
+Core usado: cores/nds.dll
+
+Formatos aceitos nesta pasta:
+  .nds soltos, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  BIOS presente e conferida por MD5 (bios7.bin, bios9.bin,
+firmware.bin). Faltam os arquivos exclusivos de DSi (so importam
+para jogos DSi-only, raros).
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

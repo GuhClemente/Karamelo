@@ -1,0 +1,20 @@
+﻿==========================================================================
+ PlayStation2 - Play!
+==========================================================================
+
+Core usado: cores/ps2.dll
+
+Formatos aceitos nesta pasta:
+  .chd/.cue/.iso/.m3u/.toc, .bin, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nenhuma BIOS necessaria (emulacao HLE).
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

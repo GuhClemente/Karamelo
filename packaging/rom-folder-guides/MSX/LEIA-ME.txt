@@ -1,0 +1,24 @@
+﻿==========================================================================
+ MSX - fMSX
+==========================================================================
+
+Core usado: cores/msx.dll
+
+Formatos aceitos nesta pasta:
+  .mx1/.mx2 soltos (forcam MSX1/MSX2 explicitamente), .rom/.dsk/.cas,
+ou .zip/.7z/.rar
+
+BIOS / firmware:
+  BIOS completa e conferida por MD5 (MSX.ROM, MSX2.ROM+EXT,
+MSX2P.ROM+EXT, mais os opcionais DISK/FMPAC/MSXDOS2/PAINTER/KANJI).
+O app forca o modo MSX1/MSX2 pela extensao do arquivo porque o
+padrao MSX2+ do core vem quebrado nesta build (tela preta).
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

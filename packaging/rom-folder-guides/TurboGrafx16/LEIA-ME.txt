@@ -1,0 +1,22 @@
+﻿==========================================================================
+ TurboGrafx16 - Beetle PCE
+==========================================================================
+
+Core usado: cores/pce.dll
+
+Formatos aceitos nesta pasta:
+  .pce/.sgx soltos (cartucho), .chd/.cue/.iso/.m3u/.toc (CD), ou
+.zip/.7z/.rar
+
+BIOS / firmware:
+  Cartucho roda sem BIOS. CD precisa de syscard3.pce - ja
+presente.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

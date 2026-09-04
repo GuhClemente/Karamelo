@@ -1,0 +1,22 @@
+﻿==========================================================================
+ 3DO - Opera
+==========================================================================
+
+Core usado: cores/3do.dll
+
+Formatos aceitos nesta pasta:
+  .iso/.cue/.chd/.m3u/.toc soltos, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  BLOQUEANTE: falta a BIOS do 3DO (ex: panafz1.bin). Sem ela nenhum
+jogo boota. Veja app/bios/BIOS_NECESSARIOS.txt para a lista completa
+de arquivos aceitos (qualquer variante regional serve).
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

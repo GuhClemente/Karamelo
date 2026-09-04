@@ -1,0 +1,21 @@
+﻿==========================================================================
+ Lynx - Handy
+==========================================================================
+
+Core usado: cores/lynx.dll
+
+Formatos aceitos nesta pasta:
+  .lnx soltos, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  BLOQUEANTE: falta lynxboot.img. Sem ela nenhum jogo boota.
+MD5 esperado em app/bios/BIOS_NECESSARIOS.txt.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

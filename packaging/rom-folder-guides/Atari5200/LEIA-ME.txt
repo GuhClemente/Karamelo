@@ -1,0 +1,23 @@
+﻿==========================================================================
+ Atari5200 - Atari800
+==========================================================================
+
+Core usado: cores/atari5200.dll
+
+Formatos aceitos nesta pasta:
+  .a52 soltos, .bin, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  BLOQUEANTE: faltam os 5 arquivos da BIOS do Atari 5200/8-bit
+(5200.rom, ATARIXL.ROM, ATARIBAS.ROM, ATARIOSA.ROM, ATARIOSB.ROM).
+Sem eles nenhum jogo boota. Lista completa com MD5 em
+app/bios/BIOS_NECESSARIOS.txt.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

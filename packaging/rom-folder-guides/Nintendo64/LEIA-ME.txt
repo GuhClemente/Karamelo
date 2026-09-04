@@ -1,0 +1,25 @@
+﻿==========================================================================
+ Nintendo64 - Gopher64 (padrao) / ParaLLEl N64 / Mupen64Plus-Next
+==========================================================================
+
+Core usado: GetN64CoreDll() - Gopher64, ParaLLEl N64 ou Mupen64Plus-Next,
+trocavel em Video > N64 Core
+
+Formatos aceitos nesta pasta:
+  .z64/.n64/.v64 soltos, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nenhuma BIOS necessaria (boot HLE em todos os tres cores).
+Gopher64 tem um bug conhecido de corrupcao de memoria ao fechar
+a sessao (contido, nao derruba mais o app inteiro, mas pode
+encerrar o jogo sozinho) - troque para ParaLLEl N64 se isso
+incomodar, ao custo de perder o suporte a conquistas.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

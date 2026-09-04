@@ -1,0 +1,24 @@
+﻿==========================================================================
+ Amiga - PUAE
+==========================================================================
+
+Core usado: cores/amiga.dll
+
+Formatos aceitos nesta pasta:
+  .adf/.hdf/.lha soltos (disquete), .iso/.cue/.chd/.m3u/.toc (CD32),
+ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Kickstart de A500 e CD32 ja presentes em app/bios/. Falta o
+Kickstart 3.1 (A1200/A4000, jogos AGA) - sem ele o core cai no
+AROS embutido, entao nunca trava, so pode rodar errado em titulos
+que exigem hardware AGA de verdade.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================
