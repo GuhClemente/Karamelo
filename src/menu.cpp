@@ -355,7 +355,7 @@ static const char *GetArcadeCoreDll(const std::string &file_path = "") {
     std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
 
     // 1. Sega NAOMI / Sammy Atomiswave 3D arcade games -> Flycast
-    if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
+    if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2mf" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
         stem == "mslug6" || stem == "slasho" || stem == "hokuto" || stem == "fotns" ||
         stem == "ikaruga" || stem == "dolphinblue" || stem == "kofnw" || stem == "kofxi" ||
         stem == "ngbc" || stem == "ggx" || stem == "ggxx" || stem == "ggxxac" ||
@@ -1621,6 +1621,18 @@ void PopulateBrowse(const std::string &dirpath) {
         }
 
         if (entry.is_directory()) {
+          // Hide arcade CHD data folders (e.g. cvs2, cvs2mf, sfiii3) from the game list
+          if (dirpath.find("Arcade") != std::string::npos) {
+            bool has_chd = false;
+            std::error_code ec_sub;
+            for (const auto &sub : fs::directory_iterator(entry.path(), ec_sub)) {
+              if (sub.path().extension() == ".chd") {
+                has_chd = true;
+                break;
+              }
+            }
+            if (has_chd) continue;
+          }
           dirs.push_back({filename, ">", true, false, 0});
         } else {
           files.push_back({filename, "", false, false, 0});

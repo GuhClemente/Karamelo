@@ -304,7 +304,7 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 			std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
 
 			// 1. Sega NAOMI / Sammy Atomiswave 3D arcade games -> Flycast
-			if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
+			if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2mf" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
 				stem == "mslug6" || stem == "slasho" || stem == "hokuto" || stem == "fotns" ||
 				stem == "ikaruga" || stem == "dolphinblue" || stem == "kofnw" || stem == "kofxi" ||
 				stem == "ngbc" || stem == "ggx" || stem == "ggxx" || stem == "ggxxac" ||
