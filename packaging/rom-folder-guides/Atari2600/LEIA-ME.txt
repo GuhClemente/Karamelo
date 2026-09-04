@@ -1,0 +1,20 @@
+﻿==========================================================================
+ Atari2600 - Stella
+==========================================================================
+
+Core usado: cores/atari2600.dll
+
+Formatos aceitos nesta pasta:
+  .a26 soltos, .bin, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nenhuma BIOS necessaria.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

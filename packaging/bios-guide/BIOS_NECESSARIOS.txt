@@ -1,0 +1,217 @@
+==========================================================================
+ BIOS NECESSARIAS - MiSTer 4 ALL
+ Lista completa, sistema por sistema, com nome exato de arquivo, MD5
+ esperado (quando documentado pelo core) e onde colocar.
+ Gerado em 2026-09-04. Fonte: documentacao oficial de cada core em
+ docs.libretro.com, cruzada com o que esta de fato presente nesta pasta.
+==========================================================================
+
+Regra geral: quase tudo vai solto dentro de app/bios/ (mesmo nivel deste
+arquivo). As excecoes com subpasta propria estao marcadas abaixo.
+Escolha os arquivos pelo HASH (MD5), nao pelo nome - sets de BIOS trazem
+variantes regionais com nomes parecidos e so uma bate com o que o core
+espera.
+
+--------------------------------------------------------------------------
+BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
+--------------------------------------------------------------------------
+
+[3DO] cores/3do.dll (Opera)
+  Status: FALTANDO
+  Precisa de UM destes (qualquer um serve, sao variantes regionais do
+  mesmo boot ROM):
+    panafz1.bin        MD5 f47264dd47fe30f73ab3c010015c155b
+    panafz10.bin
+    panafz10-norsa.bin
+    panafz10e-anvil.bin
+    panafz10e-anvil-norsa.bin
+    panafz1j.bin
+    panafz1j-norsa.bin
+    goldstar.bin
+    sanyotry.bin
+    3do_arcade_saot.bin
+  Pasta: app/bios/
+
+[Atari5200] cores/atari5200.dll (Atari800)
+  Status: FALTANDO (todos os 5)
+    5200.rom           MD5 281f20ea4320404ec820fb7ec0693b38
+    ATARIXL.ROM        MD5 06daac977823773a3eea3422fd26a703
+    ATARIBAS.ROM       MD5 0bac0c6a50104045d902df4503a4c30b
+    ATARIOSA.ROM       MD5 eb1f32f5d9f382db1bbfb8d7f9cb343a
+    ATARIOSB.ROM       MD5 a3e8d617c95d08031fe1b20d541434b2
+  Pasta: app/bios/
+
+[Lynx] cores/lynx.dll (Handy)
+  Status: FALTANDO
+    lynxboot.img       MD5 fcd403db69f54290b51035d82f835e7b
+  Pasta: app/bios/
+
+[PC-FX] cores/pcfx.dll (Beetle PC-FX)
+  Status: FALTANDO
+    pcfx.rom           MD5 08e36edbea28a017f79f8d4f7ff9b6d7
+  Pasta: app/bios/
+
+--------------------------------------------------------------------------
+JA COMPLETO - confira o MD5 se algum jogo especifico reclamar
+--------------------------------------------------------------------------
+
+[MSX / MSX2 / MSX2+] cores/msx.dll (fMSX)
+  Status: COMPLETO E CONFERIDO (sessao atual)
+    MSX.ROM            MD5 364a1a579fe5cb8dba54519bcfcdac0d   [obrigatorio p/ MSX1]
+    MSX2.ROM           MD5 ec3a01c91f24fbddcbcab0ad301bc9ef   [obrigatorio p/ MSX2]
+    MSX2EXT.ROM        MD5 2183c2aff17cf4297bdb496de78c2e8a   [obrigatorio p/ MSX2]
+    MSX2P.ROM          MD5 847cc025ffae665487940ff2639540e5   [obrigatorio p/ MSX2+ - presente com MD5 diferente, revisao regional, tamanho correto]
+    MSX2PEXT.ROM       MD5 7c8243c71d8f143b2531f01afa6a05dc   [obrigatorio p/ MSX2+ - confere]
+    DISK.ROM                                                  [opcional - disquete/BDOS]
+    FMPAC.ROM          MD5 6f69cc8b5ed761b03afd78000dfb0e19   [opcional - som FM - confere]
+    MSXDOS2.ROM        MD5 6418d091cd6907bbcf940324339e43bb   [opcional - confere]
+    PAINTER.ROM        MD5 403cdea1cbd2bb24fae506941f8f655e   [opcional - confere]
+    KANJI.ROM          MD5 febe8782b466d7c3b16de6d104826b34   [opcional - confere]
+  Pasta: app/bios/
+  Nota: o app forca fmsx_mode para MSX1 ou MSX2 conforme a extensao do
+  arquivo (.mx1/.mx2/outros) - o padrao MSX2+ do core vem quebrado nesta
+  build (tela preta), por isso nunca fica selecionado sozinho.
+
+[Dreamcast / Arcade Naomi] cores/dreamcast.dll (Flycast)
+  Status: COMPLETO E CONFERIDO
+    dc_boot.bin        MD5 e10c53c2f8b90bab96ead2d368858623   [confere]
+  Pasta: app/bios/dc/ (uma copia solta em app/bios/ tambem existe, inofensiva)
+  Tambem presentes: naomi.zip, awbios.zip (BIOS de arcade Naomi/Atomiswave)
+
+[Nintendo DS] cores/nds.dll (melonDS)
+  Status: PRESENTE (opcional, mas recomendado - sem eles o core usa HLE)
+    bios7.bin          MD5 df692a80a5b1bc90728bc3dfc76cd948   [confere]
+    bios9.bin          MD5 a392174eb3e572fed6447e956bde4b25   [confere]
+    firmware.bin                                              [presente, sem hash publicado pelo core]
+  Pasta: app/bios/
+  Falta (so importa para jogos exclusivos de DSi): dsi_bios7.bin,
+  dsi_bios9.bin, dsi_firmware.bin, dsi_nand.bin, dsi_sd_card.bin
+
+[PSP] cores/psp.dll (PPSSPP)
+  Status: PRESENTE (nao e BIOS - sao assets do proprio projeto PPSSPP,
+  open source, nao ROM do PSP real)
+    app/bios/PPSSPP/ com fontes (.ttf, flash0/font/*.pgf), sons de UI,
+    compat.ini, lang/, shaders/, themes/ etc.
+  Pasta: app/bios/PPSSPP/ (arquivos soltos direto ali, sem subpasta extra
+  "assets" no meio - o core procura direto em app/bios/PPSSPP/<arquivo>)
+  Sem isso: o menu interno do PPSSPP fica sem nenhum texto e o jogo trava
+  ao fechar a sessao (corrigido nesta sessao).
+
+[Sega Saturn] cores/saturn.dll (Beetle Saturn)
+  Status: PRESENTE (varias variantes regionais)
+    sega_101.bin, sega_100.bin, mpr-17933.bin, saturn.bin,
+    saturn_bios.bin, saturn_eu.bin, Sega Saturn BIOS (EUR/USA/JAP).bin
+  Pasta: app/bios/
+  So uma dessas bate exatamente com o que o core pede - se um jogo
+  reclamar de BIOS ausente, confira o MD5 da variante da regiao do jogo.
+
+[NeoGeo AES/MVS] cores/neogeo.dll (Geolith)
+  Status: PRESENTE
+    neo-epo.bin, neo-po.bin, sp-1v1_3db8c.bin, front-sp1.bin, top-sp1.bin,
+    japan-j3.bin, asia-s3.rom, uni-bios_*.rom (varias versoes do UniBIOS)
+  Pasta: app/bios/
+  Nota: o core tambem aceita os arquivos empacotados como neogeo.zip/
+  aes.zip - qualquer uma das duas formas funciona.
+
+[NeoGeo CD] cores/neocd_alt.dll (NeoCD)
+  Status: PRESENTE
+    neocd_f.rom, neocd_t.rom, neocd_z.rom, neocd_sf.rom, neocd_st.rom,
+    neocd_sz.rom, uni-bioscd.rom, ng-lo.rom, neocd.bin, neocdz.bin,
+    neodebug.bin
+  Pasta: PRECISA estar em app/bios/neocd/ (uma subpasta). Os .rom soltos
+  direto em app/bios/ NAO funcionam para este core - da erro "No BIOS
+  detected!". Confirme que existe app/bios/neocd/ com copias desses
+  arquivos dentro.
+
+[Mega CD / Sega CD] cores/genesis.dll (Genesis Plus GX)
+  Status: PRESENTE
+    bios_CD_U.bin (USA), bios_CD_E.bin (Europa), bios_CD_J.bin (Japao)
+  Pasta: app/bios/
+
+[TurboGrafx-CD / PC Engine CD] cores/pce.dll (Beetle PCE)
+  Status: PRESENTE
+    syscard3.pce
+  Pasta: app/bios/
+  Necessario so para jogos em CD; cartucho roda sem.
+
+[PlayStation] cores/psx.dll (Beetle PSX)
+  Status: PRESENTE PARA NTSC-U E PAL, FALTA NTSC-J
+    scph5501.bin (NTSC-U)   - presente
+    scph5502.bin (PAL)      - presente
+    scph5500.bin (NTSC-J)   - FALTANDO
+  Pasta: app/bios/
+  Um jogo japones sem o scph5500.bin ainda tenta bootar com outra regiao
+  e o core avisa "Firmware is missing: scph5500.bin" - vale completar se
+  for jogar titulos japoneses.
+
+[ColecoVision] cores/coleco.dll
+  Status: PRESENTE E CONFERIDO
+    coleco.rom         MD5 2c66f5911e5b42b8ebe113403548eee7   [confere]
+  Pasta: app/bios/
+
+--------------------------------------------------------------------------
+OPCIONAL - a maioria dos jogos funciona sem, so amplia compatibilidade
+--------------------------------------------------------------------------
+
+[Amiga] cores/amiga.dll (PUAE)
+  Status: PARCIAL - A500 e CD32 cobertos, falta AGA
+    kick34005.A500 (Kickstart 1.3)   - presente
+    kick40060.CD32 (Kickstart CD32)  - presente
+    Falta: Kickstart 3.1 para A1200/A4000 (jogos AGA) - o core tem um
+    fallback AROS embutido, entao nunca trava, so pode rodar errado em
+    jogos que exigem hardware AGA de verdade.
+  Pasta: app/bios/
+
+[Master System / Game Gear] cores/sms.dll (Gearsystem)
+  Status: FALTANDO (opcional)
+    bios_U.sms, bios_E.sms, bios_J.sms, bios.gg
+  Pasta: app/bios/
+  A maioria dos jogos boota sem BIOS - so afeta o logo de abertura e
+  pouquissimos jogos que dependem dela.
+
+[Atari 7800] cores/atari7800.dll (ProSystem)
+  Status: FALTANDO (opcional)
+    7800 BIOS (U).rom     MD5 0763f1ffb006ddbe32e52d497ee848ae
+  Pasta: app/bios/
+
+[Commodore 64] cores/c64.dll (VICE)
+  Status: nao precisa de nada - tudo embutido no core.
+  Opcional: JiffyDOS (JiffyDOS_C64.bin, JiffyDOS_1541-II.bin) em
+  app/bios/vice/ - so acelera o disco, nao e necessario pra jogar.
+
+[ZX Spectrum] cores/spectrum.dll (Fuse)
+  Status: nao precisa de nada para Spectrum 48K/128K/+2/+3 padrao.
+  So precisa de ROMs extras (em app/bios/fuse/) se for emular os clones
+  russos Pentagon ou Scorpion - nao e o caso normal de uso.
+
+[Arcade - FinalBurn Neo] cores/arcade_fbneo.dll
+  Status: PARCIAL
+  neogeo.zip (compartilhado com o NeoGeo AES/MVS) cobre os jogos de
+  arcade baseados em placa Neo Geo (MVS). Outros drivers de arcade tem
+  BIOS proprias empacotadas dentro do proprio romset do jogo (o .zip do
+  jogo ja traz o que precisa) - nao ha uma lista fixa aqui, depende de
+  qual jogo for adicionado.
+
+--------------------------------------------------------------------------
+NAO PRECISA DE BIOS NENHUMA (nada a fazer)
+--------------------------------------------------------------------------
+32X, Atari 2600, Nintendo 64 (todos os 3 cores: Gopher64/ParaLLEl/
+Mupen64Plus-Next), DOSBox Pure, Jaguar, Neo Geo Pocket, PlayStation 2,
+WonderSwan, Genesis/Mega Drive (cartucho), NES, SNES, Game Boy/Color,
+Game Boy Advance, MAME 2003/2010 (sem BIOS fixa de sistema - depende do
+romset de cada jogo).
+
+[GameCube] cores/gamecube.dll (Dolphin)
+  Status: PRESENTE - pacote de dados completo do Dolphin
+  Pasta: app/bios/dolphin-emu/Sys/ (nao e uma BIOS unica, e todo o
+  conjunto de arquivos de sistema que o Dolphin precisa - ja instalado)
+
+[Nintendo 3DS] cores/3ds.dll (Citra)
+  Status: PRESENTE - nao usa BIOS tradicional (e HLE), so precisa de
+  aes_keys.txt para decriptar alguns jogos comerciais.
+  Pasta: app/saves/3DS/Citra/sysdata/aes_keys.txt
+
+==========================================================================
+Como confirmar um MD5 no Windows (PowerShell):
+  Get-FileHash "app\bios\NOMEDOARQUIVO" -Algorithm MD5
+==========================================================================

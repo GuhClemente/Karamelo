@@ -1,0 +1,21 @@
+﻿==========================================================================
+ GameCube - Dolphin
+==========================================================================
+
+Core usado: cores/gamecube.dll
+
+Formatos aceitos nesta pasta:
+  .gcm/.rvz/.wbfs soltos, .iso/.cue/.chd/.m3u/.toc, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Pacote de dados do Dolphin ja instalado em
+app/bios/dolphin-emu/Sys/. Core ainda considerado instavel.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

@@ -1,0 +1,21 @@
+﻿==========================================================================
+ Dreamcast - Flycast
+==========================================================================
+
+Core usado: cores/dreamcast.dll
+
+Formatos aceitos nesta pasta:
+  .gdi/.cdi soltos, .chd/.cue/.iso/.m3u/.toc, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  BIOS presente e conferida por MD5 (dc_boot.bin, em
+app/bios/dc/).
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

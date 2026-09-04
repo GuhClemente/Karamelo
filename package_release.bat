@@ -47,101 +47,14 @@ mkdir "%DIST_DIR%\screenshots"
 mkdir "%DIST_DIR%\Config"
 
 rem ---------------------------------------------------------------
-rem Create BIOS directory with per-system subfolders and guides
+rem Create BIOS directory with the real, per-system, MD5-verified guide
+rem (packaging\bios-guide\BIOS_NECESSARIOS.txt is the tracked source of
+rem truth - edit it there, not here, next time a core's BIOS requirements
+rem change. It lives outside bios/roms because .gitignore blanket-ignores
+rem any directory literally named "bios" or "roms" anywhere in the repo.)
 rem ---------------------------------------------------------------
 mkdir "%DIST_DIR%\bios"
-(
-echo =====================================================================
-echo   MiSTer 4 ALL - Guia de BIOS por Sistema
-echo =====================================================================
-echo.
-echo Cada core procura BIOS nesta pasta "bios/". Alguns sistemas precisam
-echo de arquivos de BIOS especificos para funcionar. Coloque-os aqui.
-echo.
-echo IMPORTANTE: Os nomes dos arquivos devem ser EXATOS conforme listado.
-echo.
-echo === SISTEMAS QUE PRECISAM DE BIOS ===
-echo.
-echo  PlayStation 1:
-echo    - scph5500.bin  ^(Japao^)
-echo    - scph5501.bin  ^(America^)
-echo    - scph5502.bin  ^(Europa^)
-echo.
-echo  PlayStation 2:
-echo    - ps2-0230a-20080220.bin  ^(ou outra BIOS PS2 compativel^)
-echo.
-echo  Sega Saturn:
-echo    - saturn_bios.bin
-echo    - sega_101.bin  ^(Japao^)
-echo    - mpr-17933.bin ^(America/Europa^)
-echo.
-echo  Sega Dreamcast:
-echo    - dc_boot.bin   ^(BIOS Dreamcast^)
-echo    - dc_flash.bin  ^(Flash ROM^)
-echo.
-echo  Sega Mega CD:
-echo    - bios_CD_U.bin ^(America^)
-echo    - bios_CD_E.bin ^(Europa^)
-echo    - bios_CD_J.bin ^(Japao^)
-echo.
-echo  Neo Geo ^(AES/MVS^):
-echo    - neogeo.zip    ^(BIOS unificada^)
-echo.
-echo  PC Engine CD / TurboGrafx-CD:
-echo    - syscard3.pce
-echo.
-echo  3DO:
-echo    - panafz1.bin  ^(Panasonic FZ-1^)
-echo    - panafz10.bin ^(Panasonic FZ-10^)
-echo    - goldstar.bin ^(GoldStar GDO-101M^)
-echo.
-echo  Game Boy Advance ^(Opcional^):
-echo    - gba_bios.bin
-echo.
-echo  Nintendo DS:
-echo    - bios7.bin  ^(ARM7 BIOS^)
-echo    - bios9.bin  ^(ARM9 BIOS^)
-echo    - firmware.bin
-echo.
-echo  Nintendo 3DS:
-echo    - Consulte a documentacao do Citra para o setup de System Archives.
-echo.
-echo  PSP ^(Opcional^):
-echo    - ppge_atlas.zim
-echo.
-echo  Atari 5200:
-echo    - 5200.rom
-echo.
-echo  Atari 7800:
-echo    - 7800 BIOS ^(U^).rom
-echo.
-echo  Atari Lynx:
-echo    - lynxboot.img
-echo.
-echo  ColecoVision:
-echo    - colecovision.rom
-echo.
-echo  MSX:
-echo    - Machines/ ^(pasta do openMSX com BIOS^)
-echo.
-echo  Amiga:
-echo    - kick34005.A500   ^(Amiga 500^)
-echo    - kick40068.A1200  ^(Amiga 1200^)
-echo.
-echo  PC-FX:
-echo    - pcfx.rom
-echo.
-echo  GameCube:
-echo    - IPL.bin ^(BIOS GameCube - opcional para Dolphin^)
-echo.
-echo === SISTEMAS QUE NAO PRECISAM DE BIOS ===
-echo.
-echo  NES, SNES, Nintendo 64, Game Boy, GBA*, Genesis, Master System,
-echo  32X, GBA, Neo Geo Pocket, WonderSwan, ZX Spectrum, C64, DOS
-echo  ^(* GBA funciona sem BIOS mas a experiencia e melhor com ela^)
-echo.
-echo =====================================================================
-) > "%DIST_DIR%\bios\LEIA_BIOS_AQUI.txt"
+copy /Y "%~dp0packaging\bios-guide\BIOS_NECESSARIOS.txt" "%DIST_DIR%\bios\BIOS_NECESSARIOS.txt" >nul
 
 rem ---------------------------------------------------------------
 rem Create all 35 ROM system folders with user instructions
@@ -160,7 +73,7 @@ for %%S in (
     DOS MSX Amiga C64 ZXSpectrum
 ) do (
     mkdir "%ROMS_DIR%\%%S"
-    echo Coloque seus jogos proprios do %%S nesta pasta. > "%ROMS_DIR%\%%S\COLOQUE_SUAS_ROMS_AQUI.txt"
+    copy /Y "%~dp0packaging\rom-folder-guides\%%S\LEIA-ME.txt" "%ROMS_DIR%\%%S\LEIA-ME.txt" >nul 2>&1
 )
 
 rem 3. Copy binaries and assets (Engines and wallpapers only - NO ROMs or BIOSes)

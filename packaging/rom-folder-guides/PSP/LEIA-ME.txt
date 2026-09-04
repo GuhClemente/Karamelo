@@ -1,0 +1,23 @@
+﻿==========================================================================
+ PSP - PPSSPP
+==========================================================================
+
+Core usado: cores/psp.dll
+
+Formatos aceitos nesta pasta:
+  .cso soltos, .chd/.cue/.iso/.m3u/.toc, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nao usa BIOS - so precisa dos assets do proprio projeto PPSSPP
+(fontes, sons de UI) em app/bios/PPSSPP/, ja instalados. Sem eles
+o menu interno do PPSSPP fica sem texto e a sessao trava ao
+fechar.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

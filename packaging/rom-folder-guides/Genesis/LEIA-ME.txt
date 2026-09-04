@@ -1,0 +1,21 @@
+﻿==========================================================================
+ Genesis - Genesis Plus GX
+==========================================================================
+
+Core usado: cores/genesis.dll
+
+Formatos aceitos nesta pasta:
+  .md/.gen soltos, .bin, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nenhuma BIOS necessaria para cartucho. Mega CD e uma pasta
+separada (MegaCD/) e precisa de BIOS - veja aquela pasta.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

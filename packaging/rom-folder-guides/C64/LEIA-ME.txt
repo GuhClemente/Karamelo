@@ -1,0 +1,20 @@
+﻿==========================================================================
+ C64 - VICE
+==========================================================================
+
+Core usado: cores/c64.dll
+
+Formatos aceitos nesta pasta:
+  .d64/.t64/.prg/.crt soltos, ou .zip/.7z/.rar
+
+BIOS / firmware:
+  Nenhuma BIOS necessaria - tudo embutido no core.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================
