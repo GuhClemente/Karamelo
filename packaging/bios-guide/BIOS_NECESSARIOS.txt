@@ -144,6 +144,19 @@ JA COMPLETO - confira o MD5 se algum jogo especifico reclamar
   e o core avisa "Firmware is missing: scph5500.bin" - vale completar se
   for jogar titulos japoneses.
 
+[PlayStation 2] cores/ps2.dll (LRPS2 / PCSX2)
+  Status: PRESENTE E CONFERIDO (sessao atual)
+    SCPH-70012_BIOS_V12_USA_200.BIN   MD5 d333558cc14561c1fdc334c75d5f37b7   [4.194.304 bytes - 4MB]
+    SCPH-70012_BIOS_V12_USA_200.mec   MD5 3faf7c064a4984f53e2ef5e80ed543bc   [configuracao MEC]
+    SCPH-70012_BIOS_V12_USA_200.nvm   MD5 116b0e0f3d0ecef3997cf53266fa27a1   [memoria NVRAM persistente]
+    GameIndex.yaml                    (base de dados de compatibilidade e correcoes do PCSX2)
+  Pasta: pode ficar solto direto em app/bios/ ou bios/, ou na subpasta app/bios/pcsx2/bios/
+  (o MiSTer 4 ALL detecta automaticamente qualquer BIOS de PS2 solta na pasta bios,
+  sincroniza para a subpasta do PCSX2 e repassa para o core sem necessidade de configuracao manual).
+  Nota: O core oficial PCSX2 / LRPS2 utiliza BIOS real para emulacao precisa,
+  permitindo mapeamento integral de 32MB de memoria RAM para RetroAchievements
+  (compativel com rcheevos) e aceleracao por hardware OpenGL a 60 FPS cravados.
+
 [ColecoVision] cores/coleco.dll
   Status: PRESENTE E CONFERIDO
     coleco.rom         MD5 2c66f5911e5b42b8ebe113403548eee7   [confere]
@@ -196,10 +209,9 @@ OPCIONAL - a maioria dos jogos funciona sem, so amplia compatibilidade
 NAO PRECISA DE BIOS NENHUMA (nada a fazer)
 --------------------------------------------------------------------------
 32X, Atari 2600, Nintendo 64 (todos os 3 cores: Gopher64/ParaLLEl/
-Mupen64Plus-Next), DOSBox Pure, Jaguar, Neo Geo Pocket, PlayStation 2,
-WonderSwan, Genesis/Mega Drive (cartucho), NES, SNES, Game Boy/Color,
-Game Boy Advance, MAME 2003/2010 (sem BIOS fixa de sistema - depende do
-romset de cada jogo).
+Mupen64Plus-Next), DOSBox Pure, Jaguar, Neo Geo Pocket, WonderSwan,
+Genesis/Mega Drive (cartucho), NES, SNES, Game Boy/Color, Game Boy Advance,
+MAME 2003/2010 (sem BIOS fixa de sistema - depende do romset de cada jogo).
 
 [GameCube] cores/gamecube.dll (Dolphin)
   Status: PRESENTE - pacote de dados completo do Dolphin

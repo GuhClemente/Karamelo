@@ -35,7 +35,7 @@ o do log é sempre o real.
 | `pce.dll` | Beetle PCE | PC Engine / TurboGrafx |
 | `pcfx.dll` | Beetle PC-FX | PC-FX |
 | `psx.dll` | Beetle PSX | PlayStation |
-| `ps2.dll` | Play! | PlayStation 2 |
+| `ps2.dll` | LRPS2 (PCSX2) / Play! (`ps2_play.dll`) | PlayStation 2 |
 | `psp.dll` | PPSSPP | PlayStation Portable |
 | `saturn.dll` | Beetle Saturn | Sega Saturn |
 | `dreamcast.dll` | Flycast | Dreamcast, Naomi, Atomiswave |

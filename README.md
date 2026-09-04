@@ -32,7 +32,7 @@ A tabela abaixo é a mesma lógica usada pelo próprio app para decidir qual cor
 | Nintendo 3DS | `3ds.dll` | Citra | `.3ds` `.cia`, `.zip` `.7z` `.rar` |
 | GameCube | `gamecube.dll` | Dolphin | `.gcm` `.rvz` `.wbfs`, `.iso` `.cue` `.chd` `.m3u` `.toc`, `.zip` `.7z` `.rar` |
 | PlayStation | `psx.dll` | Beetle PSX | `.chd` `.cue` `.iso` `.m3u` `.pbp` `.toc`, `.zip` `.7z` `.rar` |
-| PlayStation 2 | `ps2.dll` | Play! | `.chd` `.cue` `.iso` `.m3u` `.toc` `.bin`, `.zip` `.7z` `.rar` |
+| PlayStation 2 | `ps2.dll` | LRPS2 (PCSX2) / Play! (`ps2_play.dll`) | `.chd` `.cue` `.iso` `.m3u` `.toc` `.bin`, `.zip` `.7z` `.rar` |
 | PSP | `psp.dll` | PPSSPP | `.cso`, `.chd` `.cue` `.iso` `.m3u` `.toc`, `.zip` `.7z` `.rar` |
 | Sega Saturn | `saturn.dll` | Beetle Saturn | `.chd` `.cue` `.iso` `.m3u` `.toc` `.bin`, `.zip` `.7z` `.rar` |
 | Sega Dreamcast | `dreamcast.dll` | Flycast | `.gdi` `.cdi`, `.chd` `.cue` `.iso` `.m3u` `.toc`, `.zip` `.7z` `.rar` |
@@ -157,10 +157,10 @@ desatualizada dela que motivou esta reescrita do README.
 
 Resumo rápido: **3DO, Atari 5200, Atari Lynx e PC-FX não rodam nenhum jogo**
 sem a BIOS correspondente. MSX, Dreamcast/Naomi, NeoGeo (AES/MVS/CD), Mega CD,
-TurboGrafx-CD, Saturn, NDS, PSP e ColecoVision já têm a BIOS completa e
+TurboGrafx-CD, Saturn, NDS, PSP, ColecoVision e **PlayStation 2 (PCSX2/LRPS2 com BIOS real SCPH-70012)** já têm a BIOS completa e
 conferida por MD5 neste checkout. PlayStation tem NTSC-U e PAL, falta NTSC-J.
 Amiga tem Kickstart de A500/CD32, falta o de A1200 (jogos AGA). O resto
-(NES, SNES, N64, Game Boy, GBA, Genesis, PS2, WonderSwan, Neo Geo Pocket,
+(NES, SNES, N64, Game Boy, GBA, Genesis, WonderSwan, Neo Geo Pocket,
 Jaguar, C64, ZX Spectrum padrão, 32X, Atari 2600, DOSBox) não precisa de
 nada.
 
