@@ -52,7 +52,7 @@ echo.
 echo [2/2] Enviando pacote (v%APP_VER%), executavel e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
 echo.
 
-scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 if errorlevel 1 (
     echo.
     echo [AVISO] Falha no upload via SCP - verifique se a chave SSH esta configurada.
@@ -61,6 +61,10 @@ if errorlevel 1 (
     echo   - dist\MiSTer_4_ALL.exe
     echo   - %LOCAL_ZIP%
     echo.
+) else (
+    echo.
+    echo Sincronizando com containers do Coolify e ajustando permissoes...
+    ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "chmod +x %REMOTE_DIR%fix_server.sh && %REMOTE_DIR%fix_server.sh"
 )
 
 rem -------------------------------------------------------------

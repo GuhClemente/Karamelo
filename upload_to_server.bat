@@ -36,12 +36,15 @@ echo   - %LOCAL_ZIP%
 echo   - %LOCAL_EXE%
 echo   - %LOCAL_JSON%
 echo.
-scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 
 if errorlevel 0 (
     echo.
+    echo Sincronizando com containers do Coolify e ajustando permissoes...
+    ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "chmod +x %REMOTE_DIR%fix_server.sh && %REMOTE_DIR%fix_server.sh"
+    echo.
     echo =======================================================
-    echo   UPLOAD CONCLUIDO COM SUCESSO!
+    echo   UPLOAD E PUBLICACAO CONCLUIDOS COM SUCESSO!
     echo =======================================================
     echo   Downloads disponiveis em:
     echo   - https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip

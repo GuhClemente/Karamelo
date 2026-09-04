@@ -5,7 +5,7 @@ echo "Encontrado em:"
 echo "$TARGETS"
 
 echo ""
-echo "=== 2. Copiando v0.9.1 para os mesmos locais ==="
+echo "=== 2. Copiando v0.9.1 para os mesmos locais no host ==="
 for file in $TARGETS; do
     dir=$(dirname "$file")
     echo "Copiando para $dir..."
@@ -18,21 +18,29 @@ for file in $TARGETS; do
 done
 
 echo ""
-echo "=== 3. Injetando diretamente nos containers Docker ==="
+echo "=== 3. Injetando diretamente nos containers Docker do Coolify ==="
 for c in $(docker ps -q); do
     cname=$(docker inspect -f '{{.Name}}' "$c")
-    docker cp /data/downloads/MiSTer_4_ALL_v0.9.1_Win64.zip "$c:/app/public/downloads/" 2>/dev/null && echo " -> Injetado no container $cname (/app/public/downloads/)" || true
+    echo "Container: $cname"
+    docker exec "$c" mkdir -p /app/public/downloads 2>/dev/null || true
+    docker exec "$c" mkdir -p /app/.next/standalone/public/downloads 2>/dev/null || true
+    
+    docker cp /data/downloads/MiSTer_4_ALL_v0.9.1_Win64.zip "$c:/app/public/downloads/" 2>/dev/null && echo " -> Copiado para $cname:/app/public/downloads/" || true
     docker cp /data/downloads/MiSTer_4_ALL.exe "$c:/app/public/downloads/" 2>/dev/null || true
     docker cp /data/downloads/version.json "$c:/app/public/downloads/" 2>/dev/null || true
+    
+    docker cp /data/downloads/MiSTer_4_ALL_v0.9.1_Win64.zip "$c:/app/.next/standalone/public/downloads/" 2>/dev/null || true
+    docker cp /data/downloads/MiSTer_4_ALL.exe "$c:/app/.next/standalone/public/downloads/" 2>/dev/null || true
+    docker cp /data/downloads/version.json "$c:/app/.next/standalone/public/downloads/" 2>/dev/null || true
+    
+    docker exec "$c" chmod -R 755 /app/public/downloads 2>/dev/null || true
+    docker exec "$c" chmod -R 755 /app/.next/standalone/public/downloads 2>/dev/null || true
 done
 
 chmod -R 755 /data/downloads/
 echo ""
-echo "=== 4. Teste de presenca do arquivo ==="
-for file in $TARGETS; do
-    dir=$(dirname "$file")
-    ls -lh "$dir/MiSTer_4_ALL_v0.9.1_Win64.zip"
-done
+echo "=== 4. Teste de presenca dos arquivos ==="
+ls -lh /data/downloads/MiSTer_4_ALL_v0.9.1_Win64.zip
 
 echo ""
 echo "=== TUDO PRONTO! ==="
