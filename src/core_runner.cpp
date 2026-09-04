@@ -371,6 +371,7 @@ static int16_t  g_hist_r[4] = { 0, 0, 0, 0 };
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
+static bool          s_loaded_core_is_pcsx2 = false;
 
 // Resampler rate-control state. This used to live as function-local statics
 // inside SendAudioSamples, which meant a lock from one game's audio survived
@@ -406,6 +407,15 @@ static void ResetAudioRateController()
 	s_trim_active = true;
 	s_stable_time = 0.0;
 	s_tempo_last_time.QuadPart = 0;
+
+	// PCSX2 has an internal SPU2 engine that produces clean 48000 Hz.
+	// When running output at 48000 Hz, pre-lock step at 1.0 to eliminate initial drift and stutter.
+	if (s_loaded_core_is_pcsx2 && g_output_sample_rate == 48000)
+	{
+		s_locked_step = 1.0;
+		s_step = 1.0;
+		s_trim_active = false;
+	}
 }
 
 // Queries the default render device's shared-mode mix format once, so
@@ -598,6 +608,7 @@ static void InitAudio(int sample_rate)
 	// game takes effect without restarting the app.
 	{
 		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
+		if (s_loaded_core_is_pcsx2 && want < 20) want = 20; // 20 buffers = ~213ms headroom for PCSX2 multi-threading
 		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
 		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
@@ -810,7 +821,8 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		// Too empty pads with silence; too full discards the excess, which is
 		// stale latency nobody wants to hear anyway.
 		const LONG seed = (LONG)target_fill;
-		if (occupancy < seed / 2 || occupancy > seed * 2)
+		const LONG min_thresh = s_loaded_core_is_pcsx2 ? (SAMPLES_PER_BUFFER * 2) : (seed / 3);
+		if (occupancy < min_thresh || occupancy > seed * 3)
 		{
 			// Re-read: the audio thread has been draining since the snapshot
 			// above, so the stale value would seed us behind the reader.
@@ -1417,6 +1429,14 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "pcsx2_fastmem") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_mtvu") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_instant_vu1") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_fastcdvd") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_preload_frame_data") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_blending_accuracy") == 0) var->value = "Basic";
+			else if (strcmp(var->key, "pcsx2_gpu_palette_conversion") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_enable_hw_hacks") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_auto_flush") == 0) var->value = "disabled";
+			else if (strcmp(var->key, "pcsx2_ee_cycle_rate") == 0) var->value = "0";
+			else if (strcmp(var->key, "pcsx2_ee_cycle_skip") == 0) var->value = "0";
 
 			// If no explicit override matched: hand back what the core itself declared as default.
 			else
@@ -1652,11 +1672,9 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 		// of being rewritten as shaders.
 		if (!HwReadPixels(dst_fb, width, height)) return;
 
-		// 480i / 448i Motion-Adaptive Deinterlacing for PS2 (Play! core).
-		// PS2 GS renders odd/even interlaced fields into the 448-line frame.
-		// By blending alternate scanlines with the previous field, we achieve full vertical stability
-		// (zero shaking/vibrating) while eliminating combing artifacts on fonts and text boxes.
-		if (height == 448 && width >= 512)
+		// 480i / 448i Motion-Adaptive Deinterlacing for PS2 (Play! core only).
+		// PCSX2 handles hardware deinterlacing natively in its OpenGL GS pipeline.
+		if (!s_loaded_core_is_pcsx2 && height == 448 && width >= 512)
 		{
 			if (g_deinterlace_have_prev)
 			{
@@ -2714,6 +2732,9 @@ static bool CoreLoad(const char* core_dll_path)
 		return false;
 	}
 
+	s_loaded_core_is_pcsx2 = (strstr(core_dll_path, "pcsx2") != NULL) ||
+	                         (strstr(core_dll_path, "ps2") != NULL && strstr(core_dll_path, "play") == NULL);
+
 	p_retro_init = (retro_init_t)GetProcAddress(h_core_dll, "retro_init");
 	p_retro_deinit = (retro_deinit_t)GetProcAddress(h_core_dll, "retro_deinit");
 	p_retro_get_system_info = (retro_get_system_info_t)GetProcAddress(h_core_dll, "retro_get_system_info");
@@ -3055,6 +3076,7 @@ static void CoreUnload()
 	}
 
 	ResetCoreFunctionPointers();
+	s_loaded_core_is_pcsx2 = false;
 
 	if (audio_thread_running)
 	{
