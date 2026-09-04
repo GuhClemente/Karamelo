@@ -152,6 +152,15 @@ static const char *kNdsHybridVals[] = {"Bottom", "Top", "Duplicate"};
 static const char *kNdsHybridNames[] = {"Inferior", "Superior", "Duplicar"};
 static const int kNdsHybridCount = 3;
 
+// citra_layout_option, verbatim from the core's own declaration.
+static const char *kCitraLayoutVals[] = {"Default Top-Bottom Screen",
+                                         "Single Screen Only",
+                                         "Large Screen, Small Screen",
+                                         "Side by Side"};
+static const char *kCitraLayoutNames[] = {"Cima/Baixo", "So Uma Tela",
+                                          "Grande/Peq", "Lado a Lado"};
+static const int kCitraLayoutCount = 4;
+
 static int setting_wallpaper =
     1; // 0=None, 1=Static Noise, 2=Parallax Stars, 3=Cyber Grid
 static bool setting_fullscreen = false;
@@ -186,6 +195,7 @@ static int setting_sms_fm = 0; // 0=auto, 1=desligado, 2=ligado
 static int setting_nds_layout = 0;
 static int setting_nds_gap = 0;
 static int setting_nds_hybrid = 0;
+static int setting_citra_layout = 0;
 
 // Filled in by PopulateMainMenu from the list it actually builds, so the
 // About page can never disagree with the menu the way it used to.
@@ -221,6 +231,8 @@ static void ApplyPersistedCoreOptions() {
   // RETRO_DEVICE_POINTER, an absolute position, and only "Touch" reads that.
   // On the default the stylus did nothing at all.
   CoreSetOption("melonds_touch_mode", "Touch");
+
+  CoreSetOption("citra_layout_option", kCitraLayoutVals[setting_citra_layout]);
 
   const char *onoff[] = {"disabled", "enabled"};
   CoreSetOption("genesis_plus_gx_cd_precache", onoff[setting_cd_precache]);
@@ -830,6 +842,13 @@ void PopulateMainMenu() {
                          false, false, 512});
     }
 
+    // Same deal as the DS: two screens, layout is a preference. Citra
+    // exposes it as a hidden keyboard hotkey (C) with no menu entry at all.
+    if (core_name.find("Nintendo 3DS") != std::string::npos) {
+      items.push_back({"Layout Telas", kCitraLayoutNames[setting_citra_layout],
+                       false, false, 515});
+    }
+
     // Mega CD load times are long because the core emulates a 1x drive.
     // Only meaningful for a disc: the same core runs Genesis cartridges.
     if (core_name.find("Genesis") != std::string::npos && CoreIsDiscGame()) {
@@ -1091,6 +1110,7 @@ static void ResetAllSettingsToDefault() {
   setting_nds_layout = 0;
   setting_nds_gap = 0;
   setting_nds_hybrid = 0;
+  setting_citra_layout = 0;
   setting_cd_precache = 0;
   setting_cd_latency = 0;
   neo_sys = 0;
@@ -1712,6 +1732,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "nds_layout", setting_nds_layout);
   AppendSetting(out, "nds_gap", setting_nds_gap);
   AppendSetting(out, "nds_hybrid", setting_nds_hybrid);
+  AppendSetting(out, "citra_layout", setting_citra_layout);
   AppendSetting(out, "cd_precache", setting_cd_precache);
   AppendSetting(out, "cd_latency", setting_cd_latency);
   AppendSetting(out, "volume", CoreGetVolume());
@@ -1824,6 +1845,8 @@ static void MenuLoadSettings() {
       setting_nds_gap = ClampInt(iv, 0, kNdsGapCount - 1);
     else if (!strcmp(key, "nds_hybrid"))
       setting_nds_hybrid = ClampInt(iv, 0, kNdsHybridCount - 1);
+    else if (!strcmp(key, "citra_layout"))
+      setting_citra_layout = ClampInt(iv, 0, kCitraLayoutCount - 1);
     else if (!strcmp(key, "cd_precache"))
       setting_cd_precache = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "cd_latency"))
@@ -2245,6 +2268,18 @@ static void MenuProcessKeyImpl(MenuKey key) {
       char msg[64];
       snprintf(msg, sizeof(msg), "TELA PEQUENA: %s",
                kNdsHybridNames[setting_nds_hybrid]);
+      CoreSetToast(msg, 120);
+      PopulateMainMenu();
+      selected_idx = cur;
+    } else if (item.action_id == 515) // 3DS screen layout
+    {
+      int cur = selected_idx;
+      setting_citra_layout =
+          (setting_citra_layout + delta + kCitraLayoutCount) % kCitraLayoutCount;
+      CoreSetOption("citra_layout_option", kCitraLayoutVals[setting_citra_layout]);
+      char msg[64];
+      snprintf(msg, sizeof(msg), "LAYOUT: %s",
+               kCitraLayoutNames[setting_citra_layout]);
       CoreSetToast(msg, 120);
       PopulateMainMenu();
       selected_idx = cur;
