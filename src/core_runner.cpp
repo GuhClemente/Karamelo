@@ -2017,9 +2017,26 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			return 0;
 		}
 
-		if (CoreLoad(core_dll.c_str()) && CoreLoadGame(rom_path.c_str(), false))
+		if (CoreLoad(core_dll.c_str()))
 		{
-			loaded = true;
+			// citra_touch_touchscreen defaults to "disabled" (first of
+			// disabled|enabled) - the core's own conservative default for a
+			// platform that might have no pointer device at all. We always
+			// feed real touch/mouse position through CoreSetPointer()
+			// (PollMouseStylus in main_win32.cpp), so leaving this at the
+			// core's default meant every click on the touch screen was
+			// silently ignored. citra_render_touchscreen defaults off the
+			// same way, hiding the touch-screen cursor entirely.
+			if (core_dll.find("3ds.dll") != std::string::npos)
+			{
+				CoreSetOption("citra_touch_touchscreen", "enabled");
+				CoreSetOption("citra_render_touchscreen", "enabled");
+			}
+
+			if (CoreLoadGame(rom_path.c_str(), false))
+			{
+				loaded = true;
+			}
 		}
 	}
 
