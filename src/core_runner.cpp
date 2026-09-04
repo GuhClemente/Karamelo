@@ -2028,11 +2028,41 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 				// Suppress toast unless all candidates have failed
 				if (CoreLoadGame(load_path.c_str(), !is_last_candidate))
 				{
-					core_dll = cand_dll;
-					rom_path = load_path;
-					loaded = true;
-					CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Sucesso no carregamento de arcade com: %s", cand_dll.c_str());
-					break;
+					// retro_load_game() returning true only means the core
+					// accepted the file - not that the content actually runs.
+					// A romset built for a different driver revision can boot
+					// far enough to say yes and then fault a moment later once
+					// real emulation starts (confirmed in the field: MAME2003
+					// loaded a Mortal Kombat dump clean, then hit "op-code
+					// execute on mapped I/O" and froze). Run it unthrottled
+					// for a couple of probation seconds before committing -
+					// a crash in that window is treated the same as a load
+					// failure and the loop moves on to the next candidate,
+					// instead of leaving the player looking at a dead game
+					// with no indication anything else was ever available.
+					bool probation_ok = true;
+					const int kProbationFrames = 120;
+					for (int pf = 0; pf < kProbationFrames; pf++)
+					{
+						FrameRunResult pr = RunOneFrameGuarded();
+						if (!pr.ok)
+						{
+							CoreLogPrintf(RETRO_LOG_ERROR,
+								"[CoreRunner] %s travou no periodo de teste (frame %d/%d) apos carregar '%s'; tentando proximo core",
+								cand_dll.c_str(), pf, kProbationFrames, load_path.c_str());
+							probation_ok = false;
+							break;
+						}
+					}
+
+					if (probation_ok)
+					{
+						core_dll = cand_dll;
+						rom_path = load_path;
+						loaded = true;
+						CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Sucesso no carregamento de arcade com: %s", cand_dll.c_str());
+						break;
+					}
 				}
 			}
 			CoreUnload();
