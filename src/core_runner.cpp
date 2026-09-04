@@ -1117,6 +1117,132 @@ const char* CoreGetOption(const char* key)
 	return result;
 }
 
+// PS2 BIOS discovery and auto-preparation
+static std::string ResolveAndPreparePs2Bios()
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+
+	auto is_ps2_bios = [](const fs::directory_entry& entry) -> bool {
+		std::error_code ec2;
+		if (!entry.is_regular_file(ec2)) return false;
+		std::string ext = entry.path().extension().string();
+		for (char& c : ext) c = (char)tolower((unsigned char)c);
+		if (ext != ".bin") return false;
+
+		uintmax_t sz = entry.file_size(ec2);
+		std::string fn = entry.path().filename().string();
+		std::string fn_lower = fn;
+		for (char& c : fn_lower) c = (char)tolower((unsigned char)c);
+
+		// PS1 BIOSes like scph5501 are 512KB (524288) - ignore them
+		if (sz == 524288) return false;
+		// Non-PS2 files
+		if (fn_lower.find("saturn") != std::string::npos ||
+		    fn_lower.find("sega") != std::string::npos ||
+		    fn_lower.find("dc_boot") != std::string::npos ||
+		    fn_lower.find("bios7") != std::string::npos ||
+		    fn_lower.find("bios9") != std::string::npos ||
+		    fn_lower.find("firmware") != std::string::npos) return false;
+
+		// Real PS2 BIOS: standard is 4,194,304 bytes (4MB), or 2MB/8MB, or filename matches SCPH-7xxxx / SCPH-xxxxx / ps2
+		if (sz == 4194304 || sz == 2097152 || sz == 8388608) return true;
+		if (fn_lower.find("scph-7") != std::string::npos ||
+		    fn_lower.find("scph-3") != std::string::npos ||
+		    fn_lower.find("scph-5") != std::string::npos ||
+		    fn_lower.find("scph-9") != std::string::npos ||
+		    fn_lower.find("scph-1") != std::string::npos ||
+		    fn_lower.find("ps2") != std::string::npos) return true;
+
+		return false;
+	};
+
+	// 1. Search directories for an existing PS2 BIOS
+	const char* search_dirs[] = {
+		"app/bios/pcsx2/bios",
+		"bios/pcsx2/bios",
+		"app/bios",
+		"bios"
+	};
+
+	fs::path found_path;
+	std::string found_filename;
+
+	for (const char* dir : search_dirs)
+	{
+		if (fs::exists(dir, ec))
+		{
+			for (const auto& entry : fs::directory_iterator(dir, ec))
+			{
+				if (is_ps2_bios(entry))
+				{
+					found_path = entry.path();
+					found_filename = entry.path().filename().string();
+					break;
+				}
+			}
+		}
+		if (!found_filename.empty()) break;
+	}
+
+	if (found_filename.empty())
+	{
+		found_filename = "SCPH-70012_BIOS_V12_USA_200.bin";
+	}
+	else
+	{
+		// 2. Ensure the BIOS is present in all target pcsx2/bios directories so LRPS2 always finds it:
+		const char* target_dirs[] = {
+			"app/bios/pcsx2/bios",
+			"bios/pcsx2/bios"
+		};
+		for (const char* tdir : target_dirs)
+		{
+			fs::create_directories(tdir, ec);
+			fs::path dest = fs::path(tdir) / found_filename;
+			if (!fs::exists(dest, ec))
+			{
+				fs::copy_file(found_path, dest, fs::copy_options::overwrite_existing, ec);
+			}
+
+			// Copy companion .mec and .nvm if they exist next to the source
+			fs::path src_stem = found_path.parent_path() / found_path.stem();
+			fs::path dest_stem = fs::path(tdir) / found_path.stem();
+
+			fs::path mec_src = src_stem; mec_src += ".mec";
+			fs::path mec_dest = dest_stem; mec_dest += ".mec";
+			if (fs::exists(mec_src, ec) && !fs::exists(mec_dest, ec))
+				fs::copy_file(mec_src, mec_dest, fs::copy_options::overwrite_existing, ec);
+
+			fs::path nvm_src = src_stem; nvm_src += ".nvm";
+			fs::path nvm_dest = dest_stem; nvm_dest += ".nvm";
+			if (fs::exists(nvm_src, ec) && !fs::exists(nvm_dest, ec))
+				fs::copy_file(nvm_src, nvm_dest, fs::copy_options::overwrite_existing, ec);
+		}
+
+		// 3. Ensure GameIndex.yaml is available in pcsx2/resources
+		const char* res_dirs[] = { "app/bios/pcsx2/resources", "bios/pcsx2/resources" };
+		fs::path src_gameindex;
+		for (const char* rdir : res_dirs)
+		{
+			fs::path gi = fs::path(rdir) / "GameIndex.yaml";
+			if (fs::exists(gi, ec)) { src_gameindex = gi; break; }
+		}
+		if (!src_gameindex.empty())
+		{
+			for (const char* rdir : res_dirs)
+			{
+				fs::create_directories(rdir, ec);
+				fs::path dest_gi = fs::path(rdir) / "GameIndex.yaml";
+				if (!fs::exists(dest_gi, ec))
+					fs::copy_file(src_gameindex, dest_gi, fs::copy_options::overwrite_existing, ec);
+			}
+		}
+	}
+
+	return found_filename;
+}
+
 // -------------------------------------------------------------
 // Libretro Environment & Callbacks
 // -------------------------------------------------------------
@@ -1230,17 +1356,6 @@ static bool CB_Environment(unsigned cmd, void* data)
 				return true;
 			}
 
-			// No user override: hand back what the core itself declared.
-			EnterCriticalSection(&options_lock);
-			auto d = g_core_defaults.find(var->key);
-			const char* default_value = (d != g_core_defaults.end()) ? StableOptionValue(d->second) : NULL;
-			LeaveCriticalSection(&options_lock);
-
-			if (default_value)
-			{
-				var->value = default_value;
-				return true;
-			}
 			// Defaults we explicitly override. Values below are the exact enum
 			// strings accepted by each core - a value the core does not
 			// recognise leaves it in an undefined state (a wrong
@@ -1287,10 +1402,37 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "play_fastboot") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "play_widescreen_hack") == 0) var->value = "disabled";
 
-			// Anything we have no verified value for: report "unset" so the
-			// core keeps its own default. Returning true with a NULL value
-			// makes cores that do strcmp(var.value, ...) fault.
-			else return false;
+			// PCSX2 / LRPS2 core options
+			else if (strcmp(var->key, "pcsx2_bios") == 0)
+			{
+				static std::string s_pcsx2_bios;
+				if (s_pcsx2_bios.empty())
+				{
+					s_pcsx2_bios = ResolveAndPreparePs2Bios();
+				}
+				var->value = s_pcsx2_bios.c_str();
+			}
+			else if (strcmp(var->key, "pcsx2_fastboot") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_renderer") == 0) var->value = (MenuGetHwRender() && HwGlProbed()) ? "OpenGL" : "Auto";
+			else if (strcmp(var->key, "pcsx2_fastmem") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_mtvu") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "pcsx2_instant_vu1") == 0) var->value = "enabled";
+
+			// If no explicit override matched: hand back what the core itself declared as default.
+			else
+			{
+				EnterCriticalSection(&options_lock);
+				auto d = g_core_defaults.find(var->key);
+				const char* default_value = (d != g_core_defaults.end()) ? StableOptionValue(d->second) : NULL;
+				LeaveCriticalSection(&options_lock);
+
+				if (default_value)
+				{
+					var->value = default_value;
+					return true;
+				}
+				return false;
+			}
 			return true;
 		}
 		return false;

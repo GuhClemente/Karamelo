@@ -1,14 +1,17 @@
-﻿==========================================================================
- PlayStation2 - Play!
+==========================================================================
+ PlayStation 2 - PCSX2 / LRPS2
 ==========================================================================
 
-Core usado: cores/ps2.dll
+Core usado: cores/ps2.dll (LRPS2 / PCSX2 oficial)
+Core alternativo: cores/ps2_play.dll (Play! HLE)
 
 Formatos aceitos nesta pasta:
-  .chd/.cue/.iso/.m3u/.toc, .bin, ou .zip/.7z/.rar
+  .iso, .bin, .chd, .cue, .m3u, .toc ou .zip/.7z/.rar
 
 BIOS / firmware:
-  Nenhuma BIOS necessaria (emulacao HLE).
+  SCPH-70012_BIOS_V12_USA_200.BIN (4MB) e arquivos de configuracao
+  (.mec e .nvm) na pasta app/bios/ ou app/bios/pcsx2/bios/.
+  Ja inclusos e configurados no sistema.
 
 --------------------------------------------------------------------------
 Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos

@@ -150,8 +150,10 @@ pub fn init(ui: &mut ui::Ui, rom: &[u8]) {
     ui.storage.save_type = get_save_type(rom, &ui.game_id);
 
     let saves_path = ui.dirs.data_dir.join("saves");
+    let _ = std::fs::create_dir_all(&saves_path);
 
     let states_path = ui.dirs.data_dir.join("states");
+    let _ = std::fs::create_dir_all(&states_path);
 
     let game_name = get_game_name(rom);
 

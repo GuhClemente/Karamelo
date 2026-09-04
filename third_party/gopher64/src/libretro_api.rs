@@ -215,7 +215,9 @@ pub unsafe extern "C" fn retro_init() {
 pub unsafe extern "C" fn retro_deinit() {
     retro_unload_game();
     let mut rt_guard = runtime_lock();
-    *rt_guard = None;
+    if let Some(rt) = rt_guard.take() {
+        rt.shutdown_background();
+    }
 }
 
 #[unsafe(no_mangle)]
