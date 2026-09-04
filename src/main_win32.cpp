@@ -980,11 +980,29 @@ static void RenderFrame()
 	}
 }
 
-// Mouse as the DS stylus. Only while the left button is held and the cursor
-// is over the picture, so it cannot interfere with anything else - and never
-// while the OSD is up, where the mouse belongs to the menu.
+// Hides the real Windows cursor while gameplay owns the mouse (the DS/3DS
+// stylus path draws its own on-screen touch indicator, so the OS arrow on
+// top of it just looked like a duplicate cursor) and restores it once the
+// OSD comes back up or the core stops, where the mouse belongs to the menu
+// again. ShowCursor keeps an internal display counter, not a simple flag -
+// calling it every frame in the same direction would decrement/increment it
+// without bound, so this only calls it on the actual state transition.
+static void SetGameplayCursorHidden(bool hidden)
+{
+	static bool s_hidden = false;
+	if (hidden == s_hidden) return;
+	ShowCursor(!hidden);
+	s_hidden = hidden;
+}
+
+// Mouse as the DS/3DS stylus. Only while the left button is held and the
+// cursor is over the picture, so it cannot interfere with anything else -
+// and never while the OSD is up, where the mouse belongs to the menu.
 static void PollMouseStylus()
 {
+	const bool gameplay_active = CoreIsRunning() && !OsdIsEnabled();
+	SetGameplayCursorHidden(gameplay_active && GetForegroundWindow() == g_hwnd);
+
 	if (!CoreIsRunning() || OsdIsEnabled()) { CoreSetPointer(0.0, 0.0, false); return; }
 	if (GetForegroundWindow() != g_hwnd) { CoreSetPointer(0.0, 0.0, false); return; }
 
