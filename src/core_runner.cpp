@@ -372,6 +372,7 @@ static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
 static bool          s_loaded_core_is_pcsx2 = false;
+static std::string   s_loaded_core_path = "";
 
 // Resampler rate-control state. This used to live as function-local statics
 // inside SendAudioSamples, which meant a lock from one game's audio survived
@@ -1290,7 +1291,37 @@ static bool CB_Environment(unsigned cmd, void* data)
 		const char** dir = (const char**)data;
 		if (dir)
 		{
-			static std::string sys_dir = fs::absolute("bios").string();
+			static std::string sys_dir;
+			if (sys_dir.empty())
+			{
+				std::error_code ec;
+				if (fs::exists("bios/PPSSPP", ec) || (fs::exists("bios", ec) && !fs::exists("app/bios/PPSSPP", ec)))
+					sys_dir = fs::absolute("bios").string();
+				else if (fs::exists("app/bios", ec))
+					sys_dir = fs::absolute("app/bios").string();
+				else
+					sys_dir = fs::absolute("bios").string();
+			}
+
+			// fMSX (msx.dll) retro_load_game runs a strrchr for '/' and '\\' on the
+			// system directory buffer and zeroes the last slash, assuming the frontend
+			// provided a trailing slash (e.g. "bios/"). Without a trailing slash, fMSX
+			// cuts off the final directory component (".../app/bios" -> ".../app"),
+			// causing StartMSX() to search for MSX.ROM, MSX2.ROM, MSX2EXT.ROM in "app"
+			// instead of "app/bios", failing to load any BIOS and causing a black screen.
+			if (s_loaded_core_path.find("msx.dll") != std::string::npos)
+			{
+				static std::string msx_sys_dir;
+				if (msx_sys_dir.empty())
+				{
+					msx_sys_dir = sys_dir;
+					if (!msx_sys_dir.empty() && msx_sys_dir.back() != '\\' && msx_sys_dir.back() != '/')
+						msx_sys_dir += "\\";
+				}
+				*dir = msx_sys_dir.c_str();
+				return true;
+			}
+
 			*dir = sys_dir.c_str();
 			return true;
 		}
@@ -1429,6 +1460,16 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "pcsx2_fastmem") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_mtvu") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_instant_vu1") == 0) var->value = "enabled";
+
+			// PPSSPP core options
+			else if (strcmp(var->key, "ppsspp_fast_memory") == 0) var->value = "disabled";
+			else if (strcmp(var->key, "ppsspp_ignore_bad_memory_access") == 0) var->value = "enabled";
+			else if (strcmp(var->key, "ppsspp_io_timing_method") == 0) var->value = "Simulate UMD delays";
+			else if (strcmp(var->key, "ppsspp_skip_buffer_effects") == 0) var->value = "disabled";
+			else if (strcmp(var->key, "ppsspp_skip_gpu_readbacks") == 0) var->value = "disabled";
+			else if (strcmp(var->key, "ppsspp_backend") == 0) var->value = (MenuGetHwRender() && HwGlProbed()) ? "opengl" : "auto";
+			else if (strcmp(var->key, "ppsspp_auto_frameskip") == 0) var->value = "disabled";
+			else if (strcmp(var->key, "ppsspp_frameskip") == 0) var->value = "disabled";
 
 			// If no explicit override matched: hand back what the core itself declared as default.
 			else
@@ -1747,16 +1788,21 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 	// Kept to the first frames of a load only: it costs nothing there and tells
 	// us instantly whether a core is emitting real pixels. Logging it forever
 	// would just bloat the log.
-	if (g_video_diag_frames < 5)
+	static int nonblack_logged = 0;
+	uint32_t acc = 0;
+	if (g_video_diag_frames < 300 && nonblack_logged < 5)
 	{
-		uint32_t acc = 0;
 		for (unsigned yy = 0; yy < height; yy += 4)
 			for (unsigned xx = 0; xx < width; xx += 4)
 				acc |= dst_fb[yy * width + xx] & 0x00FFFFFFu;
 
-		CoreLogPrintf(RETRO_LOG_INFO, "[VIDEO] f=%ld %ux%u pitch=%u fmt=%d nonblack=%s",
-			g_video_diag_frames, width, height, (unsigned)pitch,
-			(int)core_pixel_format, acc ? "SIM" : "nao");
+		if (g_video_diag_frames < 5 || acc)
+		{
+			if (acc) nonblack_logged++;
+			CoreLogPrintf(RETRO_LOG_INFO, "[VIDEO] f=%ld %ux%u pitch=%u fmt=%d nonblack=%s",
+				g_video_diag_frames, width, height, (unsigned)pitch,
+				(int)core_pixel_format, acc ? "SIM" : "nao");
+		}
 	}
 	g_video_diag_frames++;
 
@@ -2140,21 +2186,16 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			if (!extracted_core.empty()) core_dll = extracted_core;
 
 			// fMSX's fmsx_mode core option defaults to "MSX2+" (the first of
-			// MSX2+|MSX1|MSX2), and that specific default is broken in this
-			// build: retro_run() executes normally (correct fps, no errors)
-			// but every frame comes back solid black, on both MSX1 and MSX2
-			// titles - confirmed with record_gameplay against a plain
-			// cartridge game with zero disk/BIOS dependency. Explicitly
-			// requesting either "MSX1" or "MSX2" instead of leaving the
-			// default in place renders correctly. .mx2 unambiguously means
-			// MSX2; everything else (.mx1, bare .rom/.bin used by both
-			// generations) requests MSX1, the safer base case since MSX2
-			// hardware runs MSX1-only carts fine but not the reverse.
+			// MSX2+|MSX1|MSX2), and that specific default can fail to render in some builds.
+			// Explicitly setting "MSX2" provides full MSX2 hardware (V9938 VDP, 128KB VRAM)
+			// which is required for MSX2 titles (such as Aleste, Metal Gear 2, Rastan Saga,
+			// Outrun) while remaining backwards compatible with MSX1 games.
+			// Only explicit .mx1 files are constrained to "MSX1".
 			if (core_dll.find("msx.dll") != std::string::npos)
 			{
 				std::string extracted_ext = fs::path(rom_path).extension().string();
 				std::transform(extracted_ext.begin(), extracted_ext.end(), extracted_ext.begin(), ::tolower);
-				CoreSetOption("fmsx_mode", extracted_ext == ".mx2" ? "MSX2" : "MSX1");
+				CoreSetOption("fmsx_mode", extracted_ext == ".mx1" ? "MSX1" : "MSX2");
 			}
 		}
 		else
@@ -2166,6 +2207,21 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
 			return 0;
 		}
+	}
+
+	{
+		fs::path init_p(rom_path);
+		EnterCriticalSection(&name_lock);
+		loaded_game_stem = init_p.stem().string();
+		loaded_game_name = init_p.filename().string();
+		loaded_rom_dir = init_p.parent_path().string();
+		loaded_system_dir = init_p.parent_path().filename().string();
+		if (loaded_system_dir.empty() || loaded_system_dir == "." ||
+			loaded_system_dir == "roms" || loaded_system_dir == "cache" || loaded_system_dir == "app")
+		{
+			loaded_system_dir = init_p.stem().string();
+		}
+		LeaveCriticalSection(&name_lock);
 	}
 
 	const bool is_arcade_rom =
@@ -2306,6 +2362,13 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			{
 				CoreSetOption("citra_touch_touchscreen", "enabled");
 				CoreSetOption("citra_render_touchscreen", "enabled");
+			}
+
+			if (core_dll.find("msx.dll") != std::string::npos)
+			{
+				std::string ext = fs::path(rom_path).extension().string();
+				std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+				CoreSetOption("fmsx_mode", ext == ".mx1" ? "MSX1" : "MSX2");
 			}
 
 			if (CoreLoadGame(rom_path.c_str(), false))
@@ -2520,22 +2583,16 @@ static void RecoverAfterKilledCore()
 
 void CoreShutdown()
 {
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Inicio do shutdown...");
 	InterlockedExchange(&core_thread_running, 0);
 
 	if (h_core_thread)
 	{
-		// Was 8000. A core that has not finished in three seconds is wedged, and
-		// the whole wait blocks the UI thread - that pause is what read as the
-		// app freezing when a game was closed.
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Aguardando core thread encerrar (3000ms)...");
 		if (WaitForSingleObject(h_core_thread, 3000) == WAIT_TIMEOUT)
 		{
-			// TerminateThread()-ing the core thread while it owns the process
-			// loader lock (mid-LoadLibrary/FreeLibrary) wedges that lock
-			// forever - worse than the freeze this timeout exists to avoid,
-			// since no thread anywhere in the process can ever LoadLibrary/
-			// FreeLibrary/CreateThread again. LoadLibrary/FreeLibrary normally
-			// finish in well under a second, so give a module op in flight a
-			// real chance to finish before resorting to TerminateThread.
+			CoreLogPrintf(RETRO_LOG_WARN, "[CoreShutdown] Timeout aguardando core thread. Verificando module_op=%ld",
+				InterlockedCompareExchange(&g_core_in_module_op, 0, 0));
 			int extra_waited_ms = 0;
 			while (InterlockedCompareExchange(&g_core_in_module_op, 0, 0) &&
 				extra_waited_ms < 5000)
@@ -2547,19 +2604,23 @@ void CoreShutdown()
 
 			if (WaitForSingleObject(h_core_thread, 0) == WAIT_TIMEOUT)
 			{
+				CoreLogPrintf(RETRO_LOG_ERROR, "[CoreShutdown] Matando core thread via TerminateThread...");
 				TerminateThread(h_core_thread, 0);
 			}
 			CloseHandle(h_core_thread);
 			h_core_thread = NULL;
 			RecoverAfterKilledCore();
 			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+			CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Finalizado apos recuperacao forcada.");
 			return;
 		}
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Core thread encerrou normalmente.");
 		CloseHandle(h_core_thread);
 		h_core_thread = NULL;
 	}
 
 	InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Shutdown concluido com sucesso.");
 }
 
 bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint)
@@ -2724,6 +2785,7 @@ static bool CoreLoad(const char* core_dll_path)
 		return false;
 	}
 
+	s_loaded_core_path = core_dll_path ? core_dll_path : "";
 	s_loaded_core_is_pcsx2 = (strstr(core_dll_path, "pcsx2") != NULL) ||
 	                         (strstr(core_dll_path, "ps2") != NULL && strstr(core_dll_path, "play") == NULL);
 
@@ -3037,41 +3099,11 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 static void CoreUnload()
 {
-	if (is_game_loaded)
-	{
-		RaOnGameUnload();
-		CoreReleaseMemoryMap();
-
-		EnterCriticalSection(&options_lock);
-		g_core_defaults.clear();
-		LeaveCriticalSection(&options_lock);
-
-		RetroUnloadGameGuarded();
-		is_game_loaded = false;
-	}
-
-	if (is_core_loaded)
-	{
-		RetroDeinitGuarded();
-		is_core_loaded = false;
-	}
-
-	HwContextDestroy();
-	HwReleaseCurrent();
-
-	if (h_core_dll)
-	{
-		InterlockedExchange(&g_core_in_module_op, 1);
-		FreeLibrary(h_core_dll);
-		InterlockedExchange(&g_core_in_module_op, 0);
-		h_core_dll = NULL;
-	}
-
-	ResetCoreFunctionPointers();
-	s_loaded_core_is_pcsx2 = false;
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Inicio: is_game_loaded=%d is_core_loaded=%d", is_game_loaded, is_core_loaded);
 
 	if (audio_thread_running)
 	{
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Parando audio thread...");
 		audio_thread_running = false;
 		if (h_audio_event) SetEvent(h_audio_event);
 		if (h_audio_thread)
@@ -3080,10 +3112,12 @@ static void CoreUnload()
 			CloseHandle(h_audio_thread);
 			h_audio_thread = NULL;
 		}
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Audio thread finalizada.");
 	}
 
 	if (h_wave_out)
 	{
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Fechando waveOut...");
 		waveOutReset(h_wave_out);
 		for (int i = 0; i < NUM_WAVE_BUFFERS; i++)
 		{
@@ -3095,6 +3129,7 @@ static void CoreUnload()
 		waveOutClose(h_wave_out);
 		h_wave_out = NULL;
 		audio_initialized = false;
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] waveOut finalizado.");
 	}
 
 	if (h_audio_event)
@@ -3108,7 +3143,84 @@ static void CoreUnload()
 	memset(g_hist_r, 0, sizeof(g_hist_r));
 	InterlockedExchange(&g_ring_write_pos, 0);
 	InterlockedExchange(&g_ring_read_pos, 0);
+
+	if (is_game_loaded)
+	{
+		RaOnGameUnload();
+		CoreReleaseMemoryMap();
+
+		EnterCriticalSection(&options_lock);
+		g_core_defaults.clear();
+		LeaveCriticalSection(&options_lock);
+
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroUnloadGameGuarded...");
+		RetroUnloadGameGuarded();
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] RetroUnloadGameGuarded concluido.");
+		is_game_loaded = false;
+	}
+
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando HwContextDestroy...");
+	HwContextDestroy();
+	HwReleaseCurrent();
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy concluido.");
+
+	if (is_core_loaded)
+	{
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroDeinitGuarded...");
+		RetroDeinitGuarded();
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] RetroDeinitGuarded concluido.");
+		is_core_loaded = false;
+	}
+
+	EnterCriticalSection(&name_lock);
+	loaded_system_dir.clear();
+	LeaveCriticalSection(&name_lock);
+
+	bool skip_free = false;
+	{
+		std::string lower_path = s_loaded_core_path;
+		for (char& c : lower_path) c = (char)tolower((unsigned char)c);
+
+		if (s_loaded_core_is_pcsx2 ||
+		    loaded_core_name == "Arcade" ||
+		    loaded_core_name == "PlayStation 2" ||
+		    loaded_core_name == "PSP" ||
+		    loaded_core_name == "GameCube" ||
+		    loaded_core_name == "Dreamcast" ||
+		    lower_path.find("fbneo") != std::string::npos ||
+		    lower_path.find("mame") != std::string::npos ||
+		    lower_path.find("pcsx2") != std::string::npos ||
+		    lower_path.find("ppsspp") != std::string::npos ||
+		    lower_path.find("psp") != std::string::npos)
+		{
+			skip_free = true;
+		}
+	}
+
+	if (h_core_dll)
+	{
+		if (skip_free)
+		{
+			CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Mantendo DLL mapeada para evitar loader lock deadlock (%s)", s_loaded_core_path.c_str());
+		}
+		else
+		{
+			CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando FreeLibrary(h_core_dll)...");
+			InterlockedExchange(&g_core_in_module_op, 1);
+			FreeLibrary(h_core_dll);
+			InterlockedExchange(&g_core_in_module_op, 0);
+			CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] FreeLibrary concluido.");
+		}
+		h_core_dll = NULL;
+	}
+
+	ResetCoreFunctionPointers();
+	s_loaded_core_is_pcsx2 = false;
+	s_loaded_core_path.clear();
+
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Concluido com sucesso.");
 }
+
 
 static void DoReset()
 {

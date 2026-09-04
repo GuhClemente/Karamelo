@@ -245,9 +245,9 @@ static void ApplyPersistedCoreOptions() {
 // is the real inner extension known. See the comment there for why fMSX's
 // "MSX2+" default is not trusted.
 static void ApplyMsxMachineTypeOption(const std::string &core_dll,
-                                       const std::string &ext) {
+                                      const std::string &ext) {
   if (core_dll.find("msx.dll") == std::string::npos) return;
-  CoreSetOption("fmsx_mode", ext == ".mx2" ? "MSX2" : "MSX1");
+  CoreSetOption("fmsx_mode", ext == ".mx1" ? "MSX1" : "MSX2");
 }
 static int setting_language = 0; // 0=Português, 1=English
 static std::string join_ip_input = "127.0.0.1";
