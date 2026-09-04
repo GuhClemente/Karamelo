@@ -1945,6 +1945,21 @@ static void CB_InputPoll(void)
 		}
 	}
 
+	// For MSX computer cores: also route Space to Joypad A/B so games reading
+	// either the MSX joystick or MSX keyboard respond naturally to Space and Enter.
+	if (s_loaded_core_path.find("msx.dll") != std::string::npos)
+	{
+		if (GetAsyncKeyState(VK_SPACE) & 0x8000)
+		{
+			joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_A] = 1;
+			joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_B] = 1;
+		}
+		if (GetAsyncKeyState(VK_RETURN) & 0x8000)
+		{
+			joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_START] = 1;
+		}
+	}
+
 	// 3. Netplay: ship this frame's local input and take the peer's as P2.
 	//
 	// This call did not exist anywhere in the project. Sessions connected, said
@@ -2006,6 +2021,91 @@ void CoreSetPointer(double client_fx, double client_fy, bool pressed)
 	InterlockedExchange(&g_pointer_down, pressed ? 1 : 0);
 }
 
+static int RetroKeyToVK(unsigned id)
+{
+	if (id >= 'a' && id <= 'z') return 'A' + (id - 'a');
+	if (id >= '0' && id <= '9') return '0' + (id - '0');
+	switch (id)
+	{
+	case 8:   return VK_BACK;      // RETROK_BACKSPACE
+	case 9:   return VK_TAB;       // RETROK_TAB
+	case 12:  return VK_CLEAR;     // RETROK_CLEAR
+	case 13:  return VK_RETURN;    // RETROK_RETURN
+	case 19:  return VK_PAUSE;     // RETROK_PAUSE
+	case 27:  return VK_ESCAPE;    // RETROK_ESCAPE
+	case 32:  return VK_SPACE;     // RETROK_SPACE
+	case 39:  return VK_OEM_7;     // RETROK_QUOTE (')
+	case 44:  return VK_OEM_COMMA; // RETROK_COMMA (,)
+	case 45:  return VK_OEM_MINUS; // RETROK_MINUS (-)
+	case 46:  return VK_OEM_PERIOD;// RETROK_PERIOD (.)
+	case 47:  return VK_OEM_2;     // RETROK_SLASH (/)
+	case 59:  return VK_OEM_1;     // RETROK_SEMICOLON (;)
+	case 61:  return VK_OEM_PLUS;  // RETROK_EQUALS (=)
+	case 91:  return VK_OEM_4;     // RETROK_LEFTBRACKET ([)
+	case 92:  return VK_OEM_5;     // RETROK_BACKSLASH (\)
+	case 93:  return VK_OEM_6;     // RETROK_RIGHTBRACKET (])
+	case 96:  return VK_OEM_3;     // RETROK_BACKQUOTE (`)
+	case 127: return VK_DELETE;    // RETROK_DELETE
+
+	// Keypad
+	case 256: return VK_NUMPAD0;
+	case 257: return VK_NUMPAD1;
+	case 258: return VK_NUMPAD2;
+	case 259: return VK_NUMPAD3;
+	case 260: return VK_NUMPAD4;
+	case 261: return VK_NUMPAD5;
+	case 262: return VK_NUMPAD6;
+	case 263: return VK_NUMPAD7;
+	case 264: return VK_NUMPAD8;
+	case 265: return VK_NUMPAD9;
+	case 266: return VK_DECIMAL;
+	case 267: return VK_DIVIDE;
+	case 268: return VK_MULTIPLY;
+	case 269: return VK_SUBTRACT;
+	case 270: return VK_ADD;
+	case 271: return VK_RETURN;
+
+	// Arrows & Navigation
+	case 273: return VK_UP;        // RETROK_UP
+	case 274: return VK_DOWN;      // RETROK_DOWN
+	case 275: return VK_RIGHT;     // RETROK_RIGHT
+	case 276: return VK_LEFT;      // RETROK_LEFT
+	case 277: return VK_INSERT;    // RETROK_INSERT
+	case 278: return VK_HOME;      // RETROK_HOME
+	case 279: return VK_END;       // RETROK_END
+	case 280: return VK_PRIOR;     // RETROK_PAGEUP
+	case 281: return VK_NEXT;      // RETROK_PAGEDOWN
+
+	// Function keys
+	case 282: return VK_F1;
+	case 283: return VK_F2;
+	case 284: return VK_F3;
+	case 285: return VK_F4;
+	case 286: return VK_F5;
+	case 287: return VK_F6;
+	case 288: return VK_F7;
+	case 289: return VK_F8;
+	case 290: return VK_F9;
+	case 291: return VK_F10;
+	case 292: return VK_F11;
+	case 293: return VK_F12;
+
+	// Modifiers
+	case 300: return VK_NUMLOCK;
+	case 301: return VK_CAPITAL;   // RETROK_CAPSLOCK
+	case 302: return VK_SCROLL;
+	case 303: return VK_RSHIFT;
+	case 304: return VK_LSHIFT;
+	case 305: return VK_RCONTROL;
+	case 306: return VK_LCONTROL;
+	case 307: return VK_RMENU;     // RETROK_RALT
+	case 308: return VK_LMENU;     // RETROK_LALT
+	case 311: return VK_LWIN;
+	case 312: return VK_RWIN;
+	default:  return 0;
+	}
+}
+
 static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, unsigned id)
 {
 	if (port >= 4) return 0;
@@ -2022,6 +2122,52 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 			return mask;
 		}
 		if (id < 16) return joypad_buttons[port][id];
+	}
+	else if (device == RETRO_DEVICE_KEYBOARD && port == 0)
+	{
+		if (OsdIsEnabled()) return 0;
+		HWND fg = GetForegroundWindow();
+		if (fg)
+		{
+			DWORD fg_pid = 0;
+			GetWindowThreadProcessId(fg, &fg_pid);
+			if (fg_pid != 0 && fg_pid != GetCurrentProcessId()) return 0;
+		}
+		if (id == 27 || id == 293) return 0; // Esc and F12 reserved for frontend OSD
+
+		int vk = RetroKeyToVK(id);
+		if (vk > 0)
+		{
+			if (vk == VK_LSHIFT || vk == VK_RSHIFT)
+			{
+				if ((GetAsyncKeyState(vk) & 0x8000) || (GetAsyncKeyState(VK_SHIFT) & 0x8000)) return 1;
+			}
+			else if (vk == VK_LCONTROL || vk == VK_RCONTROL)
+			{
+				if ((GetAsyncKeyState(vk) & 0x8000) || (GetAsyncKeyState(VK_CONTROL) & 0x8000)) return 1;
+			}
+			else if (vk == VK_LMENU || vk == VK_RMENU)
+			{
+				if ((GetAsyncKeyState(vk) & 0x8000) || (GetAsyncKeyState(VK_MENU) & 0x8000)) return 1;
+			}
+			else
+			{
+				if (GetAsyncKeyState(vk) & 0x8000) return 1;
+			}
+		}
+
+		// Also bridge Joypad buttons to common keyboard keys so gamepad players can
+		// drive keyboard-controlled computer games (MSX, C64, ZX Spectrum, etc.):
+		if (id == 273 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_UP]) return 1;
+		if (id == 274 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_DOWN]) return 1;
+		if (id == 276 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_LEFT]) return 1;
+		if (id == 275 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_RIGHT]) return 1;
+		if (id == 32  && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_B] || joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_A])) return 1; // Space
+		if (id == 13  && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_START]) return 1; // Enter
+		if (id == 282 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_SELECT]) return 1; // F1
+		if (id == 'm' && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_Y] || joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_X])) return 1; // M / Powerup
+
+		return 0;
 	}
 	else if (device == RETRO_DEVICE_ANALOG)
 	{
@@ -2709,7 +2855,15 @@ static void SetPortDevicesGuarded()
 	if (!p_retro_set_controller_port_device) return;
 	__try
 	{
-		p_retro_set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
+		unsigned port0_device = RETRO_DEVICE_JOYPAD;
+		if (s_loaded_core_path.find("msx.dll") != std::string::npos)
+		{
+			// fMSX requires port 0 device to be RETRO_DEVICE_KEYBOARD (3) so that
+			// it polls the emulated MSX keyboard matrix via RETRO_DEVICE_KEYBOARD while
+			// simultaneously polling RETRO_DEVICE_JOYPAD on both ports for joystick/gamepad input.
+			port0_device = RETRO_DEVICE_KEYBOARD;
+		}
+		p_retro_set_controller_port_device(0, port0_device);
 		p_retro_set_controller_port_device(1, RETRO_DEVICE_JOYPAD);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
