@@ -41,6 +41,7 @@ o do log é sempre o real.
 | `dreamcast.dll` | Flycast | Dreamcast, Naomi, Atomiswave |
 | `gamecube.dll` | Dolphin | GameCube |
 | `n64.dll` | build generico, nao identifica o motor | Nintendo 64 |
+| `n64_gopher.dll` | Gopher64 (Parallel-RDP) | Nintendo 64 |
 | `n64_parallel.dll` | ParaLLEl N64 | Nintendo 64 |
 | `n64_mupen.dll` | Mupen64Plus-Next | Nintendo 64 |
 | `nds.dll` | melonDS | Nintendo DS |
@@ -67,15 +68,24 @@ o do log é sempre o real.
 | `mame2003.dll` | MAME 2003 | Arcade (romset 0.78) |
 | `mame2010.dll` | MAME 2010 | Arcade (romset 0.139) |
 
-**39 motores distintos em 40 arquivos.** `play_libretro.dll` é cópia byte a byte
-de `ps2.dll` e nada no código a referencia — é peso morto e pode ser removida.
+**40 motores distintos em 42 arquivos.** Dois são peso morto: `play_libretro.dll`
+é cópia byte a byte de `ps2.dll` e nada no código a referencia; `bluemsx.dll`
+sobrou de uma tentativa abandonada de rotear MSX para blueMSX em vez de fMSX
+(revertida por completo no código, o arquivo só nunca foi apagado do disco).
+Nenhum dos dois é referenciado por `MenuResolveCoreForPath()` nem por qualquer
+outro caminho de carregamento.
 
-Duas observações:
+Três observações:
 
 - `n64.dll` se identifica apenas como `Nintendo 64 v1.0` e não diz qual motor é.
-  Contém `parallel-rdp` internamente, o que sugere um build do ParaLLEl, mas
-  isso é inferência. É também o único dos três que não exporta memória, e por
-  isso não rende conquistas no RetroAchievements.
+  Contém `parallel-rdp` internamente, o que sugere relação com o Gopher64 (que
+  também usa Parallel-RDP) ou com o ParaLLEl, mas isso é inferência. É também
+  o único dos quatro cores de N64 que não exporta memória, e por isso não
+  rende conquistas no RetroAchievements. Na prática ele só é usado quando
+  `n64_gopher.dll` não existe em disco - `GetN64CoreDll()` sempre prefere o
+  Gopher64 primeiro (é o padrão do menu "N64 Core").
+- `n64_gopher.dll` (Gopher64) é o core de N64 padrão do app - único dos
+  quatro com suporte a RetroAchievements de verdade, integrado em `49cf96e`.
 - `coleco.dll` é um core libretro válido e aceita `col|cv|bin|rom`, mas não
   declara um nome que eu conseguisse identificar com segurança.
 

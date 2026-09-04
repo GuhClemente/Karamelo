@@ -2790,7 +2790,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 			if (strstr(sys, "Dreamcast") || strstr(sys, "GameCube"))
 			{
-				CoreSetToast("ATIVE 3D ACCELERATION EM SETTINGS > VIDEO", 300);
+				CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
 			}
 			else if (strstr(sys, "Nintendo 3DS"))
 			{
