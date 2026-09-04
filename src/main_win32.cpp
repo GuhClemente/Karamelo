@@ -3,6 +3,7 @@
 #include <mmsystem.h>
 #include <xinput.h>
 #include <dwmapi.h>
+#include <winevt.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +13,10 @@
 #include <stdarg.h>
 #include <thread>
 #include <atomic>
+#include <string>
+#include <vector>
+
+#pragma comment(lib, "wevtapi.lib")
 
 #include "osd.h"
 #include "menu.h"
@@ -510,6 +515,135 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 	}
 
 	return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// Pulls a <Data Name="key">value</Data> field out of a WER crash event's
+// rendered XML. Not a real parser - the Application Error event schema is
+// fixed and simple enough that this is fine, and pulling in an XML library
+// for eight fields once per startup is not.
+static std::wstring ExtractWerField(const std::wstring& xml, const wchar_t* key)
+{
+	std::wstring needle = L"Name='";
+	needle += key;
+	needle += L"'>";
+	size_t pos = xml.find(needle);
+	if (pos == std::wstring::npos)
+	{
+		needle = L"Name=\"";
+		needle += key;
+		needle += L"\">";
+		pos = xml.find(needle);
+		if (pos == std::wstring::npos) return L"";
+	}
+	pos += needle.size();
+	size_t end = xml.find(L"<", pos);
+	if (end == std::wstring::npos) return L"";
+	return xml.substr(pos, end - pos);
+}
+
+// Some faults never reach CrashHandler above at all - STATUS_HEAP_CORRUPTION
+// (0xC0000374) chief among them. Windows raises that one via __fastfail,
+// which is documented to bypass every user-mode handler (SEH, vectored, this
+// process's SetUnhandledExceptionFilter, all of it) specifically so a
+// corrupted heap can never get attacker-controlled code to run in a "handler".
+// The only place that kind of fault is ever visible is Windows' own crash
+// report in the Application event log - so read it back on the next launch
+// and fold whatever is new into our own log, instead of a crash silently
+// leaving no trace here at all and someone having to run Get-WinEvent by
+// hand to find out it happened.
+static void CheckWindowsCrashReportsOnStartup()
+{
+	const char* state_path = "last_wer_check.txt";
+	std::string last_check;
+	{
+		FILE* sf = fopen(state_path, "r");
+		if (sf)
+		{
+			char buf[64] = { 0 };
+			if (fgets(buf, sizeof(buf), sf)) last_check = buf;
+			fclose(sf);
+		}
+	}
+
+	EVT_HANDLE hResults = EvtQuery(NULL, L"Application",
+		L"*[System[Provider[@Name='Application Error']]]",
+		EvtQueryChannelPath | EvtQueryReverseDirection);
+	if (!hResults) return;
+
+	std::string newest_seen = last_check;
+	EVT_HANDLE events[10] = { 0 };
+	DWORD returned = 0;
+
+	if (EvtNext(hResults, 10, events, 2000, 0, &returned))
+	{
+		FILE* lf = fopen("mister_flavor.log", "a");
+
+		for (DWORD i = 0; i < returned; i++)
+		{
+			DWORD used = 0, prop_count = 0;
+			EvtRender(NULL, events[i], EvtRenderEventXml, 0, NULL, &used, &prop_count);
+			if (used > 0)
+			{
+				std::vector<wchar_t> buf(used / sizeof(wchar_t) + 1, 0);
+				if (EvtRender(NULL, events[i], EvtRenderEventXml,
+					(DWORD)(buf.size() * sizeof(wchar_t)), buf.data(), &used, &prop_count))
+				{
+					std::wstring xml(buf.data());
+
+					std::wstring app_path = ExtractWerField(xml, L"AppPath");
+					if (app_path.find(L"MiSTer_4_ALL.exe") == std::wstring::npos)
+						continue;
+
+					// ISO 8601 UTC timestamps sort correctly as plain strings,
+					// so no date parsing is needed to compare or track "newest".
+					size_t tpos = xml.find(L"TimeCreated SystemTime='");
+					if (tpos == std::wstring::npos) tpos = xml.find(L"TimeCreated SystemTime=\"");
+					std::wstring time_str;
+					if (tpos != std::wstring::npos)
+					{
+						tpos = xml.find(L"'", tpos);
+						if (tpos == std::wstring::npos) tpos = xml.find(L"\"", xml.find(L"TimeCreated"));
+						size_t qend = xml.find_first_of(L"'\"", tpos + 1);
+						if (tpos != std::wstring::npos && qend != std::wstring::npos)
+							time_str = xml.substr(tpos + 1, qend - tpos - 1);
+					}
+					char time_utf8[64] = { 0 };
+					WideCharToMultiByte(CP_UTF8, 0, time_str.c_str(), -1, time_utf8, sizeof(time_utf8), NULL, NULL);
+
+					if (!last_check.empty() && time_utf8 <= last_check) continue;
+					if (std::string(time_utf8) > newest_seen) newest_seen = time_utf8;
+
+					std::wstring exc_code = ExtractWerField(xml, L"ExceptionCode");
+					std::wstring mod_name = ExtractWerField(xml, L"ModuleName");
+					std::wstring fault_offset = ExtractWerField(xml, L"FaultingOffset");
+
+					char exc_utf8[32] = { 0 }, mod_utf8[128] = { 0 }, off_utf8[32] = { 0 };
+					WideCharToMultiByte(CP_UTF8, 0, exc_code.c_str(), -1, exc_utf8, sizeof(exc_utf8), NULL, NULL);
+					WideCharToMultiByte(CP_UTF8, 0, mod_name.c_str(), -1, mod_utf8, sizeof(mod_utf8), NULL, NULL);
+					WideCharToMultiByte(CP_UTF8, 0, fault_offset.c_str(), -1, off_utf8, sizeof(off_utf8), NULL, NULL);
+
+					if (lf)
+					{
+						fprintf(lf,
+							"[ERROR] [CRASH-WER] %s codigo=%s modulo=%s offset=%s"
+							" (relatorio do Windows - o processo morreu antes do nosso handler rodar)\n",
+							time_utf8, exc_utf8, mod_utf8, off_utf8);
+					}
+				}
+			}
+			EvtClose(events[i]);
+		}
+
+		if (lf) fclose(lf);
+	}
+
+	EvtClose(hResults);
+
+	if (newest_seen != last_check)
+	{
+		FILE* sf = fopen(state_path, "w");
+		if (sf) { fputs(newest_seen.c_str(), sf); fclose(sf); }
+	}
 }
 
 static void RenderFrame()
@@ -1131,6 +1265,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			}
 		}
 	}
+
+	CheckWindowsCrashReportsOnStartup();
 
 	// Headless port install: "MiSTer_4_ALL.exe --install-port <id>" downloads
 	// and extracts a known port and exits, before any window is created, so
