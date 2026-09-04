@@ -93,6 +93,10 @@ bool HwInit()
 {
 	if (g_gl_ready) return true;
 
+	// Enable GPU driver threaded optimizations and persistent shader disk cache
+	_putenv("__GL_THREADED_OPTIMIZATIONS=1");
+	_putenv("__GL_SHADER_DISK_CACHE=1");
+
 	// A hidden 1x1 window is enough: we never present through GL, we read the
 	// FBO back and let the existing GDI path put it on screen.
 	WNDCLASSA wc;
