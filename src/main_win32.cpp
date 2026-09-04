@@ -489,6 +489,26 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 
 		fclose(f);
 	}
+
+	// A fault whose address lands inside a loaded module that is not this
+	// executable is, by construction, not on our own core thread: every call
+	// this app makes into a core's retro_* entry points already runs behind
+	// its own __try/__except (RunOneFrameGuarded and friends in
+	// core_runner.cpp), so a crash from inside a core DLL that reaches this
+	// top-level, process-wide handler has to be on a thread the core spawned
+	// for itself - confirmed in the field with PPSSPP's own background
+	// cleanup threads (a different thread id logged on every occurrence),
+	// crashing on a null read deep in its own shutdown path well after our
+	// side had already finished unloading it. Terminating the whole process
+	// for a background worker thread dying in a third-party DLL is a bigger
+	// loss than the resources that thread leaks by not unwinding cleanly -
+	// kill just this thread and let the app (UI, core thread, everything
+	// else already running) keep going.
+	if (fault_mod && fault_mod != base)
+	{
+		TerminateThread(GetCurrentThread(), 1);
+	}
+
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
