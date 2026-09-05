@@ -37,6 +37,33 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem SDL3, vendored as source under third_party\SDL3 (dev-sdl3 migration branch) and
+rem built once as a static lib into build\sdl3\ - cached there across runs since
+rem compile_port.bat never wipes build\, same as every .obj file below. Building
+rem it fresh takes a couple of minutes (270+ translation units); linking against
+rem the cached SDL3-static.lib afterward costs nothing extra.
+if not exist build\sdl3\SDL3-static.lib (
+    echo [SDL3] Nenhum build em cache - configurando e compilando do source ^(so na primeira vez^)...
+    cmake -S third_party\SDL3 -B build\sdl3 -G Ninja ^
+        -DCMAKE_BUILD_TYPE=Release ^
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+        -DSDL_STATIC=ON ^
+        -DSDL_SHARED=OFF ^
+        -DSDL_TEST_LIBRARY=OFF ^
+        -DSDL_EXAMPLES=OFF ^
+        -DSDL_DISABLE_INSTALL=ON ^
+        -DSDL_DISABLE_INSTALL_DOCS=ON
+    if errorlevel 1 (
+        echo [BUILD FAILED] SDL3 cmake configure falhou.
+        exit /b 1
+    )
+    cmake --build build\sdl3 --config Release
+    if errorlevel 1 (
+        echo [BUILD FAILED] SDL3 falhou ao compilar.
+        exit /b 1
+    )
+)
+
 rem /Fobuild\ keeps the .obj files out of the source tree.
 rem /MT statically links the C/C++ runtime so the exe runs on any Windows machine with 0 dependencies.
 rem /std:c++20 enables modern C++20 standard with concepts, spans and optimizer enhancements.
@@ -55,6 +82,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     /I third_party\rcheevos\src ^
     /I third_party\libchdr\include ^
     /I third_party\libchdr ^
+    /I third_party\SDL3\include ^
     /D_CRT_SECURE_NO_WARNINGS ^
     /DRC_CLIENT_SUPPORTS_HASH ^
     /DZSTD_DISABLE_ASM ^
@@ -80,8 +108,10 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     third_party\rcheevos\src\rhash\*.c ^
     build\resource.res ^
     build\unity.obj ^
+    build\sdl3\SDL3-static.lib ^
     /link /OUT:app\%APP_EXE% ^
     user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib dwmapi.lib ole32.lib ^
+    kernel32.lib imm32.lib oleaut32.lib version.lib uuid.lib advapi32.lib setupapi.lib dinput8.lib ^
     /SUBSYSTEM:WINDOWS /DEBUG /PDBALTPATH:%%_PDB%% /GUARD:CF /MAP:build\%APP_BASE%.map /OPT:REF /OPT:ICF
 
 if errorlevel 1 (
