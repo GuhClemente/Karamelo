@@ -28,6 +28,15 @@ static bool RunHiddenCommand(const std::string& cmd)
 	si.wShowWindow = SW_HIDE;
 
 	char cmd_buf[2048];
+	if (cmd.size() >= sizeof(cmd_buf))
+	{
+		// strncpy_s below would silently truncate instead - dropping the
+		// closing quote and the "-C dest_dir" argument off the end, which
+		// makes tar.exe misparse the line rather than fail loudly (a long
+		// nested cache path built from a long ROM filename can get this
+		// close to 2KB).
+		return false;
+	}
 	strncpy_s(cmd_buf, cmd.c_str(), sizeof(cmd_buf) - 1);
 
 	if (!CreateProcessA(NULL, cmd_buf, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))

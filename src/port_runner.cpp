@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <thread>
+#include <system_error>
 #include <atomic>
 #include <vector>
 #include <string>
@@ -768,6 +769,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     HANDLE hProcess = pi.hProcess;
     HANDLE hThread = pi.hThread;
 
+    try {
     std::thread([hProcess, hThread, hwnd]() {
         // The wait itself can run for as long as the user plays (hours) - it
         // is not counted in s_active_bg_threads, or PortShutdown() would
@@ -791,6 +793,18 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         OsdEnable();
         s_active_bg_threads.fetch_sub(1);
     }).detach();
+    } catch (const std::system_error&) {
+        // Thread creation itself failed (resource exhaustion) - the process
+        // we just launched would otherwise go completely untracked (no one
+        // left to wait on it or restore the window) and s_port_running would
+        // stay stuck at true forever, refusing every future PortLaunch() for
+        // the rest of the session.
+        CloseHandle(hThread);
+        CloseHandle(hProcess);
+        s_port_running.store(false);
+        CoreSetToast("FALHA AO MONITORAR PORT - TENTE NOVAMENTE", 200);
+        return false;
+    }
 
     return true;
 }

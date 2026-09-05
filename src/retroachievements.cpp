@@ -743,6 +743,14 @@ void RaShutdown()
 
 	if (g_http_event) { CloseHandle(g_http_event); g_http_event = NULL; }
 
+	// The worker thread has fully stopped by this point (waited above), so
+	// nothing else can still be pushing into these deques - safe to drain
+	// and free whatever job was in flight or completed-but-unconsumed.
+	for (HttpJob* job : g_http_pending) delete job;
+	g_http_pending.clear();
+	for (HttpJob* job : g_http_done) delete job;
+	g_http_done.clear();
+
 	EnterCriticalSection(&g_client_lock);
 	if (g_client)
 	{
@@ -764,10 +772,34 @@ void RaDoFrame()
 	EnterCriticalSection(&g_client_lock);
 	RaPumpHttp();
 
-	if (g_memory_ready)
-		rc_client_do_frame(g_client);
-	else
-		rc_client_idle(g_client);
+	// InitMemoryForConsole() only refuses the "inferred memory map" mechanism
+	// for MSX, the one console it was confirmed to crash on - every other
+	// console_id still trusts rc_libretro's inference to line up with what
+	// the core actually exposes. A future core/console combination that
+	// mismatches the same way would otherwise fault here, on the core
+	// thread, with nothing between it and the top-level crash handler -
+	// which can't even contain it (the fault address is inside our own exe,
+	// not a core DLL, so CrashHandler's "kill just this thread" branch does
+	// not apply). Catching it here turns a bad map into "achievements stop
+	// for this session" instead of taking the whole app down.
+	__try
+	{
+		if (g_memory_ready)
+			rc_client_do_frame(g_client);
+		else
+			rc_client_idle(g_client);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		g_memory_ready = false;
+		g_enabled = false;
+		FILE* lf = fopen("mister_flavor.log", "a");
+		if (lf)
+		{
+			fprintf(lf, "[ERROR] [RA] rc_client_do_frame excecao - RetroAchievements desativado nesta sessao\n");
+			fclose(lf);
+		}
+	}
 	LeaveCriticalSection(&g_client_lock);
 }
 

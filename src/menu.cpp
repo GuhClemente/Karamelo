@@ -2190,7 +2190,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
   case KEY_LEFT:
   case KEY_RIGHT: {
     int delta = (key == KEY_RIGHT) ? 1 : -1;
-    const auto &item = items[selected_idx];
+    // A copy, not a reference: several branches below call PopulateXxx(),
+    // which clear()s/rebuilds `items` and can reallocate its backing storage -
+    // a reference held across that call would dangle for any code reading it
+    // afterward.
+    const auto item = items[selected_idx];
 
     if (item.action_id == 301) // Aspect
     {
@@ -2480,7 +2484,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
   }
 
   case KEY_SELECT: {
-    const auto &item = items[selected_idx];
+    // A copy, not a reference - see the identical note on KEY_LEFT/KEY_RIGHT
+    // above: branches below rebuild `items` via PopulateXxx(), which can
+    // reallocate it and leave a reference dangling.
+    const auto item = items[selected_idx];
 
     if (item.action_id == 99) // Exit
     {

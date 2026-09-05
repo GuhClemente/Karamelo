@@ -1259,6 +1259,59 @@ static std::string ResolveAndPreparePs2Bios()
 // -------------------------------------------------------------
 // Libretro Environment & Callbacks
 // -------------------------------------------------------------
+
+// Plain-old-data only (no std::string/std::vector members): a __try/__except
+// block cannot share a function with a C++ object whose destructor would need
+// to run on unwind (MSVC C2712). SET_VARIABLES hands us a core-owned array we
+// have to walk and dereference; if that array is malformed - or the core's own
+// heap is already corrupted, the same class of bug that crashed on MSX - the
+// access violation used to fire while options_lock was held (EnterCriticalSection
+// with no matching LeaveCriticalSection on this path), leaving it permanently
+// locked for the rest of the process once the core thread unwound past it: any
+// later CoreSetOption()/CoreGetOption() call (e.g. from the Settings menu) would
+// hang forever with no crash and nothing in the log to explain why. Parsing into
+// a POD buffer first, entirely before options_lock is ever taken, means the only
+// memory touched while the lock is held is our own - a bad core can now fail
+// this call, but it can never wedge the lock.
+struct ParsedCoreVar { char key[80]; char value[400]; };
+
+static bool ParseCoreVariablesGuarded(const struct retro_variable* vars,
+	ParsedCoreVar* out, int max_out, int* out_count)
+{
+	__try
+	{
+		int n = 0;
+		for (; vars->key && n < max_out; vars++)
+		{
+			if (!vars->value) continue;
+
+			const char* semi = strchr(vars->value, ';');
+			const char* first = semi ? semi + 1 : vars->value;
+			while (*first == ' ') first++;
+
+			const char* bar = strchr(first, '|');
+			size_t len = bar ? (size_t)(bar - first) : strlen(first);
+			if (len >= sizeof(out[n].value)) len = sizeof(out[n].value) - 1;
+			while (len > 0 && (first[len - 1] == ' ' || first[len - 1] == '\r' || first[len - 1] == '\n'))
+				len--;
+			if (len == 0) continue;
+
+			strncpy(out[n].key, vars->key, sizeof(out[n].key) - 1);
+			out[n].key[sizeof(out[n].key) - 1] = 0;
+			memcpy(out[n].value, first, len);
+			out[n].value[len] = 0;
+			n++;
+		}
+		*out_count = n;
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		*out_count = 0;
+		return false;
+	}
+}
+
 static bool CB_Environment(unsigned cmd, void* data)
 {
 	switch (cmd)
@@ -1586,34 +1639,24 @@ static bool CB_Environment(unsigned cmd, void* data)
 		const struct retro_variable* vars = (const struct retro_variable*)data;
 		if (!vars) return true;
 
-		EnterCriticalSection(&options_lock);
-		g_core_defaults.clear();
-
-		for (; vars->key; vars++)
+		static ParsedCoreVar s_parsed[512];
+		int count = 0;
+		if (!ParseCoreVariablesGuarded(vars, s_parsed, 512, &count))
 		{
-			if (!vars->value) continue;
-
-			const char* semi = strchr(vars->value, ';');
-			const char* first = semi ? semi + 1 : vars->value;
-			while (*first == ' ') first++;
-
-			// Log each option for diagnostics
-			CoreLogPrintf(RETRO_LOG_DEBUG, "[OPT] opcao: %s = %s", vars->key, first);
-
-			while (*first == ' ') first++;
-
-			// The default is the first choice; the rest are separated by '|'.
-			const char* bar = strchr(first, '|');
-			std::string def = bar ? std::string(first, bar - first) : std::string(first);
-
-			while (!def.empty() && (def.back() == ' ' || def.back() == '\r' || def.back() == '\n'))
-				def.pop_back();
-
-			if (!def.empty()) g_core_defaults[vars->key] = def;
+			CoreLogPrintf(RETRO_LOG_ERROR,
+				"[OPT] core forneceu SET_VARIABLES malformado - ignorado");
+			return true;
 		}
 
+		EnterCriticalSection(&options_lock);
+		g_core_defaults.clear();
+		for (int i = 0; i < count; i++)
+			g_core_defaults[s_parsed[i].key] = s_parsed[i].value;
 		size_t n = g_core_defaults.size();
 		LeaveCriticalSection(&options_lock);
+
+		for (int i = 0; i < count; i++)
+			CoreLogPrintf(RETRO_LOG_DEBUG, "[OPT] opcao: %s = %s", s_parsed[i].key, s_parsed[i].value);
 
 		CoreLogPrintf(RETRO_LOG_INFO, "[OPT] %u opcoes declaradas pelo core", (unsigned)n);
 		return true;
@@ -2683,6 +2726,36 @@ static void ResetCoreFunctionPointers()
 	p_retro_unload_game = NULL;
 }
 
+// A core-spawned background thread that crashes while holding one of these
+// locks (SEH-caught in main_win32.cpp's CrashHandler, which has to
+// TerminateThread it rather than let the whole process die - see that file)
+// would otherwise leave the lock "owned" by a thread ID that no longer
+// exists, wedging every future EnterCriticalSection on it forever with no
+// crash to explain why. OwningThread is part of the public CRITICAL_SECTION
+// layout and stable across Windows versions. Only a lock THIS thread
+// actually holds is recreated - blindly recreating all three the way
+// RecoverAfterKilledCore() does would corrupt one a different, still-running
+// thread legitimately holds at the same moment.
+void CoreRecoverLocksHeldByThread(unsigned long thread_id)
+{
+	HANDLE owner = (HANDLE)(ULONG_PTR)thread_id;
+	if (toast_lock.OwningThread == owner)
+	{
+		DeleteCriticalSection(&toast_lock);
+		InitializeCriticalSection(&toast_lock);
+	}
+	if (name_lock.OwningThread == owner)
+	{
+		DeleteCriticalSection(&name_lock);
+		InitializeCriticalSection(&name_lock);
+	}
+	if (options_lock.OwningThread == owner)
+	{
+		DeleteCriticalSection(&options_lock);
+		InitializeCriticalSection(&options_lock);
+	}
+}
+
 static void RecoverAfterKilledCore()
 {
 	// A critical section owned by a dead thread is never released. Recreating it
@@ -2716,7 +2789,15 @@ static void RecoverAfterKilledCore()
 		if (h_audio_event) SetEvent(h_audio_event);
 		if (h_audio_thread)
 		{
-			WaitForSingleObject(h_audio_thread, 1000);
+			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
+			{
+				// Still inside a waveOut* call (a wedged driver) - closing
+				// h_wave_out out from under it right below would race that
+				// call. Force it down first; it holds no C++ objects that
+				// need unwinding, just WinMM buffers we are about to
+				// release anyway.
+				TerminateThread(h_audio_thread, 1);
+			}
 			CloseHandle(h_audio_thread);
 			h_audio_thread = NULL;
 		}
@@ -3199,6 +3280,10 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 				CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
 			}
 		}
+		// The core can have already called SET_MEMORY_MAPS from inside this
+		// same, ultimately-failed retro_load_game() before faulting/refusing -
+		// is_game_loaded is still false here so CoreUnload() won't release it.
+		CoreReleaseMemoryMap();
 		return false;
 	}
 
@@ -3218,6 +3303,12 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		if (!suppress_toast)
 			CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
 		RetroUnloadGameGuarded();
+		// is_game_loaded is still false here, so CoreUnload()'s own
+		// CoreReleaseMemoryMap() call (gated on is_game_loaded) never runs -
+		// a core that registered SET_MEMORY_MAPS before faulting here would
+		// otherwise leave its descriptor table behind for the next, unrelated
+		// game to inherit.
+		CoreReleaseMemoryMap();
 		return false;
 	}
 
@@ -3279,7 +3370,12 @@ static void CoreUnload()
 		if (h_audio_event) SetEvent(h_audio_event);
 		if (h_audio_thread)
 		{
-			WaitForSingleObject(h_audio_thread, 1000);
+			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
+			{
+				CoreLogPrintf(RETRO_LOG_WARN,
+					"[CoreUnload] Audio thread nao respondeu a tempo (driver travado?) - forcando encerramento");
+				TerminateThread(h_audio_thread, 1);
+			}
 			CloseHandle(h_audio_thread);
 			h_audio_thread = NULL;
 		}
@@ -3518,15 +3614,23 @@ static bool DoLoadState(int slot)
 #define CORE_CMD_RESET 1
 #define CORE_CMD_SAVE  2
 #define CORE_CMD_LOAD  3
-static volatile LONG g_pending_cmd = CORE_CMD_NONE;
-static volatile LONG g_pending_cmd_slot = 0;
+
+// cmd and slot used to be two separate InterlockedExchange calls, which is not
+// one atomic update: RaEventHandler can post CORE_CMD_RESET from the core
+// thread itself (RaDoFrame -> rc_client_do_frame -> RC_CLIENT_EVENT_RESET) at
+// the same time the UI thread posts CORE_CMD_SAVE/LOAD from a hotkey. The two
+// threads' writes to g_pending_cmd and g_pending_cmd_slot could interleave, so
+// the command that ran could end up paired with the other call's slot -
+// silently saving/loading the wrong slot, or dropping one command entirely.
+// Packing both into a single LONG makes the update one indivisible exchange.
+static volatile LONG g_pending_cmd_packed = 0; // low byte = cmd, next byte = slot
 
 static void ProcessPendingCommand()
 {
-	LONG cmd = InterlockedExchange(&g_pending_cmd, CORE_CMD_NONE);
+	LONG packed = InterlockedExchange(&g_pending_cmd_packed, 0);
+	int cmd = packed & 0xFF;
 	if (cmd == CORE_CMD_NONE) return;
-
-	int slot = (int)InterlockedCompareExchange(&g_pending_cmd_slot, 0, 0);
+	int slot = (packed >> 8) & 0xFF;
 
 	if (cmd == CORE_CMD_RESET) DoReset();
 	else if (cmd == CORE_CMD_SAVE) DoSaveState(slot);
@@ -3544,8 +3648,7 @@ static bool PostCoreCommand(LONG cmd, int slot)
 		CoreSetToast("SAVESTATE LOCKED (RA HARDCORE)", 200);
 		return false;
 	}
-	InterlockedExchange(&g_pending_cmd_slot, slot);
-	InterlockedExchange(&g_pending_cmd, cmd);
+	InterlockedExchange(&g_pending_cmd_packed, (cmd & 0xFF) | ((slot & 0xFF) << 8));
 	return true;
 }
 
