@@ -635,24 +635,58 @@ bool UpdaterApplyAndRestart()
 	// that backup again on iteration 2 while target_exe was already gone
 	// (renamed on iteration 1), destroying the one safety net this exists
 	// for the moment a single copy attempt failed.
+	fprintf(f, "set RETRY_RENAME_COUNT=0\r\n");
 	fprintf(f, ":retry_rename\r\n");
 	fprintf(f, "if not exist \"%s\" goto renamed\r\n", target_exe.c_str());
 	fprintf(f, "del /f /q \"%s\" >nul 2>&1\r\n", old_exe.c_str());
 	fprintf(f, "ren \"%s\" \"%s\" >nul 2>&1\r\n", target_exe.c_str(),
 		(fs::path(old_exe).filename().string()).c_str());
 	fprintf(f, "if exist \"%s\" (\r\n", target_exe.c_str());
+	// A persistent AV lock/handle on the live exe could in principle hold this
+	// forever too - give up after 30s rather than leave an invisible cmd.exe
+	// spinning. target_exe still exists in this branch by definition, so
+	// giving up here is safe: the running install is untouched, just not
+	// updated this time.
+	fprintf(f, "    set /a RETRY_RENAME_COUNT+=1\r\n");
+	fprintf(f, "    if %%RETRY_RENAME_COUNT%% geq 30 (\r\n");
+	fprintf(f, "        del \"%%~f0\" >nul 2>&1\r\n");
+	fprintf(f, "        goto :eof\r\n");
+	fprintf(f, "    )\r\n");
 	fprintf(f, "    timeout /t 1 /nobreak >nul\r\n");
 	fprintf(f, "    goto retry_rename\r\n");
 	fprintf(f, ")\r\n");
 	fprintf(f, ":renamed\r\n");
+	// The C++ fs::exists(new_exe) check above and this copy running are
+	// seconds apart (the timeout at the top of the script, plus whatever
+	// delay there was before the user/app called this function at all) - an
+	// AV quarantine or a concurrent re-download can make new_exe vanish in
+	// that window. Without a cap, target_exe is already gone (renamed to
+	// .old above) and this loop retried forever with nothing to copy,
+	// leaving the install with neither exe in place and a hidden cmd.exe
+	// spinning unnoticed for good.
+	fprintf(f, "set RETRY_COPY_COUNT=0\r\n");
 	fprintf(f, ":retry_copy\r\n");
+	fprintf(f, "if not exist \"%s\" goto copy_failed\r\n", new_exe.c_str());
 	fprintf(f, "copy /y \"%s\" \"%s\" >nul 2>&1\r\n", new_exe.c_str(), target_exe.c_str());
 	fprintf(f, "if errorlevel 1 (\r\n");
+	fprintf(f, "    set /a RETRY_COPY_COUNT+=1\r\n");
+	fprintf(f, "    if %%RETRY_COPY_COUNT%% geq 15 goto copy_failed\r\n");
 	fprintf(f, "    timeout /t 1 /nobreak >nul\r\n");
 	fprintf(f, "    goto retry_copy\r\n");
 	fprintf(f, ")\r\n");
 	fprintf(f, "del /f /q \"%s\" >nul 2>&1\r\n", new_exe.c_str());
 	fprintf(f, "start \"\" \"%s\"\r\n", target_exe.c_str());
+	fprintf(f, "del \"%%~f0\" >nul 2>&1\r\n");
+	fprintf(f, "goto :eof\r\n");
+	fprintf(f, "\r\n");
+	fprintf(f, ":copy_failed\r\n");
+	// Neither exe may exist at this point (target_exe was already renamed
+	// away, new_exe never showed up or never copied cleanly) - restore the
+	// backup so the install is not left completely broken, even though the
+	// update itself did not apply.
+	fprintf(f, "if exist \"%s\" copy /y \"%s\" \"%s\" >nul 2>&1\r\n",
+		old_exe.c_str(), old_exe.c_str(), target_exe.c_str());
+	fprintf(f, "if exist \"%s\" start \"\" \"%s\"\r\n", target_exe.c_str(), target_exe.c_str());
 	fprintf(f, "del \"%%~f0\" >nul 2>&1\r\n");
 	fclose(f);
 
