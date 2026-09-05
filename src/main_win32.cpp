@@ -34,6 +34,12 @@ namespace fs = std::filesystem;
 #include "resource.h"
 #include "mister_math.h"
 
+// dev-sdl3: first slice of the SDL3 migration. This only proves the vendored,
+// statically-linked SDL3 build actually links and runs inside this exe - it
+// does not replace any Win32 window/input/audio code yet. That happens
+// incrementally in later commits on this branch.
+#include <SDL3/SDL.h>
+
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
@@ -1299,6 +1305,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	CheckWindowsCrashReportsOnStartup();
 
+	// dev-sdl3 smoke test: confirms the statically-linked SDL3 build actually
+	// initializes inside this exe before any of the real Win32 windowing/
+	// input/audio code is touched. Nothing downstream depends on this yet.
+	{
+		FILE* lf = fopen("mister_flavor.log", "a");
+		if (SDL_Init(SDL_INIT_VIDEO))
+		{
+			if (lf) fprintf(lf, "[INFO] [SDL3] inicializado, versao=%d\n", SDL_GetVersion());
+		}
+		else if (lf)
+		{
+			fprintf(lf, "[ERROR] [SDL3] SDL_Init falhou: %s\n", SDL_GetError());
+		}
+		if (lf) fclose(lf);
+	}
+
 	// Headless port install: "MiSTer_4_ALL.exe --install-port <id>" downloads
 	// and extracts a known port and exits, before any window is created, so
 	// ports/ can be pre-populated (packaging, CI, or just getting ahead of a
@@ -1656,6 +1678,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// be holding the GL context current at this point - safe to tear it down
 	// here even though HwInit()/HwMakeCurrent() are otherwise core-thread-only.
 	HwShutdown();
+
+	SDL_Quit();
 
 	if (h_mem_dc) DeleteDC(h_mem_dc);
 	if (h_bitmap) DeleteObject(h_bitmap);
