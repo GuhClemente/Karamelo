@@ -511,6 +511,12 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 	// else already running) keep going.
 	if (fault_mod && fault_mod != base)
 	{
+		// If this thread happened to be inside one of our own locked sections
+		// (e.g. a core callback that touches CoreSetToast) when it faulted,
+		// TerminateThread below never runs its LeaveCriticalSection - recreate
+		// only the locks this exact thread owns before killing it, or that
+		// lock stays wedged forever with no crash to explain why.
+		CoreRecoverLocksHeldByThread(GetCurrentThreadId());
 		TerminateThread(GetCurrentThread(), 1);
 	}
 
@@ -592,7 +598,10 @@ static void CheckWindowsCrashReportsOnStartup()
 
 					std::wstring app_path = ExtractWerField(xml, L"AppPath");
 					if (app_path.find(L"MiSTer_4_ALL.exe") == std::wstring::npos)
+					{
+						EvtClose(events[i]);
 						continue;
+					}
 
 					// ISO 8601 UTC timestamps sort correctly as plain strings,
 					// so no date parsing is needed to compare or track "newest".
@@ -610,7 +619,11 @@ static void CheckWindowsCrashReportsOnStartup()
 					char time_utf8[64] = { 0 };
 					WideCharToMultiByte(CP_UTF8, 0, time_str.c_str(), -1, time_utf8, sizeof(time_utf8), NULL, NULL);
 
-					if (!last_check.empty() && time_utf8 <= last_check) continue;
+					if (!last_check.empty() && time_utf8 <= last_check)
+					{
+						EvtClose(events[i]);
+						continue;
+					}
 					if (std::string(time_utf8) > newest_seen) newest_seen = time_utf8;
 
 					std::wstring exc_code = ExtractWerField(xml, L"ExceptionCode");
@@ -1638,6 +1651,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	CoreShutdown();
 	RaShutdown();
 	UpdaterShutdown();
+
+	// CoreShutdown() has already joined the core thread, so nothing else can
+	// be holding the GL context current at this point - safe to tear it down
+	// here even though HwInit()/HwMakeCurrent() are otherwise core-thread-only.
+	HwShutdown();
 
 	if (h_mem_dc) DeleteDC(h_mem_dc);
 	if (h_bitmap) DeleteObject(h_bitmap);

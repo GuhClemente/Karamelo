@@ -15,6 +15,13 @@
 bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint);
 bool CoreIsLoading();
 void CoreShutdown();
+
+// Recreates any of the frontend's internal locks (toast/name/options) that
+// the given thread ID currently owns. For use right before force-terminating
+// a core-spawned thread that crashed mid-callback: TerminateThread never runs
+// that thread's LeaveCriticalSection, so without this any lock it held stays
+// wedged forever.
+void CoreRecoverLocksHeldByThread(unsigned long thread_id);
 void CoreReset();
 bool CoreIsRunning();
 double CoreGetTargetFps();

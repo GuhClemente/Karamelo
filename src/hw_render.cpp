@@ -134,9 +134,10 @@ bool HwInit()
 	// A legacy context first - it is the only way to reach the ARB entry point
 	// that creates a modern one.
 	HGLRC legacy = wglCreateContext(g_gl_dc);
-	if (!legacy || !wglMakeCurrent(g_gl_dc, legacy))
+	if (!legacy || (legacy && !wglMakeCurrent(g_gl_dc, legacy)))
 	{
 		HwLog("wglCreateContext falhou (%lu)", GetLastError());
+		if (legacy) wglDeleteContext(legacy);
 		HwShutdown();
 		return false;
 	}
@@ -284,9 +285,19 @@ bool HwMakeCurrent()
 			// calls against them instead of rebuilding.
 			g_context_live = false;
 
+			// HwShutdown() unconditionally memset()s g_hw_cb (and clears
+			// g_hw_active) - save the callback struct first, or the
+			// context_reset check right below always sees a wiped-out
+			// struct and the notification this whole branch exists for can
+			// never fire, silently leaving the core rendering against a
+			// dead context forever.
+			struct retro_hw_render_callback saved_cb = g_hw_cb;
+
 			HwShutdown();
 			if (HwInit() && wglMakeCurrent(g_gl_dc, g_gl_ctx))
 			{
+				g_hw_cb = saved_cb;
+				g_hw_active = true;
 				if (g_hw_cb.context_reset)
 				{
 					g_hw_cb.context_reset();

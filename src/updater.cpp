@@ -286,10 +286,25 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 
 					FILE* dest_file = NULL;
 					std::string temp_new_path;
-					if (out_bin == NULL && out_str == NULL && track_progress)
+					bool need_dest_file = (out_bin == NULL && out_str == NULL && track_progress);
+					if (need_dest_file)
 					{
 						temp_new_path = GetExecutableDirectory() + "\\MiSTer_4_ALL.new";
 						dest_file = fopen(temp_new_path.c_str(), "wb");
+						if (!dest_file)
+						{
+							// Nothing to write the download into (read-only install
+							// dir, AV lock, full disk) - without this check every
+							// downloaded byte below was silently discarded (none of
+							// the dest_file/out_bin/out_str branches matched) while
+							// the function still reported success at the end, since
+							// dest_file being NULL also skips the size/read_ok check
+							// that would otherwise have caught it.
+							WinHttpCloseHandle(request);
+							WinHttpCloseHandle(connect);
+							WinHttpCloseHandle(session);
+							return false;
+						}
 					}
 
 					DWORD avail = 0;
