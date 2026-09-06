@@ -5,8 +5,22 @@
 #include <windows.h>
 #include <SDL3/SDL.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 #include "gamepad_sdl.h"
+
+static void GamepadLog(const char* fmt, ...)
+{
+	char buf[256];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+
+	FILE* f = fopen("mister_flavor.log", "a");
+	if (f) { fprintf(f, "[INFO] [GAMEPAD] %s\n", buf); fclose(f); }
+}
 
 // Slots 0-3, assigned in connection order - see the header for why this
 // differs from XInput's fixed hardware-slot model.
@@ -34,14 +48,25 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 		SDL_JoystickID id = event->gdevice.which;
 		if (FindSlotByInstanceId(id) >= 0) return; // already open
 		int slot = FindFreeSlot();
-		if (slot < 0) return; // four controllers already claimed
+		if (slot < 0) { GamepadLog("conectado mas os 4 slots ja estao ocupados - ignorado"); return; }
 		s_pads[slot] = SDL_OpenGamepad(id);
+		if (s_pads[slot])
+		{
+			GamepadLog("slot %d: %s (tipo=%d)", slot,
+				SDL_GetGamepadName(s_pads[slot]),
+				(int)SDL_GetGamepadType(s_pads[slot]));
+		}
+		else
+		{
+			GamepadLog("slot %d: SDL_OpenGamepad falhou - %s", slot, SDL_GetError());
+		}
 	}
 	else if (event->type == SDL_EVENT_GAMEPAD_REMOVED)
 	{
 		int slot = FindSlotByInstanceId(event->gdevice.which);
 		if (slot >= 0)
 		{
+			GamepadLog("slot %d desconectado", slot);
 			SDL_CloseGamepad(s_pads[slot]);
 			s_pads[slot] = nullptr;
 		}
