@@ -142,12 +142,17 @@ vezes vêm junto).
 | Super Metroid | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
 | Viva Pinata: Trouble in Paradise | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
 | WipEout Phantom Edition | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
+| OutRun (CannonBall DX) | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
 
 Assim como os cores, nenhum ROM/disco/ISO é baixado ou distribuído pelo app -
 só o executável de cada projeto, que é open source e distribuído livremente
 pelos próprios desenvolvedores. A imagem original do jogo continua sendo
 responsabilidade de quem usa o app possuir legalmente; onde o próprio port
-sabe pedir a ROM (a maioria), ele pede na primeira execução.
+sabe pedir a ROM (a maioria), ele pede na primeira execução. O CannonBall DX é
+diferente dos demais nesse ponto: ele não pede a ROM sozinho, então o app
+procura um `outrun.zip` (o romset MAME do OutRun original) já presente em
+`roms/Arcade`/`roms/MAME` e copia automaticamente para dentro da pasta do
+port na primeira vez que ele é aberto.
 
 O mecanismo de download (escolha do asset certo entre vários que uma release
 pode oferecer, e a preferência por executável raso/não-nested ao invés do
