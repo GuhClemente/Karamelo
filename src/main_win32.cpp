@@ -33,6 +33,7 @@ namespace fs = std::filesystem;
 #include "hw_render.h"
 #include "resource.h"
 #include "mister_math.h"
+#include "gamepad_sdl.h"
 
 // dev-sdl3: first slice of the SDL3 migration. This only proves the vendored,
 // statically-linked SDL3 build actually links and runs inside this exe - it
@@ -1034,7 +1035,7 @@ static void PollGamepad()
 	XINPUT_STATE state;
 	ZeroMemory(&state, sizeof(XINPUT_STATE));
 
-	if (XInputGetState(0, &state) == ERROR_SUCCESS)
+	if (GamepadGetState(0, &state))
 	{
 		WORD wButtons = state.Gamepad.wButtons;
 		SHORT sThumbY = state.Gamepad.sThumbLY;
@@ -1365,7 +1366,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// input/audio code is touched. Nothing downstream depends on this yet.
 	{
 		FILE* lf = fopen("mister_flavor.log", "a");
-		if (SDL_Init(SDL_INIT_VIDEO))
+		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
 		{
 			if (lf) fprintf(lf, "[INFO] [SDL3] inicializado, versao=%d\n", SDL_GetVersion());
 		}
@@ -1665,6 +1666,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				g_running = false;
 				break;
 			}
+			GamepadHandleDeviceEvent(&sdl_event);
 		}
 
 		PollGamepad();

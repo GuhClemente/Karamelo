@@ -107,7 +107,7 @@ bool InputCaptureIsAllReleased();
 // when nothing was pressed. Ignores modifiers on their own.
 int InputCaptureScanKey();
 
-// Scans for any gamepad button pressed across all connected XInput controllers.
+// Scans for any gamepad button pressed across all connected controllers.
 int InputCaptureScanPad();
 
 #endif

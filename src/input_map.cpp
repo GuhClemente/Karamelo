@@ -6,6 +6,7 @@
 
 #include "input_map.h"
 #include "libretro.h"
+#include "gamepad_sdl.h"
 
 struct BindDef
 {
@@ -298,10 +299,10 @@ bool InputCaptureIsAllReleased()
 		if (GetAsyncKeyState(vk) & 0x8000) return false;
 	}
 
-	for (DWORD i = 0; i < 4; i++)
+	for (int i = 0; i < 4; i++)
 	{
 		XINPUT_STATE st;
-		if (XInputGetState(i, &st) == ERROR_SUCCESS)
+		if (GamepadGetState(i, &st))
 		{
 			if (st.Gamepad.wButtons != 0) return false;
 			if (st.Gamepad.bLeftTrigger > 50 || st.Gamepad.bRightTrigger > 50) return false;
@@ -325,10 +326,10 @@ int InputCaptureScanKey()
 
 int InputCaptureScanPad()
 {
-	for (DWORD i = 0; i < 4; i++)
+	for (int i = 0; i < 4; i++)
 	{
 		XINPUT_STATE st;
-		if (XInputGetState(i, &st) != ERROR_SUCCESS) continue;
+		if (!GamepadGetState(i, &st)) continue;
 
 		WORD w = st.Gamepad.wButtons;
 		if (w & XINPUT_GAMEPAD_A) return PAD_BTN_A;
