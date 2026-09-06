@@ -1139,6 +1139,55 @@ static void PollGamepad()
 // unmodified. The bool return replaces "return 0 to say handled" (false =
 // drop it here, matching every explicit `return 0/1` case below) vs.
 // "return DefWindowProc" (true = let SDL's own default handling continue).
+static void BlitToDc(HDC hdc, HWND hwnd)
+{
+	RECT client;
+	GetClientRect(hwnd, &client);
+
+	SetStretchBltMode(hdc, COLORONCOLOR);
+
+	if (g_use_present && h_present_dc)
+	{
+		if (present_w == client.right && present_h == client.bottom)
+			BitBlt(hdc, 0, 0, client.right, client.bottom, h_present_dc, 0, 0, SRCCOPY);
+		else
+			StretchBlt(hdc, 0, 0, client.right, client.bottom,
+				h_present_dc, 0, 0, present_w, present_h, SRCCOPY);
+	}
+	else
+	{
+		StretchBlt(
+			hdc, 0, 0, client.right, client.bottom,
+			h_mem_dc, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
+			SRCCOPY
+		);
+	}
+}
+
+// dev-sdl3: PresentFrame calls this directly, once per frame, instead of the
+// old InvalidateRect(hwnd)+UpdateWindow(hwnd) pair. UpdateWindow sends
+// WM_PAINT straight to the window's WNDPROC, bypassing the message queue
+// entirely (that is its documented, intentional behavior) - which meant it
+// never passed through SDL_SetWindowsMessageHook at all, since that hook
+// only fires for messages SDL's own pump actually retrieves from the queue.
+// The window rendered solid black until this was found: PresentFrame kept
+// running every frame with no crash and nothing in the log to explain it,
+// because internally nothing WAS wrong - the paint code the whole rest of
+// the frame's work was building towards simply never ran.
+//
+// GetDC/ReleaseDC, not BeginPaint/EndPaint: BeginPaint clips the returned DC
+// to whatever the currently-pending invalid region happens to be, which can
+// be empty outside of actually handling a real WM_PAINT - drawing would
+// silently be clipped away instead of erroring. WM_PAINT's own case below,
+// which IS a real response to that message, still uses BeginPaint/EndPaint
+// correctly.
+static void PaintNow(HWND hwnd)
+{
+	HDC hdc = GetDC(hwnd);
+	BlitToDc(hdc, hwnd);
+	ReleaseDC(hwnd, hdc);
+}
+
 static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 {
 	(void)userdata;
@@ -1224,30 +1273,17 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 
 	case WM_PAINT:
 	{
+		// The frame-loop-driven redraw (PresentFrame, every frame) uses
+		// PaintNow()/GetDC below instead of InvalidateRect+UpdateWindow - see
+		// the comment on PaintNow for why. This case only remains to answer a
+		// genuine OS-driven repaint request (another window dragged over
+		// ours, restoring from minimize), which arrives as a real queued
+		// message and so still reaches this hook normally; BeginPaint/
+		// EndPaint is correct here specifically because it IS responding to
+		// an actual WM_PAINT.
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hwnd, &ps);
-		RECT client;
-		GetClientRect(hwnd, &client);
-
-		SetStretchBltMode(hdc, COLORONCOLOR);
-
-		if (g_use_present && h_present_dc)
-		{
-			if (present_w == client.right && present_h == client.bottom)
-				BitBlt(hdc, 0, 0, client.right, client.bottom, h_present_dc, 0, 0, SRCCOPY);
-			else
-				StretchBlt(hdc, 0, 0, client.right, client.bottom,
-					h_present_dc, 0, 0, present_w, present_h, SRCCOPY);
-		}
-		else
-		{
-			StretchBlt(
-				hdc, 0, 0, client.right, client.bottom,
-				h_mem_dc, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
-				SRCCOPY
-			);
-		}
-
+		BlitToDc(hdc, hwnd);
 		EndPaint(hwnd, &ps);
 		return false;
 	}
@@ -1278,8 +1314,7 @@ static void PresentFrame(HWND hwnd)
 	MenuRun();
 	RenderFrame();
 
-	InvalidateRect(hwnd, NULL, FALSE);
-	UpdateWindow(hwnd);
+	PaintNow(hwnd);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
