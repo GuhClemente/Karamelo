@@ -1199,6 +1199,23 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 
 	switch (msg)
 	{
+	// Windows posts WM_SYSKEYDOWN, not WM_KEYDOWN, for any key pressed while
+	// ALT is held down - Alt+Enter included. The check below lived inside
+	// "case WM_KEYDOWN:" since long before this SDL3 branch (confirmed back
+	// to this file's earliest committed version), so it could never have
+	// fired: this is a pre-existing, unrelated bug this pass happened to
+	// catch while testing fullscreen toggling, not a regression from the
+	// SDL3 migration. Only VK_RETURN is handled here - everything else falls
+	// through to `return true` so Alt+F4, Alt+Space (system menu) and F10
+	// keep working exactly as Windows expects.
+	case WM_SYSKEYDOWN:
+		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000))
+		{
+			ToggleFullscreen(hwnd);
+			return false;
+		}
+		return true;
+
 	case WM_KEYDOWN:
 		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000))
 		{
