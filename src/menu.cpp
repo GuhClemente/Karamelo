@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <filesystem>
+#include <map>
 #include <set>
 #include <stdio.h>
 #include <stdlib.h>
@@ -216,55 +217,40 @@ static int g_system_count = 0;
 static int setting_cd_precache = 0; // 0=disabled, 1=enabled
 static int setting_cd_latency = 0;  // 0=enabled (real), 1=disabled (fast)
 
-// Pushes the saved per-core options into the core. Called on load as well as
-// on change: without the load-time call a layout restored from the config
-// only took effect if the player toggled it again by hand.
-static void ApplyPersistedCoreOptions() {
-  // Two different cores can end up running a Master System game and they use
-  // different option keys: cores/sms.dll is Gearsystem, cores/genesis.dll is
-  // Genesis Plus GX. Setting only the Genesis one meant the FM toggle did
-  // nothing at all for .sms files, which load Gearsystem. Each core ignores
-  // the key it does not know.
-  const char *fm_gpgx[] = {"auto", "disabled", "enabled"};
-  // Gearsystem offers only Auto and Disabled - it has no force-on - so the
-  // menu's "Ligado" maps to Auto there. Genesis Plus GX has all three.
-  const char *fm_gears[] = {"Auto", "Disabled", "Auto"};
-  CoreSetOption("genesis_plus_gx_ym2413", fm_gpgx[setting_sms_fm]);
-  CoreSetOption("gearsystem_ym2413", fm_gears[setting_sms_fm]);
-
-  CoreSetOption("melonds_screen_layout", kNdsLayoutVals[setting_nds_layout]);
-  CoreSetOption("melonds_screen_gap", kNdsGapVals[setting_nds_gap]);
-  CoreSetOption("melonds_hybrid_small_screen",
-                kNdsHybridVals[setting_nds_hybrid]);
-
-  // melonDS defaults touch mode to "Mouse", which is its RETRO_DEVICE_MOUSE
-  // path: relative movement for a captured cursor. What we feed it is
-  // RETRO_DEVICE_POINTER, an absolute position, and only "Touch" reads that.
-  // On the default the stylus did nothing at all.
-  CoreSetOption("melonds_touch_mode", "Touch");
-
-  CoreSetOption("citra_layout_option", kCitraLayoutVals[setting_citra_layout]);
-
-  const char *onoff[] = {"disabled", "enabled"};
-  CoreSetOption("genesis_plus_gx_cd_precache", onoff[setting_cd_precache]);
-  CoreSetOption("genesis_plus_gx_cd_latency",
-                onoff[setting_cd_latency ? 0 : 1]);
-}
-
-// Only reached for a loose (non-archived) MSX file - archived content gets
-// the equivalent check in core_runner.cpp after extraction, since only then
-// is the real inner extension known. See the comment there for why fMSX's
-// "MSX2+" default is not trusted.
+// ApplyPersistedCoreOptions()/ApplyMsxMachineTypeOption() are defined below,
+// after the neo_* dip-switch/system-type globals they also push - see the
+// comment on ApplyPersistedCoreOptions() itself.
+static void ApplyPersistedCoreOptions();
 static void ApplyMsxMachineTypeOption(const std::string &core_dll,
-                                      const std::string &ext) {
-  if (core_dll.find("msx.dll") == std::string::npos) return;
-  CoreSetOption("fmsx_mode", ext == ".mx1" ? "MSX1" : "MSX2");
-}
+                                      const std::string &ext);
+
 static int setting_language = 0; // 0=Português, 1=English
 static std::string join_ip_input = "127.0.0.1";
 
 static void MenuProcessKeyImpl(MenuKey key);
 static void MenuSaveSettings();
+
+// A player's choice on the generic Core Options page (PopulateCoreOptionsSettings/
+// CoreOption* in core_runner.cpp), keyed by the core's own option key so it
+// survives a restart - unlike CoreSetOption's own g_core_options, which is
+// in-memory only and forgotten the moment the process exits. Persisted as
+// "coreopt:<key>=<value>" lines (see SettingsSnapshot/MenuLoadSettings) since
+// the existing settings format is otherwise strictly int-keyed and these are
+// core-declared strings. Flat, not scoped per-core: two cores sharing an
+// option name (rare) would share this too, same tradeoff g_core_options
+// itself already makes.
+static std::map<std::string, std::string> g_persisted_core_options;
+
+const char* MenuGetPersistedCoreOption(const char* key) {
+  if (!key) return NULL;
+  auto it = g_persisted_core_options.find(key);
+  return (it != g_persisted_core_options.end()) ? it->second.c_str() : NULL;
+}
+void MenuSetPersistedCoreOption(const char* key, const char* value) {
+  if (!key || !value) return;
+  g_persisted_core_options[key] = value;
+  MenuSaveSettings();
+}
 
 int MenuGetAspectMode() { return setting_aspect; }
 int MenuGetFilterMode() { return setting_filter; }
@@ -723,6 +709,74 @@ static int neo_cd_region = 0;    // 0: US, 1: Japan, 2: Europe
 static int neo_memcard = 0;      // 0: Plugged, 1: Unplugged
 static int neo_dip_settings = 0; // 0: OFF, 1: ON
 static int neo_dip_freeplay = 0; // 0: OFF, 1: ON
+
+// Pushes the saved per-core options into the core. Called on load as well as
+// on change: without the load-time call a setting restored from the config
+// only took effect if the player toggled it again by hand - true of every
+// value below (found the hard way for NeoGeo's own dip switches, which
+// persisted correctly to mister_flavor.cfg and displayed correctly in this
+// menu on the very next launch, but silently never reached Geolith unless
+// re-toggled in that session, since none of them were being re-applied here).
+static void ApplyPersistedCoreOptions() {
+  // Two different cores can end up running a Master System game and they use
+  // different option keys: cores/sms.dll is Gearsystem, cores/genesis.dll is
+  // Genesis Plus GX. Setting only the Genesis one meant the FM toggle did
+  // nothing at all for .sms files, which load Gearsystem. Each core ignores
+  // the key it does not know.
+  const char *fm_gpgx[] = {"auto", "disabled", "enabled"};
+  // Gearsystem offers only Auto and Disabled - it has no force-on - so the
+  // menu's "Ligado" maps to Auto there. Genesis Plus GX has all three.
+  const char *fm_gears[] = {"Auto", "Disabled", "Auto"};
+  CoreSetOption("genesis_plus_gx_ym2413", fm_gpgx[setting_sms_fm]);
+  CoreSetOption("gearsystem_ym2413", fm_gears[setting_sms_fm]);
+
+  CoreSetOption("melonds_screen_layout", kNdsLayoutVals[setting_nds_layout]);
+  CoreSetOption("melonds_screen_gap", kNdsGapVals[setting_nds_gap]);
+  CoreSetOption("melonds_hybrid_small_screen",
+                kNdsHybridVals[setting_nds_hybrid]);
+
+  // melonDS defaults touch mode to "Mouse", which is its RETRO_DEVICE_MOUSE
+  // path: relative movement for a captured cursor. What we feed it is
+  // RETRO_DEVICE_POINTER, an absolute position, and only "Touch" reads that.
+  // On the default the stylus did nothing at all.
+  CoreSetOption("melonds_touch_mode", "Touch");
+
+  CoreSetOption("citra_layout_option", kCitraLayoutVals[setting_citra_layout]);
+
+  const char *onoff[] = {"disabled", "enabled"};
+  CoreSetOption("genesis_plus_gx_cd_precache", onoff[setting_cd_precache]);
+  CoreSetOption("genesis_plus_gx_cd_latency",
+                onoff[setting_cd_latency ? 0 : 1]);
+
+  // NeoGeo/Geolith - value tables kept identical to the interactive
+  // KEY_LEFT/KEY_RIGHT handlers for these (action_id 501-507) on purpose,
+  // since a mismatch here would mean the menu and the actual running core
+  // disagree about what e.g. "MVS" maps to.
+  const char *sys_vals[] = {"aes", "mvs", "uni"};
+  CoreSetOption("geolith_system_type", sys_vals[neo_sys]);
+  const char *bios_vals[] = {"aes", "mvs"};
+  CoreSetOption("geolith_unibios_hw", bios_vals[neo_bios]);
+  const char *cd_vals[] = {"cdz", "cd_top", "cd_front", "cdz_unibios"};
+  CoreSetOption("geolith_cd_system_type", cd_vals[neo_cd_type]);
+  const char *reg_vals[] = {"us", "jp", "as", "eu"};
+  CoreSetOption("geolith_region", reg_vals[neo_cd_region]);
+  const char *mc_vals[] = {"on", "off"};
+  CoreSetOption("geolith_memcard", mc_vals[neo_memcard]);
+  const char *dip_vals[] = {"off", "on"};
+  CoreSetOption("geolith_settingmode", dip_vals[neo_dip_settings]);
+  const char *fp_vals[] = {"off", "on"};
+  CoreSetOption("geolith_freeplay", fp_vals[neo_dip_freeplay]);
+}
+
+// Only reached for a loose (non-archived) MSX file - archived content gets
+// the equivalent check in core_runner.cpp after extraction, since only then
+// is the real inner extension known. See the comment there for why fMSX's
+// "MSX2+" default is not trusted.
+static void ApplyMsxMachineTypeOption(const std::string &core_dll,
+                                      const std::string &ext) {
+  if (core_dll.find("msx.dll") == std::string::npos) return;
+  CoreSetOption("fmsx_mode", ext == ".mx1" ? "MSX1" : "MSX2");
+}
 
 // Which core each system entry needs, so an entry with no DLL behind it can be
 // left out of the menu instead of promising a system that cannot load.
@@ -1848,6 +1902,17 @@ static std::string SettingsSnapshot() {
   out += join_ip_input;
   out += "\n";
 
+  // Core Options page choices - see g_persisted_core_options's own comment.
+  // "=" cannot appear in a libretro option key, so this splits back apart
+  // the same simple way every other line in this file does.
+  for (const auto &kv : g_persisted_core_options) {
+    out += "coreopt:";
+    out += kv.first;
+    out += "=";
+    out += kv.second;
+    out += "\n";
+  }
+
   return out;
 }
 
@@ -1978,6 +2043,10 @@ static void MenuLoadSettings() {
       neo_dip_freeplay = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "netplay_ip") && val[0])
       join_ip_input = val;
+    else if (!strncmp(key, "coreopt:", 8) && key[8] && val[0])
+      // See g_persisted_core_options's own comment - key/val are raw
+      // strings here, not the atoi()'d iv used by every setting above.
+      g_persisted_core_options[key + 8] = val;
   }
   fclose(f);
 }
@@ -2578,7 +2647,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
       int choice_count = CoreOptionChoiceCount(opt_index);
       if (choice_count > 0) {
         int cur = CoreOptionCurrentChoiceIndex(opt_index);
-        CoreOptionSetChoiceIndex(opt_index, (cur + delta + choice_count) % choice_count);
+        int next = (cur + delta + choice_count) % choice_count;
+        CoreOptionSetChoiceIndex(opt_index, next);
+        // Persist so this choice survives a restart - without this, the
+        // very bug ApplyPersistedCoreOptions() exists to avoid for the
+        // hand-picked settings would apply here too: the value would look
+        // chosen but silently revert to the core's own default next launch.
+        MenuSetPersistedCoreOption(CoreOptionKey(opt_index), CoreOptionChoiceAt(opt_index, next));
       }
       int cur_row = selected_idx;
       PopulateCoreOptionsSettings();

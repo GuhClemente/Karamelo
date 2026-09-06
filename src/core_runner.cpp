@@ -1972,6 +1972,28 @@ static bool CB_Environment(unsigned cmd, void* data)
 		size_t n = g_core_defaults.size();
 		LeaveCriticalSection(&options_lock);
 
+		// The generic Core Options menu page persists a player's choice to
+		// mister_flavor.cfg (see menu.cpp's g_persisted_core_options); re-apply
+		// any match now, the same way ApplyPersistedCoreOptions() already does
+		// for the older, hand-picked per-core settings - without this a chosen
+		// Internal Resolution (or any other generic option) silently reverted
+		// to the core's own default on every fresh launch, which is exactly
+		// the bug that function's own comment was written to avoid for the
+		// settings it already covers. Skips a key the user already set this
+		// session (g_core_options), so a core that re-declares SET_VARIABLES
+		// mid-session cannot clobber a choice just made with a stale disk value.
+		for (int i = 0; i < count; i++)
+		{
+			EnterCriticalSection(&options_lock);
+			bool already_set = g_core_options.find(s_parsed[i].key) != g_core_options.end();
+			LeaveCriticalSection(&options_lock);
+			if (already_set) continue;
+
+			const char* persisted = MenuGetPersistedCoreOption(s_parsed[i].key);
+			if (persisted && persisted[0])
+				CoreSetOption(s_parsed[i].key, persisted);
+		}
+
 		for (int i = 0; i < count; i++)
 			CoreLogPrintf(RETRO_LOG_DEBUG, "[OPT] opcao: %s = %s", s_parsed[i].key, s_parsed[i].value);
 
