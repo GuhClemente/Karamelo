@@ -1366,7 +1366,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// input/audio code is touched. Nothing downstream depends on this yet.
 	{
 		FILE* lf = fopen("mister_flavor.log", "a");
-		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
+		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
 		{
 			if (lf) fprintf(lf, "[INFO] [SDL3] inicializado, versao=%d\n", SDL_GetVersion());
 		}
