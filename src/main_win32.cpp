@@ -39,7 +39,14 @@ namespace fs = std::filesystem;
 // statically-linked SDL3 build actually links and runs inside this exe - it
 // does not replace any Win32 window/input/audio code yet. That happens
 // incrementally in later commits on this branch.
+//
+// SDL_MAIN_HANDLED tells SDL_main.h not to #define main SDL_main / wrap the
+// entry point - this app's entry point is its own WinMain, not something
+// SDL should own. Only pulled in for the SDL_RegisterApp() declaration
+// below (see its call site in WinMain for why it's needed).
+#define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "user32.lib")
@@ -1360,6 +1367,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	CheckWindowsCrashReportsOnStartup();
+
+	// Root cause of a real crash: SDL_Init(SDL_INIT_VIDEO) registers a Win32
+	// window class named "SDL_app" (SDL's own hardcoded default) under
+	// GetModuleHandle(NULL) - which always resolves to THIS EXE's module
+	// handle, even when the call originates inside a loaded DLL. gopher64
+	// links its own, entirely separate, statically-linked copy of SDL3, and
+	// when it calls its own SDL_Init(SDL_INIT_VIDEO) on the core thread
+	// during retro_load_game(), it tries to register that exact same
+	// (class name, hInstance) pair again. RegisterClassEx fails
+	// (ERROR_CLASS_ALREADY_EXISTS) - and SDL's own WIN_CreateDevice()
+	// ignores that failure's return value, leaving gopher64's copy of
+	// SDL_Appname NULL. Its later SDL_CreateWindow(..., SDL_Appname, ...)
+	// then fails with ERROR_INVALID_PARAMETER ("Parametro incorreto"),
+	// panicking gopher64's Rust side. Registering our OWN class under a
+	// name other than the default here, before SDL_Init ever runs, means
+	// gopher64's later default "SDL_app" registration is the only one
+	// under that name and succeeds cleanly instead of colliding with ours.
+	SDL_RegisterApp("MiSTer4ALL_SDL", 0, NULL);
 
 	// dev-sdl3 smoke test: confirms the statically-linked SDL3 build actually
 	// initializes inside this exe before any of the real Win32 windowing/
