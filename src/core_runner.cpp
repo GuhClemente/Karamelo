@@ -683,6 +683,21 @@ static void InitAudio(int sample_rate)
 		h_audio_thread = CreateThread(NULL, 0, AudioThreadProc, NULL, 0, NULL);
 		audio_initialized = true;
 	}
+	else
+	{
+		// Both attempts failed - every game from here on plays completely
+		// silent with nothing else in the log to explain why (audio_initialized
+		// stays false, so SendAudioSamples() no-ops every call with no error of
+		// its own). This is exactly the failure mode that happens if SDL_INIT_AUDIO
+		// was never passed to SDL_Init() - the subsystem call fails quietly
+		// rather than crashing.
+		FILE* lf = fopen("mister_flavor.log", "a");
+		if (lf)
+		{
+			fprintf(lf, "[ERROR] [AUDIO] SDL_OpenAudioDeviceStream falhou: %s\n", SDL_GetError());
+			fclose(lf);
+		}
+	}
 }
 
 static void SendAudioSamples(const int16_t* data, size_t frames)
