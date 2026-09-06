@@ -200,7 +200,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "REDRIVER2", "REDRIVER 2",
           "OpenDriver2/REDRIVER2", "", true, {} },
         { "SymphonyRecomp", "Castlevania: Symphony of the Night",
-          "gfdac/SymphonyRecomp", "", true, {} },
+          "GuhClemente/SymphonyRecomp", "", true, {} },
         { "Sonic1Forever", "Sonic 1 Forever",
           "ElspethThePict/S1Forever", "", true, {} },
         { "Sonic3AIR", "Sonic 3 A.I.R.",

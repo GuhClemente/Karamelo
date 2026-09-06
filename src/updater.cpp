@@ -25,7 +25,7 @@ namespace fs = std::filesystem;
 
 // Configuration
 static const char* UPDATE_MANIFEST_URL = "https://mister4all.com/downloads/version.json";
-static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/gfdac/MiSTer-4-All/main/dist/version.json";
+static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/GuhClemente/MiSTer-4-All/main/dist/version.json";
 static const wchar_t* USER_AGENT = L"MiSTer-4-ALL-Updater/1.0";
 
 // Internal State
