@@ -132,7 +132,7 @@ vezes vêm junto).
 | Jak & Daxter (OpenGOAL) | [open-goal/jak-project](https://github.com/open-goal/jak-project) |
 | LoD: Severed Chains | [Legend-of-Dragoon-Modding/Severed-Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) |
 | REDRIVER 2 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
-| Castlevania: Symphony of the Night | [gfdac/SymphonyRecomp](https://github.com/gfdac/SymphonyRecomp) |
+| Castlevania: Symphony of the Night | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
 | Sonic 1 Forever | [ElspethThePict/S1Forever](https://github.com/ElspethThePict/S1Forever) |
 | Sonic 3 A.I.R. | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
 | Sonic Unleashed Recompiled | [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) |

@@ -14,7 +14,7 @@
 #define APP_ARCH        "x64"
 #define APP_EXE_BASE    "MiSTer_4_ALL"
 #define APP_EXE_NAME    "MiSTer_4_ALL_v0.9.1.exe"
-#define APP_GITHUB_REPO "gfdac/MiSTer-4-All"
+#define APP_GITHUB_REPO "GuhClemente/MiSTer-4-All"
 #define APP_SITE        "mister4all.com"
 
 // One entry per system in the main menu, and every one of them now has a
