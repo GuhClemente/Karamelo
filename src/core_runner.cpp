@@ -37,7 +37,6 @@
 namespace fs = std::filesystem;
 
 #pragma comment(lib, "winmm.lib")
-#pragma comment(lib, "xinput.lib")
 
 // Libretro Core Function Pointers
 typedef void (*retro_init_t)(void);
@@ -336,7 +335,7 @@ void CoreUpdateToast()
 #define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz
 
 // A card whose shared-mode mix format is natively 44.1kHz still accepts a
-// 48kHz waveOutOpen() - the OS mixer resamples - but that is a second
+// 48kHz SDL_OpenAudioDeviceStream() - the OS mixer resamples - but that is a second
 // conversion stage stacked on top of the one this file already does from the
 // core's rate. DetectPreferredOutputSampleRate() asks the device what it
 // actually wants, once, so most machines end up doing only one conversion
@@ -456,8 +455,8 @@ static void ResetAudioRateController()
 }
 
 // Queries the default render device's shared-mode mix format once, so
-// InitAudio can open waveOut at the rate the card actually runs instead of
-// an assumed 48000. Every failure path falls back to 48000, which every
+// InitAudio can open the audio stream at the rate the card actually runs
+// instead of an assumed 48000. Every failure path falls back to 48000, which every
 // device accepts (the OS mixer resamples for it, same as it always has).
 static int DetectPreferredOutputSampleRate()
 {

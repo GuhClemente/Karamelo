@@ -40,6 +40,12 @@ const char* MenuGetWallpaperCustomPath(int index);
 int  MenuGetOsdTheme();
 bool MenuGetFullscreen();
 void MenuSetFullscreen(bool fs);
+// Windowed-mode position/size, persisted across restarts. Get returns false
+// (leaving x/y/w/h untouched) if nothing has been saved yet - caller should
+// keep its own built-in default in that case. Set is meant to be called once
+// at shutdown with the current geometry, not on every move/resize event.
+bool MenuGetWindowRect(int* x, int* y, int* w, int* h);
+void MenuSetWindowRect(int x, int y, int w, int h);
 int  MenuGetDeadzone();
 int  MenuGetAudioLatencyMs();
 int  MenuGetVideoDriver();

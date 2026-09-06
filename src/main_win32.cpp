@@ -51,7 +51,6 @@ namespace fs = std::filesystem;
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "xinput.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "dwmapi.lib")
 
@@ -1575,10 +1574,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// AdjustWindowRect dance the old CreateWindowEx call needed to make its
 	// *outer* window rect produce a WINDOW_WIDTH x WINDOW_HEIGHT *client*
 	// area is not needed here.
+	// Created hidden: MenuInit() below (which loads the saved window rect)
+	// has to run before the geometry below can be applied, and there is no
+	// point flashing the default 1280x720 centered window for one frame only
+	// to jump to the restored size/position immediately after. Shown once
+	// that geometry has been applied.
 	g_sdl_window = SDL_CreateWindow(
 		APP_NAME " v" APP_VERSION " " APP_ARCH " [mister4all.com | @GuhClemente]",
 		WINDOW_WIDTH, WINDOW_HEIGHT,
-		SDL_WINDOW_RESIZABLE);
+		SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
 	if (!g_sdl_window) return 1;
 
 	SDL_PropertiesID win_props = SDL_GetWindowProperties(g_sdl_window);
@@ -1604,6 +1608,42 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ReleaseDC(hwnd, hdc);
 
 	MenuInit();
+
+	// Restore the windowed-mode size/position saved on a previous exit, now
+	// that MenuInit() has loaded it. Guards against a monitor that is no
+	// longer connected (laptop undocked, a second monitor unplugged): if the
+	// saved rect's center would not land on any currently-connected display,
+	// only the size is restored and the position stays at SDL's own default
+	// (centered on the primary display) instead of placing the window
+	// somewhere the user cannot see or reach it.
+	{
+		int wx, wy, ww, wh;
+		if (MenuGetWindowRect(&wx, &wy, &ww, &wh))
+		{
+			bool visible_on_a_display = false;
+			int display_count = 0;
+			SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+			if (displays)
+			{
+				SDL_Point center = { wx + ww / 2, wy + wh / 2 };
+				for (int i = 0; i < display_count; i++)
+				{
+					SDL_Rect bounds;
+					if (SDL_GetDisplayBounds(displays[i], &bounds) && SDL_PointInRect(&center, &bounds))
+					{
+						visible_on_a_display = true;
+						break;
+					}
+				}
+				SDL_free(displays);
+			}
+
+			SDL_SetWindowSize(g_sdl_window, ww, wh);
+			if (visible_on_a_display)
+				SDL_SetWindowPosition(g_sdl_window, wx, wy);
+		}
+	}
+	SDL_ShowWindow(g_sdl_window);
 
 	// Probe OpenGL once, here on the main thread. Doing it lazily from a core
 	// callback created a window on the core thread, which is a bad place for one.
@@ -1770,6 +1810,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// be holding the GL context current at this point - safe to tear it down
 	// here even though HwInit()/HwMakeCurrent() are otherwise core-thread-only.
 	HwShutdown();
+
+	// Save the windowed-mode geometry for MenuGetWindowRect to restore next
+	// launch. Skipped while fullscreen (SDL reports the fullscreen rect, not
+	// the windowed one it would return to) or minimized (Windows reports a
+	// minimized window's position as roughly -32000,-32000, which would
+	// otherwise get saved as if it were a real, deliberate position).
+	if (!g_is_fullscreen && !(SDL_GetWindowFlags(g_sdl_window) & SDL_WINDOW_MINIMIZED))
+	{
+		int wx = 0, wy = 0, ww = 0, wh = 0;
+		SDL_GetWindowPosition(g_sdl_window, &wx, &wy);
+		SDL_GetWindowSize(g_sdl_window, &ww, &wh);
+		if (ww > 0 && wh > 0)
+			MenuSetWindowRect(wx, wy, ww, wh);
+	}
 
 	SDL_Quit();
 
