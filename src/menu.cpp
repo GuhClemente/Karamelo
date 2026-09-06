@@ -171,16 +171,19 @@ static int setting_latency = 1;  // index into kAudioLatencyMs below; default 12
 // Audio buffer depth. Below 64ms the waveOut queue cannot stay ahead of the
 // mixer on a loaded machine; above 512ms the delay is audible against input.
 static const int kAudioLatencyMs[4] = { 64, 128, 256, 512 };
-// Vulkan and DirectX 11 used to be listed here too, but hw_render.cpp only
-// ever implements OpenGL/WGL - picking either one silently ran OpenGL
-// anyway, with no indication anything different had happened. Only list
-// backends that actually exist until a real Vulkan/D3D11 backend lands.
+// A single on/off toggle, not a per-API picker: OpenGL, Vulkan and D3D11
+// backends (hw_render.cpp/hw_render_vulkan.cpp/hw_render_d3d11.cpp) all sit
+// behind this one setting via MenuGetHwRender() - a core requests whichever
+// context type it prefers, and CB_Environment's SET_HW_RENDER case dispatches
+// to whichever of the three backends matches. There is no way for the user to
+// force one specific API over another; only to allow hardware rendering at
+// all or fall back to every core's own software renderer.
 static const char *kVideoDrivers[] = {
     "Software (CPU)",
-    "OpenGL (GPU 3D)"
+    "Hardware (GPU 3D)"
 };
 static const int kVideoDriverCount = 2;
-static int setting_driver = 1; // Default to OpenGL (GPU 3D)
+static int setting_driver = 1; // Default to Hardware (GPU 3D)
 static int setting_sync = 1;  // 0=Native (Game Rate), 1=Sync to Display
 static int setting_vsync = 1; // 0=Disabled, 1=Enabled
 // ParaLLEl N64 is the primary robust core with Ari64 Dynarec and RetroAchievements.
