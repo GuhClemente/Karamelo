@@ -89,6 +89,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     /Fobuild\ ^
     src\mister_math.cpp ^
     src\input_map.cpp ^
+    src\gamepad_sdl.cpp ^
     src\hw_render.cpp ^
     src\chd_reader.cpp ^
     src\netplay_protocol.cpp ^

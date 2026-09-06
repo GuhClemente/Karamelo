@@ -23,6 +23,7 @@
 #include "core_runner.h"
 #include "menu.h"
 #include "input_map.h"
+#include "gamepad_sdl.h"
 #include "archive_helper.h"
 #include "retroachievements.h"
 #include "mister_math.h"
@@ -1903,11 +1904,11 @@ static void CB_InputPoll(void)
 	// Analog deadzone, read once rather than per pad.
 	const int deadzone_thresh = (MenuGetDeadzone() * 32768) / 100;
 
-	// 1. Direct JIT Hardware Polling via XInput (Zero Windows Queue Latency)
+	// 1. Direct JIT Hardware Polling via SDL_Gamepad (dev-sdl3: was XInput)
 	for (DWORD pad = 0; pad < 4; pad++)
 	{
 		XINPUT_STATE state;
-		if (XInputGetState(pad, &state) != ERROR_SUCCESS) continue;
+		if (!GamepadGetState((int)pad, &state)) continue;
 
 		WORD w = state.Gamepad.wButtons;
 		if (state.Gamepad.bLeftTrigger > 50) w |= PAD_BTN_LT;
