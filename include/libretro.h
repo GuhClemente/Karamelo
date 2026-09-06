@@ -197,6 +197,34 @@ struct retro_hw_render_callback
    bool debug_context;
 };
 
+// Added for Vulkan support (dev-sdl3 branch): our vendored libretro.h predates
+// these upstream additions, which libretro_vulkan.h's structs need by field
+// type even where we don't implement every rendering API listed here.
+enum retro_hw_render_interface_type
+{
+   RETRO_HW_RENDER_INTERFACE_VULKAN     = 0,
+   RETRO_HW_RENDER_INTERFACE_D3D9       = 1,
+   RETRO_HW_RENDER_INTERFACE_D3D10      = 2,
+   RETRO_HW_RENDER_INTERFACE_D3D11      = 3,
+   RETRO_HW_RENDER_INTERFACE_D3D12      = 4,
+   RETRO_HW_RENDER_INTERFACE_GSKIT_PS2  = 5,
+   RETRO_HW_RENDER_INTERFACE_DUMMY      = 0x7FFFFFFF
+};
+
+// All retro_hw_render_interface implementations (e.g. retro_hw_render_interface_vulkan
+// in libretro_vulkan.h) start with these two fields - a core casts based on interface_type.
+struct retro_hw_render_interface
+{
+   enum retro_hw_render_interface_type interface_type;
+   unsigned interface_version;
+};
+
+enum retro_hw_render_context_negotiation_interface_type
+{
+   RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN = 0,
+   RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_DUMMY = 0x7FFFFFFF
+};
+
 enum retro_pixel_format
 {
    RETRO_PIXEL_FORMAT_0RGB1555 = 0,

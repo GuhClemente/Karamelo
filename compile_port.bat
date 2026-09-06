@@ -83,6 +83,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     /I third_party\libchdr\include ^
     /I third_party\libchdr ^
     /I third_party\SDL3\include ^
+    /I third_party\Vulkan-Headers\include ^
     /D_CRT_SECURE_NO_WARNINGS ^
     /DRC_CLIENT_SUPPORTS_HASH ^
     /DZSTD_DISABLE_ASM ^
@@ -91,6 +92,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     src\input_map.cpp ^
     src\gamepad_sdl.cpp ^
     src\hw_render.cpp ^
+    src\hw_render_vulkan.cpp ^
     src\chd_reader.cpp ^
     src\netplay_protocol.cpp ^
     src\charrom.cpp ^
