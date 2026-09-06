@@ -90,6 +90,7 @@ static uint32_t* pixel_buffer = nullptr;
 static HBITMAP h_bitmap = nullptr;
 static HDC h_mem_dc = nullptr;
 static HWND g_hwnd = nullptr;
+static SDL_Window* g_sdl_window = nullptr;
 HWND MainGetHwnd() { return g_hwnd; }
 static bool g_running = true;
 static bool g_is_fullscreen = false;
@@ -326,35 +327,20 @@ static void DrawToast(uint32_t* buf, int bw, int bh, const ThemeColor& theme)
 	DrawStringToScaled(buf, bw, bh, tx + 12 * scale, ty + 5 * scale, msg, theme.text_white, scale);
 }
 
+// dev-sdl3: the window itself is now created and owned by SDL3 (see WinMain),
+// so toggling its style bits directly via SetWindowLong/SetWindowPos - as this
+// function used to - would change the real Win32 window out from under SDL's
+// own internal state cache without SDL ever finding out, desyncing anything
+// that later asks SDL for the window's flags/size. SDL_SetWindowFullscreen is
+// the API that keeps both in agreement; the (void)hwnd is here only because
+// PollGamepad-era callers still pass one - the SDL window is the actual
+// source of truth now.
 static void ToggleFullscreen(HWND hwnd)
 {
-	static WINDOWPLACEMENT g_wpPrev = { sizeof(g_wpPrev) };
-	DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
-
-	if (dwStyle & WS_OVERLAPPEDWINDOW)
-	{
-		MONITORINFO mi = { sizeof(mi) };
-		if (GetWindowPlacement(hwnd, &g_wpPrev) &&
-			GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi))
-		{
-			SetWindowLong(hwnd, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
-			SetWindowPos(hwnd, HWND_TOP,
-				mi.rcMonitor.left, mi.rcMonitor.top,
-				mi.rcMonitor.right - mi.rcMonitor.left,
-				mi.rcMonitor.bottom - mi.rcMonitor.top,
-				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-			g_is_fullscreen = true;
-		}
-	}
-	else
-	{
-		SetWindowLong(hwnd, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
-		SetWindowPlacement(hwnd, &g_wpPrev);
-		SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-			SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-		g_is_fullscreen = false;
-	}
+	(void)hwnd;
+	g_is_fullscreen = !g_is_fullscreen;
+	SDL_SetWindowFullscreen(g_sdl_window, g_is_fullscreen);
+	SDL_SyncWindow(g_sdl_window);
 	MenuSetFullscreen(g_is_fullscreen);
 }
 
@@ -1145,8 +1131,23 @@ static void PollGamepad()
 	}
 }
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+// dev-sdl3: the window is now created by SDL3, which installs its own
+// internal WndProc - this app no longer registers one of its own. SDL runs
+// this hook for every raw Windows message before its own processing (see
+// SDL_SetWindowsMessageHook in WinMain), which is the supported way to keep
+// exactly this switch-statement's worth of custom handling working
+// unmodified. The bool return replaces "return 0 to say handled" (false =
+// drop it here, matching every explicit `return 0/1` case below) vs.
+// "return DefWindowProc" (true = let SDL's own default handling continue).
+static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 {
+	(void)userdata;
+	HWND hwnd = msg_ptr->hwnd;
+	UINT msg = msg_ptr->message;
+	WPARAM wParam = msg_ptr->wParam;
+	LPARAM lParam = msg_ptr->lParam;
+	(void)lParam;
+
 	switch (msg)
 	{
 	case WM_KEYDOWN:
@@ -1214,12 +1215,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			}
 		}
 		InvalidateRect(hwnd, NULL, FALSE);
-		return 0;
+		return false;
 
 	case WM_KEYUP:
 		// Nothing to do: the core thread samples the keyboard directly with
 		// GetAsyncKeyState, so key-up needs no bookkeeping here.
-		return 0;
+		return false;
 
 	case WM_PAINT:
 	{
@@ -1248,19 +1249,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		}
 
 		EndPaint(hwnd, &ps);
-		return 0;
+		return false;
 	}
 
 	case WM_ERASEBKGND:
-		return 1;
-
-	case WM_DESTROY:
-		g_running = false;
-		PostQuitMessage(0);
-		return 0;
+		// Dropping the message entirely (false) is the hook-model equivalent
+		// of a WndProc returning nonzero here: either way, nothing ever
+		// erases the background before WM_PAINT draws over it, which is the
+		// whole point - it avoids the visible flicker a real erase causes.
+		return false;
 	}
 
-	return DefWindowProc(hwnd, msg, wParam, lParam);
+	// Every other message (WM_DESTROY included - SDL's own handling of it is
+	// what generates SDL_EVENT_QUIT on the last window closing, watched for
+	// in WinMain's loop) continues on to SDL's default processing.
+	return true;
 }
 
 static void PresentFrame(HWND hwnd)
@@ -1482,34 +1485,41 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return pass ? 0 : 1;
 	}
 
-	WNDCLASSEX wc = { 0 };
-	wc.cbSize = sizeof(WNDCLASSEX);
-	wc.style = CS_HREDRAW | CS_VREDRAW;
-	wc.lpfnWndProc = WndProc;
-	wc.hInstance = hInstance;
-	wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
-	wc.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON, 16, 16, 0);
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-	wc.lpszClassName = "MiSTerFlavorWindowClass";
-
-	if (!RegisterClassEx(&wc)) return 1;
-
-	RECT wr = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
-	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
-
-	HWND hwnd = CreateWindowEx(
-		0,
-		wc.lpszClassName,
+	// dev-sdl3: window creation and the message pump are now SDL3's - see
+	// SdlWindowsMsgHook above for where the old WndProc's switch statement
+	// moved to, and ToggleFullscreen for why that one specifically had to be
+	// rewritten (not just relocated) once SDL owned the window. Everything
+	// else downstream (GDI blit in the paint handler, WGL in hw_render.cpp,
+	// XInput/GetAsyncKeyState polling, mouse-as-stylus) still operates on the
+	// real HWND pulled out of the SDL window below, unchanged.
+	//
+	// SDL_CreateWindow's w/h size the client area directly - the manual
+	// AdjustWindowRect dance the old CreateWindowEx call needed to make its
+	// *outer* window rect produce a WINDOW_WIDTH x WINDOW_HEIGHT *client*
+	// area is not needed here.
+	g_sdl_window = SDL_CreateWindow(
 		APP_NAME " v" APP_VERSION " " APP_ARCH " [mister4all.com | @GuhClemente]",
-		WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-		CW_USEDEFAULT, CW_USEDEFAULT,
-		wr.right - wr.left, wr.bottom - wr.top,
-		NULL, NULL, hInstance, NULL
-	);
+		WINDOW_WIDTH, WINDOW_HEIGHT,
+		SDL_WINDOW_RESIZABLE);
+	if (!g_sdl_window) return 1;
 
-	if (!hwnd) return 1;
-	g_hwnd = hwnd;
+	SDL_PropertiesID win_props = SDL_GetWindowProperties(g_sdl_window);
+	g_hwnd = (HWND)SDL_GetPointerProperty(win_props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	if (!g_hwnd) return 1;
+
+	// SDL has no idea this exe carries its own icon resource (src\resource.rc)
+	// - the old WNDCLASSEX registration set it via wc.hIcon/hIconSm, which no
+	// longer exists. WM_SETICON on the real HWND is the direct equivalent.
+	HICON h_icon_big = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+	HICON h_icon_small = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON, 16, 16, 0);
+	SendMessage(g_hwnd, WM_SETICON, ICON_BIG, (LPARAM)h_icon_big);
+	SendMessage(g_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)h_icon_small);
+
+	SDL_SetWindowsMessageHook(SdlWindowsMsgHook, NULL);
+
+	// Kept so the rest of this function - written for the old CreateWindowEx
+	// local of the same name - did not need touching line by line.
+	HWND hwnd = g_hwnd;
 
 	HDC hdc = GetDC(hwnd);
 	InitBackbuffer(hdc);
@@ -1588,18 +1598,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	QueryPerformanceCounter(&next_frame);
 	next_frame.QuadPart += target_ticks;
 
-	MSG msg;
+	SDL_Event sdl_event;
 	while (g_running)
 	{
-		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		// SDL_PollEvent pumps the real Win32 message queue internally (via
+		// PeekMessage/TranslateMessage/DispatchMessage) - SdlWindowsMsgHook
+		// above still fires for every one of those raw messages exactly as
+		// it did as a real WndProc. SDL_EVENT_QUIT is what SDL raises once
+		// its own WM_DESTROY handling notices the last window closed.
+		while (SDL_PollEvent(&sdl_event))
 		{
-			if (msg.message == WM_QUIT)
+			if (sdl_event.type == SDL_EVENT_QUIT)
 			{
 				g_running = false;
 				break;
 			}
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
 		}
 
 		PollGamepad();
