@@ -32,6 +32,7 @@
 #include "netplay.h"
 #include "hw_render.h"
 #include "hw_render_vulkan.h"
+#include "hw_render_d3d11.h"
 
 namespace fs = std::filesystem;
 
@@ -1708,6 +1709,8 @@ static bool CB_Environment(unsigned cmd, void* data)
 		}
 		{
 			struct retro_hw_render_callback* cb = (struct retro_hw_render_callback*)data;
+			if (cb && cb->context_type == RETRO_HW_CONTEXT_D3D11)
+				return D3D11HwSetRenderCallback(cb);
 			if (cb && cb->context_type == RETRO_HW_CONTEXT_VULKAN)
 			{
 				if (g_core_wants_vk_negotiation)
@@ -1725,13 +1728,16 @@ static bool CB_Environment(unsigned cmd, void* data)
 	case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
 	{
 		// Handshake companion to SET_HW_RENDER above: called (usually right
-		// after context_reset) once the core wants the actual Vulkan handles
-		// - device/queue/set_image/etc - rather than just having been told
-		// "yes, Vulkan is available". Only meaningful once a Vulkan context
-		// actually exists; the OpenGL path has no equivalent (get_proc_address
-		// and get_current_framebuffer are handed to the core directly on its
-		// own retro_hw_render_callback instead).
-		const void* iface = VkHwGetRenderInterface();
+		// after context_reset) once the core wants the actual D3D11/Vulkan
+		// handles - device/context/set_image/etc - rather than just having
+		// been told "yes, hardware rendering is available". Only meaningful
+		// once that context actually exists; the OpenGL path has no
+		// equivalent (get_proc_address and get_current_framebuffer are
+		// handed to the core directly on its own retro_hw_render_callback
+		// instead). D3D11HwGetRenderInterface/VkHwGetRenderInterface each
+		// return NULL when their own backend isn't the active one.
+		const void* iface = D3D11HwGetRenderInterface();
+		if (!iface) iface = VkHwGetRenderInterface();
 		if (!iface) return false;
 		*(const void**)data = iface;
 		return true;
@@ -1895,10 +1901,11 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 	{
 		// One copy GPU -> CPU per frame. That is the deliberate trade: the CRT
 		// filters, the OSD and the blit all stay on the software path instead
-		// of being rewritten as shaders. Only one of these two is ever active
+		// of being rewritten as shaders. Only one of these three is ever active
 		// for a given loaded core - dispatch on whichever it is.
-		bool hw_ok = VkHwIsActive() ? VkHwReadPixels(dst_fb, width, height)
-		                            : HwReadPixels(dst_fb, width, height);
+		bool hw_ok = D3D11HwIsActive() ? D3D11HwReadPixels(dst_fb, width, height)
+		           : VkHwIsActive()    ? VkHwReadPixels(dst_fb, width, height)
+		                               : HwReadPixels(dst_fb, width, height);
 		if (!hw_ok) return;
 
 		// 480i / 448i Motion-Adaptive Deinterlacing for PS2 (Play! core only).
@@ -2921,10 +2928,11 @@ static void RecoverAfterKilledCore()
 	DeleteCriticalSection(&toast_lock);
 	InitializeCriticalSection(&toast_lock);
 
-	// Both are safe to call unconditionally - each only acts if its own
+	// All three are safe to call unconditionally - each only acts if its own
 	// g_hw_active is set, and a given core only ever activates one of them.
 	HwContextDestroy();
 	VkHwContextDestroy();
+	D3D11HwContextDestroy();
 
 	is_game_loaded = false;
 	is_core_loaded = false;
@@ -3519,7 +3527,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		return false;
 	}
 
-	if (HwIsActive() || VkHwIsActive())
+	if (HwIsActive() || VkHwIsActive() || D3D11HwIsActive())
 	{
 		unsigned hw_w = av_info.geometry.max_width  ? av_info.geometry.max_width  : core_fb_width;
 		unsigned hw_h = av_info.geometry.max_height ? av_info.geometry.max_height : core_fb_height;
@@ -3531,21 +3539,30 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			av_info.geometry.base_width, av_info.geometry.base_height,
 			av_info.geometry.max_width, av_info.geometry.max_height, hw_w, hw_h);
 
-		bool surface_ok = VkHwIsActive() ? VkHwEnsureSurface(hw_w, hw_h) : HwEnsureSurface(hw_w, hw_h);
+		bool surface_ok = D3D11HwIsActive() ? D3D11HwEnsureSurface(hw_w, hw_h)
+		                : VkHwIsActive()    ? VkHwEnsureSurface(hw_w, hw_h)
+		                                    : HwEnsureSurface(hw_w, hw_h);
 		if (surface_ok)
 		{
-			// The core allocates its GL/Vulkan resources here, so it has to
-			// happen after load and before the first retro_run.
-			bool want_vulkan = VkHwIsActive();
-			bool context_ok = want_vulkan ? VkHwContextReset() : (HwContextReset(), true);
-			if (want_vulkan && !context_ok)
+			// The core allocates its GL/Vulkan/D3D11 resources here, so it has
+			// to happen after load and before the first retro_run. Only
+			// Vulkan's reset can fail from a known cause (context negotiation,
+			// checked above before we get here) - D3D11HwContextReset/
+			// HwContextReset returning false means an actually unexpected
+			// native fault, not something we already know how to avoid.
+			bool using_hw_reset = VkHwIsActive() || D3D11HwIsActive();
+			bool context_ok = D3D11HwIsActive() ? D3D11HwContextReset()
+			                : VkHwIsActive()    ? VkHwContextReset()
+			                                    : (HwContextReset(), true);
+			if (using_hw_reset && !context_ok)
 			{
 				// Belt-and-suspenders: covers a core that crashes synchronously
-				// inside context_reset() itself (caught by VkHwContextReset's
-				// own SEH guard) without ever setting g_core_wants_vk_negotiation -
-				// the check above only handles the negotiation-interface case.
+				// inside context_reset() itself (caught by the SEH guard in
+				// VkHwContextReset/D3D11HwContextReset) without having set
+				// g_core_wants_vk_negotiation - the check above only handles
+				// the known Vulkan-negotiation case.
 				CoreLogPrintf(RETRO_LOG_ERROR,
-					"[HW-VK] context_reset falhou/crashou para '%s'",
+					"[HW] context_reset falhou/crashou para '%s'",
 					loaded_core_name.c_str());
 				if (!suppress_toast)
 					CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
@@ -3624,6 +3641,7 @@ static void CoreUnload()
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando HwContextDestroy...");
 	HwContextDestroy();
 	VkHwContextDestroy();
+	D3D11HwContextDestroy();
 	HwReleaseCurrent();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy concluido.");
 

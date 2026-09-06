@@ -93,6 +93,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     src\gamepad_sdl.cpp ^
     src\hw_render.cpp ^
     src\hw_render_vulkan.cpp ^
+    src\hw_render_d3d11.cpp ^
     src\chd_reader.cpp ^
     src\netplay_protocol.cpp ^
     src\charrom.cpp ^
@@ -115,6 +116,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     /link /OUT:app\%APP_EXE% ^
     user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib dwmapi.lib ole32.lib ^
     kernel32.lib imm32.lib oleaut32.lib version.lib uuid.lib advapi32.lib setupapi.lib dinput8.lib ^
+    d3d11.lib d3dcompiler.lib ^
     /SUBSYSTEM:WINDOWS /DEBUG /PDBALTPATH:%%_PDB%% /GUARD:CF /MAP:build\%APP_BASE%.map /OPT:REF /OPT:ICF
 
 if errorlevel 1 (
