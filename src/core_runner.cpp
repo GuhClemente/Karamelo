@@ -6,6 +6,7 @@
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <xinput.h>
+#include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -343,17 +344,20 @@ static int g_output_sample_rate = 48000;
 #define UNDERRUN_ESCALATE_THRESHOLD    3    // this many starved passes in the window...
 #define UNDERRUN_ESCALATE_STEP_BUFFERS 4    // ...grows the queue by this many buffers
 
-static HWAVEOUT h_wave_out = NULL;
+// dev-sdl3: g_audio_stream replaces HWAVEOUT/WAVEHDR. SDL_OpenAudioDeviceStream
+// hands back a stream already bound to the default output device; feeding it
+// is just SDL_PutAudioStreamData with no header prepare/unprepare bookkeeping.
+static SDL_AudioStream* g_audio_stream = nullptr;
 static HANDLE   h_audio_event = NULL;
 static HANDLE   h_audio_thread = NULL;
 static bool     audio_thread_running = false;
 
-static WAVEHDR  wave_headers[NUM_WAVE_BUFFERS];
-static int16_t  wave_buffer_data[NUM_WAVE_BUFFERS][SAMPLES_PER_BUFFER * 2];
-
-// How many of the NUM_WAVE_BUFFERS are actually queued. Set from the Audio
-// Latency setting when a game loads; the rest stay idle. A deeper queue rides
-// out longer hitches, a shallower one responds faster.
+// How many SAMPLES_PER_BUFFER-sized chunks of latency to keep queued in the
+// stream. Set from the Audio Latency setting when a game loads. A deeper
+// queue rides out longer hitches, a shallower one responds faster - same
+// role NUM_WAVE_BUFFERS/g_active_wave_buffers played for the WAVEHDR array,
+// just measured against SDL_GetAudioStreamQueued() now instead of counting
+// how many discrete headers are still WHDR_INQUEUE.
 static volatile LONG g_active_wave_buffers = 12;
 
 // Passes (not samples) that starved during the current judging window, and
@@ -482,7 +486,7 @@ static inline int16_t HermiteInterpolate(int16_t y0, int16_t y1, int16_t y2, int
 // Latency menu setting only ever picks the *starting* depth; this is what
 // lets the same build hold up on hardware weaker than whatever it was tuned
 // on, without the user ever finding the setting. Called only from the audio
-// thread, which is the sole owner of h_wave_out and wave_headers.
+// thread, which is the sole owner of g_audio_stream.
 static void EscalateWaveQueue()
 {
 	LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
@@ -490,20 +494,9 @@ static void EscalateWaveQueue()
 	if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
 	if (want <= active) return;
 
-	for (LONG i = active; i < want; i++)
-	{
-		if (!(wave_headers[i].dwFlags & WHDR_PREPARED))
-		{
-			memset(&wave_headers[i], 0, sizeof(WAVEHDR));
-			memset(wave_buffer_data[i], 0, sizeof(wave_buffer_data[i]));
-			wave_headers[i].lpData = (LPSTR)wave_buffer_data[i];
-			wave_headers[i].dwBufferLength = sizeof(wave_buffer_data[i]);
-			waveOutPrepareHeader(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-		}
-		wave_headers[i].dwFlags &= ~WHDR_DONE;
-		waveOutWrite(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-	}
-
+	// Nothing to prepare/queue up front the way WAVEHDR needed - the target
+	// byte count AudioThreadProc tops the stream up to is derived from this
+	// value on every pass, so raising it takes effect on the very next one.
 	InterlockedExchange(&g_active_wave_buffers, want);
 
 	FILE* lf = fopen("mister_flavor.log", "a");
@@ -525,30 +518,31 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 	{
 		WaitForSingleObject(h_audio_event, 5);
 
-		if (!audio_thread_running || !h_wave_out) break;
+		if (!audio_thread_running || !g_audio_stream) break;
 
+		// Top the stream up to the target queue depth rather than always
+		// pushing one fixed chunk - SDL_GetAudioStreamQueued() is the
+		// byte-level equivalent of "how many WAVEHDRs are still WHDR_INQUEUE"
+		// the old loop tracked per-buffer. Looping in SAMPLES_PER_BUFFER-sized
+		// chunks keeps the underrun/hold-last-sample behavior identical to
+		// before instead of computing one enormous catch-up chunk.
 		const LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+		const int target_bytes = (int)active * SAMPLES_PER_BUFFER * 2 * (int)sizeof(int16_t);
 		bool pass_underran = false;
-		for (int i = 0; i < active; i++)
-		{
-			WAVEHDR* hdr = &wave_headers[i];
-			// Only refill a buffer the driver has finished with. Touching one
-			// that is still WHDR_INQUEUE corrupts the playing audio.
-			if (!(hdr->dwFlags & WHDR_DONE) && (hdr->dwFlags & WHDR_INQUEUE))
-				continue;
 
+		static int16_t s_hold_l = 0;
+		static int16_t s_hold_r = 0;
+		int16_t chunk[SAMPLES_PER_BUFFER * 2];
+
+		while (SDL_GetAudioStreamQueued(g_audio_stream) < target_bytes)
+		{
 			LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
 			LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
-
 			LONG available = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
 
 			// Always keep the device fed. Letting the queue run dry stops
 			// playback outright, which is what produced the periodic gaps;
 			// short frames are padded by holding the last sample instead.
-			int16_t* dst = wave_buffer_data[i];
-			static int16_t s_hold_l = 0;
-			static int16_t s_hold_r = 0;
-
 			for (int s = 0; s < SAMPLES_PER_BUFFER; s++)
 			{
 				if (available > 0)
@@ -566,15 +560,16 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 					s_hold_l = (int16_t)(s_hold_l * 63 / 64);
 					s_hold_r = (int16_t)(s_hold_r * 63 / 64);
 				}
-				dst[s * 2 + 0] = s_hold_l;
-				dst[s * 2 + 1] = s_hold_r;
+				chunk[s * 2 + 0] = s_hold_l;
+				chunk[s * 2 + 1] = s_hold_r;
 			}
 
-
 			InterlockedExchange(&g_ring_read_pos, rp);
-
-			hdr->dwFlags &= ~WHDR_DONE;
-			waveOutWrite(h_wave_out, hdr, sizeof(WAVEHDR));
+			// A false return means nothing was actually queued - breaking
+			// here avoids ever spinning forever on a while condition that
+			// SDL_GetAudioStreamQueued() would otherwise never satisfy.
+			if (!SDL_PutAudioStreamData(g_audio_stream, chunk, (int)sizeof(chunk)))
+				break;
 		}
 
 		DWORD now_tick = GetTickCount();
@@ -645,46 +640,42 @@ static void InitAudio(int sample_rate)
 		return;
 	}
 
-	WAVEFORMATEX wfx = { 0 };
-	wfx.wFormatTag = WAVE_FORMAT_PCM;
-	wfx.nChannels = 2;
-	wfx.nSamplesPerSec = g_output_sample_rate;
-	wfx.wBitsPerSample = 16;
-	wfx.nBlockAlign = (wfx.nChannels * wfx.wBitsPerSample) / 8;
-	wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+	SDL_AudioSpec spec = { 0 };
+	spec.format = SDL_AUDIO_S16;
+	spec.channels = 2;
+	spec.freq = g_output_sample_rate;
 
 	h_audio_event = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-	if (waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR)
+	g_audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
+	if (!g_audio_stream)
 	{
-		// The exact device rate can still be rejected outright (a WDM driver
-		// advertising a shared-mode format waveOut's older API path does not
-		// know how to open). Fall back to the one rate every Windows audio
-		// driver since XP is required to accept, rather than leaving audio
-		// silently dead for the rest of the session.
+		// The exact device rate can still be rejected outright by some
+		// drivers. Fall back to the one rate every Windows audio stack has
+		// accepted since XP, rather than leaving audio silently dead for the
+		// rest of the session.
 		g_output_sample_rate = 48000;
-		wfx.nSamplesPerSec = g_output_sample_rate;
-		wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+		spec.freq = g_output_sample_rate;
 		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
 		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
 		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
 		InterlockedExchange(&g_ring_write_pos, want * SAMPLES_PER_BUFFER);
-		waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT);
+		g_audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
 	}
 
-	if (h_wave_out)
+	if (g_audio_stream)
 	{
+		SDL_ResumeAudioStreamDevice(g_audio_stream);
+
+		// Prime the stream with silence up to the target queue depth - the
+		// same preload the old code did by writing N zeroed WAVEHDR buffers,
+		// so playback starts already at target latency instead of climbing
+		// to it (the startup mute ramp above covers the pop, not the climb).
 		const LONG prime = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+		static const int16_t s_silence[SAMPLES_PER_BUFFER * 2] = { 0 };
 		for (int i = 0; i < prime; i++)
-		{
-			memset(&wave_headers[i], 0, sizeof(WAVEHDR));
-			memset(wave_buffer_data[i], 0, sizeof(wave_buffer_data[i]));
-			wave_headers[i].lpData = (LPSTR)wave_buffer_data[i];
-			wave_headers[i].dwBufferLength = sizeof(wave_buffer_data[i]);
-			waveOutPrepareHeader(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-			waveOutWrite(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-		}
+			SDL_PutAudioStreamData(g_audio_stream, s_silence, (int)sizeof(s_silence));
 
 		// Ring positions were already set above, including the target-occupancy
 		// preload; resetting them here would empty it on the first game.
@@ -806,7 +797,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	double step = s_step;
 	if (s_locked_step > 0.0)
 	{
-		// One waveOut queue in reserve, not half the ring. The ring is 65536
+		// One audio-stream queue in reserve, not half the ring. The ring is 65536
 		// frames of headroom for bursts; aiming at the middle of it would mean
 		// holding 683ms of audio, and the slow climb toward that target is
 		// itself an audible drift. 12 buffers of 512 frames is 128ms, which is
@@ -2781,9 +2772,10 @@ static void RecoverAfterKilledCore()
 	h_core_dll = NULL;
 
 	// Stop-then-close, same order as CoreUnload: AudioThreadProc is a separate
-	// live thread the core-thread kill above never touched. Closing h_wave_out
-	// out from under it while it can still be mid-waveOutWrite() races the
-	// handle close against that thread's own use of it.
+	// live thread the core-thread kill above never touched. Destroying
+	// g_audio_stream out from under it while it can still be mid-
+	// SDL_PutAudioStreamData() races the handle close against that thread's
+	// own use of it.
 	if (audio_thread_running)
 	{
 		audio_thread_running = false;
@@ -2792,10 +2784,10 @@ static void RecoverAfterKilledCore()
 		{
 			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
 			{
-				// Still inside a waveOut* call (a wedged driver) - closing
-				// h_wave_out out from under it right below would race that
+				// Still inside an SDL audio call (a wedged driver) - closing
+				// the stream out from under it right below would race that
 				// call. Force it down first; it holds no C++ objects that
-				// need unwinding, just WinMM buffers we are about to
+				// need unwinding, just an audio buffer we are about to
 				// release anyway.
 				TerminateThread(h_audio_thread, 1);
 			}
@@ -2804,11 +2796,12 @@ static void RecoverAfterKilledCore()
 		}
 	}
 
-	if (h_wave_out)
+	if (g_audio_stream)
 	{
-		waveOutReset(h_wave_out);
-		waveOutClose(h_wave_out);
-		h_wave_out = NULL;
+		// Destroying the stream also closes the device it was opened
+		// against - SDL_OpenAudioDeviceStream's own contract.
+		SDL_DestroyAudioStream(g_audio_stream);
+		g_audio_stream = nullptr;
 		audio_initialized = false;
 	}
 	if (h_audio_event) { CloseHandle(h_audio_event); h_audio_event = NULL; }
@@ -3383,21 +3376,15 @@ static void CoreUnload()
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Audio thread finalizada.");
 	}
 
-	if (h_wave_out)
+	if (g_audio_stream)
 	{
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Fechando waveOut...");
-		waveOutReset(h_wave_out);
-		for (int i = 0; i < NUM_WAVE_BUFFERS; i++)
-		{
-			if (wave_headers[i].dwFlags & WHDR_PREPARED)
-			{
-				waveOutUnprepareHeader(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-			}
-		}
-		waveOutClose(h_wave_out);
-		h_wave_out = NULL;
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Fechando audio stream...");
+		// Destroying the stream also closes the device it was opened
+		// against - SDL_OpenAudioDeviceStream's own contract.
+		SDL_DestroyAudioStream(g_audio_stream);
+		g_audio_stream = nullptr;
 		audio_initialized = false;
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] waveOut finalizado.");
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] audio stream finalizado.");
 	}
 
 	if (h_audio_event)
