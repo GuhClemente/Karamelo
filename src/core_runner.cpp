@@ -349,6 +349,8 @@ static int g_output_sample_rate = 48000;
 #define UNDERRUN_ESCALATE_WINDOW_MS    2000 // how often the underrun count is judged
 #define UNDERRUN_ESCALATE_THRESHOLD    3    // this many starved passes in the window...
 #define UNDERRUN_ESCALATE_STEP_BUFFERS 4    // ...grows the queue by this many buffers
+#define DEESCALATE_CLEAN_WINDOWS_NEEDED 8   // this many perfectly clean windows in a row (16s)...
+                                             // ...shrinks it back by UNDERRUN_ESCALATE_STEP_BUFFERS
 
 // dev-sdl3: g_audio_stream replaces HWAVEOUT/WAVEHDR. SDL_OpenAudioDeviceStream
 // hands back a stream already bound to the default output device; feeding it
@@ -382,6 +384,28 @@ static int16_t  g_hist_r[4] = { 0, 0, 0, 0 };
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
+
+// Set once SendAudioSamples has ever pushed real frames from the core into
+// the ring buffer for the current game; reset on every load. A handful of
+// cores go a real stretch after retro_load_game before their first sample -
+// the audio thread has nothing to play yet and correctly pads with silence,
+// which should never count as a real underrun. Measured to matter little for
+// Gopher64 specifically (it starts submitting audio almost immediately), but
+// it costs nothing and is correct for cores that do have a genuine silent
+// gap, so it stays as a first filter ahead of the de-escalation below, which
+// is what actually addresses a core that runs below realtime for a few
+// seconds of boot (JIT/cache warmup, disc parsing) and then recovers.
+static volatile LONG g_core_ever_produced_audio = 0;
+
+// The queue depth InitAudio computed from the Audio Latency setting, before
+// any EscalateWaveQueue growth - the floor DeescalateWaveQueue will not step
+// below. Without a floor, a long enough clean stretch would erode the user's
+// own chosen latency, not just an escalation this session added on top of it.
+static volatile LONG g_baseline_wave_buffers = 12;
+
+// Consecutive fully-elapsed judging windows with zero starved passes, at the
+// current (possibly escalated) queue depth. Touched only by the audio thread.
+static LONG s_clean_windows = 0;
 static bool          s_loaded_core_is_pcsx2 = false;
 static std::string   s_loaded_core_path = "";
 
@@ -515,6 +539,35 @@ static void EscalateWaveQueue()
 	}
 }
 
+// The other half of EscalateWaveQueue: a boot-time hiccup (JIT/cache warmup,
+// disc parsing running a few seconds below realtime - N64 cores are the
+// common case) escalates the queue exactly like a genuinely weak machine
+// would, and had no way back down once the core reached full speed. That
+// left every affected session carrying extra fixed latency for the rest of
+// its run for no ongoing reason. Symmetric with the escalation side: only
+// after a long enough *clean* stretch at the current depth, step back down
+// one notch at a time, never below the depth the user's own Latency setting
+// asked for. Called only from the audio thread.
+static void DeescalateWaveQueue()
+{
+	LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+	LONG baseline = InterlockedCompareExchange(&g_baseline_wave_buffers, 0, 0);
+	LONG want = active - UNDERRUN_ESCALATE_STEP_BUFFERS;
+	if (want < baseline) want = baseline;
+	if (want >= active) return;
+
+	InterlockedExchange(&g_active_wave_buffers, want);
+
+	FILE* lf = fopen("mister_flavor.log", "a");
+	if (lf)
+	{
+		fprintf(lf, "[INFO] [AUDIO] audio estavel; fila reduzida de %ldms para %ldms\n",
+			(long)((long long)active * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate),
+			(long)((long long)want * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate));
+		fclose(lf);
+	}
+}
+
 static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 {
 	(void)lpParam;
@@ -560,8 +613,15 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 				}
 				else
 				{
-					// Underrun: decay smoothly to silence from last sample
-					InterlockedIncrement(&g_audio_underrun_count);
+					// Underrun: decay smoothly to silence from last sample.
+					// Only counted once the core has produced its first real
+					// sample - padding before that is the loading screen
+					// playing silence as intended, not a real underrun (see
+					// g_core_ever_produced_audio), and was otherwise drowning
+					// out the [PERF] log's underrun count with tens of
+					// thousands of false hits during every boot.
+					if (InterlockedCompareExchange(&g_core_ever_produced_audio, 0, 0))
+						InterlockedIncrement(&g_audio_underrun_count);
 					pass_underran = true;
 					s_hold_l = (int16_t)(s_hold_l * 63 / 64);
 					s_hold_r = (int16_t)(s_hold_r * 63 / 64);
@@ -580,11 +640,33 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 
 		DWORD now_tick = GetTickCount();
 		if (s_escalate_window_start == 0) s_escalate_window_start = now_tick;
-		if (pass_underran) s_escalate_window_underruns++;
+		// Ignore pre-first-sample padding (see g_core_ever_produced_audio) -
+		// that silence is expected and not evidence the machine is struggling.
+		if (pass_underran && InterlockedCompareExchange(&g_core_ever_produced_audio, 0, 0))
+			s_escalate_window_underruns++;
 		if (now_tick - s_escalate_window_start >= UNDERRUN_ESCALATE_WINDOW_MS)
 		{
 			if (s_escalate_window_underruns >= UNDERRUN_ESCALATE_THRESHOLD)
+			{
 				EscalateWaveQueue();
+				s_clean_windows = 0;
+			}
+			else if (s_escalate_window_underruns == 0)
+			{
+				// A window with SOME underruns but below the escalate
+				// threshold is not "clean" either - only a perfectly quiet
+				// window counts, so a machine hovering right at the edge
+				// doesn't get de-escalated back into audible trouble.
+				if (++s_clean_windows >= DEESCALATE_CLEAN_WINDOWS_NEEDED)
+				{
+					DeescalateWaveQueue();
+					s_clean_windows = 0;
+				}
+			}
+			else
+			{
+				s_clean_windows = 0;
+			}
 			s_escalate_window_start = now_tick;
 			s_escalate_window_underruns = 0;
 		}
@@ -615,6 +697,10 @@ static void InitAudio(int sample_rate)
 		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
 		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
+		// Floor for DeescalateWaveQueue - a long clean stretch should only ever
+		// unwind an escalation this session added, never erode below what the
+		// user's own Latency setting asked for.
+		InterlockedExchange(&g_baseline_wave_buffers, (LONG)want);
 	}
 
 	g_core_sample_rate = sample_rate > 0 ? (double)sample_rate : 48000.0;
@@ -628,6 +714,8 @@ static void InitAudio(int sample_rate)
 	ResetAudioRateController();
 	s_escalate_window_start = 0;
 	s_escalate_window_underruns = 0;
+	s_clean_windows = 0;
+	InterlockedExchange(&g_core_ever_produced_audio, 0);
 
 	// Anti-pop: Zero ring buffer and activate soft startup ramp
 	InterlockedExchange(&g_startup_mute_samples, (LONG)(g_output_sample_rate * 0.15));
@@ -709,6 +797,8 @@ static void InitAudio(int sample_rate)
 static void SendAudioSamples(const int16_t* data, size_t frames)
 {
 	if (!audio_initialized || !data || frames == 0) return;
+
+	InterlockedExchange(&g_core_ever_produced_audio, 1);
 
 	float vol_mult = audio_muted ? 0.0f : (master_volume / 100.0f);
 
