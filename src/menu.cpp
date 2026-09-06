@@ -8,11 +8,11 @@
 #include <unordered_set>
 #include <vector>
 #include <windows.h>
-#include <xinput.h>
 
 #include "app_info.h"
 #include "archive_helper.h"
 #include "core_runner.h"
+#include "gamepad_sdl.h" // pulls in <xinput.h> for the XINPUT_STATE shape
 #include "hw_render.h"
 #include "input_map.h"
 #include "menu.h"
@@ -164,12 +164,19 @@ static const int kCitraLayoutCount = 4;
 static int setting_wallpaper =
     1; // 0=None, 1=Static Noise, 2=Parallax Stars, 3=Cyber Grid
 static bool setting_fullscreen = false;
+// -1 sentinel = never saved yet (fresh install, or an old config from before
+// this existed) - main_win32.cpp keeps its own built-in default in that case
+// instead of restoring a bogus 0x0 window.
+static int setting_win_x = -1;
+static int setting_win_y = -1;
+static int setting_win_w = -1;
+static int setting_win_h = -1;
 static int setting_theme =
     0; // 0=Red/Burgundy, 1=Blue, 2=Green, 3=Amber, 4=Gray, 5=Dark
 static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
-// Audio buffer depth. Below 64ms the waveOut queue cannot stay ahead of the
-// mixer on a loaded machine; above 512ms the delay is audible against input.
+// Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
+// the mixer on a loaded machine; above 512ms the delay is audible against input.
 static const int kAudioLatencyMs[4] = { 64, 128, 256, 512 };
 // A single on/off toggle, not a per-API picker: OpenGL, Vulkan and D3D11
 // backends (hw_render.cpp/hw_render_vulkan.cpp/hw_render_d3d11.cpp) all sit
@@ -335,6 +342,31 @@ bool MenuGetFullscreen() { return setting_fullscreen; }
 void MenuSetFullscreen(bool fs) {
   bool changed = (setting_fullscreen != fs);
   setting_fullscreen = fs;
+  if (changed)
+    MenuSaveSettings();
+}
+
+// Called once at startup (before the window is shown) and once at shutdown -
+// not on every SDL_EVENT_WINDOW_MOVED/RESIZED, which would mean a disk write
+// per pixel dragged. Returns false (and leaves x/y/w/h untouched) if nothing
+// has ever been saved, so the caller can fall back to its own built-in default
+// instead of restoring a sentinel -1 as a real position or a 0x0 window.
+bool MenuGetWindowRect(int *x, int *y, int *w, int *h) {
+  if (setting_win_x < 0 || setting_win_y < 0 || setting_win_w <= 0 || setting_win_h <= 0)
+    return false;
+  *x = setting_win_x;
+  *y = setting_win_y;
+  *w = setting_win_w;
+  *h = setting_win_h;
+  return true;
+}
+void MenuSetWindowRect(int x, int y, int w, int h) {
+  bool changed = (setting_win_x != x || setting_win_y != y ||
+                   setting_win_w != w || setting_win_h != h);
+  setting_win_x = x;
+  setting_win_y = y;
+  setting_win_w = w;
+  setting_win_h = h;
   if (changed)
     MenuSaveSettings();
 }
@@ -995,7 +1027,7 @@ static void ControllerPageOnEnter() {
   int pads = 0;
   for (DWORD i = 0; i < 4; i++) {
     XINPUT_STATE st;
-    if (XInputGetState(i, &st) == ERROR_SUCCESS)
+    if (GamepadGetState((int)i, &st))
       pads++;
   }
   if (pads == 0)
@@ -1010,7 +1042,7 @@ void PopulateControllerSettings() {
   int pads = 0;
   for (DWORD i = 0; i < 4; i++) {
     XINPUT_STATE st;
-    if (XInputGetState(i, &st) == ERROR_SUCCESS)
+    if (GamepadGetState((int)i, &st))
       pads++;
   }
 
@@ -1734,6 +1766,10 @@ static std::string SettingsSnapshot() {
   }
   AppendSetting(out, "wallpaper", setting_wallpaper);
   AppendSetting(out, "fullscreen", setting_fullscreen ? 1 : 0);
+  AppendSetting(out, "win_x", setting_win_x);
+  AppendSetting(out, "win_y", setting_win_y);
+  AppendSetting(out, "win_w", setting_win_w);
+  AppendSetting(out, "win_h", setting_win_h);
   AppendSetting(out, "theme", setting_theme);
   AppendSetting(out, "deadzone", setting_deadzone);
   AppendSetting(out, "latency", setting_latency);
@@ -1821,6 +1857,14 @@ static void MenuLoadSettings() {
       setting_wallpaper = ClampInt(iv, 0, WallpaperMaxMode());
     else if (!strcmp(key, "fullscreen"))
       setting_fullscreen = (iv != 0);
+    else if (!strcmp(key, "win_x"))
+      setting_win_x = iv;
+    else if (!strcmp(key, "win_y"))
+      setting_win_y = iv;
+    else if (!strcmp(key, "win_w"))
+      setting_win_w = iv;
+    else if (!strcmp(key, "win_h"))
+      setting_win_h = iv;
     else if (!strcmp(key, "theme"))
       setting_theme = ClampInt(iv, 0, 5);
     else if (!strcmp(key, "deadzone"))

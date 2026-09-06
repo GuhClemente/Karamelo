@@ -66,8 +66,8 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- ^
     build\unity.obj ^
     build\sdl3\SDL3-static.lib ^
     /link /OUT:tools\record_gameplay\out\record_gameplay.exe ^
-    user32.lib gdi32.lib winmm.lib xinput.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib ole32.lib ^
-    kernel32.lib imm32.lib oleaut32.lib version.lib uuid.lib advapi32.lib setupapi.lib dinput8.lib ^
+    user32.lib gdi32.lib winmm.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib ole32.lib ^
+    kernel32.lib imm32.lib oleaut32.lib version.lib uuid.lib advapi32.lib setupapi.lib ^
     d3d11.lib d3dcompiler.lib ^
     /SUBSYSTEM:CONSOLE
 
