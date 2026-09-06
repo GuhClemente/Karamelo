@@ -31,6 +31,7 @@
 #include "osd.h"
 #include "netplay.h"
 #include "hw_render.h"
+#include "hw_render_vulkan.h"
 
 namespace fs = std::filesystem;
 
@@ -245,6 +246,11 @@ const void* CoreGetMemoryMap()
 
 static long g_video_diag_frames = 0;
 static bool g_render_diag_done = false;
+// Set by RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE, read
+// by RETRO_ENVIRONMENT_SET_HW_RENDER (see both cases in CB_Environment) -
+// reset per load so a stale true from a previous core cannot wrongly refuse
+// Vulkan to the next one that never asked for negotiation at all.
+static bool g_core_wants_vk_negotiation = false;
 static std::string   g_pending_rom;
 static std::string   g_pending_core_hint;
 
@@ -1580,6 +1586,24 @@ static bool CB_Environment(unsigned cmd, void* data)
 		return true;
 	}
 
+	case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE:
+		// A core provides this when it needs to dictate its own Vulkan device
+		// extensions/features rather than accept whatever "default" device we
+		// hand it - flycast confirmed needing this: given a vanilla device
+		// with no negotiation, it crashed with a null-pointer GPF deep in its
+		// own renderer setup (presumably relying on a feature/extension only
+		// negotiation would have enabled) rather than failing cleanly. We do
+		// not implement negotiation (a real create_device/create_device2
+		// wrapper letting the core choose), so remember that this core asked
+		// for it and have SET_HW_RENDER below refuse Vulkan outright instead
+		// of repeating that crash - the core then falls back to its next
+		// preferred context type (OpenGL, which we do support).
+		g_core_wants_vk_negotiation = true;
+		CoreLogPrintf(RETRO_LOG_INFO,
+			"[HW] core pediu negociacao de contexto Vulkan - nao implementada, "
+			"Vulkan sera recusado para forcar fallback");
+		return false;
+
 	case RETRO_ENVIRONMENT_SET_HW_RENDER:
 		// Accepting this is what lets mupen64plus-next, flycast and dolphin
 		// load at all - they refuse outright without OpenGL. But saying yes
@@ -1592,7 +1616,36 @@ static bool CB_Environment(unsigned cmd, void* data)
 				"(3D Acceleration esta Off em Settings > Video)");
 			return false;
 		}
-		return HwSetRenderCallback((struct retro_hw_render_callback*)data);
+		{
+			struct retro_hw_render_callback* cb = (struct retro_hw_render_callback*)data;
+			if (cb && cb->context_type == RETRO_HW_CONTEXT_VULKAN)
+			{
+				if (g_core_wants_vk_negotiation)
+				{
+					CoreLogPrintf(RETRO_LOG_INFO,
+						"[HW] recusando Vulkan (negociacao de contexto nao suportada) - "
+						"core deve tentar o proximo tipo de contexto");
+					return false;
+				}
+				return VkHwSetRenderCallback(cb);
+			}
+			return HwSetRenderCallback(cb);
+		}
+
+	case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
+	{
+		// Handshake companion to SET_HW_RENDER above: called (usually right
+		// after context_reset) once the core wants the actual Vulkan handles
+		// - device/queue/set_image/etc - rather than just having been told
+		// "yes, Vulkan is available". Only meaningful once a Vulkan context
+		// actually exists; the OpenGL path has no equivalent (get_proc_address
+		// and get_current_framebuffer are handed to the core directly on its
+		// own retro_hw_render_callback instead).
+		const void* iface = VkHwGetRenderInterface();
+		if (!iface) return false;
+		*(const void**)data = iface;
+		return true;
+	}
 
 	case RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION:
 	{
@@ -1752,8 +1805,11 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 	{
 		// One copy GPU -> CPU per frame. That is the deliberate trade: the CRT
 		// filters, the OSD and the blit all stay on the software path instead
-		// of being rewritten as shaders.
-		if (!HwReadPixels(dst_fb, width, height)) return;
+		// of being rewritten as shaders. Only one of these two is ever active
+		// for a given loaded core - dispatch on whichever it is.
+		bool hw_ok = VkHwIsActive() ? VkHwReadPixels(dst_fb, width, height)
+		                            : HwReadPixels(dst_fb, width, height);
+		if (!hw_ok) return;
 
 		// 480i / 448i Motion-Adaptive Deinterlacing for PS2 (Play! core only).
 		// PCSX2 handles hardware deinterlacing natively in its OpenGL GS pipeline.
@@ -2775,7 +2831,10 @@ static void RecoverAfterKilledCore()
 	DeleteCriticalSection(&toast_lock);
 	InitializeCriticalSection(&toast_lock);
 
+	// Both are safe to call unconditionally - each only acts if its own
+	// g_hw_active is set, and a given core only ever activates one of them.
 	HwContextDestroy();
+	VkHwContextDestroy();
 
 	is_game_loaded = false;
 	is_core_loaded = false;
@@ -3036,6 +3095,7 @@ static bool CoreLoad(const char* core_dll_path)
 	// A core that sends no descriptors must not inherit the previous one's
 	// names, so this is cleared on the way in rather than only on the way out.
 	ClearInputDescriptors();
+	g_core_wants_vk_negotiation = false;
 
 	InterlockedExchange(&g_core_in_module_op, 1);
 	h_core_dll = LoadLibraryA(core_dll_path);
@@ -3344,7 +3404,32 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 
 
-	if (HwIsActive())
+	if (VkHwIsActive() && g_core_wants_vk_negotiation)
+	{
+		// The core already asked for the Vulkan context negotiation interface
+		// (create_device/create_device2) somewhere during retro_load_game -
+		// every RETRO_ENVIRONMENT_* call it was going to make has happened by
+		// now regardless of the order it made them in, so this check is safe
+		// even for cores (e.g. Flycast) that call SET_HW_RENDER before
+		// SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE. We don't implement that
+        // interface, so the core would be handed a generic device it doesn't
+		// know how to drive; letting it proceed into context_reset() crashes
+        // it (confirmed with Flycast/Dreamcast: the fault happens on the
+		// core's own internal threaded-renderer thread, asynchronously, which
+		// no SEH __try/__except on this thread can ever catch) - so bail out
+		// here, before ever calling context_reset(), instead of trying to
+		// recover from a crash we cannot actually contain.
+		CoreLogPrintf(RETRO_LOG_ERROR,
+			"[HW-VK] '%s' exige negociacao de contexto Vulkan (nao implementada) - recusando carregamento para evitar crash",
+			loaded_core_name.c_str());
+		if (!suppress_toast)
+			CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
+		RetroUnloadGameGuarded();
+		CoreReleaseMemoryMap();
+		return false;
+	}
+
+	if (HwIsActive() || VkHwIsActive())
 	{
 		unsigned hw_w = av_info.geometry.max_width  ? av_info.geometry.max_width  : core_fb_width;
 		unsigned hw_h = av_info.geometry.max_height ? av_info.geometry.max_height : core_fb_height;
@@ -3356,11 +3441,28 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			av_info.geometry.base_width, av_info.geometry.base_height,
 			av_info.geometry.max_width, av_info.geometry.max_height, hw_w, hw_h);
 
-		if (HwEnsureSurface(hw_w, hw_h))
+		bool surface_ok = VkHwIsActive() ? VkHwEnsureSurface(hw_w, hw_h) : HwEnsureSurface(hw_w, hw_h);
+		if (surface_ok)
 		{
-			// The core allocates its GL resources here, so it has to happen
-			// after load and before the first retro_run.
-			HwContextReset();
+			// The core allocates its GL/Vulkan resources here, so it has to
+			// happen after load and before the first retro_run.
+			bool want_vulkan = VkHwIsActive();
+			bool context_ok = want_vulkan ? VkHwContextReset() : (HwContextReset(), true);
+			if (want_vulkan && !context_ok)
+			{
+				// Belt-and-suspenders: covers a core that crashes synchronously
+				// inside context_reset() itself (caught by VkHwContextReset's
+				// own SEH guard) without ever setting g_core_wants_vk_negotiation -
+				// the check above only handles the negotiation-interface case.
+				CoreLogPrintf(RETRO_LOG_ERROR,
+					"[HW-VK] context_reset falhou/crashou para '%s'",
+					loaded_core_name.c_str());
+				if (!suppress_toast)
+					CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
+				RetroUnloadGameGuarded();
+				CoreReleaseMemoryMap();
+				return false;
+			}
 		}
 	}
 
@@ -3431,6 +3533,7 @@ static void CoreUnload()
 
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando HwContextDestroy...");
 	HwContextDestroy();
+	VkHwContextDestroy();
 	HwReleaseCurrent();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy concluido.");
 
