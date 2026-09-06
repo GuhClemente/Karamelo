@@ -161,6 +161,9 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" } },
         { "SM64CoopDX", "Super Mario 64 CoopDX",
           "coop-deluxe/sm64coopdx", "", true, {} },
+        { "CannonballDX", "OutRun (CannonBall DX)",
+          "Endprodukt/cannonball-dx", "cannonball-dx.exe",
+          true, { "outrun" } },
 
         // -----------------------------------------------------------------
         // Not part of the launcher's own default list - these are the rest of
@@ -417,7 +420,7 @@ static bool IsWindowsAssetName(const std::string& lower_name) {
                                    "appimage", "flatpak", ".dmg", ".pkg", "switch", "android", "source" }))
         return false;
     if (ContainsAny(lower_name, { "windows", "win64", "win32", "win-x64", "win-x86",
-                                   "-win.", "_win.", ".exe", ".msi", "msvc", "mingw" }))
+                                   "-win.", "_win.", ".exe", ".msi", "msvc", "mingw", "cannonball" }))
         return true;
     // A handful of projects (Sonic 3 A.I.R. among them) tag their Windows zip
     // with just an architecture - "..._64bit.zip", "...-x64.zip" - and no
@@ -662,7 +665,92 @@ bool PortAutoSetupRom(const std::string& port_id) {
     std::error_code ec;
     fs::create_directories(target_dir, ec);
 
-    // Already has a ROM? Nothing to do.
+    // 1. Special case: Cannonball DX (OutRun Arcade)
+    // Cannonball DX reads MAME's merged outrun.zip inside ports/CannonballDX/roms/
+    if (port_id == "CannonballDX") {
+        fs::path cb_rom_dir = fs::path(target_dir) / "roms";
+        if (fs::exists(cb_rom_dir / "outrun.zip", ec)) return true;
+        if (fs::exists(cb_rom_dir, ec)) {
+            for (const auto& f : fs::directory_iterator(cb_rom_dir, ec)) {
+                if (ToLowerStr(f.path().filename().string()) == "outrun.zip") return true;
+            }
+        }
+
+        static const std::vector<std::string> arcade_dirs = {
+            "roms/Arcade", "app/roms/Arcade", "roms", "app/roms", "roms/MAME", "app/roms/MAME"
+        };
+        for (const auto& sdir : arcade_dirs) {
+            if (!fs::exists(sdir, ec)) continue;
+            for (const auto& entry : fs::directory_iterator(sdir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(entry.path().filename().string());
+                if (fname.find("outrun") != std::string::npos && fname.size() >= 4 && fname.substr(fname.size() - 4) == ".zip") {
+                    fs::create_directories(cb_rom_dir, ec);
+                    fs::copy_file(entry.path(), cb_rom_dir / "outrun.zip", fs::copy_options::overwrite_existing, ec);
+                    return !ec;
+                }
+            }
+        }
+        return false;
+    }
+
+    // 2. SNES Recomps (SuperMetroidRecomp, SuperMarioWorldRecomp, StarFoxEnhanced)
+    if (port_id.find("SuperMetroid") != std::string::npos ||
+        port_id.find("SuperMarioWorld") != std::string::npos ||
+        port_id.find("StarFox") != std::string::npos) {
+        for (const auto& f : fs::directory_iterator(target_dir, ec)) {
+            std::string ext = ToLowerStr(f.path().extension().string());
+            if (ext == ".sfc" || ext == ".smc") return true;
+        }
+        static const std::vector<std::string> snes_dirs = {
+            "roms/SNES", "app/roms/SNES", "roms", "app/roms"
+        };
+        for (const auto& sdir : snes_dirs) {
+            if (!fs::exists(sdir, ec)) continue;
+            for (const auto& entry : fs::directory_iterator(sdir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(entry.path().filename().string());
+                std::string ext = ToLowerStr(entry.path().extension().string());
+                if (ext != ".sfc" && ext != ".smc") continue;
+                bool all_match = true;
+                for (const auto& kw : def->rom_keywords)
+                    if (fname.find(kw) == std::string::npos) { all_match = false; break; }
+                if (!all_match) continue;
+                fs::path dest = fs::path(target_dir) / entry.path().filename();
+                fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
+                return !ec;
+            }
+        }
+    }
+
+    // 3. Genesis / Mega Drive Ports (Sonic1Forever, Sonic3AIR)
+    if (port_id.find("Sonic") != std::string::npos) {
+        for (const auto& f : fs::directory_iterator(target_dir, ec)) {
+            std::string ext = ToLowerStr(f.path().extension().string());
+            if (ext == ".md" || ext == ".gen" || ext == ".bin") return true;
+        }
+        static const std::vector<std::string> gen_dirs = {
+            "roms/Genesis", "app/roms/Genesis", "roms/MegaDrive", "app/roms/MegaDrive", "roms", "app/roms"
+        };
+        for (const auto& sdir : gen_dirs) {
+            if (!fs::exists(sdir, ec)) continue;
+            for (const auto& entry : fs::directory_iterator(sdir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(entry.path().filename().string());
+                std::string ext = ToLowerStr(entry.path().extension().string());
+                if (ext != ".md" && ext != ".gen" && ext != ".bin") continue;
+                bool all_match = true;
+                for (const auto& kw : def->rom_keywords)
+                    if (fname.find(kw) == std::string::npos) { all_match = false; break; }
+                if (!all_match) continue;
+                fs::path dest = fs::path(target_dir) / entry.path().filename();
+                fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
+                return !ec;
+            }
+        }
+    }
+
+    // 4. Default: Nintendo 64 ports (.z64, .n64, .v64)
     for (const auto& f : fs::directory_iterator(target_dir, ec)) {
         std::string ext = ToLowerStr(f.path().extension().string());
         if (ext == ".z64" || ext == ".n64" || ext == ".v64") return true;
