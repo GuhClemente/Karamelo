@@ -34,7 +34,8 @@ enum MenuState {
   STATE_CONTROLLER,
   STATE_NETPLAY,
   STATE_ABOUT,
-  STATE_UPDATE
+  STATE_UPDATE,
+  STATE_CORE_OPTIONS
 };
 
 struct MenuItem {
@@ -711,6 +712,7 @@ void PopulateControllerSettings();
 void PopulateNetplay();
 void PopulateAbout();
 void PopulateRetroAchievements();
+void PopulateCoreOptionsSettings();
 void PopulateAchievementList();
 void PopulateUpdate();
 
@@ -895,6 +897,14 @@ void PopulateMainMenu() {
           {"Cache do CD", od[setting_cd_precache], false, false, 513});
       items.push_back(
           {"Acesso do CD", acc[setting_cd_latency], false, false, 514});
+    }
+
+    // 3b. Core Options: whatever the core itself declared via SET_VARIABLES
+    // (internal resolution, region, DSP, ...), generically - only shown when
+    // there is actually something to show, same as every other conditional
+    // block in this menu.
+    if (CoreOptionCount() > 0) {
+      items.push_back({"Core Options", ">", false, true, 221});
     }
 
     // 4. RetroAchievements, if the integration is configured. None of this
@@ -1261,6 +1271,42 @@ void PopulateAudioSettings() {
   snprintf(vol_str, sizeof(vol_str), "%d%%", CoreGetVolume());
   items.push_back({"Volume", vol_str, false, false, 403});
 
+  selected_idx = 0;
+  scroll_top = 0;
+}
+
+// Generic "Core Options" page (like RetroArch's Quick Menu > Options): lists
+// whatever options the currently loaded core declared through
+// RETRO_ENVIRONMENT_SET_VARIABLES - internal resolution, region, DSP,
+// whatever - with zero core-specific code here. Reachable only from the
+// in-game main menu (CoreOptionCount() > 0 there), not from Settings, so its
+// own Back row (898) returns to STATE_MAIN/PopulateMainMenu() directly
+// instead of going through the shared 999 handler, which always lands on
+// STATE_SETTINGS - wrong for a page nothing routes through Settings to reach.
+//
+// Rows use action_id 800 + option_index, capped at 98 options (800-897) so
+// the range can never collide with 898 (Back) - two full orders of magnitude
+// past what any real core declares, this is headroom, not a real limit.
+static const int kCoreOptionsMaxRows = 98;
+void PopulateCoreOptionsSettings() {
+  items.clear();
+  current_title = "Core Options";
+
+  int n = CoreOptionCount();
+  if (n > kCoreOptionsMaxRows) n = kCoreOptionsMaxRows;
+  for (int i = 0; i < n; i++) {
+    std::string label = CoreOptionLabel(i);
+    int cur = CoreOptionCurrentChoiceIndex(i);
+    std::string val = CoreOptionChoiceAt(i, cur);
+    items.push_back({label, val, false, false, 800 + i});
+  }
+  if (n == 0)
+    items.push_back({"Este core nao declarou opcoes", "", false, false, 0});
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({"Voltar", "", false, true, 898});
+
+  OsdSetSize((int)items.size());
   selected_idx = 0;
   scroll_top = 0;
 }
@@ -2526,6 +2572,17 @@ static void MenuProcessKeyImpl(MenuKey key) {
       setting_deadzone = (setting_deadzone + delta + 4) % 4;
       PopulateControllerSettings();
       selected_idx = 2;
+    } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
+    {
+      int opt_index = item.action_id - 800;
+      int choice_count = CoreOptionChoiceCount(opt_index);
+      if (choice_count > 0) {
+        int cur = CoreOptionCurrentChoiceIndex(opt_index);
+        CoreOptionSetChoiceIndex(opt_index, (cur + delta + choice_count) % choice_count);
+      }
+      int cur_row = selected_idx;
+      PopulateCoreOptionsSettings();
+      selected_idx = cur_row;
     }
     break;
   }
@@ -2543,6 +2600,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
     {
       current_state = STATE_SETTINGS;
       PopulateSettings();
+    } else if (item.action_id == 898) // Back (Core Options -> in-game menu, not Settings)
+    {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
     } else if (current_state == STATE_MAIN) {
       if (item.action_id == 1) // Load another game from the same folder
       {
@@ -2724,6 +2785,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_CONTROLLER;
         ControllerPageOnEnter();
         PopulateControllerSettings();
+      }
+      else if (item.action_id == 221) {
+        current_state = STATE_CORE_OPTIONS;
+        PopulateCoreOptionsSettings();
       }
     } else if (current_state == STATE_SETTINGS) {
       if (item.action_id == 201) {

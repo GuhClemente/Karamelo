@@ -1162,6 +1162,24 @@ static std::map<std::string, std::string> g_core_options;
 // default back, not nothing.
 static std::map<std::string, std::string> g_core_defaults;
 
+// g_core_defaults is a std::map, so iterating it directly for the Core
+// Options menu page would list keys alphabetically instead of in the order
+// the core actually declared them (RETRO_ENVIRONMENT_SET_VARIABLES hands them
+// over as a plain array) - a cosmetic difference from RetroArch's own Quick
+// Menu, but confusing when a core groups related options together on
+// purpose. This mirrors that declaration order; kept in lockstep with
+// g_core_defaults at both of its own clear/populate sites.
+static std::vector<std::string> g_core_defaults_order;
+
+// g_core_defaults itself only ever holds the resolved default VALUE (see
+// ParsedCoreVar::value's own comment - just the first choice, nothing else),
+// because that is all GET_VARIABLE's fallback path has ever needed. The Core
+// Options menu page needs the label and the full choice list too, so this
+// keeps each key's untouched declaration ("Label; choice1|choice2|...")
+// separately instead of changing what g_core_defaults itself stores. Kept in
+// lockstep with g_core_defaults at both of its own clear/populate sites.
+static std::map<std::string, std::string> g_core_option_raw;
+
 // The map is written by the UI thread and read by the core thread from inside
 // retro_run. Guarded, and values are handed out through a rotating buffer so a
 // core never holds a pointer into map storage that may be reallocated.
@@ -1231,6 +1249,130 @@ const char* CoreGetOption(const char* key)
 	const char* result = (it != g_core_options.end()) ? StableOptionValue(it->second) : "";
 	LeaveCriticalSection(&options_lock);
 	return result;
+}
+
+// Splits a core-declared SET_VARIABLES value ("Label; choice1|choice2|...")
+// into its display label and pipe-separated choice list - every core follows
+// this exact shape (see the SET_VARIABLES case's own comment above).
+static void SplitCoreOptionDecl(const std::string& raw, std::string* label, std::vector<std::string>* choices)
+{
+	size_t semi = raw.find(';');
+	*label = (semi == std::string::npos) ? raw : raw.substr(0, semi);
+	std::string rest = (semi == std::string::npos) ? std::string() : raw.substr(semi + 1);
+	size_t start = rest.find_first_not_of(' '); // conventional space after ";", not guaranteed
+	if (start != std::string::npos) rest = rest.substr(start);
+
+	choices->clear();
+	size_t pos = 0;
+	while (pos <= rest.size())
+	{
+		size_t bar = rest.find('|', pos);
+		if (bar == std::string::npos) { choices->push_back(rest.substr(pos)); break; }
+		choices->push_back(rest.substr(pos, bar - pos));
+		pos = bar + 1;
+	}
+}
+
+// Shared by every CoreOption* accessor below - caller must hold options_lock.
+static bool GetCoreOptionDeclLocked(int index, std::string* key_out, std::string* label_out, std::vector<std::string>* choices_out)
+{
+	if (index < 0 || index >= (int)g_core_defaults_order.size()) return false;
+	*key_out = g_core_defaults_order[index];
+	auto it = g_core_option_raw.find(*key_out);
+	if (it == g_core_option_raw.end()) return false;
+	SplitCoreOptionDecl(it->second, label_out, choices_out);
+	return true;
+}
+
+// Generic Core Options menu support (menu.cpp's "Core Options" page): the
+// currently loaded core's own SET_VARIABLES declarations, exposed as
+// key/label/choice-list/current-selection so any core's options - internal
+// resolution, region, DSP, whatever it declared - get a working menu row
+// with zero core-specific code, the same way RetroArch's Quick Menu >
+// Options does. Choices set here go through the existing CoreSetOption(),
+// so they only last for the current run, exactly like every other option
+// set this way - not persisted to mister_flavor.cfg across restarts.
+int CoreOptionCount()
+{
+	EnterCriticalSection(&options_lock);
+	int n = (int)g_core_defaults_order.size();
+	LeaveCriticalSection(&options_lock);
+	return n;
+}
+
+const char* CoreOptionKey(int index)
+{
+	EnterCriticalSection(&options_lock);
+	const char* result = (index >= 0 && index < (int)g_core_defaults_order.size())
+		? StableOptionValue(g_core_defaults_order[index]) : "";
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+const char* CoreOptionLabel(int index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	const char* result = ok ? StableOptionValue(label) : "";
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+int CoreOptionChoiceCount(int index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	int n = ok ? (int)choices.size() : 0;
+	LeaveCriticalSection(&options_lock);
+	return n;
+}
+
+const char* CoreOptionChoiceAt(int index, int choice_index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	const char* result = (ok && choice_index >= 0 && choice_index < (int)choices.size())
+		? StableOptionValue(choices[choice_index]) : "";
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+// The user's override if one has been set this run, else choice 0 - the
+// first choice in the list is always the core's own declared default, per
+// the SET_VARIABLES contract.
+int CoreOptionCurrentChoiceIndex(int index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	int result = 0;
+	if (ok)
+	{
+		auto ov = g_core_options.find(key);
+		const std::string* current = (ov != g_core_options.end()) ? &ov->second
+			: (!choices.empty() ? &choices[0] : nullptr);
+		if (current)
+			for (size_t c = 0; c < choices.size(); c++)
+				if (choices[c] == *current) { result = (int)c; break; }
+	}
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+void CoreOptionSetChoiceIndex(int index, int choice_index)
+{
+	std::string key, label, value; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	if (ok && choice_index >= 0 && choice_index < (int)choices.size())
+		value = choices[choice_index];
+	LeaveCriticalSection(&options_lock);
+
+	if (!key.empty() && !value.empty())
+		CoreSetOption(key.c_str(), value.c_str());
 }
 
 // PS2 BIOS discovery and auto-preparation
@@ -1376,7 +1518,15 @@ static std::string ResolveAndPreparePs2Bios()
 // a POD buffer first, entirely before options_lock is ever taken, means the only
 // memory touched while the lock is held is our own - a bad core can now fail
 // this call, but it can never wedge the lock.
-struct ParsedCoreVar { char key[80]; char value[400]; };
+// `value` keeps only this call's original purpose (the GET_VARIABLE
+// fallback default - just the first choice, nothing else). `raw` is the
+// core's entire declaration untouched ("Label; choice1|choice2|...") for the
+// Core Options menu page, which needs the label and the full choice list -
+// data `value` alone deliberately throws away. Both are copied out under the
+// same SEH guard below, for the same reason `value` already was: a core is
+// free to unload the memory `vars` points into as soon as this call returns,
+// so nothing outside this function may ever read through `vars` again.
+struct ParsedCoreVar { char key[80]; char value[400]; char raw[600]; };
 
 static bool ParseCoreVariablesGuarded(const struct retro_variable* vars,
 	ParsedCoreVar* out, int max_out, int* out_count)
@@ -1403,6 +1553,8 @@ static bool ParseCoreVariablesGuarded(const struct retro_variable* vars,
 			out[n].key[sizeof(out[n].key) - 1] = 0;
 			memcpy(out[n].value, first, len);
 			out[n].value[len] = 0;
+			strncpy(out[n].raw, vars->value, sizeof(out[n].raw) - 1);
+			out[n].raw[sizeof(out[n].raw) - 1] = 0;
 			n++;
 		}
 		*out_count = n;
@@ -1805,8 +1957,18 @@ static bool CB_Environment(unsigned cmd, void* data)
 
 		EnterCriticalSection(&options_lock);
 		g_core_defaults.clear();
+		g_core_defaults_order.clear();
+		g_core_option_raw.clear();
 		for (int i = 0; i < count; i++)
+		{
+			// A core is free to declare the same key twice (rare, but seen) -
+			// only record it in the order list once, at its first appearance,
+			// so the Core Options menu does not list it twice.
+			if (g_core_defaults.find(s_parsed[i].key) == g_core_defaults.end())
+				g_core_defaults_order.push_back(s_parsed[i].key);
 			g_core_defaults[s_parsed[i].key] = s_parsed[i].value;
+			g_core_option_raw[s_parsed[i].key] = s_parsed[i].raw;
+		}
 		size_t n = g_core_defaults.size();
 		LeaveCriticalSection(&options_lock);
 
@@ -3629,6 +3791,8 @@ static void CoreUnload()
 
 		EnterCriticalSection(&options_lock);
 		g_core_defaults.clear();
+		g_core_defaults_order.clear();
+		g_core_option_raw.clear();
 		LeaveCriticalSection(&options_lock);
 
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroUnloadGameGuarded...");
