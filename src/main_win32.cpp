@@ -101,6 +101,9 @@ static HDC h_mem_dc = nullptr;
 static HWND g_hwnd = nullptr;
 static SDL_Window* g_sdl_window = nullptr;
 HWND MainGetHwnd() { return g_hwnd; }
+// Cross-platform equivalent for callers (port_runner.cpp) that only need to
+// minimize/restore/raise the main window, not a raw platform HWND.
+SDL_Window* MainGetSdlWindow() { return g_sdl_window; }
 static bool g_running = true;
 static bool g_is_fullscreen = false;
 
