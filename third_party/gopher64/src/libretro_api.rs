@@ -216,7 +216,22 @@ pub unsafe extern "C" fn retro_deinit() {
     retro_unload_game();
     let mut rt_guard = runtime_lock();
     if let Some(rt) = rt_guard.take() {
-        rt.shutdown_background();
+        // shutdown_background() detaches the runtime's worker threads and
+        // returns immediately, without waiting for them - any task still
+        // running on this runtime (retroachievements network calls, netplay,
+        // anything else spawned via tokio::spawn) keeps executing, unjoined,
+        // while the caller (retro_unload_game() just above, then whatever the
+        // frontend does right after this call returns) goes on to free the
+        // Device/RDRAM/CommandProcessor state those tasks may still be
+        // touching. shutdown_timeout() blocks until every task actually
+        // finishes (or the timeout elapses), which is safe to do here since
+        // retro_deinit() runs on the frontend's own core thread, never on one
+        // of this runtime's own worker threads (dropping/shutting down a
+        // Tokio runtime from inside its own worker thread is the case that
+        // actually deadlocks/panics - this is not that case). The timeout is
+        // a backstop, not the expected path: a task that is still not done
+        // after 2s was never going to finish on its own either.
+        rt.shutdown_timeout(std::time::Duration::from_secs(2));
     }
 }
 
