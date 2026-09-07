@@ -1,8 +1,36 @@
+#ifdef _WIN32
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
+// getaddrinfo/freeaddrinfo/inet_ntop/gethostname/ntohl/setsockopt/getsockopt/
+// bind/listen/accept/connect/send/recv/select and the sockaddr* types are the
+// same shape on POSIX as on Winsock - only the handful of Windows-only names
+// below need a stand-in. FIONBIO is defined by <sys/ioctl.h> on Linux, same
+// as ioctlsocket's own contract.
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <errno.h>
+typedef int SOCKET;
+typedef int BOOL;
+typedef unsigned long u_long;
+#define TRUE 1
+#define INVALID_SOCKET (-1)
+#define SOCKET_ERROR (-1)
+#define closesocket(s) close(s)
+#define ioctlsocket(s, cmd, argp) ioctl(s, cmd, argp)
+#define WSAGetLastError() errno
+#define WSAEWOULDBLOCK EWOULDBLOCK
+static inline void WSACleanup() {}
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,8 +42,6 @@
 #include "core_runner.h"
 #include "netplay_protocol.h"
 
-#pragma comment(lib, "ws2_32.lib")
-
 
 static NetplayRole  net_role = NETPLAY_NONE;
 static NetplayState net_state = NETPLAY_DISCONNECTED;
@@ -25,7 +51,6 @@ static std::string  local_ip_str = "127.0.0.1";
 static std::string  status_str = "Disconnected";
 static int          ping_ms = 0;
 static uint32_t     frame_counter = 0;
-static DWORD        last_ping_time = 0;
 
 static int16_t remote_buttons[16] = { 0 };
 static int16_t remote_analog[2][2] = { 0 };
@@ -71,8 +96,10 @@ static void ConfigurePeerSocket(SOCKET s)
 
 void NetplayInit()
 {
+#ifdef _WIN32
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return;
+#endif
 
 	// gethostbyname returned only the first address, which on a machine with a
 	// virtual display or VPN adapter is usually the wrong one - and this is the
