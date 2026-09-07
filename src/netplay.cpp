@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <mutex>
 
 #include "netplay.h"
 #include "core_runner.h"
@@ -29,10 +30,9 @@ static int16_t remote_buttons[16] = { 0 };
 static int16_t remote_analog[2][2] = { 0 };
 
 // Connection management runs on the UI thread while input exchange runs on the
-// core thread, so every socket touch is serialised.
-static CRITICAL_SECTION net_lock;
-struct NetLockInit { NetLockInit() { InitializeCriticalSection(&net_lock); } };
-static NetLockInit g_net_lock_init;
+// core thread, so every socket touch is serialised. Recursive: NetplayUpdate()
+// and NetplaySyncInputs() call NetplayDisconnect() while already holding it.
+static std::recursive_mutex net_lock;
 
 // Partial deliveries are normal on TCP; leftovers live here until the rest
 // arrives.
@@ -119,43 +119,35 @@ void NetplayShutdown()
 const char* NetplayGetLocalIp()
 {
 	static thread_local char buf[64];
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 	strncpy_s(buf, sizeof(buf), local_ip_str.c_str(), _TRUNCATE);
-	LeaveCriticalSection(&net_lock);
 	return buf;
 }
 
 NetplayRole NetplayGetRole()
 {
-	EnterCriticalSection(&net_lock);
-	NetplayRole role = net_role;
-	LeaveCriticalSection(&net_lock);
-	return role;
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	return net_role;
 }
 
 NetplayState NetplayGetState()
 {
-	EnterCriticalSection(&net_lock);
-	NetplayState state = net_state;
-	LeaveCriticalSection(&net_lock);
-	return state;
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	return net_state;
 }
 
 const char* NetplayGetStatusString()
 {
 	static thread_local char buf[160];
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 	strncpy_s(buf, sizeof(buf), status_str.c_str(), _TRUNCATE);
-	LeaveCriticalSection(&net_lock);
 	return buf;
 }
 
 int NetplayGetPingMs()
 {
-	EnterCriticalSection(&net_lock);
-	int ms = ping_ms;
-	LeaveCriticalSection(&net_lock);
-	return ms;
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	return ping_ms;
 }
 
 // NetplayStartHost/StartClient/Disconnect are called from the UI thread
@@ -168,43 +160,42 @@ bool NetplayStartHost(int port)
 {
 	NetplayDisconnect();
 
-	EnterCriticalSection(&net_lock);
-
-	listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listen_sock == INVALID_SOCKET) { LeaveCriticalSection(&net_lock); return false; }
-
-	// Without this, re-hosting within the TIME_WAIT window fails with
-	// WSAEADDRINUSE - about two minutes of "port busy" after every session.
-	BOOL reuse = TRUE;
-	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
-
-	SetSocketNonBlocking(listen_sock);
-
-	sockaddr_in addr = { 0 };
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = INADDR_ANY;
-	addr.sin_port = htons((u_short)port);
-
-	if (bind(listen_sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR)
 	{
-		closesocket(listen_sock);
-		listen_sock = INVALID_SOCKET;
-		LeaveCriticalSection(&net_lock);
-		return false;
-	}
+		std::lock_guard<std::recursive_mutex> lock(net_lock);
 
-	if (listen(listen_sock, 1) == SOCKET_ERROR)
-	{
-		closesocket(listen_sock);
-		listen_sock = INVALID_SOCKET;
-		LeaveCriticalSection(&net_lock);
-		return false;
-	}
+		listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (listen_sock == INVALID_SOCKET) return false;
 
-	net_role = NETPLAY_HOST;
-	net_state = NETPLAY_LISTENING;
-	status_str = "Hosting (Waiting for Player 2 on port " + std::to_string(port) + ")...";
-	LeaveCriticalSection(&net_lock);
+		// Without this, re-hosting within the TIME_WAIT window fails with
+		// WSAEADDRINUSE - about two minutes of "port busy" after every session.
+		BOOL reuse = TRUE;
+		setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
+
+		SetSocketNonBlocking(listen_sock);
+
+		sockaddr_in addr = { 0 };
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = INADDR_ANY;
+		addr.sin_port = htons((u_short)port);
+
+		if (bind(listen_sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR)
+		{
+			closesocket(listen_sock);
+			listen_sock = INVALID_SOCKET;
+			return false;
+		}
+
+		if (listen(listen_sock, 1) == SOCKET_ERROR)
+		{
+			closesocket(listen_sock);
+			listen_sock = INVALID_SOCKET;
+			return false;
+		}
+
+		net_role = NETPLAY_HOST;
+		net_state = NETPLAY_LISTENING;
+		status_str = "Hosting (Waiting for Player 2 on port " + std::to_string(port) + ")...";
+	}
 	CoreSetToast("NETPLAY: HOSTING SESSION", 120);
 	return true;
 }
@@ -213,32 +204,33 @@ bool NetplayStartClient(const char* host_ip, int port)
 {
 	NetplayDisconnect();
 
-	EnterCriticalSection(&net_lock);
+	{
+		std::lock_guard<std::recursive_mutex> lock(net_lock);
 
-	peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (peer_sock == INVALID_SOCKET) { LeaveCriticalSection(&net_lock); return false; }
+		peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (peer_sock == INVALID_SOCKET) return false;
 
-	sockaddr_in addr = { 0 };
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((u_short)port);
-	addr.sin_addr.s_addr = inet_addr(host_ip);
+		sockaddr_in addr = { 0 };
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons((u_short)port);
+		addr.sin_addr.s_addr = inet_addr(host_ip);
 
-	ConfigurePeerSocket(peer_sock);
-	rx_len = 0;
+		ConfigurePeerSocket(peer_sock);
+		rx_len = 0;
 
-	connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
+		connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
 
-	net_role = NETPLAY_CLIENT;
-	net_state = NETPLAY_CONNECTING;
-	status_str = "Connecting to Host (" + std::string(host_ip) + ")...";
-	LeaveCriticalSection(&net_lock);
+		net_role = NETPLAY_CLIENT;
+		net_state = NETPLAY_CONNECTING;
+		status_str = "Connecting to Host (" + std::string(host_ip) + ")...";
+	}
 	CoreSetToast("NETPLAY: CONNECTING TO HOST...", 120);
 	return true;
 }
 
 void NetplayDisconnect()
 {
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 
 	if (peer_sock != INVALID_SOCKET)
 	{
@@ -260,13 +252,11 @@ void NetplayDisconnect()
 	last_peer_tick = 0;
 	pending_tick = 0;
 	ping_ms = 0;
-
-	LeaveCriticalSection(&net_lock);
 }
 
 void NetplayUpdate()
 {
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 	frame_counter++;
 
 	if (net_role == NETPLAY_HOST && net_state == NETPLAY_LISTENING)
@@ -337,7 +327,6 @@ void NetplayUpdate()
 			{
 				NetplayDisconnect();
 				CoreSetToast("NETPLAY: PEER DISCONNECTED", 120);
-				LeaveCriticalSection(&net_lock);
 				return;
 			}
 
@@ -349,7 +338,6 @@ void NetplayUpdate()
 			{
 				NetplayDisconnect();
 				CoreSetToast("NETPLAY: CONNECTION LOST", 120);
-				LeaveCriticalSection(&net_lock);
 				return;
 			}
 			break;
@@ -388,19 +376,15 @@ void NetplayUpdate()
 		}
 	}
 
-	LeaveCriticalSection(&net_lock);
 }
 
 void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][2],
                        int16_t out_p2_buttons[16], int16_t out_p2_analog[2][2])
 {
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 
 	if (net_state != NETPLAY_CONNECTED || peer_sock == INVALID_SOCKET)
-	{
-		LeaveCriticalSection(&net_lock);
 		return;
-	}
 
 	NetPacket pkt;
 	memset(&pkt, 0, sizeof(pkt));
@@ -447,6 +431,4 @@ void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][
 	// Output remote inputs into Player 2
 	memcpy(out_p2_buttons, remote_buttons, sizeof(remote_buttons));
 	memcpy(out_p2_analog, remote_analog, sizeof(remote_analog));
-
-	LeaveCriticalSection(&net_lock);
 }
