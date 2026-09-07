@@ -3,6 +3,4 @@
 
 extern unsigned char charfont[256][8];
 
-void LoadFont(char* name);
-
 #endif
