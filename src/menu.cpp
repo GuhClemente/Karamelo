@@ -168,7 +168,9 @@ static int setting_wallpaper =
 static bool setting_fullscreen = false;
 // -1 sentinel = never saved yet (fresh install, or an old config from before
 // this existed) - main_win32.cpp keeps its own built-in default in that case
-// instead of restoring a bogus 0x0 window.
+// instead of restoring a bogus 0x0 window. Only setting_win_w/h are actually
+// read as that sentinel (see MenuGetWindowRect): x and y are legitimately
+// negative on any display placed left of, or above, the primary one.
 static int setting_win_x = -1;
 static int setting_win_y = -1;
 static int setting_win_w = -1;
@@ -339,7 +341,16 @@ void MenuSetFullscreen(bool fs) {
 // has ever been saved, so the caller can fall back to its own built-in default
 // instead of restoring a sentinel -1 as a real position or a 0x0 window.
 bool MenuGetWindowRect(int *x, int *y, int *w, int *h) {
-  if (setting_win_x < 0 || setting_win_y < 0 || setting_win_w <= 0 || setting_win_h <= 0)
+  // Only w/h decide "never saved". A negative x or y is a perfectly real
+  // position - any display placed to the left of, or above, the primary one
+  // has negative coordinates - and treating it as the sentinel meant a window
+  // on such a monitor was saved correctly and then silently refused on the way
+  // back in, landing centered on the primary display every launch instead.
+  // Width and height can never legitimately be <= 0, so they carry the
+  // sentinel on their own; the two are always written together by
+  // MenuSetWindowRect, so there is no config where one is set and the other
+  // is not.
+  if (setting_win_w <= 0 || setting_win_h <= 0)
     return false;
   *x = setting_win_x;
   *y = setting_win_y;

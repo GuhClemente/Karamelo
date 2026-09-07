@@ -497,7 +497,14 @@ bool VkHwIsActive() { return g_hw_active && g_vk_ready; }
 
 const void* VkHwGetRenderInterface()
 {
-	if (!g_vk_ready) return NULL;
+	// VkHwIsActive(), not g_vk_ready alone: g_vk_ready stays true for the rest
+	// of the process once a Vulkan device has ever been built (VkHwContextDestroy
+	// only clears g_hw_active), so gating on it meant this kept handing out the
+	// Vulkan interface to cores that never asked for a Vulkan context. Combined
+	// with core_runner.cpp's GET_HW_RENDER_INTERFACE trying D3D11 first, a core
+	// could be handed the *other* backend's struct - which starts with an
+	// interface_type field saying so, and which the core would then misread.
+	if (!VkHwIsActive()) return NULL;
 	return &g_iface;
 }
 

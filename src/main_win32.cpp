@@ -31,6 +31,8 @@ namespace fs = std::filesystem;
 #include "updater.h"
 #include "port_runner.h"
 #include "hw_render.h"
+#include "hw_render_vulkan.h"
+#include "hw_render_d3d11.h"
 #include "resource.h"
 #include "mister_math.h"
 #include "gamepad_sdl.h"
@@ -1809,7 +1811,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// CoreShutdown() has already joined the core thread, so nothing else can
 	// be holding the GL context current at this point - safe to tear it down
 	// here even though HwInit()/HwMakeCurrent() are otherwise core-thread-only.
+	//
+	// All three backends, not just OpenGL: VkHwShutdown/D3D11HwShutdown had no
+	// call site anywhere, so the VkInstance/VkDevice/command pool/staging buffer
+	// and the ID3D11Device/Context/staging texture were never released, and
+	// their g_*_ready flags stayed true for the life of the process. Same
+	// reasoning as HwShutdown() above applies to both: the core thread is
+	// already joined, so nothing can still be issuing GPU work through them.
 	HwShutdown();
+	VkHwShutdown();
+	D3D11HwShutdown();
 
 	// Save the windowed-mode geometry for MenuGetWindowRect to restore next
 	// launch. Skipped while fullscreen (SDL reports the fullscreen rect, not

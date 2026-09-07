@@ -87,6 +87,10 @@ static void* GlProc(const char* name)
 	return (void*)SDL_GL_GetProcAddress(name);
 }
 
+// HwShutdown() is the public, tear-down-everything version. The window is
+// kept when destroy_window is false: see the comment in HwInit below.
+static void HwShutdownInternal(bool destroy_window);
+
 bool HwInit()
 {
 	if (g_gl_ready) return true;
@@ -95,14 +99,27 @@ bool HwInit()
 	_putenv("__GL_THREADED_OPTIMIZATIONS=1");
 	_putenv("__GL_SHADER_DISK_CACHE=1");
 
-	// A hidden 1x1 window is enough: we never present through GL, we read the
-	// FBO back and let the existing GDI path put it on screen.
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	// The window is created once and then reused for the life of the process.
+	// HwMakeCurrent's recovery path calls HwShutdown()/HwInit() to rebuild a
+	// context that went bad, and it runs on the CORE thread - but SDL only
+	// supports creating and destroying windows on the thread that initialized
+	// its video subsystem (the main thread, in WinMain). The raw CreateWindowExA
+	// this used to use tolerated that; SDL does not. A lost context does not
+	// invalidate the window either, so there was never a reason to recreate it -
+	// only the context below gets rebuilt, and every failure path in this
+	// function tears down exactly what this call created.
+	const bool created_window_here = (g_gl_window == NULL);
+	if (created_window_here)
+	{
+		// A hidden 1x1 window is enough: we never present through GL, we read
+		// the FBO back and let the existing GDI path put it on screen.
+		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-	g_gl_window = SDL_CreateWindow("MiSTerFlavorGL", 1, 1, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
-	if (!g_gl_window) { HwLog("SDL_CreateWindow falhou: %s", SDL_GetError()); return false; }
+		g_gl_window = SDL_CreateWindow("MiSTerFlavorGL", 1, 1, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+		if (!g_gl_window) { HwLog("SDL_CreateWindow falhou: %s", SDL_GetError()); return false; }
+	}
 
 	// Cores mix modern shaders with fixed-function calls often enough that a
 	// strict core profile breaks them (flycast for Dreamcast, the GL plugins
@@ -126,21 +143,33 @@ bool HwInit()
 		// No version/profile combination above would start at all - let the
 		// driver pick whatever it wants as a last resort. Simple cores still
 		// work; the demanding ones will refuse, which is better than crashing.
+		//
+		// SDL_GL_ResetAttributes() first, or this is not a last resort at all:
+		// the attributes set in the loop above persist, so without the reset
+		// this retry asks for exactly the 3.3-compatibility context the final
+		// loop iteration was just refused, and can never succeed where the
+		// loop failed. Depth/stencil/double-buffer are re-applied because the
+		// reset clears those too; they are pixel-format attributes fixed at
+		// window creation, so this only matters if the window is created here.
 		HwLog("nenhuma versao 4.x/3.3 aceita - tentando contexto padrao do driver");
+		SDL_GL_ResetAttributes();
+		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 		g_gl_ctx = SDL_GL_CreateContext(g_gl_window);
 	}
 
 	if (!g_gl_ctx)
 	{
 		HwLog("SDL_GL_CreateContext falhou: %s", SDL_GetError());
-		HwShutdown();
+		HwShutdownInternal(created_window_here);
 		return false;
 	}
 
 	if (!SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx))
 	{
 		HwLog("SDL_GL_MakeCurrent falhou: %s", SDL_GetError());
-		HwShutdown();
+		HwShutdownInternal(created_window_here);
 		return false;
 	}
 
@@ -159,7 +188,7 @@ bool HwInit()
 		!p_glCheckFramebufferStatus)
 	{
 		HwLog("driver sem suporte a FBO");
-		HwShutdown();
+		HwShutdownInternal(created_window_here);
 		return false;
 	}
 
@@ -171,7 +200,7 @@ bool HwInit()
 	return true;
 }
 
-void HwShutdown()
+static void HwShutdownInternal(bool destroy_window)
 {
 	if (g_gl_ctx)
 	{
@@ -188,7 +217,7 @@ void HwShutdown()
 		g_gl_ctx = NULL;
 	}
 
-	if (g_gl_window) { SDL_DestroyWindow(g_gl_window); g_gl_window = NULL; }
+	if (destroy_window && g_gl_window) { SDL_DestroyWindow(g_gl_window); g_gl_window = NULL; }
 
 	g_gl_ready = false;
 	g_hw_active = false;
@@ -196,6 +225,10 @@ void HwShutdown()
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 	g_surface_w = g_surface_h = 0;
 }
+
+// Only ever called from the main thread (WinMain's teardown), which is the
+// only thread allowed to destroy an SDL window.
+void HwShutdown() { HwShutdownInternal(true); }
 
 bool HwIsActive() { return g_hw_active && g_gl_ready; }
 
@@ -239,7 +272,11 @@ bool HwMakeCurrent()
 			// dead context forever.
 			struct retro_hw_render_callback saved_cb = g_hw_cb;
 
-			HwShutdown();
+			// Keep the window: this runs on the core thread, and destroying
+			// (or recreating) an SDL window off the main thread is not
+			// supported - see HwInit's own comment. Only the context is
+			// rebuilt, which is all that actually went bad here.
+			HwShutdownInternal(false);
 			if (HwInit() && SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx))
 			{
 				g_hw_cb = saved_cb;

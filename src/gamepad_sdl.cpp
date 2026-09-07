@@ -26,6 +26,25 @@ static void GamepadLog(const char* fmt, ...)
 // differs from XInput's fixed hardware-slot model.
 static SDL_Gamepad* s_pads[4] = { nullptr, nullptr, nullptr, nullptr };
 
+// s_pads is written by GamepadHandleDeviceEvent on the main thread (SDL's
+// event pump in WinMain) and read by GamepadGetState from the core thread
+// (CB_InputPoll, inside retro_run) as well as the main thread. Without this,
+// unplugging a controller mid-game could run SDL_CloseGamepad on one thread
+// while the other was already inside SDL_GetGamepadButton on that same
+// pointer - a use-after-free. XInputGetState was thread-safe by construction
+// and needed nothing here; SDL_OpenGamepad/SDL_CloseGamepad are not, for the
+// lifetime of the object they hand back.
+//
+// Shared for readers so two threads polling at once still don't serialize
+// (SDL does its own internal locking for the actual button/axis reads),
+// exclusive only for the open/close that changes what the slots point at.
+// SRWLOCK_INIT is a static initializer, so there is no init function to call
+// and no order-of-initialization hazard against the first poll.
+static SRWLOCK s_pads_lock = SRWLOCK_INIT;
+
+// Both helpers below assume the caller already holds s_pads_lock exclusively
+// (GamepadHandleDeviceEvent is the only caller) - they must never take it
+// themselves, or the event handler would deadlock against itself.
 static int FindFreeSlot()
 {
 	for (int i = 0; i < 4; i++) if (!s_pads[i]) return i;
@@ -46,15 +65,33 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 	if (event->type == SDL_EVENT_GAMEPAD_ADDED)
 	{
 		SDL_JoystickID id = event->gdevice.which;
-		if (FindSlotByInstanceId(id) >= 0) return; // already open
+
+		AcquireSRWLockExclusive(&s_pads_lock);
+		if (FindSlotByInstanceId(id) >= 0) // already open
+		{
+			ReleaseSRWLockExclusive(&s_pads_lock);
+			return;
+		}
 		int slot = FindFreeSlot();
-		if (slot < 0) { GamepadLog("conectado mas os 4 slots ja estao ocupados - ignorado"); return; }
-		s_pads[slot] = SDL_OpenGamepad(id);
-		if (s_pads[slot])
+		if (slot < 0)
+		{
+			ReleaseSRWLockExclusive(&s_pads_lock);
+			GamepadLog("conectado mas os 4 slots ja estao ocupados - ignorado");
+			return;
+		}
+		SDL_Gamepad* opened = SDL_OpenGamepad(id);
+		s_pads[slot] = opened;
+		ReleaseSRWLockExclusive(&s_pads_lock);
+
+		// Logged outside the lock: this writes to disk, and GamepadGetState is
+		// polled every frame from the core thread behind the same lock.
+		// `opened` stays valid to read here because only this thread ever
+		// closes a pad, and it is not inside another event right now.
+		if (opened)
 		{
 			GamepadLog("slot %d: %s (tipo=%d)", slot,
-				SDL_GetGamepadName(s_pads[slot]),
-				(int)SDL_GetGamepadType(s_pads[slot]));
+				SDL_GetGamepadName(opened),
+				(int)SDL_GetGamepadType(opened));
 		}
 		else
 		{
@@ -63,13 +100,22 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 	}
 	else if (event->type == SDL_EVENT_GAMEPAD_REMOVED)
 	{
+		// The close itself has to happen INSIDE the exclusive section, not
+		// after it: acquiring exclusive only waits for readers already holding
+		// the shared lock to leave, so releasing first and closing after would
+		// put the free right back in the window where a reader on the core
+		// thread can be inside SDL_GetGamepadButton on that pointer - the
+		// exact use-after-free this lock exists to close.
+		AcquireSRWLockExclusive(&s_pads_lock);
 		int slot = FindSlotByInstanceId(event->gdevice.which);
 		if (slot >= 0)
 		{
-			GamepadLog("slot %d desconectado", slot);
 			SDL_CloseGamepad(s_pads[slot]);
 			s_pads[slot] = nullptr;
 		}
+		ReleaseSRWLockExclusive(&s_pads_lock);
+
+		if (slot >= 0) GamepadLog("slot %d desconectado", slot);
 	}
 }
 
@@ -86,8 +132,18 @@ static BYTE ScaleTrigger(Sint16 v)
 
 bool GamepadGetState(int slot, XINPUT_STATE* out_state)
 {
-	if (slot < 0 || slot >= 4 || !s_pads[slot]) return false;
+	if (slot < 0 || slot >= 4) return false;
+
+	// Shared for the whole read, not just to fetch the pointer: SDL_CloseGamepad
+	// on the main thread frees the object, so the lock has to still be held
+	// while the SDL_GetGamepad* calls below dereference it.
+	AcquireSRWLockShared(&s_pads_lock);
 	SDL_Gamepad* gp = s_pads[slot];
+	if (!gp)
+	{
+		ReleaseSRWLockShared(&s_pads_lock);
+		return false;
+	}
 
 	memset(out_state, 0, sizeof(XINPUT_STATE));
 	WORD w = 0;
@@ -124,5 +180,6 @@ bool GamepadGetState(int slot, XINPUT_STATE* out_state)
 	out_state->Gamepad.sThumbRX = rx;
 	out_state->Gamepad.sThumbRY = (ry == -32768) ? 32767 : (SHORT)(-ry);
 
+	ReleaseSRWLockShared(&s_pads_lock);
 	return true;
 }
