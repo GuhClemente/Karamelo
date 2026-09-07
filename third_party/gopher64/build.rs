@@ -147,10 +147,17 @@ fn main() {
         println!("cargo:rustc-link-lib=static=clang_rt.osx");
     }
 
-    volk_build.flag("-flto=thin");
-    rdp_build.flag("-flto=thin");
-    simd_build.flag("-flto=thin");
-    retroachievements_build.flag("-flto=thin");
+    // Thin LTO merges/inlines these C++ TUs into one blob, which destroys
+    // function-boundary symbol info even when debug info is present -
+    // making crashes inside this code (parallel-rdp/interface.cpp, vulkan/*)
+    // unresolvable in a debugger. Skip it for debug-info builds.
+    let debug_info = std::env::var("DEBUG").as_deref() == Ok("true");
+    if !debug_info {
+        volk_build.flag("-flto=thin");
+        rdp_build.flag("-flto=thin");
+        simd_build.flag("-flto=thin");
+        retroachievements_build.flag("-flto=thin");
+    }
 
     volk_build.compile("volk");
     rdp_build.compile("parallel-rdp");
