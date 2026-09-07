@@ -1,5 +1,15 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <spawn.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
+extern char **environ;
+#endif
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -19,35 +29,50 @@ namespace fs = std::filesystem;
 // second extractor on top of the first, corrupting the result.
 #define EXTRACT_TIMEOUT_MS (10 * 60 * 1000) // 10 min, only to survive a wedged tool
 
-static bool RunHiddenCommand(const std::string& cmd)
+// Runs argv[0] with the rest as arguments, no visible window, output
+// discarded. Waits up to timeout_ms; on timeout the process is killed rather
+// than left running in the background writing into a folder we are about to
+// scan. Returns whether it exited with code 0.
+static bool RunHiddenCommand(const std::vector<std::string>& argv, uint32_t timeout_ms)
 {
-	STARTUPINFOA si = { 0 };
-	PROCESS_INFORMATION pi = { 0 };
-	si.cb = sizeof(STARTUPINFOA);
-	si.dwFlags = STARTF_USESHOWWINDOW;
-	si.wShowWindow = SW_HIDE;
+#ifdef _WIN32
+	// CreateProcessA takes one pre-quoted command line, not an argv array -
+	// every element here is a flag or a path, and Windows filenames cannot
+	// contain a double quote, so wrapping each in quotes is sufficient (no
+	// escaping needed, unlike the PowerShell '...' quoting elsewhere in this
+	// file).
+	std::string cmd;
+	for (size_t i = 0; i < argv.size(); i++)
+	{
+		if (i) cmd += ' ';
+		cmd += '"'; cmd += argv[i]; cmd += '"';
+	}
 
 	char cmd_buf[2048];
 	if (cmd.size() >= sizeof(cmd_buf))
 	{
 		// strncpy_s below would silently truncate instead - dropping the
 		// closing quote and the "-C dest_dir" argument off the end, which
-		// makes tar.exe misparse the line rather than fail loudly (a long
-		// nested cache path built from a long ROM filename can get this
+		// makes the extractor misparse the line rather than fail loudly (a
+		// long nested cache path built from a long ROM filename can get this
 		// close to 2KB).
 		return false;
 	}
 	strncpy_s(cmd_buf, cmd.c_str(), sizeof(cmd_buf) - 1);
 
+	STARTUPINFOA si = { 0 };
+	si.cb = sizeof(STARTUPINFOA);
+	si.dwFlags = STARTF_USESHOWWINDOW;
+	si.wShowWindow = SW_HIDE;
+	PROCESS_INFORMATION pi = { 0 };
+
 	if (!CreateProcessA(NULL, cmd_buf, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
 		return false;
 
-	DWORD wait = WaitForSingleObject(pi.hProcess, EXTRACT_TIMEOUT_MS);
+	DWORD wait = WaitForSingleObject(pi.hProcess, timeout_ms);
 
 	if (wait == WAIT_TIMEOUT)
 	{
-		// Never leave it running in the background writing into the folder we
-		// are about to scan.
 		TerminateProcess(pi.hProcess, 1);
 		WaitForSingleObject(pi.hProcess, 5000);
 		CloseHandle(pi.hProcess);
@@ -60,6 +85,39 @@ static bool RunHiddenCommand(const std::string& cmd)
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 	return (exit_code == 0);
+#else
+	std::vector<char*> cargv;
+	for (const auto& a : argv) cargv.push_back(const_cast<char*>(a.c_str()));
+	cargv.push_back(nullptr);
+
+	posix_spawn_file_actions_t fa;
+	posix_spawn_file_actions_init(&fa);
+	posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
+	posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
+	posix_spawn_file_actions_addopen(&fa, 2, "/dev/null", O_WRONLY, 0);
+
+	pid_t pid;
+	int rc = posix_spawnp(&pid, cargv[0], &fa, NULL, cargv.data(), environ);
+	posix_spawn_file_actions_destroy(&fa);
+	if (rc != 0) return false;
+
+	unsigned elapsed_ms = 0;
+	int status = 0;
+	for (;;)
+	{
+		pid_t r = waitpid(pid, &status, WNOHANG);
+		if (r == pid) break;
+		if (elapsed_ms >= timeout_ms)
+		{
+			kill(pid, SIGKILL);
+			waitpid(pid, &status, 0);
+			return false;
+		}
+		usleep(50 * 1000);
+		elapsed_ms += 50;
+	}
+	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+#endif
 }
 
 // Repacks in the wild routinely ship a cue whose FILE entries do not match what
@@ -407,22 +465,26 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 	return "";
 }
 
-// Lists the archive's entry names via "tar.exe -tf" (no extraction) and
-// rejects it if any entry could escape dest_dir: a ".." path component, a
-// leading path separator, or a drive letter. Archives handled by this
-// function are not always trustworthy input - a Ports & Recomp download
-// comes from whatever repo a PortDefinition points at, and this same
-// function extracts user-supplied ROM zips too. tar/Expand-Archive extract
-// wherever an entry's path resolves to with no containment of their own, so
-// this has to happen before the real extraction, not after.
-static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
+// Runs argv[0], no visible window, capturing combined stdout+stderr into
+// out_output. Returns the exit code, or -1 if the process could not even be
+// started - callers treat that the same as a nonzero exit code (fail
+// closed), same shape as RunHiddenCommand above.
+static int RunHiddenCommandCaptureOutput(const std::vector<std::string>& argv, uint32_t timeout_ms, std::string& out_output)
 {
-	std::string list_cmd = "tar.exe -tf \"" + archive_path + "\"";
-
+#ifdef _WIN32
 	SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
 	HANDLE read_pipe = NULL, write_pipe = NULL;
-	if (!CreatePipe(&read_pipe, &write_pipe, &sa, 0)) return true; // fail closed
+	if (!CreatePipe(&read_pipe, &write_pipe, &sa, 0)) return -1;
 	SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0);
+
+	std::string cmd;
+	for (size_t i = 0; i < argv.size(); i++)
+	{
+		if (i) cmd += ' ';
+		cmd += '"'; cmd += argv[i]; cmd += '"';
+	}
+	std::vector<char> cmd_buf(cmd.begin(), cmd.end());
+	cmd_buf.push_back('\0');
 
 	STARTUPINFOA si = { 0 };
 	si.cb = sizeof(si);
@@ -432,34 +494,96 @@ static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
 	si.hStdError = write_pipe;
 	PROCESS_INFORMATION pi = { 0 };
 
-	std::vector<char> cmd_buf(list_cmd.begin(), list_cmd.end());
-	cmd_buf.push_back('\0');
-
 	bool started = CreateProcessA(NULL, cmd_buf.data(), NULL, NULL, TRUE,
 		CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
 	CloseHandle(write_pipe);
 
-	if (!started) { CloseHandle(read_pipe); return true; } // fail closed: can't list, don't trust it
+	if (!started) { CloseHandle(read_pipe); return -1; }
 
-	std::string output;
 	char buf[4096];
 	DWORD n = 0;
 	while (ReadFile(read_pipe, buf, sizeof(buf), &n, NULL) && n > 0)
-		output.append(buf, n);
+		out_output.append(buf, n);
 	CloseHandle(read_pipe);
 
-	WaitForSingleObject(pi.hProcess, 30000);
+	WaitForSingleObject(pi.hProcess, timeout_ms);
 	DWORD exit_code = 1;
 	GetExitCodeProcess(pi.hProcess, &exit_code);
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
+	return (int)exit_code;
+#else
+	std::vector<char*> cargv;
+	for (const auto& a : argv) cargv.push_back(const_cast<char*>(a.c_str()));
+	cargv.push_back(nullptr);
 
-	// tar couldn't even list this archive's contents (a format it can't
-	// parse, or it's genuinely corrupt) - the PowerShell fallback in
-	// ArchiveExtractAll would otherwise extract it completely unvalidated.
-	// Refusing it here is a real behavior change for whatever edge case that
-	// fallback existed for, but extracting something we could not check the
-	// paths of is worse.
+	int pipefd[2];
+	if (pipe(pipefd) != 0) return -1;
+
+	posix_spawn_file_actions_t fa;
+	posix_spawn_file_actions_init(&fa);
+	posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
+	posix_spawn_file_actions_adddup2(&fa, pipefd[1], 1);
+	posix_spawn_file_actions_adddup2(&fa, pipefd[1], 2);
+	posix_spawn_file_actions_addclose(&fa, pipefd[0]);
+	posix_spawn_file_actions_addclose(&fa, pipefd[1]);
+
+	pid_t pid;
+	int rc = posix_spawnp(&pid, cargv[0], &fa, NULL, cargv.data(), environ);
+	posix_spawn_file_actions_destroy(&fa);
+	close(pipefd[1]);
+	if (rc != 0) { close(pipefd[0]); return -1; }
+
+	char buf[4096];
+	ssize_t n;
+	while ((n = read(pipefd[0], buf, sizeof(buf))) > 0)
+		out_output.append(buf, (size_t)n);
+	close(pipefd[0]);
+
+	unsigned elapsed_ms = 0;
+	int status = 0;
+	for (;;)
+	{
+		pid_t r = waitpid(pid, &status, WNOHANG);
+		if (r == pid) break;
+		if (elapsed_ms >= timeout_ms)
+		{
+			kill(pid, SIGKILL);
+			waitpid(pid, &status, 0);
+			return -1;
+		}
+		usleep(50 * 1000);
+		elapsed_ms += 50;
+	}
+	return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
+}
+
+// Lists the archive's entry names (no extraction) and rejects it if any
+// entry could escape dest_dir: a ".." path component, a leading path
+// separator, or a drive letter. Archives handled by this function are not
+// always trustworthy input - a Ports & Recomp download comes from whatever
+// repo a PortDefinition points at, and this same function extracts
+// user-supplied ROM zips too. The extractor itself does not contain paths
+// on its own, so this has to happen before the real extraction, not after.
+static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
+{
+	std::string output;
+#ifdef _WIN32
+	int exit_code = RunHiddenCommandCaptureOutput({ "tar.exe", "-tf", archive_path }, 30000, output);
+#else
+	// "-Z1" is zipinfo mode built into unzip: bare filenames, one per line,
+	// no header/footer/column formatting - the same plain shape "tar -tf"
+	// produces, so the parsing loop below needs no changes either way.
+	int exit_code = RunHiddenCommandCaptureOutput({ "unzip", "-Z1", archive_path }, 30000, output);
+#endif
+
+	// The extractor couldn't even list this archive's contents (a format it
+	// can't parse, or it's genuinely corrupt, or -1: it couldn't even start) -
+	// the PowerShell fallback in ArchiveExtractAll would otherwise extract it
+	// completely unvalidated. Refusing it here is a real behavior change for
+	// whatever edge case that fallback existed for, but extracting something
+	// we could not check the paths of is worse.
 	if (exit_code != 0) return true;
 
 	std::stringstream ss(output);
@@ -482,9 +606,9 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 	if (ArchiveHasUnsafeEntry(archive_path)) return false;
 	fs::create_directories(dest_dir);
 
+#ifdef _WIN32
 	// 1. Try Windows tar.exe (fast native extractor)
-	std::string tar_cmd = "tar.exe -xf \"" + archive_path + "\" -C \"" + dest_dir + "\"";
-	bool ok = RunHiddenCommand(tar_cmd);
+	bool ok = RunHiddenCommand({ "tar.exe", "-xf", archive_path, "-C", dest_dir }, EXTRACT_TIMEOUT_MS);
 
 	// 2. Only if tar genuinely failed (RAR, or a format it cannot read) fall
 	//    back to PowerShell. Running both against the same folder corrupts the
@@ -499,9 +623,20 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 			for (char c : s) { out += c; if (c == '\'') out += c; }
 			return out;
 		};
-		std::string ps_cmd = "powershell.exe -NoProfile -NonInteractive -Command \"try { Expand-Archive -LiteralPath '" + ps_quote(archive_path) + "' -DestinationPath '" + ps_quote(dest_dir) + "' -Force } catch {}\"";
-		RunHiddenCommand(ps_cmd);
+		std::string ps_script = "try { Expand-Archive -LiteralPath '" + ps_quote(archive_path) +
+			"' -DestinationPath '" + ps_quote(dest_dir) + "' -Force } catch {}";
+		RunHiddenCommand({ "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps_script }, EXTRACT_TIMEOUT_MS);
 	}
+#else
+	// Every archive that reaches this function is a .zip - "tar.exe" above is
+	// really just being used as a zip extractor (bsdtar auto-detects the
+	// format), same reason ArchiveHasUnsafeEntry below uses "unzip -Z1"
+	// instead of a real tar listing. unzip is the direct equivalent, present
+	// on essentially every Linux desktop distro. No PowerShell-style fallback
+	// exists here without a new dependency - if unzip fails, extraction fails.
+	bool ok = RunHiddenCommand({ "unzip", "-o", archive_path, "-d", dest_dir }, EXTRACT_TIMEOUT_MS);
+	(void)ok;
+#endif
 
 	return fs::exists(dest_dir) && !fs::is_empty(dest_dir);
 }
