@@ -15,7 +15,8 @@
 
 #define OSDLINELEN       256
 
-/* Functions ported from Main_MiSTer */
+/* OSD raster API - same shape Main_MiSTer's OSD functions have, but the
+   implementation in osd.cpp is a clean-room rewrite, not a port. */
 void OsdSetTitle(const char *s, int arrow = 0);
 void OsdSetArrow(int arrow);
 void OsdWrite(unsigned char n, const char *s="", unsigned char inver=0, unsigned char stipple=0, char usebg = 0, int maxinv = 32, int mininv = 0);
