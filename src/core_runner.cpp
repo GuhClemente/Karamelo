@@ -20,6 +20,22 @@
 #include <unordered_set>
 #include <fstream>
 
+// LoadLibraryA/GetProcAddress/FreeLibrary have no direct Windows-only
+// dependency other than the calling convention and the handle type - dlopen/
+// dlsym/dlclose take the same (path, RTLD_NOW)/(handle, name)/(handle)
+// shapes, so every existing call site below can stay exactly as written.
+// windows.h above still makes the rest of this file Windows-only for now
+// (WASAPI, XInput, __try/__except); this shim just means the core-loading
+// code specifically won't need touching again once those other blockers
+// are addressed.
+#ifndef _WIN32
+#include <dlfcn.h>
+typedef void* HMODULE;
+#define LoadLibraryA(path) dlopen(path, RTLD_NOW)
+#define GetProcAddress(h, name) dlsym(h, name)
+#define FreeLibrary(h) dlclose(h)
+#endif
+
 #include "libretro.h"
 #include "core_runner.h"
 #include "menu.h"
