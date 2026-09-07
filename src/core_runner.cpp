@@ -750,10 +750,18 @@ static void InitAudio(int sample_rate)
 		// rest of the session.
 		g_output_sample_rate = 48000;
 		spec.freq = g_output_sample_rate;
+		// Recomputed at the new rate, and kept identical to the primary path
+		// above - including the PCSX2 floor, which this branch was silently
+		// dropping, and g_baseline_wave_buffers, which it never updated at all.
+		// Without that second one DeescalateWaveQueue keeps the floor computed
+		// for the *rejected* rate, so a long clean stretch can erode the queue
+		// below the latency the user actually asked for.
 		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
+		if (s_loaded_core_is_pcsx2 && want < 20) want = 20;
 		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
 		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
+		InterlockedExchange(&g_baseline_wave_buffers, (LONG)want);
 		InterlockedExchange(&g_ring_write_pos, want * SAMPLES_PER_BUFFER);
 		g_audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
 	}

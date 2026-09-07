@@ -99,7 +99,12 @@ bool D3D11HwIsActive() { return g_hw_active && g_d3d11_ready; }
 
 const void* D3D11HwGetRenderInterface()
 {
-	if (!g_d3d11_ready) return NULL;
+	// D3D11HwIsActive(), not g_d3d11_ready alone - see the same fix in
+	// hw_render_vulkan.cpp's VkHwGetRenderInterface. g_d3d11_ready survives
+	// D3D11HwContextDestroy, so gating on it handed this backend's interface
+	// to whichever core asked next, Vulkan cores included (and D3D11 is tried
+	// first at the call site, so it was the one that won).
+	if (!D3D11HwIsActive()) return NULL;
 	return &g_iface;
 }
 
