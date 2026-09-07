@@ -725,7 +725,7 @@ static int neo_dip_freeplay = 0; // 0: OFF, 1: ON
 // on change: without the load-time call a setting restored from the config
 // only took effect if the player toggled it again by hand - true of every
 // value below (found the hard way for NeoGeo's own dip switches, which
-// persisted correctly to mister_flavor.cfg and displayed correctly in this
+// persisted correctly to mister4all.cfg and displayed correctly in this
 // menu on the very next launch, but silently never reached Geolith unless
 // re-toggled in that session, since none of them were being re-applied here).
 static void ApplyPersistedCoreOptions() {
@@ -1496,7 +1496,7 @@ void PopulateAbout() {
     }
   }
   if (core_files > 0 && core_files != APP_CORE_FILES) {
-    FILE *lf = fopen("mister_flavor.log", "a");
+    FILE *lf = fopen("mister4all.log", "a");
     if (lf) {
       fprintf(lf,
               "[WARN] [ABOUT] cores/ tem %d DLLs, mas APP_CORE_FILES diz %d - "
@@ -1851,8 +1851,17 @@ static void BrowseGoUp() {
 // volume reset on every launch. Written as plain key=value text next to the
 // executable, under Config/.
 // -------------------------------------------------------------
-static const char *SETTINGS_PATH = "Config/mister_flavor.cfg";
-static const char *LEGACY_SETTINGS_PATH = "Config/sabor_mister.cfg";
+static const char *SETTINGS_PATH = "Config/mister4all.cfg";
+// Older filenames this project shipped under, newest first. Read-only: the
+// first one that exists is loaded, and the very next MenuSaveSettings() writes
+// everything back out to SETTINGS_PATH above, so an upgrading player keeps
+// every binding, video/audio choice and Core Option instead of being silently
+// reset to defaults. "mister_flavor" was the name before this became
+// MiSTer 4 ALL; "sabor_mister" was the one before that.
+static const char *LEGACY_SETTINGS_PATHS[] = {
+    "Config/mister_flavor.cfg",
+    "Config/sabor_mister.cfg",
+};
 
 // One key per call. The previous version was a single snprintf with twenty
 // arguments, and adding a setting to the argument list without adding it to
@@ -1935,7 +1944,7 @@ static void MenuSaveSettings() {
   if (!f)
     return;
 
-  fprintf(f, "# MiSTer Flavor - Configuration\n");
+  fprintf(f, "# MiSTer 4 ALL - Configuration\n");
   std::string snap = SettingsSnapshot();
   fwrite(snap.data(), 1, snap.size(), f);
   fclose(f);
@@ -1943,8 +1952,11 @@ static void MenuSaveSettings() {
 
 static void MenuLoadSettings() {
   FILE *f = fopen(SETTINGS_PATH, "rb");
-  if (!f)
-    f = fopen(LEGACY_SETTINGS_PATH, "rb");
+  bool from_legacy = false;
+  for (size_t i = 0; !f && i < sizeof(LEGACY_SETTINGS_PATHS) / sizeof(LEGACY_SETTINGS_PATHS[0]); i++) {
+    f = fopen(LEGACY_SETTINGS_PATHS[i], "rb");
+    if (f) from_legacy = true;
+  }
   if (!f) {
     // Seed default settings file on first launch
     MenuSaveSettings();
@@ -2060,6 +2072,16 @@ static void MenuLoadSettings() {
       g_persisted_core_options[key + 8] = val;
   }
   fclose(f);
+
+  // Migrate now, not "whenever the player next changes something". Without
+  // this the new file is only created on the first MenuSaveSettings(), so a
+  // player who upgrades and never touches a setting keeps running off the old
+  // filename indefinitely - and the two files then silently diverge the moment
+  // they do change one. Writing immediately makes the rename a one-launch
+  // event. The old file is deliberately left on disk: it costs nothing, and it
+  // is the way back if the player downgrades.
+  if (from_legacy)
+    MenuSaveSettings();
 }
 
 void MenuProcessKey(MenuKey key) {

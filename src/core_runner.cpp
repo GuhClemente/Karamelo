@@ -486,7 +486,7 @@ static int DetectPreferredOutputSampleRate()
 	if (enumerator)  enumerator->Release();
 	if (need_uninit) CoUninitialize();
 
-	FILE* lf = fopen("mister_flavor.log", "a");
+	FILE* lf = fopen("mister4all.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] dispositivo de saida: %d Hz%s\n",
@@ -529,7 +529,7 @@ static void EscalateWaveQueue()
 	// value on every pass, so raising it takes effect on the very next one.
 	InterlockedExchange(&g_active_wave_buffers, want);
 
-	FILE* lf = fopen("mister_flavor.log", "a");
+	FILE* lf = fopen("mister4all.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] underruns recorrentes; fila ampliada de %ldms para %ldms\n",
@@ -558,7 +558,7 @@ static void DeescalateWaveQueue()
 
 	InterlockedExchange(&g_active_wave_buffers, want);
 
-	FILE* lf = fopen("mister_flavor.log", "a");
+	FILE* lf = fopen("mister4all.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] audio estavel; fila reduzida de %ldms para %ldms\n",
@@ -793,7 +793,7 @@ static void InitAudio(int sample_rate)
 		// its own). This is exactly the failure mode that happens if SDL_INIT_AUDIO
 		// was never passed to SDL_Init() - the subsystem call fails quietly
 		// rather than crashing.
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[ERROR] [AUDIO] SDL_OpenAudioDeviceStream falhou: %s\n", SDL_GetError());
@@ -890,7 +890,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 					if (++s_agree_count >= 3)
 					{
 						s_locked_step = measured / (double)g_output_sample_rate;
-						FILE* lf = fopen("mister_flavor.log", "a");
+						FILE* lf = fopen("mister4all.log", "a");
 						if (lf)
 						{
 							fprintf(lf, "[INFO] [AUDIO] taxa travada em %.0f Hz (declarada %.0f Hz), passo %.5f\n",
@@ -1153,7 +1153,7 @@ static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 
 	// Kept open: reopening per line meant 35 open/close pairs just to
 	// list the tracks of one CD image.
-	static FILE* f = fopen("mister_flavor.log", "a");
+	static FILE* f = fopen("mister4all.log", "a");
 	if (f)
 	{
 		fprintf(f, "[%s] %s\n", lvl, buf);
@@ -1299,7 +1299,7 @@ static bool GetCoreOptionDeclLocked(int index, std::string* key_out, std::string
 // with zero core-specific code, the same way RetroArch's Quick Menu >
 // Options does. Choices set here go through the existing CoreSetOption(),
 // so they only last for the current run, exactly like every other option
-// set this way - not persisted to mister_flavor.cfg across restarts.
+// set this way - not persisted to mister4all.cfg across restarts.
 int CoreOptionCount()
 {
 	EnterCriticalSection(&options_lock);
@@ -1981,7 +1981,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 		LeaveCriticalSection(&options_lock);
 
 		// The generic Core Options menu page persists a player's choice to
-		// mister_flavor.cfg (see menu.cpp's g_persisted_core_options); re-apply
+		// mister4all.cfg (see menu.cpp's g_persisted_core_options); re-apply
 		// any match now, the same way ApplyPersistedCoreOptions() already does
 		// for the older, hand-picked per-core settings - without this a chosen
 		// Internal Resolution (or any other generic option) silently reverted
@@ -3107,8 +3107,16 @@ void CoreRecoverLocksHeldByThread(unsigned long thread_id)
 	}
 }
 
+// Defined further down, next to the buffer it owns.
+static void FreeLoadedRomData();
+
 static void RecoverAfterKilledCore()
 {
+	// The core thread was killed, so RetroUnloadGameGuarded never ran and never
+	// got to release the game buffer. Nothing can still be reading it - the only
+	// thing that ever held the pointer was the core we just terminated.
+	FreeLoadedRomData();
+
 	// A critical section owned by a dead thread is never released. Recreating it
 	// is the only way back; nothing else can be running against it here, because
 	// the only other user was the thread we just killed.
@@ -3334,10 +3342,38 @@ static bool RetroLoadGameGuarded(const struct retro_game_info* info)
 	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
+// The buffer handed to the core as retro_game_info::data, kept alive for
+// exactly as long as the libretro spec requires.
+//
+// When need_fullpath is false the frontend loads the content itself, and the
+// pointer it passes has to stay valid until retro_unload_game() returns - the
+// whole point of that path is that a core may keep the pointer instead of
+// copying the ROM. This used to be free()d on the line right after
+// retro_load_game(), which is fine for the cores that do copy (mupen, mGBA -
+// most of them) and a use-after-free for the ones that do not.
+//
+// This was found while chasing gopher64's heap corruption on unload, and it
+// is worth being explicit that it did NOT fix it: gopher64 still dies inside
+// its own retro_unload_game() with the buffer kept alive, with it allocated
+// from the process heap instead of the CRT's, and with the free removed
+// entirely. So this is a real latent use-after-free that was waiting for the
+// next core that keeps the pointer - not an explanation of that crash.
+static uint8_t* g_loaded_rom_data = nullptr;
+
+static void FreeLoadedRomData()
+{
+	if (g_loaded_rom_data) { free(g_loaded_rom_data); g_loaded_rom_data = nullptr; }
+}
+
 static void RetroUnloadGameGuarded()
 {
 	__try { if (p_retro_unload_game) p_retro_unload_game(); }
 	__except (EXCEPTION_EXECUTE_HANDLER) {}
+
+	// Only now is the core guaranteed to be done with it. Every call site of
+	// this function is a point where the game is going away, so freeing here
+	// covers all of them at once instead of relying on each to remember.
+	FreeLoadedRomData();
 }
 
 static bool RetroGetSystemAvInfoGuarded(struct retro_system_av_info* av_info)
@@ -3555,9 +3591,13 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	std::string abs_rom_path = fs::absolute(p).string();
 	game_info.path = abs_rom_path.c_str();
 
+	// A previous game's buffer must never outlive its own unload; if anything
+	// slipped through, drop it before taking ownership of a new one.
+	FreeLoadedRomData();
 	uint8_t* rom_data = nullptr;
 
 	const bool is_archive = (ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".tar" || ext == ".gz");
+
 	const bool is_arcade_or_disc = (sys_info.need_fullpath || is_disc || is_archive ||
 		loaded_core_name == "Arcade" || loaded_core_name == "MS-DOS" ||
 		loaded_core_name == "Dreamcast" || loaded_core_name == "GameCube" ||
@@ -3586,11 +3626,18 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		}
 	}
 
+	// Handed over, not released: the core may have kept this pointer (see
+	// g_loaded_rom_data). RetroUnloadGameGuarded frees it once the core is
+	// actually done with it.
+	g_loaded_rom_data = rom_data;
+
 	bool ok = RetroLoadGameGuarded(&game_info);
-	if (rom_data) free(rom_data);
 
 	if (!ok)
 	{
+		// The load failed, so retro_unload_game() will not be called for it and
+		// nothing can still be holding the buffer - release it here instead.
+		FreeLoadedRomData();
 		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] Core failed to load game: %s", rom_path);
 
 		if (!suppress_toast)
@@ -3635,7 +3682,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			}
 			else
 			{
-				CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
+				CoreSetToast("FALHA AO CARREGAR - VEJA mister4all.log", 240);
 			}
 		}
 		// The core can have already called SET_MEMORY_MAPS from inside this
@@ -3659,7 +3706,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		CoreLogPrintf(RETRO_LOG_ERROR,
 			"[CoreRunner] Core faulted inside retro_get_system_av_info: %s", rom_path);
 		if (!suppress_toast)
-			CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
+			CoreSetToast("FALHA AO CARREGAR - VEJA mister4all.log", 240);
 		RetroUnloadGameGuarded();
 		// is_game_loaded is still false here, so CoreUnload()'s own
 		// CoreReleaseMemoryMap() call (gated on is_game_loaded) never runs -

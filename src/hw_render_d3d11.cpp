@@ -20,7 +20,7 @@ static void D3D11HwLog(const char* fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	FILE* f = fopen("mister_flavor.log", "a");
+	FILE* f = fopen("mister4all.log", "a");
 	if (f) { fprintf(f, "[INFO] [HW-D3D11] %s\n", buf); fclose(f); }
 }
 
