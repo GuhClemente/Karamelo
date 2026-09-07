@@ -1,3 +1,11 @@
+// Copyright (c) 2026 Gustavo Clemente (mister4all.com | @GuhClemente).
+// The arrangement/transposition below and the hand-drawn UI glyphs (0x10,
+// 0x11, 0x14, 0x15, 0x16) are original work, not GPL-derived - this file
+// used to be a near-literal port of Main_MiSTer's own charrom.cpp and was
+// rewritten from scratch (see docs/FRONTEND.md). The printable-ASCII glyph
+// data itself comes from Unscii, which its author places in the Public
+// Domain / CC0 - see the note below.
+
 #include "charrom.h"
 
 // 8x8 bitmap font for the OSD, replacing the port from Main_MiSTer's own
