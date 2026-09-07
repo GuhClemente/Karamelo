@@ -288,7 +288,18 @@ static std::string FindBestExecutable(const std::string& dir) {
     std::vector<fs::path> top_level, nested;
     for (const auto& e : fs::recursive_directory_iterator(dir, ec)) {
         if (ec || !e.is_regular_file(ec)) continue;
+#ifdef _WIN32
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
+#else
+        // Linux binaries conventionally ship with no extension at all - a
+        // release zip built for Linux is not going to contain a ".exe", so
+        // "no extension" is the closest equivalent signal available from the
+        // filename alone. Files that do have an extension here are data,
+        // scripts, or libraries (.so, .txt, .json, ...), never the binary to
+        // launch, so they are excluded the same way ".exe"-only excludes
+        // everything else on Windows.
+        if (!e.path().extension().empty()) continue;
+#endif
 
         std::string fname = ToLowerStr(e.path().filename().string());
         bool skip = false;
@@ -515,6 +526,69 @@ static GhAsset PickWindowsAsset(const std::vector<GhAsset>& assets) {
     return GhAsset{};
 }
 
+#ifndef _WIN32
+// Mirrors IsWindowsAssetName's structure but deliberately does not fall back
+// to an unmarked/generic-architecture asset the way that one does: an
+// untagged single .zip on a small hobby project's release is, in practice,
+// almost always the Windows build (the default most of these recomp/native-
+// port projects target first), not a Linux one, so guessing there would
+// routinely download a Windows binary that can't run at all. Requiring an
+// explicit Linux marker means a release with no Linux build simply returns
+// no match - PickLinuxAsset then returns empty, DownloadAndInstall reports
+// "no Linux build", and the caller can leave that port out of the list
+// instead of offering something that will not run.
+static bool IsLinuxAssetName(const std::string& lower_name) {
+    if (ContainsAny(lower_name, { "windows", "win64", "win32", "win-x64", "win-x86",
+                                   "-win.", "_win.", ".exe", ".msi", "msvc", "mingw",
+                                   "macos", "osx", "darwin", "apple", ".dmg", ".pkg",
+                                   "switch", "android", "source" }))
+        return false;
+    return ContainsAny(lower_name, { "linux", ".deb", ".rpm", "appimage", "flatpak", ".tar.gz", ".tar.xz" });
+}
+
+// Same shape as PickWindowsAsset (arch preference, companion-tool rejection,
+// prefer an archive over a bare binary) but built on IsLinuxAssetName and
+// without that function's "single untagged asset, just take it" fallback -
+// see IsLinuxAssetName's own comment for why that fallback is Windows-only.
+//
+// Restricted to ".zip" even though IsLinuxAssetName also flags .tar.gz/
+// .tar.xz/AppImage as Linux-shaped names: DownloadAndInstall's extraction
+// step below only knows how to unpack a zip (ArchiveExtractAll's Linux
+// backend is "unzip", nothing else). Picking a .tar.gz here would download
+// something the pipeline then fails to extract - worse than just not
+// offering the port. A release that ships only a .tar.gz/AppImage correctly
+// falls through to "no Linux build" until extraction grows those formats too.
+static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
+    auto is_archive = [](const std::string& n) {
+        return n.size() >= 4 && n.substr(n.size() - 4) == ".zip";
+    };
+
+    std::vector<GhAsset> matches;
+    for (const auto& a : assets) {
+        std::string n = ToLowerStr(a.name);
+        if (is_archive(n) && IsLinuxAssetName(n) && !LooksLikeCompanionTool(n)) matches.push_back(a);
+    }
+    if (!matches.empty()) {
+        const GhAsset* best = &matches.front();
+        int best_rank = ArchPreferenceRank(ToLowerStr(best->name));
+        for (const auto& a : matches) {
+            int rank = ArchPreferenceRank(ToLowerStr(a.name));
+            if (rank < best_rank) { best = &a; best_rank = rank; }
+            if (best_rank == 0) break;
+        }
+        return *best;
+    }
+
+    // No fallback loop over non-archive names here, unlike PickWindowsAsset:
+    // that one exists so a Windows .msi still gets identified (and rejected
+    // with a specific "installer, unsupported" error downstream). There is
+    // no equivalent Linux special case, so matching a non-.zip Linux-looking
+    // name here would just fail extraction later with a more confusing
+    // error - better to fall through to "no Linux build" now.
+    return GhAsset{};
+}
+#endif
+
 // Downloads the latest release of def, extracts it into ports/<id>/ and
 // flattens it. Runs on a worker thread - network + disk I/O, seconds to
 // minutes depending on the release size and the user's connection.
@@ -539,8 +613,13 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     }
 
     std::vector<GhAsset> assets = ParseReleaseAssets(json);
+#ifdef _WIN32
     GhAsset asset = PickWindowsAsset(assets);
     if (asset.url.empty()) { out_error = "nenhum build Windows na release"; return false; }
+#else
+    GhAsset asset = PickLinuxAsset(assets);
+    if (asset.url.empty()) { out_error = "nenhum build Linux na release deste port"; return false; }
+#endif
 
     std::string lower_name = ToLowerStr(asset.name);
 
