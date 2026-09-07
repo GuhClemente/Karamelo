@@ -8,6 +8,7 @@
 #include <string.h>
 #include <string>
 #include <mutex>
+#include <chrono>
 
 #include "netplay.h"
 #include "core_runner.h"
@@ -41,6 +42,16 @@ static size_t   rx_len = 0;
 
 static uint32_t last_peer_tick = 0;   // newest send_tick seen, echoed back
 static uint32_t pending_tick = 0;     // our send_tick awaiting an echo
+
+// Milliseconds on a monotonic clock, truncated to 32 bits like the old
+// GetTickCount() this replaces - only ever used for round-trip deltas
+// (send_tick echoed back by the peer), so the wraparound and the fact that
+// both sides run their own independent clock are both fine.
+static uint32_t TickCountMs()
+{
+	using namespace std::chrono;
+	return (uint32_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
 
 static void SetSocketNonBlocking(SOCKET s)
 {
@@ -370,7 +381,7 @@ void NetplayUpdate()
 			// reported roughly one frame, whatever the actual latency was.
 			if (pk.echo_tick != 0 && pk.echo_tick == pending_tick)
 			{
-				ping_ms = (int)(GetTickCount() - pk.echo_tick);
+				ping_ms = (int)(TickCountMs() - pk.echo_tick);
 				pending_tick = 0;
 			}
 		}
@@ -391,7 +402,7 @@ void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][
 	pkt.magic = NET_MAGIC;
 	pkt.type = NET_TYPE_INPUT;
 	pkt.frame_seq = frame_counter;
-	pkt.send_tick = GetTickCount();
+	pkt.send_tick = TickCountMs();
 	pkt.echo_tick = last_peer_tick;   // lets the peer time its round trip
 	memcpy(pkt.buttons, local_p1_buttons, sizeof(pkt.buttons));
 	memcpy(pkt.analog, local_p1_analog, sizeof(pkt.analog));

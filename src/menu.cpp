@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -57,13 +58,22 @@ static int scroll_top = 0;
 // item index changes - including back to one visited earlier - which is
 // exactly "the selection just landed here."
 static int s_scroll_item_idx = -1;
-static DWORD s_scroll_since = 0;
+static uint32_t s_scroll_since = 0;
 
 // Same idea for the vertical title band on the left edge (OsdSetTitle) -
 // a title longer than the 14 characters that fit in the fixed-height card
 // used to just cut off mid-word with no indication, same as the row names.
 static std::string s_title_scroll_last;
-static DWORD s_title_scroll_since = 0;
+static uint32_t s_title_scroll_since = 0;
+
+// Milliseconds on a monotonic clock, truncated to 32 bits like the old
+// GetTickCount() this replaces - every use here is a "how long since X" delta,
+// so wraparound is harmless.
+static uint32_t TickCountMs()
+{
+	using namespace std::chrono;
+	return (uint32_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
 static int main_menu_saved_idx = 0;
 static std::string current_title = "MiSTer 4 ALL";
 static std::string current_dir = "roms";
@@ -132,7 +142,7 @@ static const int kScrollDelays[] = {0, 2, 3, 5, 8, 10};
 static const int kScrollDelayCount = 6;
 
 // Refreshed on every key the menu handles; MenuRun compares against it.
-static DWORD g_last_input_tick = 0;
+static uint32_t g_last_input_tick = 0;
 
 // melonds_screen_layout, verbatim from the core's own declaration.
 static const char *kNdsLayoutVals[] = {
@@ -2114,10 +2124,10 @@ void MenuRun() {
     int secs = kOsdTimeouts[setting_osd_timeout];
     if (secs > 0) {
       if (g_last_input_tick == 0)
-        g_last_input_tick = GetTickCount();
-      if (GetTickCount() - g_last_input_tick >= (DWORD)secs * 1000) {
+        g_last_input_tick = TickCountMs();
+      if (TickCountMs() - g_last_input_tick >= (uint32_t)secs * 1000) {
         OsdDisable();
-        g_last_input_tick = GetTickCount();
+        g_last_input_tick = TickCountMs();
       }
     }
   }
@@ -2192,12 +2202,12 @@ void MenuRun() {
   const int kVisibleCharsVert = 14;
   if (current_title != s_title_scroll_last) {
     s_title_scroll_last = current_title;
-    s_title_scroll_since = GetTickCount();
+    s_title_scroll_since = TickCountMs();
   }
   if (kScrollDelays[setting_name_scroll] > 0 &&
       (int)current_title.size() > kVisibleCharsVert) {
-    DWORD delay_ms = (DWORD)kScrollDelays[setting_name_scroll] * 1000;
-    DWORD elapsed = GetTickCount() - s_title_scroll_since;
+    uint32_t delay_ms = (uint32_t)kScrollDelays[setting_name_scroll] * 1000;
+    uint32_t elapsed = TickCountMs() - s_title_scroll_since;
     if (elapsed > delay_ms) {
       int gap = kVisibleCharsVert / 2;
       int cycle = (int)current_title.size() - kVisibleCharsVert + gap;
@@ -2271,10 +2281,10 @@ void MenuRun() {
             (int)item.label.size() > kVisibleChars) {
           if (item_idx != s_scroll_item_idx) {
             s_scroll_item_idx = item_idx;
-            s_scroll_since = GetTickCount();
+            s_scroll_since = TickCountMs();
           }
-          DWORD delay_ms = (DWORD)kScrollDelays[setting_name_scroll] * 1000;
-          DWORD elapsed = GetTickCount() - s_scroll_since;
+          uint32_t delay_ms = (uint32_t)kScrollDelays[setting_name_scroll] * 1000;
+          uint32_t elapsed = TickCountMs() - s_scroll_since;
           if (elapsed > delay_ms) {
             // A blank gap half a screen wide between the tail and the loop
             // back to the start, so the seam reads as a pause, not a glitch.
@@ -2298,7 +2308,7 @@ void MenuRun() {
 }
 
 static void MenuProcessKeyImpl(MenuKey key) {
-  g_last_input_tick = GetTickCount();
+  g_last_input_tick = TickCountMs();
 
   // While waiting for a key to bind, the menu must not also act on it.
   if (capture_bind >= 0)
