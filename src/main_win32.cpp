@@ -450,7 +450,7 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 		}
 	}
 
-	FILE* f = fopen("mister_flavor.log", "a");
+	FILE* f = fopen("mister4all.log", "a");
 	if (f)
 	{
 		fprintf(f, "[ERROR] [CRASH] codigo=0x%08lX modulo=%s offset=0x%llX thread=%lu\n",
@@ -583,7 +583,7 @@ static void CheckWindowsCrashReportsOnStartup()
 
 	if (EvtNext(hResults, 10, events, 2000, 0, &returned))
 	{
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 
 		for (DWORD i = 0; i < returned; i++)
 		{
@@ -1391,7 +1391,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// initializes inside this exe before any of the real Win32 windowing/
 	// input/audio code is touched. Nothing downstream depends on this yet.
 	{
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
 		{
 			if (lf) fprintf(lf, "[INFO] [SDL3] inicializado, versao=%d\n", SDL_GetVersion());
@@ -1412,7 +1412,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		PortInit();
 		std::string install_error;
 		bool ok = PortInstallOnly(__argv[2], install_error);
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[INFO] [PORT-INSTALL] %s -> %s%s%s\n", __argv[2],
@@ -1434,7 +1434,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	{
 		PortInit();
 		bool started = PortLaunch(__argv[2]);
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 
 		DWORD waited_ms = 0;
 		while (started && !PortIsRunning() && waited_ms < 180000)
@@ -1460,7 +1460,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (__argc > 1 && _stricmp(__argv[1], "--list-ports") == 0)
 	{
 		PortInit();
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (lf)
 		{
 			for (const auto& p : PortGetAvailableList())
@@ -1484,7 +1484,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// real core hang by hand.
 	if (__argc > 3 && _stricmp(__argv[1], "--core-selftest") == 0)
 	{
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		auto log = [&](const char* fmt, ...) {
 			if (!lf) return;
 			va_list ap; va_start(ap, fmt);

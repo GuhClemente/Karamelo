@@ -74,7 +74,7 @@ static void HwLog(const char* fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	FILE* f = fopen("mister_flavor.log", "a");
+	FILE* f = fopen("mister4all.log", "a");
 	if (f) { fprintf(f, "[INFO] [HW] %s\n", buf); fclose(f); }
 }
 
@@ -117,7 +117,7 @@ bool HwInit()
 		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-		g_gl_window = SDL_CreateWindow("MiSTerFlavorGL", 1, 1, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+		g_gl_window = SDL_CreateWindow("MiSTer4ALL_GL", 1, 1, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
 		if (!g_gl_window) { HwLog("SDL_CreateWindow falhou: %s", SDL_GetError()); return false; }
 	}
 

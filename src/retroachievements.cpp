@@ -193,7 +193,7 @@ static void HttpPerform(HttpJob* job)
 	// RetroAchievements identifies integrations by User-Agent, and rcheevos
 	// supplies the clause naming itself and its version. Sending only our own
 	// name left the client unidentifiable on their side.
-	HINTERNET session = WinHttpOpen(g_user_agent[0] ? g_user_agent : L"MiSTerFlavor/2.0",
+	HINTERNET session = WinHttpOpen(g_user_agent[0] ? g_user_agent : L"MiSTer4ALL/2.0",
 		WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
 		WINHTTP_NO_PROXY_NAME,
 		WINHTTP_NO_PROXY_BYPASS, 0);
@@ -376,7 +376,7 @@ static bool InitMemoryForConsole(uint32_t console_id, const char* why)
 	// a wrong reward system is a much smaller loss than the game itself.
 	if (console_id == RC_CONSOLE_MSX)
 	{
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[INFO] [MEM] %s: console=MSX mapa=inferido recusado (layout incompativel conhecido)\n", why);
@@ -393,7 +393,7 @@ static bool InitMemoryForConsole(uint32_t console_id, const char* why)
 	bool ok = (rc_libretro_memory_init(&g_memory_regions, mmap,
 		RaGetCoreMemoryInfo, console_id) != 0);
 
-	FILE* lf = fopen("mister_flavor.log", "a");
+	FILE* lf = fopen("mister4all.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [MEM] %s: console=%u mapa=%s regioes=%u total=%u bytes%s\n",
@@ -448,7 +448,7 @@ static void RaRefreshCounts()
 static void RC_CCONV RaClientLog(const char* message, const rc_client_t* client)
 {
 	(void)client;
-	FILE* f = fopen("mister_flavor.log", "a");
+	FILE* f = fopen("mister4all.log", "a");
 	if (f)
 	{
 		fprintf(f, "[INFO] [RA] %s\n", message ? message : "");
@@ -698,12 +698,12 @@ void RaInit()
 	rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_WARN, RaClientLog);
 
 	{
-		// "MiSTerFlavor/2.0 rcheevos/12.4.0" - the clause is what RA reads.
+		// "MiSTer4ALL/2.0 rcheevos/12.4.0" - the clause is what RA reads.
 		char clause[128] = { 0 };
 		rc_client_get_user_agent_clause(g_client, clause, sizeof(clause));
 
 		char agent[256];
-		snprintf(agent, sizeof(agent), "MiSTerFlavor/2.0 %s", clause);
+		snprintf(agent, sizeof(agent), "MiSTer4ALL/2.0 %s", clause);
 		MultiByteToWideChar(CP_UTF8, 0, agent, -1, g_user_agent, 256);
 	}
 	rc_client_set_hardcore_enabled(g_client, g_hardcore ? 1 : 0);
@@ -793,7 +793,7 @@ void RaDoFrame()
 	{
 		g_memory_ready = false;
 		g_enabled = false;
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[ERROR] [RA] rc_client_do_frame excecao - RetroAchievements desativado nesta sessao\n");

@@ -20,7 +20,6 @@ set APP_EXE=%APP_BASE%_v%APP_VER%.exe
 rem Close any running instances so the linker does not fail with LNK1104 (file in use)
 taskkill /F /IM "%APP_EXE%" >nul 2>&1
 taskkill /F /IM "%APP_BASE%.exe" >nul 2>&1
-taskkill /F /IM "MiSTer_Flavor*.exe" >nul 2>&1
 
 rc.exe /nologo /I include /fobuild\resource.res src\resource.rc
 

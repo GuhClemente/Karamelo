@@ -34,7 +34,7 @@ static void VkHwLog(const char* fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	FILE* f = fopen("mister_flavor.log", "a");
+	FILE* f = fopen("mister4all.log", "a");
 	if (f) { fprintf(f, "[INFO] [HW-VK] %s\n", buf); fclose(f); }
 }
 
