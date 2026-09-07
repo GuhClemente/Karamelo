@@ -70,6 +70,8 @@ strip = true
 inherits = "release"
 debug = true
 strip = false
+lto = false
+codegen-units = 16
 
 [package.metadata.bundle]
 name = "Gopher64"
