@@ -1,8 +1,17 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+extern char **environ;
+#endif
+#include <SDL3/SDL.h>
 #include <filesystem>
 #include <algorithm>
 #include <thread>
+#include <chrono>
 #include <system_error>
 #include <atomic>
 #include <mutex>
@@ -19,7 +28,10 @@
 
 namespace fs = std::filesystem;
 
-extern HWND MainGetHwnd();
+// Minimize/restore/raise the main window through SDL3, which works the same
+// on every platform SDL3 supports - a raw HWND (MainGetHwnd(), still used
+// elsewhere in this project) only exists on Windows.
+extern SDL_Window* MainGetSdlWindow();
 
 static std::atomic<bool> s_port_running(false);
 static std::atomic<bool> s_installing(false);
@@ -783,9 +795,10 @@ bool PortAutoSetupRom(const std::string& port_id) {
 
 // Does the actual OS-level work of launching an already-installed port:
 // ROM auto-copy, stopping any running libretro core, minimizing the window,
-// CreateProcessW, and spawning the exit-monitor thread. Must only ever be
-// called from the UI thread - it touches CoreShutdown()/window state that
-// core_runner.cpp and main_win32.cpp otherwise only ever touch from there.
+// launching the process, and spawning the exit-monitor thread. Must only
+// ever be called from the UI thread - it touches CoreShutdown()/window state
+// that core_runner.cpp and main_win32.cpp otherwise only ever touch from
+// there.
 static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefinition* def,
                                       const std::string& port_id) {
     // 1. Auto-copy ROM if this port needs one and doesn't have it yet.
@@ -800,16 +813,19 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         CoreShutdown();
     }
 
-    // 3. Minimize MiSTer Window for clean seamless console transition
-    HWND hwnd = MainGetHwnd();
-    if (hwnd) {
-        ShowWindow(hwnd, SW_MINIMIZE);
+    // 3. Minimize MiSTer Window for clean seamless console transition. SDL3
+    // rather than a raw HWND, so this works the same on every platform SDL3
+    // supports.
+    SDL_Window* window = MainGetSdlWindow();
+    if (window) {
+        SDL_MinimizeWindow(window);
     }
 
     // 4. Launch process
     fs::path abs_exe = fs::absolute(exe_path);
     fs::path abs_dir = abs_exe.parent_path();
 
+#ifdef _WIN32
     STARTUPINFOW si = { sizeof(STARTUPINFOW) };
     PROCESS_INFORMATION pi = { 0 };
 
@@ -841,41 +857,77 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     }
 
     if (!ok) {
-        if (hwnd) {
-            ShowWindow(hwnd, SW_RESTORE);
-            SetForegroundWindow(hwnd);
-        }
+        if (window) SDL_RestoreWindow(window);
         CoreSetToast("FALHA AO INICIAR PORT", 180);
         return false;
     }
+
+    HANDLE hProcess = pi.hProcess;
+    HANDLE hThread = pi.hThread;
+#else
+    // No .bat/.cmd-style script launcher exists here - every port definition
+    // in KnownPortDefs() resolves to a real binary (FindBestExecutable() only
+    // ever picks an .exe today; its Linux equivalent would pick the
+    // extracted binary the same way), so a plain fork+exec covers every case
+    // this app actually installs.
+    std::string sexe = abs_exe.string();
+    std::string sdir = abs_dir.string();
+
+    // A freshly-extracted zip does not preserve the Unix execute bit, so the
+    // binary would otherwise refuse to run at all.
+    chmod(sexe.c_str(), 0755);
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        if (window) SDL_RestoreWindow(window);
+        CoreSetToast("FALHA AO INICIAR PORT", 180);
+        return false;
+    }
+    if (pid == 0) {
+        // Child: only async-signal-safe calls until exec, per fork()'s
+        // contract in a multithreaded process.
+        chdir(sdir.c_str());
+        char* argv[] = { const_cast<char*>(sexe.c_str()), nullptr };
+        execv(sexe.c_str(), argv);
+        _exit(127); // exec itself failed (not found / not executable)
+    }
+#endif
 
     s_port_running.store(true);
     CoreSetToast("INICIANDO PORT NATIVO...", 120);
 
     // 5. Monitor in background thread
-    HANDLE hProcess = pi.hProcess;
-    HANDLE hThread = pi.hThread;
-
     try {
-    std::thread([hProcess, hThread, hwnd]() {
+    std::thread([
+#ifdef _WIN32
+        hProcess, hThread,
+#else
+        pid,
+#endif
+        window]() {
         // The wait itself can run for as long as the user plays (hours) - it
         // is not counted in s_active_bg_threads, or PortShutdown() would
         // block app shutdown on the game still being open instead of just
         // waiting out this thread's own brief cleanup tail below, which is
         // the only part that touches shared state (OsdEnable(), and
         // indirectly toast_lock through it) a hung-core recovery could race.
+#ifdef _WIN32
         WaitForSingleObject(hProcess, INFINITE);
         s_active_bg_threads.fetch_add(1);
         CloseHandle(hThread);
         CloseHandle(hProcess);
+#else
+        int status = 0;
+        waitpid(pid, &status, 0);
+        s_active_bg_threads.fetch_add(1);
+#endif
 
         s_port_running.store(false);
 
         // Restore MiSTer window with full focus
-        if (hwnd) {
-            ShowWindow(hwnd, SW_RESTORE);
-            SetForegroundWindow(hwnd);
-            SetFocus(hwnd);
+        if (window) {
+            SDL_RestoreWindow(window);
+            SDL_RaiseWindow(window);
         }
         OsdEnable();
         s_active_bg_threads.fetch_sub(1);
@@ -886,8 +938,10 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         // left to wait on it or restore the window) and s_port_running would
         // stay stuck at true forever, refusing every future PortLaunch() for
         // the rest of the session.
+#ifdef _WIN32
         CloseHandle(hThread);
         CloseHandle(hProcess);
+#endif
         s_port_running.store(false);
         CoreSetToast("FALHA AO MONITORAR PORT - TENTE NOVAMENTE", 200);
         return false;
@@ -996,9 +1050,9 @@ bool PortIsRunning() {
 // that would block shutdown on the user's game instead of on this file's own
 // brief cleanup work.
 void PortShutdown() {
-    DWORD waited_ms = 0;
+    unsigned waited_ms = 0;
     while (s_active_bg_threads.load() > 0 && waited_ms < 5000) {
-        Sleep(50);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
         waited_ms += 50;
     }
 }
