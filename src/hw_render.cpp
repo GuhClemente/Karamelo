@@ -422,11 +422,35 @@ void HwContextReset()
 	}
 }
 
+// Unlike HwMakeCurrent(), never recovers a failed bind by rebuilding the
+// context and handing it back to the core via context_reset(). HwContextDestroy
+// runs during teardown, where the thread that owned this context may have
+// just been force-terminated (CoreShutdown()'s TerminateThread fallback after
+// a core's own thread missed its graceful-stop timeout) without ever
+// releasing it - wglMakeCurrent then fails here because Windows still
+// considers the context current on that now-dead thread. HwMakeCurrent()'s
+// normal recovery would rebuild a fresh context and call context_reset() (and
+// this function would then call context_destroy() right after) on a core
+// whose own thread no longer exists to service either callback - observed in
+// practice as an indefinite hang (PCSX2/LRPS2), not a crash, so no exception
+// handler catches it. If the context cannot be bound, there is nothing safe
+// left to clean up through it: skip the GL deletes below rather than
+// resurrect a context just to immediately call back into a dead core. HwInit()
+// always creates a brand-new GL context on the next core load regardless
+// (never reuses g_gl_ctx), so the old, now-unbindable one is simply leaked -
+// one dead context handle, not a hang.
+static bool HwMakeCurrentForTeardown()
+{
+	if (!g_gl_ready) return false;
+	if (SDL_GL_GetCurrentContext() == g_gl_ctx) return true;
+	return SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx);
+}
+
 void HwContextDestroy()
 {
 	if (!g_hw_active) return;
 
-	if (g_context_live && HwMakeCurrent())
+	if (g_context_live && HwMakeCurrentForTeardown())
 	{
 		if (g_hw_cb.context_destroy)
 		{
@@ -434,7 +458,7 @@ void HwContextDestroy()
 			__except (EXCEPTION_EXECUTE_HANDLER) {}
 		}
 	}
-	if (HwMakeCurrent())
+	if (HwMakeCurrentForTeardown())
 	{
 		if (g_fbo && p_glDeleteFramebuffers) { p_glDeleteFramebuffers(1, &g_fbo); g_fbo = 0; }
 		if (g_depth_rb && p_glDeleteRenderbuffers) { p_glDeleteRenderbuffers(1, &g_depth_rb); g_depth_rb = 0; }
