@@ -5,6 +5,7 @@
 #include <thread>
 #include <system_error>
 #include <atomic>
+#include <mutex>
 #include <vector>
 #include <string>
 #include <stdio.h>
@@ -43,7 +44,7 @@ static std::atomic<int> s_active_bg_threads(0);
 // now only ever sets this instead, and PortPumpPendingLaunch() - called once
 // per frame from the main loop, i.e. always the UI thread - is the only
 // place that actually performs the launch.
-static CRITICAL_SECTION s_pending_lock;
+static std::mutex       s_pending_lock;
 static std::string      s_pending_launch_id;
 static std::atomic<bool> s_has_pending_launch(false);
 
@@ -586,8 +587,6 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
 // -------------------------------------------------------------
 
 void PortInit() {
-    InitializeCriticalSection(&s_pending_lock);
-
     std::error_code ec;
     if (!fs::exists("ports", ec)) {
         fs::create_directories("ports", ec);
@@ -948,9 +947,10 @@ bool PortLaunch(const std::string& port_id) {
 
             // Hand off to the UI thread instead of launching from here - see
             // the comment on s_pending_lock above for why.
-            EnterCriticalSection(&s_pending_lock);
-            s_pending_launch_id = def_copy.id;
-            LeaveCriticalSection(&s_pending_lock);
+            {
+                std::lock_guard<std::mutex> lock(s_pending_lock);
+                s_pending_launch_id = def_copy.id;
+            }
             s_has_pending_launch.store(true);
             s_active_bg_threads.fetch_sub(1);
         }).detach();
@@ -965,9 +965,10 @@ void PortPumpPendingLaunch() {
     if (!s_has_pending_launch.exchange(false)) return;
 
     std::string id;
-    EnterCriticalSection(&s_pending_lock);
-    id = s_pending_launch_id;
-    LeaveCriticalSection(&s_pending_lock);
+    {
+        std::lock_guard<std::mutex> lock(s_pending_lock);
+        id = s_pending_launch_id;
+    }
 
     // Re-resolve rather than trust anything captured before the download
     // finished - the files just landed on disk and this is the first look
