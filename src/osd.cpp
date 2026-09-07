@@ -1,3 +1,11 @@
+// Copyright (c) 2026 Gustavo Clemente (mister4all.com | @GuhClemente).
+// All rights reserved.
+//
+// Clean-room implementation of the OSD raster used to draw this app's menu.
+// This file used to be a near-literal port of Main_MiSTer's own osd.cpp; it
+// was rewritten from scratch (see docs/FRONTEND.md for why and what that
+// means in practice) and is original work, not GPL-derived.
+
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,10 +23,12 @@ typedef unsigned int uint;
 // Every renderer in this project (SDL, GL, D3D11, Vulkan) draws the menu by
 // reading a flat byte buffer that looks like the strip a real MiSTer feeds
 // its HDMI OSD overlay: one fixed-size "row" per line of text, and inside a
-// row, one 8-byte column per on-screen glyph (bit 7 = leftmost pixel of that
-// glyph row). That raster shape is a contract the renderers already rely on,
-// so it stays exactly as it is - only the code that fills it in below was
-// written from scratch, structured around a small RowEncoder instead of
+// row, one 8-byte run per on-screen glyph - byte k of that run is column k
+// of the glyph, and bit b of that byte is row b of the glyph (the same
+// column-major, bit-is-row convention charfont[] itself uses; see
+// charrom.cpp). That raster shape is a contract the renderers already rely
+// on, so it stays exactly as it is - only the code that fills it in below
+// was written from scratch, structured around a small RowEncoder instead of
 // manual pointer bumping.
 
 #define OSD_FIXED_ROWS 15   // the OSD card never grows or shrinks; see OsdSetSize().
