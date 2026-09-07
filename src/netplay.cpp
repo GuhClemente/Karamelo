@@ -5,6 +5,10 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
+// accept()/getsockopt() take an int* for the length out-param on Winsock,
+// where POSIX's socklen_t is unsigned - declaring the locals as socklen_t on
+// both platforms means the call sites need no #ifdef of their own.
+typedef int socklen_t;
 #else
 // getaddrinfo/freeaddrinfo/inet_ntop/gethostname/ntohl/setsockopt/getsockopt/
 // bind/listen/accept/connect/send/recv/select and the sockaddr* types are the
@@ -19,6 +23,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 typedef int SOCKET;
 typedef int BOOL;
 typedef unsigned long u_long;
@@ -30,6 +35,14 @@ typedef unsigned long u_long;
 #define WSAGetLastError() errno
 #define WSAEWOULDBLOCK EWOULDBLOCK
 static inline void WSACleanup() {}
+// Both call sites in this file pass _TRUNCATE, i.e. "always null-terminate,
+// silently drop what doesn't fit" - the one behavior this stand-in needs to
+// match, not a general strncpy_s replacement.
+#define _TRUNCATE ((size_t)-1)
+static inline void strncpy_s(char* dst, size_t dst_size, const char* src, size_t) {
+	strncpy(dst, src, dst_size - 1);
+	dst[dst_size - 1] = '\0';
+}
 #endif
 #include <stdio.h>
 #include <stdlib.h>
@@ -300,7 +313,7 @@ void NetplayUpdate()
 	if (net_role == NETPLAY_HOST && net_state == NETPLAY_LISTENING)
 	{
 		sockaddr_in client_addr;
-		int addr_len = sizeof(client_addr);
+		socklen_t addr_len = sizeof(client_addr);
 		SOCKET s = accept(listen_sock, (sockaddr*)&client_addr, &addr_len);
 		if (s != INVALID_SOCKET)
 		{
@@ -322,11 +335,18 @@ void NetplayUpdate()
 		FD_SET(peer_sock, &write_fds);
 
 		timeval tv = { 0, 0 };
-		int res = select(0, NULL, &write_fds, NULL, &tv);
+		// nfds (1st arg): Winsock ignores it entirely, kept only for BSD-socket
+		// compatibility, so "0" was harmless there and this went unnoticed for
+		// as long as this file only ever ran on Windows. POSIX select() takes
+		// it literally - "highest fd in any set, plus 1" - so 0 means "examine
+		// no descriptors at all": peer_sock's writability was never actually
+		// checked, res was always <= 0, and a Linux client sat in
+		// NETPLAY_CONNECTING forever no matter how fast the host accepted it.
+		int res = select((int)peer_sock + 1, NULL, &write_fds, NULL, &tv);
 		if (res > 0)
 		{
 			int so_error = 0;
-			int len = sizeof(so_error);
+			socklen_t len = sizeof(so_error);
 			getsockopt(peer_sock, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len);
 			if (so_error == 0)
 			{
