@@ -8,6 +8,11 @@
 #include <deque>
 #include <vector>
 #include <filesystem>
+#include <mutex>
+#include <atomic>
+#include <thread>
+#include <condition_variable>
+#include <chrono>
 
 #include "retroachievements.h"
 #include "core_runner.h"
@@ -37,19 +42,15 @@ static rc_client_t* g_client = NULL;
 // (RaGetAchievements from the UI thread, RaShutdown from the main thread at
 // exit) plus the core-thread entry points they race against - nested calls
 // rc_client makes back into this file (event callbacks, RaRefreshCounts)
-// happen on the same thread that already holds it, and CRITICAL_SECTION is
-// recursive, so that stays safe.
-static CRITICAL_SECTION g_client_lock;
-struct RaClientLockInit { RaClientLockInit() { InitializeCriticalSection(&g_client_lock); } };
-static RaClientLockInit g_ra_client_lock_init;
+// happen on the same thread that already holds it, and this is a
+// std::recursive_mutex, so that stays safe.
+static std::recursive_mutex g_client_lock;
 static bool         g_enabled = false;
 static bool         g_logged_in = false;
 // Written from rcheevos callbacks on the core thread, read by the OSD on the
 // UI thread. A std::string here is the same trap that crashed the toast: the
 // reader can hold c_str() while the writer reallocates.
-static CRITICAL_SECTION g_status_lock;
-struct RaStatusLockInit { RaStatusLockInit() { InitializeCriticalSection(&g_status_lock); } };
-static RaStatusLockInit g_ra_status_lock_init;
+static std::mutex g_status_lock;
 
 static char g_status[192] = "RetroAchievements: desativado";
 static char g_status_readback[192] = "";
@@ -57,9 +58,8 @@ static char g_status_readback[192] = "";
 static void SetStatus(const char* text)
 {
 	if (!text) return;
-	EnterCriticalSection(&g_status_lock);
+	std::lock_guard<std::mutex> lock(g_status_lock);
 	strncpy_s(g_status, sizeof(g_status), text, _TRUNCATE);
-	LeaveCriticalSection(&g_status_lock);
 }
 static std::string  g_username;
 static std::string  g_password;
@@ -72,17 +72,14 @@ static bool         g_hardcore = false;
 // UI thread (menu.cpp's Achievements settings page), so it needs the same
 // lock-protected fixed-buffer mirror g_status already got, not a raw
 // std::string::c_str() a UI-thread copy could catch mid-reallocation.
-static CRITICAL_SECTION g_username_lock;
-struct RaUsernameLockInit { RaUsernameLockInit() { InitializeCriticalSection(&g_username_lock); } };
-static RaUsernameLockInit g_ra_username_lock_init;
+static std::mutex g_username_lock;
 static char g_username_mirror[64] = "";
 static char g_username_readback[64] = "";
 
 static void SyncUsernameMirror()
 {
-	EnterCriticalSection(&g_username_lock);
+	std::lock_guard<std::mutex> lock(g_username_lock);
 	strncpy_s(g_username_mirror, sizeof(g_username_mirror), g_username.c_str(), _TRUNCATE);
-	LeaveCriticalSection(&g_username_lock);
 }
 
 static wchar_t g_user_agent[256] = L"";
@@ -166,10 +163,10 @@ struct HttpJob
 	int status;
 };
 
-static CRITICAL_SECTION g_http_lock;
-static HANDLE           g_http_event = NULL;
-static HANDLE           g_http_thread = NULL;
-static volatile LONG    g_http_running = 0;
+static std::mutex              g_http_lock;
+static std::condition_variable g_http_cv;
+static std::thread             g_http_thread;
+static std::atomic<bool>       g_http_running{ false };
 static std::deque<HttpJob*> g_http_pending;
 static std::deque<HttpJob*> g_http_done;
 
@@ -252,34 +249,41 @@ static void HttpPerform(HttpJob* job)
 	WinHttpCloseHandle(session);
 }
 
-static DWORD WINAPI HttpThreadProc(LPVOID)
+static std::atomic<bool> g_http_thread_done{ false };
+
+static void HttpThreadProc()
 {
-	while (InterlockedCompareExchange(&g_http_running, 0, 0))
+	while (g_http_running.load())
 	{
-		WaitForSingleObject(g_http_event, 200);
+		{
+			std::unique_lock<std::mutex> lock(g_http_lock);
+			g_http_cv.wait_for(lock, std::chrono::milliseconds(200));
+		}
 
 		for (;;)
 		{
 			HttpJob* job = NULL;
 
-			EnterCriticalSection(&g_http_lock);
-			if (!g_http_pending.empty())
 			{
-				job = g_http_pending.front();
-				g_http_pending.pop_front();
+				std::lock_guard<std::mutex> lock(g_http_lock);
+				if (!g_http_pending.empty())
+				{
+					job = g_http_pending.front();
+					g_http_pending.pop_front();
+				}
 			}
-			LeaveCriticalSection(&g_http_lock);
 
 			if (!job) break;
 
 			HttpPerform(job);
 
-			EnterCriticalSection(&g_http_lock);
-			g_http_done.push_back(job);
-			LeaveCriticalSection(&g_http_lock);
+			{
+				std::lock_guard<std::mutex> lock(g_http_lock);
+				g_http_done.push_back(job);
+			}
 		}
 	}
-	return 0;
+	g_http_thread_done.store(true);
 }
 
 static void RC_CCONV RaServerCall(const rc_api_request_t* request,
@@ -295,11 +299,11 @@ static void RC_CCONV RaServerCall(const rc_api_request_t* request,
 	job->callback_data = callback_data;
 	job->status = 0;
 
-	EnterCriticalSection(&g_http_lock);
-	g_http_pending.push_back(job);
-	LeaveCriticalSection(&g_http_lock);
-
-	if (g_http_event) SetEvent(g_http_event);
+	{
+		std::lock_guard<std::mutex> lock(g_http_lock);
+		g_http_pending.push_back(job);
+	}
+	g_http_cv.notify_one();
 }
 
 // Core thread: hand finished transfers back to rcheevos.
@@ -309,13 +313,14 @@ static void RaPumpHttp()
 	{
 		HttpJob* job = NULL;
 
-		EnterCriticalSection(&g_http_lock);
-		if (!g_http_done.empty())
 		{
-			job = g_http_done.front();
-			g_http_done.pop_front();
+			std::lock_guard<std::mutex> lock(g_http_lock);
+			if (!g_http_done.empty())
+			{
+				job = g_http_done.front();
+				g_http_done.pop_front();
+			}
 		}
-		LeaveCriticalSection(&g_http_lock);
 
 		if (!job) break;
 
@@ -667,8 +672,6 @@ static void RC_CCONV RaLoadGameCallback(int result, const char* error_message,
 // -------------------------------------------------------------
 void RaInit()
 {
-	InitializeCriticalSection(&g_http_lock);
-
 	// Must happen before any hash is attempted.
 	ChdReaderInstall();
 
@@ -683,9 +686,8 @@ void RaInit()
 		return;
 	}
 
-	g_http_event = CreateEvent(NULL, FALSE, FALSE, NULL);
-	InterlockedExchange(&g_http_running, 1);
-	g_http_thread = CreateThread(NULL, 0, HttpThreadProc, NULL, 0, NULL);
+	g_http_running.store(true);
+	g_http_thread = std::thread(HttpThreadProc);
 
 	g_client = rc_client_create(RaReadMemory, RaServerCall);
 	if (!g_client)
@@ -730,18 +732,27 @@ void RaShutdown()
 	// thread outlive this function risks it still writing into
 	// g_http_pending/g_http_done while those deques are torn down by CRT
 	// static destruction as the process actually exits.
-	if (InterlockedExchange(&g_http_running, 0))
+	if (g_http_running.exchange(false))
 	{
-		if (g_http_event) SetEvent(g_http_event);
-		if (g_http_thread)
+		g_http_cv.notify_one();
+		if (g_http_thread.joinable())
 		{
-			WaitForSingleObject(g_http_thread, 31000);
-			CloseHandle(g_http_thread);
-			g_http_thread = NULL;
+			// Same 31s cap as before: WinHttpSetTimeouts allows up to 30s for a
+			// single send/receive, so this is a best-effort wait, not a guarantee.
+			// std::thread has no timed join, so poll a "finished" flag instead;
+			// if it's still running past the deadline, detach (same as the old
+			// CloseHandle-without-terminating - we stop waiting, the thread is
+			// left to finish or die with the process) rather than block forever.
+			auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(31);
+			while (!g_http_thread_done.load() && std::chrono::steady_clock::now() < deadline)
+				std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+			if (g_http_thread_done.load())
+				g_http_thread.join();
+			else
+				g_http_thread.detach();
 		}
 	}
-
-	if (g_http_event) { CloseHandle(g_http_event); g_http_event = NULL; }
 
 	// The worker thread has fully stopped by this point (waited above), so
 	// nothing else can still be pushing into these deques - safe to drain
@@ -751,13 +762,14 @@ void RaShutdown()
 	for (HttpJob* job : g_http_done) delete job;
 	g_http_done.clear();
 
-	EnterCriticalSection(&g_client_lock);
-	if (g_client)
 	{
-		rc_client_destroy(g_client);
-		g_client = NULL;
+		std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+		if (g_client)
+		{
+			rc_client_destroy(g_client);
+			g_client = NULL;
+		}
 	}
-	LeaveCriticalSection(&g_client_lock);
 
 	rc_libretro_memory_destroy(&g_memory_regions);
 	g_memory_ready = false;
@@ -769,7 +781,7 @@ void RaDoFrame()
 {
 	if (!g_enabled || !g_client) return;
 
-	EnterCriticalSection(&g_client_lock);
+	g_client_lock.lock();
 	RaPumpHttp();
 
 	// InitMemoryForConsole() only refuses the "inferred memory map" mechanism
@@ -800,7 +812,7 @@ void RaDoFrame()
 			fclose(lf);
 		}
 	}
-	LeaveCriticalSection(&g_client_lock);
+	g_client_lock.unlock();
 }
 
 void RaOnGameLoad(const char* rom_path, const char* core_name)
@@ -819,19 +831,21 @@ void RaOnGameLoad(const char* rom_path, const char* core_name)
 
 	// console_id 0 lets rcheevos try every hashing rule it knows, which is what
 	// we want since one core can serve several systems.
-	EnterCriticalSection(&g_client_lock);
-	rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_UNKNOWN,
-		rom_path, NULL, 0, RaLoadGameCallback, NULL);
-	LeaveCriticalSection(&g_client_lock);
+	{
+		std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+		rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_UNKNOWN,
+			rom_path, NULL, 0, RaLoadGameCallback, NULL);
+	}
 }
 
 void RaOnGameUnload()
 {
 	if (!g_enabled || !g_client) return;
 
-	EnterCriticalSection(&g_client_lock);
-	rc_client_unload_game(g_client);
-	LeaveCriticalSection(&g_client_lock);
+	{
+		std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+		rc_client_unload_game(g_client);
+	}
 	rc_libretro_memory_destroy(&g_memory_regions);
 	g_memory_ready = false;
 	g_ach_total = 0;
@@ -851,12 +865,12 @@ int RaGetAchievements(RaAchievementInfo* out, int max_out)
 	// thread can concurrently unload the game (RaOnGameUnload) or advance
 	// rc_client (RaDoFrame) - without g_client_lock this could walk buckets
 	// the core thread is freeing at the same instant.
-	EnterCriticalSection(&g_client_lock);
+	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
 
 	rc_client_achievement_list_t* list = rc_client_create_achievement_list(g_client,
 		RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE,
 		RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_PROGRESS);
-	if (!list) { LeaveCriticalSection(&g_client_lock); return 0; }
+	if (!list) return 0;
 
 	int n = 0;
 	for (uint32_t b = 0; b < list->num_buckets && n < max_out; b++)
@@ -881,22 +895,19 @@ int RaGetAchievements(RaAchievementInfo* out, int max_out)
 	}
 
 	rc_client_destroy_achievement_list(list);
-	LeaveCriticalSection(&g_client_lock);
 	return n;
 }
 int         RaGetActiveChallenges() { return g_challenge_active; }
 const char* RaGetStatus()
 {
-	EnterCriticalSection(&g_status_lock);
+	std::lock_guard<std::mutex> lock(g_status_lock);
 	strncpy_s(g_status_readback, sizeof(g_status_readback), g_status, _TRUNCATE);
-	LeaveCriticalSection(&g_status_lock);
 	return g_status_readback;
 }
 const char* RaGetUserName()
 {
-	EnterCriticalSection(&g_username_lock);
+	std::lock_guard<std::mutex> lock(g_username_lock);
 	strncpy_s(g_username_readback, sizeof(g_username_readback), g_username_mirror, _TRUNCATE);
-	LeaveCriticalSection(&g_username_lock);
 	return g_username_readback;
 }
 int         RaGetAchievementCount() { return g_ach_total; }
