@@ -19,6 +19,7 @@ struct retro_hw_render_callback;
 
 bool VkHwSetRenderCallback(struct retro_hw_render_callback* cb);
 bool VkHwIsActive();
+bool VkHwIsAvailable();
 
 // Returns a const struct retro_hw_render_interface* (void* here so this
 // header does not need to drag in vulkan.h - core_runner.cpp casts it).

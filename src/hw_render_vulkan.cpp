@@ -495,6 +495,17 @@ void VkHwShutdown()
 
 bool VkHwIsActive() { return g_hw_active && g_vk_ready; }
 
+static int g_vk_probe_result = -1;
+
+bool VkHwIsAvailable()
+{
+	if (g_vk_probe_result < 0)
+	{
+		g_vk_probe_result = VkHwInit() ? 1 : 0;
+	}
+	return g_vk_probe_result != 0;
+}
+
 const void* VkHwGetRenderInterface()
 {
 	// VkHwIsActive(), not g_vk_ready alone: g_vk_ready stays true for the rest

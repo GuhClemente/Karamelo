@@ -16,6 +16,8 @@
 #include "core_runner.h"
 #include "gamepad_sdl.h" // pulls in <xinput.h> for the XINPUT_STATE shape
 #include "hw_render.h"
+#include "hw_render_vulkan.h"
+#include "hw_render_d3d11.h"
 #include "input_map.h"
 #include "menu.h"
 #include "mister_math.h"
@@ -37,7 +39,8 @@ enum MenuState {
   STATE_NETPLAY,
   STATE_ABOUT,
   STATE_UPDATE,
-  STATE_CORE_OPTIONS
+  STATE_CORE_OPTIONS,
+  STATE_RESET_CONFIRM
 };
 
 struct MenuItem {
@@ -192,19 +195,72 @@ static int setting_latency = 1;  // index into kAudioLatencyMs below; default 12
 // Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
 // the mixer on a loaded machine; above 512ms the delay is audible against input.
 static const int kAudioLatencyMs[4] = { 64, 128, 256, 512 };
-// A single on/off toggle, not a per-API picker: OpenGL, Vulkan and D3D11
-// backends (hw_render.cpp/hw_render_vulkan.cpp/hw_render_d3d11.cpp) all sit
-// behind this one setting via MenuGetHwRender() - a core requests whichever
-// context type it prefers, and CB_Environment's SET_HW_RENDER case dispatches
-// to whichever of the three backends matches. There is no way for the user to
-// force one specific API over another; only to allow hardware rendering at
-// all or fall back to every core's own software renderer.
-static const char *kVideoDrivers[] = {
-    "Software (CPU)",
-    "Hardware (GPU 3D)"
+
+enum VideoDriverChoice {
+  VIDEO_DRIVER_AUTO = 0,     // Auto (GPU 3D)
+  VIDEO_DRIVER_OPENGL = 1,   // OpenGL (GPU 3D)
+  VIDEO_DRIVER_VULKAN = 2,   // Vulkan (GPU 3D)
+  VIDEO_DRIVER_D3D11 = 3,    // DirectX 11 (GPU)
+  VIDEO_DRIVER_SOFTWARE = 4  // Software (CPU)
 };
-static const int kVideoDriverCount = 2;
-static int setting_driver = 1; // Default to Hardware (GPU 3D)
+
+struct AvailableDriver {
+  int id;
+  const char* label;
+  const char* toast_name;
+};
+
+static std::vector<AvailableDriver> GetAvailableDrivers() {
+  std::vector<AvailableDriver> list;
+  list.push_back({ VIDEO_DRIVER_AUTO, "Auto (GPU 3D)", "Auto (GPU 3D)" });
+  if (HwIsAvailable()) {
+    list.push_back({ VIDEO_DRIVER_OPENGL, "OpenGL (GPU 3D)", "OpenGL" });
+  }
+  if (VkHwIsAvailable()) {
+    list.push_back({ VIDEO_DRIVER_VULKAN, "Vulkan (GPU 3D)", "Vulkan" });
+  }
+  if (D3D11HwIsAvailable()) {
+    list.push_back({ VIDEO_DRIVER_D3D11, "DirectX 11 (GPU)", "DirectX 11" });
+  }
+  list.push_back({ VIDEO_DRIVER_SOFTWARE, "Software (CPU)", "Software (CPU)" });
+  return list;
+}
+
+static int setting_driver = 0; // Default to Auto (GPU 3D)
+
+static const char* GetCurrentDriverLabel() {
+  auto list = GetAvailableDrivers();
+  for (const auto& d : list) {
+    if (d.id == setting_driver) return d.label;
+  }
+  return list[0].label;
+}
+
+static const char* GetCurrentDriverToast() {
+  auto list = GetAvailableDrivers();
+  for (const auto& d : list) {
+    if (d.id == setting_driver) return d.toast_name;
+  }
+  return list[0].toast_name;
+}
+
+static void CycleDriver(int delta) {
+  auto list = GetAvailableDrivers();
+  if (list.empty()) return;
+
+  int current_pos = 0;
+  for (size_t i = 0; i < list.size(); i++) {
+    if (list[i].id == setting_driver) {
+      current_pos = (int)i;
+      break;
+    }
+  }
+
+  int count = (int)list.size();
+  int next_pos = (current_pos + delta + count) % count;
+  setting_driver = list[next_pos].id;
+}
+
 static int setting_sync = 1;  // 0=Native (Game Rate), 1=Sync to Display
 static int setting_vsync = 1; // 0=Disabled, 1=Enabled
 // ParaLLEl N64 is the primary robust core with Ari64 Dynarec and RetroAchievements.
@@ -466,7 +522,7 @@ static const char *GetN64CoreDll() {
     return "cores/n64.dll";
   return "cores/n64_parallel.dll";
 }
-int MenuGetHwRender() { return (setting_driver != 0) ? 1 : 0; }
+int MenuGetHwRender() { return (setting_driver != VIDEO_DRIVER_SOFTWARE) ? 1 : 0; }
 int MenuGetLanguage() { return setting_language; }
 const char *MenuGetStatus() { return status_msg.c_str(); }
 const char *MenuGetTitle() { return current_title.c_str(); }
@@ -722,6 +778,7 @@ void PopulateRetroAchievements();
 void PopulateCoreOptionsSettings();
 void PopulateAchievementList();
 void PopulateUpdate();
+void PopulateResetConfirm();
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
 static int neo_bios = 0;         // 0: Original, 1: UniBIOS
@@ -887,11 +944,11 @@ static bool SystemHasCore(int action_id) {
 
 void PopulateMainMenu() {
   items.clear();
-  current_title = "MiSTer";
+  current_title = APP_NAME;
 
   if (CoreIsRunning()) {
     std::string core_name = CoreGetCoreName();
-    current_title = core_name.empty() ? "MiSTer" : core_name;
+    current_title = core_name.empty() ? APP_NAME : core_name;
 
     const char *aspects[] = {"Original", "4:3", "16:9"};
 
@@ -1221,7 +1278,7 @@ static void ResetAllSettingsToDefault() {
   setting_theme = 0;
   setting_deadzone = 1;
   setting_latency = 1;
-  setting_driver = 1;
+  setting_driver = 0;
   setting_sync = 1;
   setting_vsync = 1;
   setting_n64_core = 0; // ParaLLEl N64 - see the comment on its declaration
@@ -1261,9 +1318,23 @@ void PopulateSettings() {
   items.push_back({"Netplay (Online)", ">", false, true, 204});
   items.push_back({"RetroAchievements", ">", false, true, 206});
   items.push_back({"About", ">", false, true, 205});
-  items.push_back({"Restaurar Padroes de Fabrica", ">", false, true, 210});
+  items.push_back({"Restaurar Padroes", ">", false, true, 210});
 
   selected_idx = 0;
+  scroll_top = 0;
+}
+
+void PopulateResetConfirm() {
+  items.clear();
+  current_title = "Restaurar";
+  OsdSetSize(5);
+
+  items.push_back({"Restaurar Padroes?", "", false, false, 0});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({"Cancelar", ">", false, true, 211});
+  items.push_back({"Confirmar Restauracao", "", false, true, 212});
+
+  selected_idx = 2; // "Cancelar" selected by default for safety
   scroll_top = 0;
 }
 
@@ -1284,7 +1355,7 @@ void PopulateVideoSettings() {
   items.push_back(
       {"Display", displays[setting_fullscreen ? 1 : 0], false, false, 304});
   items.push_back({"OSD Color", themes[setting_theme], false, false, 305});
-  items.push_back({"Video Driver", kVideoDrivers[setting_driver], false, false, 306});
+  items.push_back({"Driver", GetCurrentDriverLabel(), false, false, 306});
 
   // Named after what each core reports through retro_get_system_info, not
   // after the filename. cores/n64.dll identifies itself only as "Nintendo 64"
@@ -1910,7 +1981,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "arcade_core", setting_arcade_core);
   AppendSetting(out, "osd_timeout", setting_osd_timeout);
   AppendSetting(out, "name_scroll", setting_name_scroll);
-  AppendSetting(out, "hw_render", (setting_driver != 0) ? 1 : 0);
+  AppendSetting(out, "hw_render", (setting_driver != VIDEO_DRIVER_SOFTWARE) ? 1 : 0);
   AppendSetting(out, "sms_fm", setting_sms_fm);
   AppendSetting(out, "nds_layout", setting_nds_layout);
   AppendSetting(out, "nds_gap", setting_nds_gap);
@@ -2022,10 +2093,7 @@ static void MenuLoadSettings() {
     else if (!strcmp(key, "latency"))
       setting_latency = ClampInt(iv, 0, 3);
     else if (!strcmp(key, "driver"))
-      // Clamped to the real range, not the old 0-4: a config saved before
-      // Vulkan/DirectX were removed from the menu could still have driver=2
-      // or 3 on disk, which would index kVideoDrivers[] out of bounds.
-      setting_driver = ClampInt(iv, 0, kVideoDriverCount - 1);
+      setting_driver = ClampInt(iv, 0, 4);
     else if (!strcmp(key, "sync"))
       setting_sync = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "vsync"))
@@ -2040,7 +2108,7 @@ static void MenuLoadSettings() {
       setting_name_scroll = ClampInt(iv, 0, kScrollDelayCount - 1);
     else if (!strcmp(key, "hw_render"))
     {
-      if (iv != 0 && setting_driver == 0) setting_driver = 1;
+      if (iv == 0) setting_driver = VIDEO_DRIVER_SOFTWARE;
     }
     else if (!strcmp(key, "sms_fm"))
       setting_sms_fm = ClampInt(iv, 0, 2);
@@ -2347,7 +2415,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
         else
           selected_idx = total - 1;
         tries++;
-      } while (selected_idx < total && items[selected_idx].label == " " &&
+      } while (selected_idx < total &&
+               (items[selected_idx].label == " " ||
+                (!items[selected_idx].is_action && items[selected_idx].action_id == 0 &&
+                 current_state == STATE_RESET_CONFIRM)) &&
                tries < total);
     }
     break;
@@ -2361,7 +2432,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
         else
           selected_idx = 0;
         tries++;
-      } while (selected_idx < total && items[selected_idx].label == " " &&
+      } while (selected_idx < total &&
+               (items[selected_idx].label == " " ||
+                (!items[selected_idx].is_action && items[selected_idx].action_id == 0 &&
+                 current_state == STATE_RESET_CONFIRM)) &&
                tries < total);
     }
     break;
@@ -2596,12 +2670,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
       selected_idx = 10;
     } else if (item.action_id == 306) // Video Driver
     {
-      setting_driver = (setting_driver + delta + kVideoDriverCount) % kVideoDriverCount;
+      CycleDriver(delta);
       char msg[64];
-      if (setting_driver == 0) {
+      if (setting_driver == VIDEO_DRIVER_SOFTWARE) {
         snprintf(msg, sizeof(msg), "DRIVER: SOFTWARE (CPU)");
+      } else if (setting_driver == VIDEO_DRIVER_AUTO) {
+        snprintf(msg, sizeof(msg), "DRIVER: AUTO (DETECTA GPU CONFORME O JOGO)");
       } else {
-        snprintf(msg, sizeof(msg), "DRIVER: %s (3D GPU ATIVADO)", kVideoDrivers[setting_driver]);
+        snprintf(msg, sizeof(msg), "DRIVER: %s (3D GPU ATIVADO)", GetCurrentDriverToast());
       }
       CoreSetToast(msg, 90);
       PopulateVideoSettings();
@@ -2929,8 +3005,19 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_ABOUT;
         PopulateAbout();
       } else if (item.action_id == 210) {
-        ResetAllSettingsToDefault();
+        current_state = STATE_RESET_CONFIRM;
+        PopulateResetConfirm();
+      }
+    } else if (current_state == STATE_RESET_CONFIRM) {
+      if (item.action_id == 211) {
+        current_state = STATE_SETTINGS;
         PopulateSettings();
+        selected_idx = 6;
+      } else if (item.action_id == 212) {
+        ResetAllSettingsToDefault();
+        current_state = STATE_SETTINGS;
+        PopulateSettings();
+        selected_idx = 6;
         CoreSetToast("CONFIGURACOES RESTAURADAS AO PADRAO", 180);
       }
     } else if (current_state == STATE_CONTROLLER) {
@@ -3045,6 +3132,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
   case KEY_CANCEL:
     if (current_state == STATE_BROWSE) {
       BrowseGoUp();
+    } else if (current_state == STATE_RESET_CONFIRM) {
+      current_state = STATE_SETTINGS;
+      PopulateSettings();
+      selected_idx = 6;
     } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
                current_state == STATE_CONTROLLER ||
                current_state == STATE_NETPLAY || current_state == STATE_ABOUT) {
