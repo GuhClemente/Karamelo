@@ -1020,6 +1020,37 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 #ifdef _WIN32
         CloseHandle(hThread);
         CloseHandle(hProcess);
+#else
+        // Windows just stops tracking the process here and lets it keep
+        // running independently (closing a handle does not kill it) - that
+        // is fine on Windows, which has no reaping requirement. POSIX does:
+        // an un-waited exited child stays a zombie process-table entry until
+        // something calls waitpid() on it, which would otherwise never
+        // happen here since the thread meant to do that never got created.
+        // The exhaustion that made std::thread throw is almost always
+        // transient (a burst of other short-lived threads elsewhere in the
+        // app), so one retry after a brief pause is worth it before settling
+        // for a bounded, non-blocking reap attempt and then - matching the
+        // Windows trade-off above - giving up and letting the child run on,
+        // untracked, rather than blocking here indefinitely.
+        bool reaped = false;
+        for (int attempt = 0; attempt < 2 && !reaped; ++attempt) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            int status = 0;
+            if (waitpid(pid, &status, WNOHANG) == pid) reaped = true;
+        }
+        if (!reaped) {
+            try {
+                std::thread([pid]() {
+                    int status = 0;
+                    waitpid(pid, &status, 0);
+                }).detach();
+            } catch (const std::system_error&) {
+                // Still exhausted - give up exactly like the Windows path
+                // does. The child keeps running untracked; it will finally
+                // be reaped when this app process itself exits.
+            }
+        }
 #endif
         s_port_running.store(false);
         CoreSetToast("FALHA AO MONITORAR PORT - TENTE NOVAMENTE", 200);

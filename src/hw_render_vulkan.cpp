@@ -617,9 +617,16 @@ bool VkHwContextReset()
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
 			VkHwLog("context_reset do core lancou excecao - core provavelmente precisa de negociacao de contexto Vulkan (nao implementada); desativando hw-render Vulkan para esta sessao");
-			g_context_live = false;
+			// Full teardown, not just clearing the ready flags: leaving
+			// g_instance/g_device/g_staging_buf alive here would leak them
+			// (the next VkHwInit() recreates everything from scratch without
+			// ever destroying these), and worse, VkHwEnsureSurface()'s reuse
+			// fast path could then hand the *new* device a staging buffer
+			// still bound to this now-orphaned one - invalid cross-device
+			// Vulkan usage. VkHwShutdown() is safe to call here: every
+			// vkDestroy*/vkFree* call inside it is already null-checked.
 			g_hw_active = false;
-			g_vk_ready = false;
+			VkHwShutdown();
 			return false;
 		}
 	}
@@ -705,11 +712,12 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	vkEndCommandBuffer_(g_cmd_buf);
 
 	// set_command_buffers requires these to be submitted before anything
-	// else this frame; folding them into the same submission (in front of
-	// our own readback buffer) satisfies that without a second vkQueueSubmit.
-	std::vector<VkCommandBuffer> submit_bufs = g_pending_core_cmds;
-	submit_bufs.push_back(g_cmd_buf);
-	g_pending_core_cmds.clear();
+	// else this frame; appending ours directly onto g_pending_core_cmds (then
+	// submitting that vector's own storage) folds them into the same
+	// submission without a second vkQueueSubmit, and without allocating a
+	// fresh copy of it every single frame the way a separate submit_bufs
+	// vector did.
+	g_pending_core_cmds.push_back(g_cmd_buf);
 
 	VkSemaphore signal_sems[1];
 	uint32_t signal_count = 0;
@@ -720,19 +728,24 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 		g_pending_signal_semaphore = VK_NULL_HANDLE;
 	}
 
-	std::vector<VkPipelineStageFlags> wait_stages(g_pending_num_semaphores, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
+	// Fixed-size, matching g_pending_semaphores' own 8-slot cap: every wait
+	// semaphore here waits on the same stage, so there is nothing a per-frame
+	// heap allocation would buy over a small stack array.
+	VkPipelineStageFlags wait_stages[8];
+	for (uint32_t i = 0; i < g_pending_num_semaphores; ++i) wait_stages[i] = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 
 	VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 	submit.waitSemaphoreCount = g_pending_num_semaphores;
 	submit.pWaitSemaphores = g_pending_num_semaphores ? g_pending_semaphores : NULL;
-	submit.pWaitDstStageMask = g_pending_num_semaphores ? wait_stages.data() : NULL;
-	submit.commandBufferCount = (uint32_t)submit_bufs.size();
-	submit.pCommandBuffers = submit_bufs.data();
+	submit.pWaitDstStageMask = g_pending_num_semaphores ? wait_stages : NULL;
+	submit.commandBufferCount = (uint32_t)g_pending_core_cmds.size();
+	submit.pCommandBuffers = g_pending_core_cmds.data();
 	submit.signalSemaphoreCount = signal_count;
 	submit.pSignalSemaphores = signal_count ? signal_sems : NULL;
 
 	vkResetFences_(g_device, 1, &g_fence);
 	VkResult submit_result = vkQueueSubmit_(g_queue, 1, &submit, g_fence);
+	g_pending_core_cmds.clear();
 	g_pending_num_semaphores = 0;
 
 	if (submit_result != VK_SUCCESS)
@@ -766,11 +779,18 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	VkFormat fmt = g_pending_image.create_info.format;
 	bool needs_swap = (fmt == VK_FORMAT_R8G8B8A8_UNORM || fmt == VK_FORMAT_R8G8B8A8_SRGB);
 
+	// A core can set bottom_left_origin the same way a GL core does (see
+	// HwReadPixels's own handling of this flag in hw_render.cpp) even though
+	// Vulkan images are natively top-down - the flag describes the image's
+	// own row order, not anything about the API storing it. Writing each
+	// source row directly to its flipped destination row folds the flip into
+	// this same copy pass instead of a separate full-buffer swap afterward.
 	const uint8_t* src = (const uint8_t*)mapped;
 	for (unsigned y = 0; y < height; y++)
 	{
 		const uint8_t* row = src + (size_t)y * width * 4;
-		uint32_t* out_row = dest + (size_t)y * width;
+		unsigned dst_y = g_hw_cb.bottom_left_origin ? (height - 1 - y) : y;
+		uint32_t* out_row = dest + (size_t)dst_y * width;
 		if (needs_swap)
 		{
 			for (unsigned x = 0; x < width; x++)

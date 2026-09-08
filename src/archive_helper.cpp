@@ -635,7 +635,14 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 	// on essentially every Linux desktop distro. No PowerShell-style fallback
 	// exists here without a new dependency - if unzip fails, extraction fails.
 	bool ok = RunHiddenCommand({ "unzip", "-o", archive_path, "-d", dest_dir }, EXTRACT_TIMEOUT_MS);
-	(void)ok;
+	// dest_dir is a stable, identity-keyed directory (e.g. ports/<id>), never
+	// cleared before extraction - a retry that lands here after a prior
+	// partial install would find it non-empty regardless of whether *this*
+	// unzip run actually did anything. Ignoring `ok` and falling through to
+	// the exists-and-non-empty check below let a failed unzip (missing
+	// binary, corrupt archive, disk full) get reported as a successful
+	// (re)install just because leftover files were already there.
+	if (!ok) return false;
 #endif
 
 	return fs::exists(dest_dir) && !fs::is_empty(dest_dir);
