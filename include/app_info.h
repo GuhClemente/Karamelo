@@ -10,10 +10,10 @@
 // the site said v1.1 with 24 cores. Nothing agreed with anything, and none of
 // it could be checked.
 #define APP_NAME        "MiSTer 4 ALL"
-#define APP_VERSION     "0.9.1"
+#define APP_VERSION     "0.9.2"
 #define APP_ARCH        "x64"
 #define APP_EXE_BASE    "MiSTer_4_ALL"
-#define APP_EXE_NAME    "MiSTer_4_ALL_v0.9.1.exe"
+#define APP_EXE_NAME    "MiSTer_4_ALL_v0.9.2.exe"
 #define APP_GITHUB_REPO "GuhClemente/MiSTer-4-All"
 #define APP_SITE        "mister4all.com"
 
