@@ -690,6 +690,21 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 	return 0;
 }
 
+// Translates the user's Latency setting (milliseconds) into a wave-buffer
+// queue depth at the given output sample rate. Shared by InitAudio's primary
+// path and its 48kHz fallback so the PCSX2 floor and the MIN/MAX clamp can't
+// drift out of sync between them the way they already once did (the fallback
+// path silently dropped the PCSX2 floor and never updated
+// g_baseline_wave_buffers until that was caught and fixed in place).
+static int ComputeWantedQueueDepth(int output_sample_rate)
+{
+	int want = (MenuGetAudioLatencyMs() * output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
+	if (s_loaded_core_is_pcsx2 && want < 20) want = 20; // 20 buffers = ~213ms headroom for PCSX2 multi-threading
+	if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
+	if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+	return want;
+}
+
 static void InitAudio(int sample_rate)
 {
 	// Resolved once, before anything below uses it to convert milliseconds to
@@ -708,10 +723,7 @@ static void InitAudio(int sample_rate)
 	// already-initialised early return so changing it and loading another
 	// game takes effect without restarting the app.
 	{
-		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
-		if (s_loaded_core_is_pcsx2 && want < 20) want = 20; // 20 buffers = ~213ms headroom for PCSX2 multi-threading
-		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
-		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+		int want = ComputeWantedQueueDepth(g_output_sample_rate);
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
 		// Floor for DeescalateWaveQueue - a long clean stretch should only ever
 		// unwind an escalation this session added, never erode below what the
@@ -766,16 +778,11 @@ static void InitAudio(int sample_rate)
 		// rest of the session.
 		g_output_sample_rate = 48000;
 		spec.freq = g_output_sample_rate;
-		// Recomputed at the new rate, and kept identical to the primary path
-		// above - including the PCSX2 floor, which this branch was silently
-		// dropping, and g_baseline_wave_buffers, which it never updated at all.
-		// Without that second one DeescalateWaveQueue keeps the floor computed
-		// for the *rejected* rate, so a long clean stretch can erode the queue
-		// below the latency the user actually asked for.
-		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
-		if (s_loaded_core_is_pcsx2 && want < 20) want = 20;
-		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
-		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+		// Recomputed at the new rate via the same ComputeWantedQueueDepth() the
+		// primary path above uses, so the PCSX2 floor and g_baseline_wave_buffers
+		// can no longer silently drift out of sync between the two paths the way
+		// they already once did here.
+		int want = ComputeWantedQueueDepth(g_output_sample_rate);
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
 		InterlockedExchange(&g_baseline_wave_buffers, (LONG)want);
 		InterlockedExchange(&g_ring_write_pos, want * SAMPLES_PER_BUFFER);

@@ -124,7 +124,7 @@ class RowEncoder
 public:
 	explicit RowEncoder(uint8_t* rowBase) : m_dst(rowBase) {}
 
-	void Push(unsigned value) { *m_dst++ = (uint8_t)value; }
+	void Push(unsigned value) { *m_dst++ = (uint8_t)value; ++m_bytesWritten; }
 
 	void PushRepeated(unsigned value, int count)
 	{
@@ -140,8 +140,14 @@ public:
 			Push(((unsigned)(glyphRows[row] << shift) & mask) ^ xorWith);
 	}
 
+	// Lets a cell-writing function report exactly how many bytes it pushed
+	// (see Emit*Cell below) instead of the caller separately hardcoding that
+	// count - two numbers that have to be kept in sync by hand otherwise.
+	int BytesWritten() const { return (int)m_bytesWritten; }
+
 private:
 	uint8_t* m_dst;
+	size_t m_bytesWritten = 0;
 };
 
 static uint8_t* RowStart(unsigned char n)
@@ -152,8 +158,9 @@ static uint8_t* RowStart(unsigned char n)
 // A title cell is the left-most 22 bytes of a row: a solid 3-byte border,
 // then 8 title-strip rows drawn twice as wide (each row byte written twice)
 // and inverted so the title text shows light-on-dark, then a 3-byte trailer.
-static void EmitTitleCell(RowEncoder& row, const unsigned char* titleColumn)
+static int EmitTitleCell(RowEncoder& row, const unsigned char* titleColumn)
 {
+	int before = row.BytesWritten();
 	row.PushRepeated(0xff, 3);
 	for (int i = 0; i < 8; ++i)
 	{
@@ -164,32 +171,37 @@ static void EmitTitleCell(RowEncoder& row, const unsigned char* titleColumn)
 	row.Push(0xff);
 	row.Push(0);
 	row.Push(0);
+	return row.BytesWritten() - before;
 }
 
 // A paging-arrow cell stacks two glyphs (an arrowhead over a chevron) with
 // filler bytes on either side; the left and right arrows use different
 // amounts of filler, which just mirrors how the arrows have always looked.
-static void EmitArrowCell(RowEncoder& row, const unsigned char* glyphTop, const unsigned char* glyphBottom,
-                           int shift, unsigned xorWith, int leadFiller, int trailFiller)
+static int EmitArrowCell(RowEncoder& row, const unsigned char* glyphTop, const unsigned char* glyphBottom,
+                          int shift, unsigned xorWith, int leadFiller, int trailFiller)
 {
+	int before = row.BytesWritten();
 	row.PushRepeated(xorWith, leadFiller);
 	row.PushGlyphRows(glyphTop, shift, 0xff, xorWith);
 	row.PushGlyphRows(glyphBottom, shift, 0xff, xorWith);
 	row.PushRepeated(xorWith, trailFiller);
+	return row.BytesWritten() - before;
 }
 
 // A text-glyph cell: 8 bytes, one per pixel row, each optionally shifted,
 // masked by the current stipple pattern, and XORed for inversion/forced
 // invert. `stippleMask` keeps alternating (when stippling is on) so the
 // dithered look continues smoothly from one glyph into the next.
-static void EmitTextGlyphCell(RowEncoder& row, const unsigned char* glyphRows, int shift, unsigned xorWith,
-                               unsigned& stippleMask, unsigned stippleToggle)
+static int EmitTextGlyphCell(RowEncoder& row, const unsigned char* glyphRows, int shift, unsigned xorWith,
+                              unsigned& stippleMask, unsigned stippleToggle)
 {
+	int before = row.BytesWritten();
 	for (int r = 0; r < 8; ++r)
 	{
 		row.Push(((unsigned)(glyphRows[r] << shift) & stippleMask) ^ xorWith);
 		stippleMask ^= stippleToggle;
 	}
+	return row.BytesWritten() - before;
 }
 
 // ---- title text --------------------------------------------------------------
@@ -296,13 +308,11 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 				titleColumn = &s_titleStrip[(s_visibleRows - 1 - n) * 8];
 			}
 
-			EmitTitleCell(row, titleColumn);
-			col += 22;
+			col += EmitTitleCell(row, titleColumn);
 		}
 		else if (n == (s_visibleRows - 1) && (arrowState & OSD_ARROW_LEFT))
 		{
-			EmitArrowCell(row, charfont[0x10], charfont[0x14], offset, xorInvert, 3, 5);
-			col += 24;
+			col += EmitArrowCell(row, charfont[0x10], charfont[0x14], offset, xorInvert, 3, 5);
 			arrowState &= ~OSD_ARROW_LEFT;
 			if (*s++ == 0) break;
 			if (*s++ == 0) break;
@@ -329,8 +339,7 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 			}
 			else if (col < (lineLimit - 8))
 			{
-				EmitTextGlyphCell(row, charfont[b], offset, xorInvert ^ xorChar, stippleMask, stippleToggle);
-				col += 8;
+				col += EmitTextGlyphCell(row, charfont[b], offset, xorInvert ^ xorChar, stippleMask, stippleToggle);
 			}
 		}
 	}
@@ -340,8 +349,7 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 
 	if (n == (s_visibleRows - 1) && (arrowState & OSD_ARROW_RIGHT))
 	{
-		EmitArrowCell(row, charfont[0x15], charfont[0x11], offset, xorInvert, 3, 3);
-		col += 22;
+		col += EmitArrowCell(row, charfont[0x15], charfont[0x11], offset, xorInvert, 3, 3);
 	}
 }
 

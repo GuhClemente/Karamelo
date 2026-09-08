@@ -164,14 +164,18 @@ bool D3D11HwEnsureSurface(unsigned width, unsigned height)
 	return true;
 }
 
-// The other half of a failed reset: undoes exactly what D3D11HwSetRenderCallback
-// and D3D11HwInit did, without tearing down the whole backend the way
-// D3D11HwShutdown does - mirrors VkHwContextReset's own SEH recovery path.
+// The other half of a failed reset: a full D3D11HwShutdown(), not the
+// lighter flag-clear this function used to be. Clearing g_d3d11_ready
+// without releasing g_device/g_context/g_staging_tex meant the next
+// D3D11HwInit() call (gated on that same flag) recreated the device from
+// scratch and overwrote those COM pointers without ever Release()-ing
+// them - a leak - and D3D11HwEnsureSurface()'s reuse check could then hand
+// the new device's context a staging texture still bound to the old,
+// now-orphaned one, which CopyResource() requires to share a device with.
+// Mirrors the equivalent fix in VkHwContextReset's own SEH recovery path.
 static void D3D11HwDisableAfterFault()
 {
-	g_context_live = false;
-	g_hw_active = false;
-	g_d3d11_ready = false;
+	D3D11HwShutdown();
 }
 
 bool D3D11HwContextReset()
@@ -308,11 +312,16 @@ bool D3D11HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 
 	unsigned copy_w = width < g_staging_w ? width : g_staging_w;
 	unsigned copy_h = height < g_staging_h ? height : g_staging_h;
+	// See VkHwReadPixels's own comment on this same flag: bottom_left_origin
+	// describes the core's own row order, independent of the graphics API
+	// storing the image, so it needs the same handling here as the GL and
+	// Vulkan paths - folded into this copy pass via the destination row index.
 	const uint8_t* src = (const uint8_t*)mapped.pData;
 	for (unsigned y = 0; y < copy_h; y++)
 	{
 		const uint8_t* row = src + (size_t)y * mapped.RowPitch;
-		uint32_t* out_row = dest + (size_t)y * width;
+		unsigned dst_y = g_hw_cb.bottom_left_origin ? (copy_h - 1 - y) : y;
+		uint32_t* out_row = dest + (size_t)dst_y * width;
 		if (needs_swap)
 		{
 			for (unsigned x = 0; x < copy_w; x++)
