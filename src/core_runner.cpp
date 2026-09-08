@@ -1795,7 +1795,15 @@ static bool CB_Environment(unsigned cmd, void* data)
 				var->value = s_pcsx2_bios.c_str();
 			}
 			else if (strcmp(var->key, "pcsx2_fastboot") == 0) var->value = "enabled";
-			else if (strcmp(var->key, "pcsx2_renderer") == 0) var->value = (MenuGetHwRender() && HwGlProbed()) ? "OpenGL" : "Auto";
+			else if (strcmp(var->key, "pcsx2_renderer") == 0)
+			{
+				int drv = MenuGetVideoDriver();
+				if (drv == 2 && VkHwIsAvailable()) var->value = "Vulkan";
+				else if (drv == 3 && D3D11HwIsAvailable()) var->value = "Direct3D11";
+				else if (drv == 1 && HwGlProbed()) var->value = "OpenGL";
+				else if (drv == 4) var->value = "Software";
+				else var->value = (MenuGetHwRender() && HwGlProbed()) ? "OpenGL" : "Auto";
+			}
 			else if (strcmp(var->key, "pcsx2_fastmem") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_mtvu") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "pcsx2_instant_vu1") == 0) var->value = "enabled";
@@ -1806,7 +1814,14 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "ppsspp_io_timing_method") == 0) var->value = "Simulate UMD delays";
 			else if (strcmp(var->key, "ppsspp_skip_buffer_effects") == 0) var->value = "disabled";
 			else if (strcmp(var->key, "ppsspp_skip_gpu_readbacks") == 0) var->value = "disabled";
-			else if (strcmp(var->key, "ppsspp_backend") == 0) var->value = (MenuGetHwRender() && HwGlProbed()) ? "opengl" : "auto";
+			else if (strcmp(var->key, "ppsspp_backend") == 0)
+			{
+				int drv = MenuGetVideoDriver();
+				if (drv == 2 && VkHwIsAvailable()) var->value = "vulkan";
+				else if (drv == 3 && D3D11HwIsAvailable()) var->value = "direct3d11";
+				else if (drv == 1 && HwGlProbed()) var->value = "opengl";
+				else var->value = (MenuGetHwRender() && HwGlProbed()) ? "opengl" : "auto";
+			}
 			else if (strcmp(var->key, "ppsspp_auto_frameskip") == 0) var->value = "disabled";
 			else if (strcmp(var->key, "ppsspp_frameskip") == 0) var->value = "disabled";
 

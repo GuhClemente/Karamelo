@@ -97,6 +97,17 @@ void D3D11HwShutdown()
 
 bool D3D11HwIsActive() { return g_hw_active && g_d3d11_ready; }
 
+static int g_d3d11_probe_result = -1;
+
+bool D3D11HwIsAvailable()
+{
+	if (g_d3d11_probe_result < 0)
+	{
+		g_d3d11_probe_result = D3D11HwInit() ? 1 : 0;
+	}
+	return g_d3d11_probe_result != 0;
+}
+
 const void* D3D11HwGetRenderInterface()
 {
 	// D3D11HwIsActive(), not g_d3d11_ready alone - see the same fix in

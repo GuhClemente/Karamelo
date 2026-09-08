@@ -875,22 +875,27 @@ static void RenderFrame()
 			}
 		}
 
-		// 3. Floating Header Text (Left: MiSTer, Right: Date/Time like "Aug 30 Sun17:30:01")
+		// 3. Floating Header Text (Left: MiSTer 4 ALL, Right: Date/Time)
 		int txt_y = hdr_y + (hdr_h - 8) / 2;
-		DrawString(ox + 6, txt_y, "MiSTer", theme.header_txt);
+		DrawString(ox + 6, txt_y, APP_NAME, theme.header_txt);
 
 		time_t now = time(NULL);
 		struct tm* tm_now = localtime(&now);
 		if (tm_now)
 		{
 			static const char* MONTHS[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-			static const char* DAYS[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 			char date_str[64];
-			snprintf(date_str, sizeof(date_str), "%s %02d %s%02d:%02d:%02d",
-				MONTHS[tm_now->tm_mon], tm_now->tm_mday, DAYS[tm_now->tm_wday],
-				tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
-			DrawString(ox + osd_w - (int)strlen(date_str) * 8 - 6, txt_y, date_str, theme.header_txt);
+			snprintf(date_str, sizeof(date_str), "%s %02d %02d:%02d",
+				MONTHS[tm_now->tm_mon], tm_now->tm_mday,
+				tm_now->tm_hour, tm_now->tm_min);
+			int date_w = (int)strlen(date_str) * 8;
+			int date_x = ox + osd_w - date_w - 6;
+			int title_w = (int)strlen(APP_NAME) * 8;
+			if (date_x > ox + 6 + title_w + 4)
+			{
+				DrawString(date_x, txt_y, date_str, theme.header_txt);
+			}
 		}
 
 		// 4. Main OSD Card Outer Border (1px)
@@ -930,7 +935,7 @@ static void RenderFrame()
 
 		// 6. Vertical Title in Left Sidebar (Authentic MiSTer FPGA: 'M' at bottom, 'r' at top)
 		const char* title = MenuGetTitle();
-		if (!title || !*title) title = "MiSTer";
+		if (!title || !*title) title = APP_NAME;
 		int tlen = (int)strlen(title);
 		int th = tlen * 8;
 		int title_start_y = oy + (osd_h - th) / 2;
@@ -1658,6 +1663,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// from the core thread do nothing at all.
 	HwIsAvailable();
 	HwReleaseCurrent();
+	VkHwIsAvailable();
+	D3D11HwIsAvailable();
 
 	RaInit();
 	UpdaterInit();

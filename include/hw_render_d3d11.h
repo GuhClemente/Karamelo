@@ -31,6 +31,7 @@ struct retro_hw_render_callback;
 
 bool D3D11HwSetRenderCallback(struct retro_hw_render_callback* cb);
 bool D3D11HwIsActive();
+bool D3D11HwIsAvailable();
 
 // Returns a const struct retro_hw_render_interface* (void* here so this
 // header does not need to drag in d3d11.h - core_runner.cpp casts it).
