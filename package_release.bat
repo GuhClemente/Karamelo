@@ -45,6 +45,8 @@ mkdir "%DIST_DIR%\Wallpapers"
 mkdir "%DIST_DIR%\saves"
 mkdir "%DIST_DIR%\screenshots"
 mkdir "%DIST_DIR%\Config"
+mkdir "%DIST_DIR%\ports"
+copy /Y "%~dp0packaging\ports-guide\LEIA-ME.txt" "%DIST_DIR%\ports\LEIA-ME.txt" >nul
 
 rem ---------------------------------------------------------------
 rem Create BIOS directory with the real, per-system, MD5-verified guide
@@ -55,6 +57,7 @@ rem any directory literally named "bios" or "roms" anywhere in the repo.)
 rem ---------------------------------------------------------------
 mkdir "%DIST_DIR%\bios"
 copy /Y "%~dp0packaging\bios-guide\BIOS_NECESSARIOS.txt" "%DIST_DIR%\bios\BIOS_NECESSARIOS.txt" >nul
+if exist "%~dp0docs\GUIA_COMPLETO_BIOS.md" copy /Y "%~dp0docs\GUIA_COMPLETO_BIOS.md" "%DIST_DIR%\bios\GUIA_COMPLETO_BIOS.md" >nul
 
 rem ---------------------------------------------------------------
 rem Create all 35 ROM system folders with user instructions
@@ -99,51 +102,18 @@ if not errorlevel 1 (
     echo    Baixe em https://upx.github.io se quiser essa etapa ativa.
 )
 
-rem Safety verification: ensure no copyrighted rom/bios files were copied
-del /s /q "%DIST_DIR%\*.bin" "%DIST_DIR%\*.iso" "%DIST_DIR%\*.cue" "%DIST_DIR%\*.chd" "%DIST_DIR%\*.nes" "%DIST_DIR%\*.sfc" "%DIST_DIR%\*.smc" "%DIST_DIR%\*.md" "%DIST_DIR%\*.gen" "%DIST_DIR%\*.z64" "%DIST_DIR%\*.n64" "%DIST_DIR%\*.gba" "%DIST_DIR%\*.gb" "%DIST_DIR%\*.gbc" "%DIST_DIR%\*.nds" "%DIST_DIR%\*.3ds" "%DIST_DIR%\*.gcm" "%DIST_DIR%\*.cso" "%DIST_DIR%\*.pbp" >nul 2>&1
+rem Safety verification: ensure no copyrighted rom/bios files were copied into roms or cores
+del /s /q "%ROMS_DIR%\*.bin" "%ROMS_DIR%\*.iso" "%ROMS_DIR%\*.cue" "%ROMS_DIR%\*.chd" "%ROMS_DIR%\*.nes" "%ROMS_DIR%\*.sfc" "%ROMS_DIR%\*.smc" "%ROMS_DIR%\*.md" "%ROMS_DIR%\*.gen" "%ROMS_DIR%\*.z64" "%ROMS_DIR%\*.n64" "%ROMS_DIR%\*.gba" "%ROMS_DIR%\*.gb" "%ROMS_DIR%\*.gbc" "%ROMS_DIR%\*.nds" "%ROMS_DIR%\*.3ds" "%ROMS_DIR%\*.gcm" "%ROMS_DIR%\*.cso" "%ROMS_DIR%\*.pbp" >nul 2>&1
+del /s /q "%DIST_DIR%\cores\*.bin" "%DIST_DIR%\cores\*.iso" >nul 2>&1
 
-rem Create README with controls & guide
-(
-echo =====================================================================
-echo   MiSTer 4 ALL v%APP_VER% - Windows x64 (C++20 Nativo)
-echo   Site: https://mister4all.com ^| YouTube: @GuhClemente
-echo =====================================================================
-echo.
-echo 1. COMO JOGAR:
-echo    - Coloque suas ROMs/ISOs na pasta correspondente dentro de "roms\"
-echo      (ex: roms\SNES, roms\Genesis, roms\PlayStation, etc.)
-echo    - Execute "MiSTer_4_ALL.exe"
-echo    - Use as setas do teclado ou o controle XInput para navegar e jogar
-echo.
-echo 2. CONTROLES PADRAO NO TECLADO:
-echo    - Abrir / Fechar Menu OSD: F1 ou ESC
-echo    - Navegar: Setas Direcionais
-echo    - Confirmar / Entrar: ENTER ou TECLA Z
-echo    - Cancelar / Voltar: BACKSPACE ou TECLA X
-echo    - Teclado remapeavel em: Settings ^> Controller
-echo.
-echo 3. CONTROLE GAMEPAD (XINPUT / XBOX / PLAYSTATION):
-echo    - Plug ^& Play automatico ao conectar.
-echo    - Abrir Menu: BOTAO GUIDE / HOME ou SELECT + START
-echo    - Confirmar: BOTAO A
-echo    - Voltar: BOTAO B
-echo.
-echo 4. SISTEMAS NATIVOS DISPONIVEIS (35 Sistemas / 39 Cores):
-echo    - Nintendo: NES, SNES, N64, Game Boy, GBA, NDS, 3DS, GameCube
-echo    - Sega: Master System, Genesis/Mega Drive, Mega CD, 32X, Saturn, Dreamcast
-echo    - Sony: PlayStation 1, PlayStation 2, PSP
-echo    - SNK / Arcade: Neo Geo AES/MVS, Neo Geo CD, Neo Geo Pocket, FBNeo, MAME
-echo    - Atari: 2600, 5200, 7800, Jaguar, Lynx
-echo    - Computadores / Outros: DOSBox Pure, Amiga, C64, MSX, ZX Spectrum,
-echo      PC Engine / TG-16, PC-FX, 3DO, ColecoVision, WonderSwan.
-echo.
-echo 5. AVISO LEGAL / LEGAL DISCLAIMER:
-echo    - O MiSTer 4 ALL e um projeto de preservacao e codigo aberto (Open Source).
-echo    - Esta distribuicao NAO CONTEM nenhum arquivo de BIOS protegida ou ROM de jogo.
-echo    - O usuario deve utilizar seus proprios backups de jogos e BIOS legalmente adquiridos.
-echo.
-echo Desenvolvido com paixao para a comunidade retro gaming.
-) > "%DIST_DIR%\LEIAME.txt"
+rem Create README with controls & user guides
+copy /Y "%~dp0packaging\release-guide\LEIAME.txt" "%DIST_DIR%\LEIAME.txt" >nul
+copy /Y "%~dp0packaging\ports-guide\LEIA-ME.txt" "%DIST_DIR%\ports\LEIA-ME.txt" >nul
+copy /Y "%~dp0packaging\bios-guide\BIOS_NECESSARIOS.txt" "%DIST_DIR%\bios\BIOS_NECESSARIOS.txt" >nul
+if exist "%~dp0docs\GUIA_COMPLETO_BIOS.md" (
+    copy /Y "%~dp0docs\GUIA_COMPLETO_BIOS.md" "%DIST_DIR%\bios\GUIA_COMPLETO_BIOS.md" >nul
+    copy /Y "%~dp0docs\GUIA_COMPLETO_BIOS.md" "%DIST_DIR%\bios\GUIA_COMPLETO_BIOS.txt" >nul
+)
 
 rem 4. Create ZIP package
 echo.

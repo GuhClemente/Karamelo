@@ -15,8 +15,6 @@ if not defined EXE (
         set "EXE=%%F"
     )
 )
-if not defined EXE if exist "app\MiSTer_Flavor_v1.0.exe" set "EXE=app\MiSTer_Flavor_v1.0.exe"
-if not defined EXE if exist "app\MiSTer_Flavor.exe" set "EXE=app\MiSTer_Flavor.exe"
 if not defined EXE if exist "app\MiSTer_Win32.exe" set "EXE=app\MiSTer_Win32.exe"
 
 if not defined EXE (

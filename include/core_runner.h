@@ -86,6 +86,19 @@ bool CoreIsDiscGame();
 const char* CoreGetRomDir();
 const char* CoreGetOption(const char* key);
 
+// The currently loaded core's own options, as declared via
+// RETRO_ENVIRONMENT_SET_VARIABLES - for the generic Core Options menu page.
+// index ranges 0..CoreOptionCount()-1, in the order the core declared them.
+// Choices set through CoreOptionSetChoiceIndex only last for the current run
+// (same lifetime as every other CoreSetOption call), not saved to disk.
+int  CoreOptionCount();
+const char* CoreOptionKey(int index);
+const char* CoreOptionLabel(int index);
+int  CoreOptionChoiceCount(int index);
+const char* CoreOptionChoiceAt(int index, int choice_index);
+int  CoreOptionCurrentChoiceIndex(int index);
+void CoreOptionSetChoiceIndex(int index, int choice_index);
+
 // What the running core calls a control, or NULL when it never said. Lets the
 // Controller page show "Cross" on PSP where it would otherwise say "Botao B".
 const char* CoreGetButtonLabel(int retro_id);

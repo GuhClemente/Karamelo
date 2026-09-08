@@ -1,0 +1,15 @@
+=====================================================================
+  MiSTer 4 ALL - Pasta de Ports Nativos e Recompilacoes
+=====================================================================
+
+Os jogos da categoria "Ports & Recomp" (como OutRun CannonBall DX,
+Zelda 64 Recomp, Ship of Harkinian, Castlevania SotN, Dr. Mario 64, etc.)
+sao baixados e configurados automaticamente pelo menu do emulador quando
+voce os seleciona pela primeira vez.
+
+Voce tambem pode adicionar seus proprios jogos nativos de PC manualmente:
+1. Crie uma subpasta aqui dentro (exemplo: ports\MeuJogo\)
+2. Coloque o executavel .exe do jogo dentro dela
+3. O MiSTer 4 ALL detectara e exibira o jogo no menu automaticamente!
+
+=====================================================================

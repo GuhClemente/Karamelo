@@ -132,7 +132,7 @@ vezes vêm junto).
 | Jak & Daxter (OpenGOAL) | [open-goal/jak-project](https://github.com/open-goal/jak-project) |
 | LoD: Severed Chains | [Legend-of-Dragoon-Modding/Severed-Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) |
 | REDRIVER 2 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
-| Castlevania: Symphony of the Night | [gfdac/SymphonyRecomp](https://github.com/gfdac/SymphonyRecomp) |
+| Castlevania: Symphony of the Night | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
 | Sonic 1 Forever | [ElspethThePict/S1Forever](https://github.com/ElspethThePict/S1Forever) |
 | Sonic 3 A.I.R. | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
 | Sonic Unleashed Recompiled | [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) |
@@ -142,12 +142,17 @@ vezes vêm junto).
 | Super Metroid | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
 | Viva Pinata: Trouble in Paradise | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
 | WipEout Phantom Edition | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
+| OutRun (CannonBall DX) | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
 
 Assim como os cores, nenhum ROM/disco/ISO é baixado ou distribuído pelo app -
 só o executável de cada projeto, que é open source e distribuído livremente
 pelos próprios desenvolvedores. A imagem original do jogo continua sendo
 responsabilidade de quem usa o app possuir legalmente; onde o próprio port
-sabe pedir a ROM (a maioria), ele pede na primeira execução.
+sabe pedir a ROM (a maioria), ele pede na primeira execução. O CannonBall DX é
+diferente dos demais nesse ponto: ele não pede a ROM sozinho, então o app
+procura um `outrun.zip` (o romset MAME do OutRun original) já presente em
+`roms/Arcade`/`roms/MAME` e copia automaticamente para dentro da pasta do
+port na primeira vez que ele é aberto.
 
 O mecanismo de download (escolha do asset certo entre vários que uma release
 pode oferecer, e a preferência por executável raso/não-nested ao invés do

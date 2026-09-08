@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
+
 #include "libretro.h"
 #include "hw_render.h"
 
@@ -14,7 +17,7 @@
 // Framebuffer-object entry points.
 //
 // opengl32.lib on Windows only exports GL 1.1, so everything FBO-related has to
-// come through wglGetProcAddress at runtime.
+// come through SDL_GL_GetProcAddress at runtime.
 // ---------------------------------------------------------------------------
 #define GL_FRAMEBUFFER            0x8D40
 #define GL_RENDERBUFFER           0x8D41
@@ -49,9 +52,8 @@ static PFN_glRenderbufferStorage     p_glRenderbufferStorage = NULL;
 static PFN_glFramebufferRenderbuffer p_glFramebufferRenderbuffer = NULL;
 static PFN_glCheckFramebufferStatus  p_glCheckFramebufferStatus = NULL;
 
-static HWND  g_gl_window = NULL;
-static HDC   g_gl_dc = NULL;
-static HGLRC g_gl_ctx = NULL;
+static SDL_Window*  g_gl_window = NULL;
+static SDL_GLContext g_gl_ctx = NULL;
 static bool  g_gl_ready = false;
 
 static GLuint g_fbo = 0;
@@ -72,22 +74,22 @@ static void HwLog(const char* fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	FILE* f = fopen("mister_flavor.log", "a");
+	FILE* f = fopen("mister4all.log", "a");
 	if (f) { fprintf(f, "[INFO] [HW] %s\n", buf); fclose(f); }
 }
 
 static void* GlProc(const char* name)
 {
-	void* p = (void*)wglGetProcAddress(name);
-	if (p == NULL || p == (void*)0x1 || p == (void*)0x2 ||
-		p == (void*)0x3 || p == (void*)-1)
-	{
-		// Core GL 1.1 entry points live in the DLL, not the ICD.
-		HMODULE gl = GetModuleHandleA("opengl32.dll");
-		p = gl ? (void*)GetProcAddress(gl, name) : NULL;
-	}
-	return p;
+	// SDL_GL_GetProcAddress already handles the "core GL 1.1 entry points
+	// live in opengl32.dll, not the ICD" fallback internally - the manual
+	// wglGetProcAddress + GetProcAddress(opengl32.dll) dance this used to
+	// need is exactly what SDL does for us here.
+	return (void*)SDL_GL_GetProcAddress(name);
 }
+
+// HwShutdown() is the public, tear-down-everything version. The window is
+// kept when destroy_window is false: see the comment in HwInit below.
+static void HwShutdownInternal(bool destroy_window);
 
 bool HwInit()
 {
@@ -97,103 +99,78 @@ bool HwInit()
 	_putenv("__GL_THREADED_OPTIMIZATIONS=1");
 	_putenv("__GL_SHADER_DISK_CACHE=1");
 
-	// A hidden 1x1 window is enough: we never present through GL, we read the
-	// FBO back and let the existing GDI path put it on screen.
-	WNDCLASSA wc;
-	memset(&wc, 0, sizeof(wc));
-	wc.lpfnWndProc = DefWindowProcA;
-	wc.hInstance = GetModuleHandleA(NULL);
-	wc.lpszClassName = "MiSTerFlavorGL";
-	RegisterClassA(&wc);
-
-	g_gl_window = CreateWindowExA(0, "MiSTerFlavorGL", "", WS_POPUP,
-		0, 0, 1, 1, NULL, NULL, wc.hInstance, NULL);
-	if (!g_gl_window) { HwLog("CreateWindow falhou (%lu)", GetLastError()); return false; }
-
-	g_gl_dc = GetDC(g_gl_window);
-	if (!g_gl_dc) { HwLog("GetDC falhou"); HwShutdown(); return false; }
-
-	PIXELFORMATDESCRIPTOR pfd;
-	memset(&pfd, 0, sizeof(pfd));
-	pfd.nSize = sizeof(pfd);
-	pfd.nVersion = 1;
-	pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL;
-	pfd.iPixelType = PFD_TYPE_RGBA;
-	pfd.cColorBits = 32;
-	pfd.cDepthBits = 24;
-	pfd.cStencilBits = 8;
-
-	int pf = ChoosePixelFormat(g_gl_dc, &pfd);
-	if (!pf || !SetPixelFormat(g_gl_dc, pf, &pfd))
+	// The window is created once and then reused for the life of the process.
+	// HwMakeCurrent's recovery path calls HwShutdown()/HwInit() to rebuild a
+	// context that went bad, and it runs on the CORE thread - but SDL only
+	// supports creating and destroying windows on the thread that initialized
+	// its video subsystem (the main thread, in WinMain). The raw CreateWindowExA
+	// this used to use tolerated that; SDL does not. A lost context does not
+	// invalidate the window either, so there was never a reason to recreate it -
+	// only the context below gets rebuilt, and every failure path in this
+	// function tears down exactly what this call created.
+	const bool created_window_here = (g_gl_window == NULL);
+	if (created_window_here)
 	{
-		HwLog("pixel format falhou (%lu)", GetLastError());
-		HwShutdown();
-		return false;
+		// A hidden 1x1 window is enough: we never present through GL, we read
+		// the FBO back and let the existing GDI path put it on screen.
+		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+		g_gl_window = SDL_CreateWindow("MiSTer4ALL_GL", 1, 1, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+		if (!g_gl_window) { HwLog("SDL_CreateWindow falhou: %s", SDL_GetError()); return false; }
 	}
 
-	// A legacy context first - it is the only way to reach the ARB entry point
-	// that creates a modern one.
-	HGLRC legacy = wglCreateContext(g_gl_dc);
-	if (!legacy || (legacy && !wglMakeCurrent(g_gl_dc, legacy)))
-	{
-		HwLog("wglCreateContext falhou (%lu)", GetLastError());
-		if (legacy) wglDeleteContext(legacy);
-		HwShutdown();
-		return false;
-	}
-
-	// wglCreateContext alone yields OpenGL 1.1 compatibility. Cores that
-	// compile modern shaders - flycast for Dreamcast, the GL plugins for N64 -
-	// need a real 3.3+ core profile, and handing them a 1.1 context made them
-	// fault inside their own shader setup rather than fail cleanly.
-	typedef HGLRC (WINAPI *PFN_wglCreateContextAttribsARB)(HDC, HGLRC, const int*);
-	PFN_wglCreateContextAttribsARB createAttribs =
-		(PFN_wglCreateContextAttribsARB)wglGetProcAddress("wglCreateContextAttribsARB");
-
-	#define WGL_CONTEXT_MAJOR_VERSION_ARB  0x2091
-	#define WGL_CONTEXT_MINOR_VERSION_ARB  0x2092
-	#define WGL_CONTEXT_PROFILE_MASK_ARB   0x9126
-	#define WGL_CONTEXT_CORE_PROFILE_BIT   0x00000001
-	#define WGL_CONTEXT_COMPATIBILITY_BIT  0x00000002
+	// Cores mix modern shaders with fixed-function calls often enough that a
+	// strict core profile breaks them (flycast for Dreamcast, the GL plugins
+	// for N64) - compatibility profile, highest version that will start.
+	// Unlike raw WGL, SDL_GL_CreateContext negotiates the ARB
+	// create-context-with-attribs path internally - no separate "legacy
+	// context first, just to reach the extension" step is needed here.
+	static const int versions[][2] = { {4,6},{4,5},{4,3},{4,1},{3,3} };
 
 	g_gl_ctx = NULL;
-
-	if (createAttribs)
+	for (int i = 0; i < 5 && !g_gl_ctx; i++)
 	{
-		// Compatibility profile, highest version that will start. Cores mix
-		// modern shaders with fixed-function calls often enough that a strict
-		// core profile breaks them.
-		static const int versions[][2] = { {4,6},{4,5},{4,3},{4,1},{3,3} };
-
-		for (int i = 0; i < 5 && !g_gl_ctx; i++)
-		{
-			const int attribs[] = {
-				WGL_CONTEXT_MAJOR_VERSION_ARB, versions[i][0],
-				WGL_CONTEXT_MINOR_VERSION_ARB, versions[i][1],
-				WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_COMPATIBILITY_BIT,
-				0
-			};
-			g_gl_ctx = createAttribs(g_gl_dc, NULL, attribs);
-		}
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, versions[i][0]);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, versions[i][1]);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+		g_gl_ctx = SDL_GL_CreateContext(g_gl_window);
 	}
 
-	if (g_gl_ctx)
+	if (!g_gl_ctx)
 	{
-		wglMakeCurrent(NULL, NULL);
-		wglDeleteContext(legacy);
-		if (!wglMakeCurrent(g_gl_dc, g_gl_ctx))
-		{
-			HwLog("nao consegui ativar o contexto moderno");
-			HwShutdown();
-			return false;
-		}
+		// No version/profile combination above would start at all - let the
+		// driver pick whatever it wants as a last resort. Simple cores still
+		// work; the demanding ones will refuse, which is better than crashing.
+		//
+		// SDL_GL_ResetAttributes() first, or this is not a last resort at all:
+		// the attributes set in the loop above persist, so without the reset
+		// this retry asks for exactly the 3.3-compatibility context the final
+		// loop iteration was just refused, and can never succeed where the
+		// loop failed. Depth/stencil/double-buffer are re-applied because the
+		// reset clears those too; they are pixel-format attributes fixed at
+		// window creation, so this only matters if the window is created here.
+		HwLog("nenhuma versao 4.x/3.3 aceita - tentando contexto padrao do driver");
+		SDL_GL_ResetAttributes();
+		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+		g_gl_ctx = SDL_GL_CreateContext(g_gl_window);
 	}
-	else
+
+	if (!g_gl_ctx)
 	{
-		// No ARB path: keep the legacy context. Simple cores still work; the
-		// demanding ones will refuse, which is better than crashing.
-		HwLog("sem wglCreateContextAttribsARB - ficando no contexto legado");
-		g_gl_ctx = legacy;
+		HwLog("SDL_GL_CreateContext falhou: %s", SDL_GetError());
+		HwShutdownInternal(created_window_here);
+		return false;
+	}
+
+	if (!SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx))
+	{
+		HwLog("SDL_GL_MakeCurrent falhou: %s", SDL_GetError());
+		HwShutdownInternal(created_window_here);
+		return false;
 	}
 
 	p_glGenFramebuffers         = (PFN_glGenFramebuffers)GlProc("glGenFramebuffers");
@@ -211,7 +188,7 @@ bool HwInit()
 		!p_glCheckFramebufferStatus)
 	{
 		HwLog("driver sem suporte a FBO");
-		HwShutdown();
+		HwShutdownInternal(created_window_here);
 		return false;
 	}
 
@@ -223,11 +200,11 @@ bool HwInit()
 	return true;
 }
 
-void HwShutdown()
+static void HwShutdownInternal(bool destroy_window)
 {
 	if (g_gl_ctx)
 	{
-		wglMakeCurrent(g_gl_dc, g_gl_ctx);
+		SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx);
 
 		if (g_fbo && p_glDeleteFramebuffers) p_glDeleteFramebuffers(1, &g_fbo);
 		if (g_depth_rb && p_glDeleteRenderbuffers) p_glDeleteRenderbuffers(1, &g_depth_rb);
@@ -235,13 +212,12 @@ void HwShutdown()
 
 		g_fbo = g_depth_rb = g_color_tex = 0;
 
-		wglMakeCurrent(NULL, NULL);
-		wglDeleteContext(g_gl_ctx);
+		SDL_GL_MakeCurrent(g_gl_window, NULL);
+		SDL_GL_DestroyContext(g_gl_ctx);
 		g_gl_ctx = NULL;
 	}
 
-	if (g_gl_dc) { ReleaseDC(g_gl_window, g_gl_dc); g_gl_dc = NULL; }
-	if (g_gl_window) { DestroyWindow(g_gl_window); g_gl_window = NULL; }
+	if (destroy_window && g_gl_window) { SDL_DestroyWindow(g_gl_window); g_gl_window = NULL; }
 
 	g_gl_ready = false;
 	g_hw_active = false;
@@ -249,6 +225,10 @@ void HwShutdown()
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 	g_surface_w = g_surface_h = 0;
 }
+
+// Only ever called from the main thread (WinMain's teardown), which is the
+// only thread allowed to destroy an SDL window.
+void HwShutdown() { HwShutdownInternal(true); }
 
 bool HwIsActive() { return g_hw_active && g_gl_ready; }
 
@@ -259,20 +239,19 @@ bool HwIsActive() { return g_hw_active && g_gl_ready; }
 // invalid FBO and crash.
 void HwReleaseCurrent()
 {
-	if (g_gl_ready) wglMakeCurrent(NULL, NULL);
+	if (g_gl_ready) SDL_GL_MakeCurrent(g_gl_window, NULL);
 }
 
 bool HwMakeCurrent()
 {
 	if (!g_gl_ready) return false;
-	if (wglGetCurrentContext() == g_gl_ctx) return true;
+	if (SDL_GL_GetCurrentContext() == g_gl_ctx) return true;
 
-	if (!wglMakeCurrent(g_gl_dc, g_gl_ctx))
+	if (!SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx))
 	{
-		DWORD err = GetLastError();
-		HwLog("wglMakeCurrent falhou nesta thread (%lu) - reestabelecendo contexto", err);
-		wglMakeCurrent(NULL, NULL);
-		if (!wglMakeCurrent(g_gl_dc, g_gl_ctx))
+		HwLog("SDL_GL_MakeCurrent falhou nesta thread (%s) - reestabelecendo contexto", SDL_GetError());
+		SDL_GL_MakeCurrent(g_gl_window, NULL);
+		if (!SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx))
 		{
 			// The old context is unreachable (both attempts above failed), so
 			// there is no context left to call context_destroy() through - a
@@ -293,8 +272,12 @@ bool HwMakeCurrent()
 			// dead context forever.
 			struct retro_hw_render_callback saved_cb = g_hw_cb;
 
-			HwShutdown();
-			if (HwInit() && wglMakeCurrent(g_gl_dc, g_gl_ctx))
+			// Keep the window: this runs on the core thread, and destroying
+			// (or recreating) an SDL window off the main thread is not
+			// supported - see HwInit's own comment. Only the context is
+			// rebuilt, which is all that actually went bad here.
+			HwShutdownInternal(false);
+			if (HwInit() && SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx))
 			{
 				g_hw_cb = saved_cb;
 				g_hw_active = true;
@@ -302,7 +285,7 @@ bool HwMakeCurrent()
 				{
 					g_hw_cb.context_reset();
 					g_context_live = true;
-					HwLog("contexto reconstruido apos falha de wglMakeCurrent; context_reset entregue ao core");
+					HwLog("contexto reconstruido apos falha de SDL_GL_MakeCurrent; context_reset entregue ao core");
 				}
 				return true;
 			}
@@ -439,11 +422,35 @@ void HwContextReset()
 	}
 }
 
+// Unlike HwMakeCurrent(), never recovers a failed bind by rebuilding the
+// context and handing it back to the core via context_reset(). HwContextDestroy
+// runs during teardown, where the thread that owned this context may have
+// just been force-terminated (CoreShutdown()'s TerminateThread fallback after
+// a core's own thread missed its graceful-stop timeout) without ever
+// releasing it - wglMakeCurrent then fails here because Windows still
+// considers the context current on that now-dead thread. HwMakeCurrent()'s
+// normal recovery would rebuild a fresh context and call context_reset() (and
+// this function would then call context_destroy() right after) on a core
+// whose own thread no longer exists to service either callback - observed in
+// practice as an indefinite hang (PCSX2/LRPS2), not a crash, so no exception
+// handler catches it. If the context cannot be bound, there is nothing safe
+// left to clean up through it: skip the GL deletes below rather than
+// resurrect a context just to immediately call back into a dead core. HwInit()
+// always creates a brand-new GL context on the next core load regardless
+// (never reuses g_gl_ctx), so the old, now-unbindable one is simply leaked -
+// one dead context handle, not a hang.
+static bool HwMakeCurrentForTeardown()
+{
+	if (!g_gl_ready) return false;
+	if (SDL_GL_GetCurrentContext() == g_gl_ctx) return true;
+	return SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx);
+}
+
 void HwContextDestroy()
 {
 	if (!g_hw_active) return;
 
-	if (g_context_live && HwMakeCurrent())
+	if (g_context_live && HwMakeCurrentForTeardown())
 	{
 		if (g_hw_cb.context_destroy)
 		{
@@ -451,7 +458,7 @@ void HwContextDestroy()
 			__except (EXCEPTION_EXECUTE_HANDLER) {}
 		}
 	}
-	if (HwMakeCurrent())
+	if (HwMakeCurrentForTeardown())
 	{
 		if (g_fbo && p_glDeleteFramebuffers) { p_glDeleteFramebuffers(1, &g_fbo); g_fbo = 0; }
 		if (g_depth_rb && p_glDeleteRenderbuffers) { p_glDeleteRenderbuffers(1, &g_depth_rb); g_depth_rb = 0; }

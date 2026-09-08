@@ -23,6 +23,12 @@
 /app/*.exe
 /app/*.pdb
 /app/last_wer_check.txt
+# Rewritten by compile_port.bat on every successful build (release_date becomes
+# today, exe_size the size just linked), so it showed up as a modified file
+# after every single compile. Nothing reads it: the auto-updater fetches the
+# manifest from the server, and the one that actually gets packaged and
+# uploaded is dist\version.json, written separately by package_release.bat.
+/app/version.json
 
 # Cores, BIOS and ROMs (NUNCA versionar: violacao de direitos autorais)
 /app/cores/

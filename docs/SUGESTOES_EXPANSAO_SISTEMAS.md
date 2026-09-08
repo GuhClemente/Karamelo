@@ -1,14 +1,14 @@
-# 🎮 MiSTer Flavor — Novos Sistemas e Sugestões de Expansão
+# 🎮 MiSTer 4 ALL — Novos Sistemas e Sugestões de Expansão
 
 > **Documento de Análise e Novas Plataformas (Apenas o que ainda NÃO está implementado)**  
-> **Projeto:** MiSTer Flavor (Native Windows x64 Port)  
+> **Projeto:** MiSTer 4 ALL (Native Windows x64 Port)  
 > **Base de Execução:** Libretro API Architecture (C++17 / OpenGL HW / Software Blit / Ring Buffer Audio)
 
 ---
 
 ## 📌 1. Sistemas Já Presentes no Projeto (19 Sistemas Ativos)
 
-Para referência rápida, os seguintes sistemas **já estão implementados** no MiSTer Flavor e **não precisam ser adicionados**:
+Para referência rápida, os seguintes sistemas **já estão implementados** no MiSTer 4 ALL e **não precisam ser adicionados**:
 
 * **Consoles de Mesa:** NES, SNES, Nintendo 64, Genesis / Mega Drive, Mega CD, Sega Saturn, Dreamcast, PlayStation 1, PlayStation 2, GameCube, TurboGrafx-16 (PCE) e Atari 2600.
 * **Portáteis:** Nintendo DS (NDS), Nintendo 3DS e Master System / Game Gear.
@@ -18,7 +18,7 @@ Para referência rápida, os seguintes sistemas **já estão implementados** no 
 
 ## 🔍 2. Avaliação dos Sistemas Solicitados (PSP, PS3 e Xbox)
 
-| Plataforma | Viável no MiSTer Flavor? | Motivo Técnico |
+| Plataforma | Viável no MiSTer 4 ALL? | Motivo Técnico |
 | :--- | :---: | :--- |
 | **PSP** (PlayStation Portable) | ✅ **100% Viável (Sugerido)** | Usa o core oficial **PPSSPP** (`ppsspp.dll`). Totalmente compatível com o pipeline OpenGL FBO (`hw_render.cpp`) já existente no projeto. Suporta `.iso`, `.cso`, `.pbp` e `.chd` com saves e RetroAchievements. |
 | **PS3** (PlayStation 3) | ❌ **Inviável como Core Interno** | O **RPCS3** é um emulador monolítico *standalone*. Não existe core Libretro funcional de PS3. Exige Vulkan, instalação de firmware Sony (`.PUP`) e compilação LLVM pesada de PPU/SPU. |

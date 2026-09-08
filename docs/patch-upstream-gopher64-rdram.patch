@@ -1,0 +1,249 @@
+From d4ab32cc7940e46371305b249ff59d5b0fa6a1dd Mon Sep 17 00:00:00 2001
+From: Gustavo Clemente <guh.clemente@gmail.com>
+Date: Mon, 7 Sep 2026 03:43:26 -0300
+Subject: [PATCH] fix(gopher64): stop freeing the RDRAM buffer with the wrong
+ alignment
+
+This is the heap corruption (STATUS_HEAP_CORRUPTION, 0xC0000374) that killed
+the process whenever a gopher64 game was unloaded.
+
+rdram::init() allocated the RDRAM buffer with a 64 KiB-aligned Layout - the
+alignment parallel-rdp needs to import it into Vulkan as host memory - and
+then handed the raw pointer to Vec::from_raw_parts. Vec<u8> always deallocates
+with Layout::array::<u8>(capacity), i.e. alignment 1, and dealloc requires the
+same layout alloc was given. Windows makes that concrete: std serves an
+over-aligned request by over-allocating and stashing the real base pointer
+just below the aligned one, and only reads it back on free when the layout
+says the alignment is large. Freeing with alignment 1 skips that step and
+hands HeapFree an address that is not the start of a heap block.
+
+The fault therefore landed inside Device's drop glue, far from the cause,
+which is why it looked like a Vulkan/parallel-rdp problem and why none of the
+frontend-side theories held up - buffer lifetime, a cross-thread SendMessage
+deadlock, allocating from the process heap instead of the CRT's, and building
+the whole frontend /MD instead of /MT were each tried and each changed
+nothing.
+
+RDRAM now lives in AlignedBytes, which remembers its alignment and frees with
+the matching layout. Deref<Target = [u8]> keeps every existing use working
+untouched; Clone, Send/Sync and serde are implemented by hand because Rdram
+derives them and Device is held behind an Arc<tokio::Mutex<..>> for
+savestates. The postcard wire format is unchanged (varint length + raw bytes),
+so existing savestates still load.
+
+Verified with the frontend's --core-selftest: gopher64 alone, after gba,
+after flycast, and followed by gba all exit 0, and every
+"Chamando RetroUnloadGameGuarded..." is now followed by "concluido" with no
+TerminateThread anywhere - which had never happened before on any run.
+
+---
+ src/device.rs       |   2 +-
+ src/device/rdram.rs | 165 +++++++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 158 insertions(+), 9 deletions(-)
+
+diff --git a/src/device.rs b/src/device.rs
+index 7e31aa8..8c66c85 100644
+--- a/src/device.rs
++++ b/src/device.rs
+@@ -484,7 +484,7 @@ impl Device {
+                 }; 512],
+             },
+             rdram: rdram::Rdram {
+-                mem: vec![],
++                mem: rdram::AlignedBytes::empty(),
+                 size: 0x800000,
+                 regs: [[0; rdram::RDRAM_REGS_COUNT]; 4],
+             },
+diff --git a/src/device/rdram.rs b/src/device/rdram.rs
+index b39a64e..9127435 100644
+--- a/src/device/rdram.rs
++++ b/src/device/rdram.rs
+@@ -1,7 +1,158 @@
+ use crate::device;
+ use crate::retroachievements;
+ use crate::ui;
+-use std::alloc::{Layout, alloc_zeroed};
++use std::alloc::{Layout, alloc_zeroed, dealloc, handle_alloc_error};
++
++/// RDRAM is imported straight into Vulkan as host memory by parallel-rdp, which
++/// requires the pointer to be aligned to the driver's
++/// `minImportedHostPointerAlignment`. 64 KiB is comfortably above every value
++/// seen in the wild, so the buffer is over-aligned to that.
++pub const RDRAM_ALIGNMENT: usize = 64 * 1024;
++
++/// An over-aligned byte buffer that deallocates with the layout it was actually
++/// allocated with.
++///
++/// This exists because the obvious way to write it is undefined behaviour, and
++/// on Windows it is the kind that actually bites:
++///
++/// ```ignore
++/// let layout = Layout::from_size_align(size, 64 * 1024).unwrap();
++/// let ptr = unsafe { alloc_zeroed(layout) };
++/// Vec::from_raw_parts(ptr, size, size)   // <-- wrong
++/// ```
++///
++/// `Vec<u8>` always deallocates with `Layout::array::<u8>(capacity)`, i.e.
++/// alignment 1 - not the alignment the block was allocated with. `dealloc`
++/// requires the *same* layout that `alloc` was given, so this is UB by the
++/// letter of the contract, and Windows makes it concrete: `std`'s allocator
++/// serves over-aligned requests by over-allocating and stashing the real base
++/// pointer just below the aligned one, and only reads that back on free when
++/// the layout says the alignment is large. Freeing with alignment 1 skips that
++/// step and hands `HeapFree` an address that is not the start of a heap block,
++/// which trips the heap's own corruption check (STATUS_HEAP_CORRUPTION,
++/// 0xC0000374) inside `Device`'s drop glue - long after the code that caused it.
++///
++/// Keeping the buffer in a type that remembers its own alignment fixes it at
++/// the source. Everything else keeps working through `Deref<Target = [u8]>`.
++pub struct AlignedBytes {
++    ptr: *mut u8,
++    len: usize,
++}
++
++// Same reasoning as Vec<u8>: this uniquely owns its allocation and hands out
++// no interior references of its own. Needed because Device is held behind an
++// Arc<tokio::Mutex<..>> for savestates, which requires Send.
++unsafe impl Send for AlignedBytes {}
++unsafe impl Sync for AlignedBytes {}
++
++impl AlignedBytes {
++    pub fn new_zeroed(len: usize) -> Self {
++        if len == 0 {
++            return Self::empty();
++        }
++        let layout = Layout::from_size_align(len, RDRAM_ALIGNMENT).expect("Invalid layout");
++        let ptr = unsafe { alloc_zeroed(layout) };
++        if ptr.is_null() {
++            handle_alloc_error(layout);
++        }
++        Self { ptr, len }
++    }
++
++    /// A buffer that owns nothing. The pointer is never dereferenced (deref
++    /// short-circuits on len == 0), it only has to be non-null and aligned.
++    pub fn empty() -> Self {
++        Self {
++            ptr: RDRAM_ALIGNMENT as *mut u8,
++            len: 0,
++        }
++    }
++}
++
++impl Drop for AlignedBytes {
++    fn drop(&mut self) {
++        if self.len == 0 {
++            return;
++        }
++        // Same size AND same alignment as the allocation - the whole point.
++        let layout = Layout::from_size_align(self.len, RDRAM_ALIGNMENT).expect("Invalid layout");
++        unsafe { dealloc(self.ptr, layout) };
++    }
++}
++
++impl std::ops::Deref for AlignedBytes {
++    type Target = [u8];
++    fn deref(&self) -> &[u8] {
++        if self.len == 0 {
++            &[]
++        } else {
++            unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
++        }
++    }
++}
++
++impl std::ops::DerefMut for AlignedBytes {
++    fn deref_mut(&mut self) -> &mut [u8] {
++        if self.len == 0 {
++            &mut []
++        } else {
++            unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len) }
++        }
++    }
++}
++
++impl Clone for AlignedBytes {
++    fn clone(&self) -> Self {
++        let mut copy = Self::new_zeroed(self.len);
++        copy.copy_from_slice(self);
++        copy
++    }
++}
++
++// Wire format matches what #[derive(Serialize)] produced for Vec<u8> under
++// postcard - a varint length followed by the raw bytes - so savestates written
++// by an older build still load.
++impl serde::Serialize for AlignedBytes {
++    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
++        serializer.serialize_bytes(self)
++    }
++}
++
++impl<'de> serde::Deserialize<'de> for AlignedBytes {
++    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
++        struct BytesVisitor;
++
++        impl<'de> serde::de::Visitor<'de> for BytesVisitor {
++            type Value = AlignedBytes;
++
++            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
++                f.write_str("RDRAM contents as bytes")
++            }
++
++            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
++                let mut out = AlignedBytes::new_zeroed(v.len());
++                out.copy_from_slice(v);
++                Ok(out)
++            }
++
++            // Formats that hand bytes back element by element rather than as
++            // one borrowed slice.
++            fn visit_seq<A: serde::de::SeqAccess<'de>>(
++                self,
++                mut seq: A,
++            ) -> Result<Self::Value, A::Error> {
++                let mut tmp: Vec<u8> = Vec::with_capacity(seq.size_hint().unwrap_or(0));
++                while let Some(b) = seq.next_element::<u8>()? {
++                    tmp.push(b);
++                }
++                let mut out = AlignedBytes::new_zeroed(tmp.len());
++                out.copy_from_slice(&tmp);
++                Ok(out)
++            }
++        }
++
++        deserializer.deserialize_bytes(BytesVisitor)
++    }
++}
+ 
+ //const RDRAM_CONFIG_REG: usize = 0;
+ //const RDRAM_DEVICE_ID_REG: usize = 1;
+@@ -19,7 +170,7 @@ pub const RDRAM_MASK: usize = 0xFFFFFF;
+ 
+ #[derive(Clone, serde::Serialize, serde::Deserialize)]
+ pub struct Rdram {
+-    pub mem: Vec<u8>,
++    pub mem: AlignedBytes,
+     pub size: u32,
+     pub regs: [[u32; RDRAM_REGS_COUNT]; 4],
+ }
+@@ -144,12 +295,10 @@ pub fn write_regs(device: &mut device::Device, address: u64, value: u32, mask: u
+ }
+ 
+ pub fn init(device: &mut device::Device) {
+-    let alignment = 64 * 1024;
+-    let layout =
+-        Layout::from_size_align(device.rdram.size as usize, alignment).expect("Invalid layout");
+-    let ptr = unsafe { alloc_zeroed(layout) };
+-    device.rdram.mem =
+-        unsafe { Vec::from_raw_parts(ptr, device.rdram.size as usize, device.rdram.size as usize) };
++    // See AlignedBytes: the old code allocated with a 64 KiB-aligned Layout and
++    // then handed the pointer to Vec::from_raw_parts, which deallocates with
++    // alignment 1 and corrupts the heap on Windows.
++    device.rdram.mem = AlignedBytes::new_zeroed(device.rdram.size as usize);
+ 
+     retroachievements::set_rdram(device.rdram.mem.as_ptr(), device.rdram.size as usize);
+ 
+-- 
+2.55.0.windows.3
+

@@ -52,7 +52,10 @@ echo.
 echo [2/2] Enviando pacote (v%APP_VER%), executavel e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
 echo.
 
-scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+set EXTRA_FILES=
+if exist "%~dp0dist\MiSTer_4_ALL_Pack_BIOS.zip" set EXTRA_FILES="%~dp0dist\MiSTer_4_ALL_Pack_BIOS.zip"
+
+scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" "%~dp0fix_server.sh" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 if errorlevel 1 (
     echo.
     echo [AVISO] Falha no upload via SCP - verifique se a chave SSH esta configurada.
@@ -60,6 +63,7 @@ if errorlevel 1 (
     echo   - dist\version.json
     echo   - dist\MiSTer_4_ALL.exe
     echo   - %LOCAL_ZIP%
+    if exist "dist\MiSTer_4_ALL_Pack_BIOS.zip" echo   - dist\MiSTer_4_ALL_Pack_BIOS.zip
     echo.
 ) else (
     echo.
@@ -79,11 +83,13 @@ echo   Arquivos Gerados na pasta dist\:
 echo   - %LOCAL_JSON%
 echo   - %LOCAL_EXE%
 echo   - %LOCAL_ZIP%
+if exist "dist\MiSTer_4_ALL_Pack_BIOS.zip" echo   - dist\MiSTer_4_ALL_Pack_BIOS.zip
 echo.
 echo   Links Oficiais:
 echo   - https://mister4all.com/downloads/version.json
 echo   - https://mister4all.com/downloads/MiSTer_4_ALL.exe
 echo   - https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip
+if exist "dist\MiSTer_4_ALL_Pack_BIOS.zip" echo   - https://mister4all.com/downloads/MiSTer_4_ALL_Pack_BIOS.zip
 echo.
 echo =====================================================================
 echo.

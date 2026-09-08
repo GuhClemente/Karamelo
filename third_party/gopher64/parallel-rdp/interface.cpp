@@ -471,6 +471,21 @@ void rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
 void rdp_close() {
   display_fps = false;
 
+  // Full device-wide idle, before anything else in this function runs -
+  // processor->idle() below only waits on CommandProcessor's own submission
+  // timeline, which is not necessarily every queue/submission the device has
+  // outstanding. This is the strongest, most conservative guarantee Vulkan
+  // offers ("nothing is in flight anywhere on this device") and it has to
+  // come before wsi->end_frame() too: that call does its own queue submission
+  // and fence bookkeeping (Device::end_frame_context), which has no business
+  // running while older work from the just-finished game session might still
+  // be executing. Found while chasing a Windows STATUS_HEAP_CORRUPTION
+  // (0xc0000374) that only ever showed up here, at unload, well after the
+  // actual corrupting write - a first, narrower fix (processor->idle() alone,
+  // below) measurably reduced but did not eliminate it.
+  if (wsi)
+    wsi->get_device().wait_idle();
+
   g_tmem = nullptr;
   g_hidden_rdram = nullptr;
 
@@ -491,6 +506,18 @@ void rdp_close() {
     achievement_challenge_indicator_font = nullptr;
   }
   if (processor) {
+    // CommandProcessor replays queued RDP commands asynchronously against the
+    // GPU (see CommandProcessor::idle() in rdp_device.cpp: flush() + wait on
+    // the signal timeline) - deleting it without draining that queue first
+    // let the destructor free RDRAM/TMEM host-visible mappings and internal
+    // command-ring state while the GPU (and Parallel-RDP's own replay
+    // machinery) could still be reading/writing them. On Windows this showed
+    // up as a delayed STATUS_HEAP_CORRUPTION (0xc0000374) inside ntdll during
+    // some unrelated later heap operation - the actual corrupting write
+    // happens here, at unload, not wherever it gets detected. idle() is the
+    // exact same synchronization rdp_idle() already uses elsewhere in this
+    // file for the same reason.
+    processor->idle();
     delete processor;
     processor = nullptr;
   }

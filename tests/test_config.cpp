@@ -43,7 +43,7 @@ TEST_CASE(ConfigClampIntBounds)
 TEST_CASE(ConfigParserCommentsAndWhitespace)
 {
 	std::string cfg_text = 
-		"# MiSTer Flavor - Configuration\n"
+		"# MiSTer 4 ALL - Configuration\n"
 		"aspect=1\r\n"
 		"filter=9\n"
 		"   # this is a commented line\n"
@@ -71,7 +71,7 @@ TEST_CASE(ConfigSettingsRoundtrip)
 	std::string ip = "10.0.0.1";
 
 	std::ostringstream oss;
-	oss << "# MiSTer Flavor - Configuration\n";
+	oss << "# MiSTer 4 ALL - Configuration\n";
 	oss << "aspect=" << aspect << "\n";
 	oss << "filter=" << filter << "\n";
 	oss << "wallpaper=" << wallpaper << "\n";
@@ -97,7 +97,7 @@ TEST_CASE(ConfigSettingsRoundtrip)
 TEST_CASE(ConfigGamepadAndKeyboardBindingsRoundtrip)
 {
 	std::ostringstream oss;
-	oss << "# MiSTer Flavor - Controller Configuration\n";
+	oss << "# MiSTer 4 ALL - Controller Configuration\n";
 	oss << "pad_device=0\n";
 	oss << "key_b=90\n";
 	oss << "key_a=88\n";

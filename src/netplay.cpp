@@ -1,18 +1,59 @@
+#ifdef _WIN32
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+// accept()/getsockopt() take an int* for the length out-param on Winsock,
+// where POSIX's socklen_t is unsigned - declaring the locals as socklen_t on
+// both platforms means the call sites need no #ifdef of their own.
+typedef int socklen_t;
+#else
+// getaddrinfo/freeaddrinfo/inet_ntop/gethostname/ntohl/setsockopt/getsockopt/
+// bind/listen/accept/connect/send/recv/select and the sockaddr* types are the
+// same shape on POSIX as on Winsock - only the handful of Windows-only names
+// below need a stand-in. FIONBIO is defined by <sys/ioctl.h> on Linux, same
+// as ioctlsocket's own contract.
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+typedef int SOCKET;
+typedef int BOOL;
+typedef unsigned long u_long;
+#define TRUE 1
+#define INVALID_SOCKET (-1)
+#define SOCKET_ERROR (-1)
+#define closesocket(s) close(s)
+#define ioctlsocket(s, cmd, argp) ioctl(s, cmd, argp)
+#define WSAGetLastError() errno
+#define WSAEWOULDBLOCK EWOULDBLOCK
+static inline void WSACleanup() {}
+// Both call sites in this file pass _TRUNCATE, i.e. "always null-terminate,
+// silently drop what doesn't fit" - the one behavior this stand-in needs to
+// match, not a general strncpy_s replacement.
+#define _TRUNCATE ((size_t)-1)
+static inline void strncpy_s(char* dst, size_t dst_size, const char* src, size_t) {
+	strncpy(dst, src, dst_size - 1);
+	dst[dst_size - 1] = '\0';
+}
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <mutex>
+#include <chrono>
 
 #include "netplay.h"
 #include "core_runner.h"
 #include "netplay_protocol.h"
-
-#pragma comment(lib, "ws2_32.lib")
 
 
 static NetplayRole  net_role = NETPLAY_NONE;
@@ -23,16 +64,14 @@ static std::string  local_ip_str = "127.0.0.1";
 static std::string  status_str = "Disconnected";
 static int          ping_ms = 0;
 static uint32_t     frame_counter = 0;
-static DWORD        last_ping_time = 0;
 
 static int16_t remote_buttons[16] = { 0 };
 static int16_t remote_analog[2][2] = { 0 };
 
 // Connection management runs on the UI thread while input exchange runs on the
-// core thread, so every socket touch is serialised.
-static CRITICAL_SECTION net_lock;
-struct NetLockInit { NetLockInit() { InitializeCriticalSection(&net_lock); } };
-static NetLockInit g_net_lock_init;
+// core thread, so every socket touch is serialised. Recursive: NetplayUpdate()
+// and NetplaySyncInputs() call NetplayDisconnect() while already holding it.
+static std::recursive_mutex net_lock;
 
 // Partial deliveries are normal on TCP; leftovers live here until the rest
 // arrives.
@@ -41,6 +80,16 @@ static size_t   rx_len = 0;
 
 static uint32_t last_peer_tick = 0;   // newest send_tick seen, echoed back
 static uint32_t pending_tick = 0;     // our send_tick awaiting an echo
+
+// Milliseconds on a monotonic clock, truncated to 32 bits like the old
+// GetTickCount() this replaces - only ever used for round-trip deltas
+// (send_tick echoed back by the peer), so the wraparound and the fact that
+// both sides run their own independent clock are both fine.
+static uint32_t TickCountMs()
+{
+	using namespace std::chrono;
+	return (uint32_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
 
 static void SetSocketNonBlocking(SOCKET s)
 {
@@ -60,8 +109,10 @@ static void ConfigurePeerSocket(SOCKET s)
 
 void NetplayInit()
 {
+#ifdef _WIN32
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return;
+#endif
 
 	// gethostbyname returned only the first address, which on a machine with a
 	// virtual display or VPN adapter is usually the wrong one - and this is the
@@ -119,43 +170,35 @@ void NetplayShutdown()
 const char* NetplayGetLocalIp()
 {
 	static thread_local char buf[64];
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 	strncpy_s(buf, sizeof(buf), local_ip_str.c_str(), _TRUNCATE);
-	LeaveCriticalSection(&net_lock);
 	return buf;
 }
 
 NetplayRole NetplayGetRole()
 {
-	EnterCriticalSection(&net_lock);
-	NetplayRole role = net_role;
-	LeaveCriticalSection(&net_lock);
-	return role;
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	return net_role;
 }
 
 NetplayState NetplayGetState()
 {
-	EnterCriticalSection(&net_lock);
-	NetplayState state = net_state;
-	LeaveCriticalSection(&net_lock);
-	return state;
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	return net_state;
 }
 
 const char* NetplayGetStatusString()
 {
 	static thread_local char buf[160];
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 	strncpy_s(buf, sizeof(buf), status_str.c_str(), _TRUNCATE);
-	LeaveCriticalSection(&net_lock);
 	return buf;
 }
 
 int NetplayGetPingMs()
 {
-	EnterCriticalSection(&net_lock);
-	int ms = ping_ms;
-	LeaveCriticalSection(&net_lock);
-	return ms;
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	return ping_ms;
 }
 
 // NetplayStartHost/StartClient/Disconnect are called from the UI thread
@@ -168,43 +211,42 @@ bool NetplayStartHost(int port)
 {
 	NetplayDisconnect();
 
-	EnterCriticalSection(&net_lock);
-
-	listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listen_sock == INVALID_SOCKET) { LeaveCriticalSection(&net_lock); return false; }
-
-	// Without this, re-hosting within the TIME_WAIT window fails with
-	// WSAEADDRINUSE - about two minutes of "port busy" after every session.
-	BOOL reuse = TRUE;
-	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
-
-	SetSocketNonBlocking(listen_sock);
-
-	sockaddr_in addr = { 0 };
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = INADDR_ANY;
-	addr.sin_port = htons((u_short)port);
-
-	if (bind(listen_sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR)
 	{
-		closesocket(listen_sock);
-		listen_sock = INVALID_SOCKET;
-		LeaveCriticalSection(&net_lock);
-		return false;
-	}
+		std::lock_guard<std::recursive_mutex> lock(net_lock);
 
-	if (listen(listen_sock, 1) == SOCKET_ERROR)
-	{
-		closesocket(listen_sock);
-		listen_sock = INVALID_SOCKET;
-		LeaveCriticalSection(&net_lock);
-		return false;
-	}
+		listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (listen_sock == INVALID_SOCKET) return false;
 
-	net_role = NETPLAY_HOST;
-	net_state = NETPLAY_LISTENING;
-	status_str = "Hosting (Waiting for Player 2 on port " + std::to_string(port) + ")...";
-	LeaveCriticalSection(&net_lock);
+		// Without this, re-hosting within the TIME_WAIT window fails with
+		// WSAEADDRINUSE - about two minutes of "port busy" after every session.
+		BOOL reuse = TRUE;
+		setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
+
+		SetSocketNonBlocking(listen_sock);
+
+		sockaddr_in addr = { 0 };
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = INADDR_ANY;
+		addr.sin_port = htons((u_short)port);
+
+		if (bind(listen_sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR)
+		{
+			closesocket(listen_sock);
+			listen_sock = INVALID_SOCKET;
+			return false;
+		}
+
+		if (listen(listen_sock, 1) == SOCKET_ERROR)
+		{
+			closesocket(listen_sock);
+			listen_sock = INVALID_SOCKET;
+			return false;
+		}
+
+		net_role = NETPLAY_HOST;
+		net_state = NETPLAY_LISTENING;
+		status_str = "Hosting (Waiting for Player 2 on port " + std::to_string(port) + ")...";
+	}
 	CoreSetToast("NETPLAY: HOSTING SESSION", 120);
 	return true;
 }
@@ -213,32 +255,33 @@ bool NetplayStartClient(const char* host_ip, int port)
 {
 	NetplayDisconnect();
 
-	EnterCriticalSection(&net_lock);
+	{
+		std::lock_guard<std::recursive_mutex> lock(net_lock);
 
-	peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (peer_sock == INVALID_SOCKET) { LeaveCriticalSection(&net_lock); return false; }
+		peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (peer_sock == INVALID_SOCKET) return false;
 
-	sockaddr_in addr = { 0 };
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((u_short)port);
-	addr.sin_addr.s_addr = inet_addr(host_ip);
+		sockaddr_in addr = { 0 };
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons((u_short)port);
+		addr.sin_addr.s_addr = inet_addr(host_ip);
 
-	ConfigurePeerSocket(peer_sock);
-	rx_len = 0;
+		ConfigurePeerSocket(peer_sock);
+		rx_len = 0;
 
-	connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
+		connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
 
-	net_role = NETPLAY_CLIENT;
-	net_state = NETPLAY_CONNECTING;
-	status_str = "Connecting to Host (" + std::string(host_ip) + ")...";
-	LeaveCriticalSection(&net_lock);
+		net_role = NETPLAY_CLIENT;
+		net_state = NETPLAY_CONNECTING;
+		status_str = "Connecting to Host (" + std::string(host_ip) + ")...";
+	}
 	CoreSetToast("NETPLAY: CONNECTING TO HOST...", 120);
 	return true;
 }
 
 void NetplayDisconnect()
 {
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 
 	if (peer_sock != INVALID_SOCKET)
 	{
@@ -260,19 +303,17 @@ void NetplayDisconnect()
 	last_peer_tick = 0;
 	pending_tick = 0;
 	ping_ms = 0;
-
-	LeaveCriticalSection(&net_lock);
 }
 
 void NetplayUpdate()
 {
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 	frame_counter++;
 
 	if (net_role == NETPLAY_HOST && net_state == NETPLAY_LISTENING)
 	{
 		sockaddr_in client_addr;
-		int addr_len = sizeof(client_addr);
+		socklen_t addr_len = sizeof(client_addr);
 		SOCKET s = accept(listen_sock, (sockaddr*)&client_addr, &addr_len);
 		if (s != INVALID_SOCKET)
 		{
@@ -294,11 +335,18 @@ void NetplayUpdate()
 		FD_SET(peer_sock, &write_fds);
 
 		timeval tv = { 0, 0 };
-		int res = select(0, NULL, &write_fds, NULL, &tv);
+		// nfds (1st arg): Winsock ignores it entirely, kept only for BSD-socket
+		// compatibility, so "0" was harmless there and this went unnoticed for
+		// as long as this file only ever ran on Windows. POSIX select() takes
+		// it literally - "highest fd in any set, plus 1" - so 0 means "examine
+		// no descriptors at all": peer_sock's writability was never actually
+		// checked, res was always <= 0, and a Linux client sat in
+		// NETPLAY_CONNECTING forever no matter how fast the host accepted it.
+		int res = select((int)peer_sock + 1, NULL, &write_fds, NULL, &tv);
 		if (res > 0)
 		{
 			int so_error = 0;
-			int len = sizeof(so_error);
+			socklen_t len = sizeof(so_error);
 			getsockopt(peer_sock, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len);
 			if (so_error == 0)
 			{
@@ -337,7 +385,6 @@ void NetplayUpdate()
 			{
 				NetplayDisconnect();
 				CoreSetToast("NETPLAY: PEER DISCONNECTED", 120);
-				LeaveCriticalSection(&net_lock);
 				return;
 			}
 
@@ -349,7 +396,6 @@ void NetplayUpdate()
 			{
 				NetplayDisconnect();
 				CoreSetToast("NETPLAY: CONNECTION LOST", 120);
-				LeaveCriticalSection(&net_lock);
 				return;
 			}
 			break;
@@ -382,32 +428,28 @@ void NetplayUpdate()
 			// reported roughly one frame, whatever the actual latency was.
 			if (pk.echo_tick != 0 && pk.echo_tick == pending_tick)
 			{
-				ping_ms = (int)(GetTickCount() - pk.echo_tick);
+				ping_ms = (int)(TickCountMs() - pk.echo_tick);
 				pending_tick = 0;
 			}
 		}
 	}
 
-	LeaveCriticalSection(&net_lock);
 }
 
 void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][2],
                        int16_t out_p2_buttons[16], int16_t out_p2_analog[2][2])
 {
-	EnterCriticalSection(&net_lock);
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
 
 	if (net_state != NETPLAY_CONNECTED || peer_sock == INVALID_SOCKET)
-	{
-		LeaveCriticalSection(&net_lock);
 		return;
-	}
 
 	NetPacket pkt;
 	memset(&pkt, 0, sizeof(pkt));
 	pkt.magic = NET_MAGIC;
 	pkt.type = NET_TYPE_INPUT;
 	pkt.frame_seq = frame_counter;
-	pkt.send_tick = GetTickCount();
+	pkt.send_tick = TickCountMs();
 	pkt.echo_tick = last_peer_tick;   // lets the peer time its round trip
 	memcpy(pkt.buttons, local_p1_buttons, sizeof(pkt.buttons));
 	memcpy(pkt.analog, local_p1_analog, sizeof(pkt.analog));
@@ -447,6 +489,4 @@ void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][
 	// Output remote inputs into Player 2
 	memcpy(out_p2_buttons, remote_buttons, sizeof(remote_buttons));
 	memcpy(out_p2_analog, remote_analog, sizeof(remote_analog));
-
-	LeaveCriticalSection(&net_lock);
 }
