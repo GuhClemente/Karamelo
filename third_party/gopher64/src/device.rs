@@ -484,7 +484,7 @@ impl Device {
                 }; 512],
             },
             rdram: rdram::Rdram {
-                mem: vec![],
+                mem: rdram::AlignedBytes::empty(),
                 size: 0x800000,
                 regs: [[0; rdram::RDRAM_REGS_COUNT]; 4],
             },

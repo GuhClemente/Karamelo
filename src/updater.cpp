@@ -12,6 +12,11 @@
 #include <filesystem>
 #include <algorithm>
 #include <cctype>
+#include <mutex>
+#include <atomic>
+#include <thread>
+#include <condition_variable>
+#include <chrono>
 
 #include "updater.h"
 #include "app_info.h"
@@ -25,14 +30,15 @@ namespace fs = std::filesystem;
 
 // Configuration
 static const char* UPDATE_MANIFEST_URL = "https://mister4all.com/downloads/version.json";
-static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/gfdac/MiSTer-4-All/main/dist/version.json";
+static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/GuhClemente/MiSTer-4-All/main/dist/version.json";
 static const wchar_t* USER_AGENT = L"MiSTer-4-ALL-Updater/1.0";
 
 // Internal State
-static CRITICAL_SECTION g_updater_lock;
-static HANDLE           g_updater_thread = NULL;
-static HANDLE           g_updater_event = NULL;
-static volatile LONG    g_updater_running = 0;
+static std::mutex              g_updater_lock;
+static std::thread             g_updater_thread;
+static std::condition_variable g_updater_cv;
+static std::atomic<bool>       g_updater_thread_done{ false };
+static std::atomic<bool>       g_updater_running{ false };
 
 static UpdaterState     g_state = UPDATER_STATE_IDLE;
 static UpdateInfo       g_info;
@@ -338,9 +344,8 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 						{
 							int pct = (int)((downloaded * 100) / expected_total);
 							if (pct > 99) pct = 99; // 100% when file finishes
-							EnterCriticalSection(&g_updater_lock);
+							std::lock_guard<std::mutex> lock(g_updater_lock);
 							g_progress = pct;
-							LeaveCriticalSection(&g_updater_lock);
 						}
 					}
 
@@ -361,9 +366,8 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 							success = true;
 							if (track_progress)
 							{
-								EnterCriticalSection(&g_updater_lock);
+								std::lock_guard<std::mutex> lock(g_updater_lock);
 								g_progress = 100;
-								LeaveCriticalSection(&g_updater_lock);
 							}
 						}
 						else
@@ -405,36 +409,41 @@ bool UpdaterHttpDownloadToFile(const std::string& url, const std::string& dest_p
 }
 
 // Background Worker Thread
-static DWORD WINAPI UpdaterThreadProc(LPVOID)
+static void UpdaterThreadProc()
 {
-	while (InterlockedCompareExchange(&g_updater_running, 0, 0))
+	while (g_updater_running.load())
 	{
-		WaitForSingleObject(g_updater_event, 100);
+		{
+			std::unique_lock<std::mutex> lock(g_updater_lock);
+			g_updater_cv.wait_for(lock, std::chrono::milliseconds(100));
+		}
 
 		bool do_check = false;
 		bool do_download = false;
 		bool manual = false;
 
-		EnterCriticalSection(&g_updater_lock);
-		if (g_command_check)
 		{
-			do_check = true;
-			g_command_check = false;
-			manual = g_manual_check;
+			std::lock_guard<std::mutex> lock(g_updater_lock);
+			if (g_command_check)
+			{
+				do_check = true;
+				g_command_check = false;
+				manual = g_manual_check;
+			}
+			if (g_command_download)
+			{
+				do_download = true;
+				g_command_download = false;
+			}
 		}
-		if (g_command_download)
-		{
-			do_download = true;
-			g_command_download = false;
-		}
-		LeaveCriticalSection(&g_updater_lock);
 
 		if (do_check)
 		{
-			EnterCriticalSection(&g_updater_lock);
-			g_state = UPDATER_STATE_CHECKING;
-			g_status_msg = "Consultando servidor...";
-			LeaveCriticalSection(&g_updater_lock);
+			{
+				std::lock_guard<std::mutex> lock(g_updater_lock);
+				g_state = UPDATER_STATE_CHECKING;
+				g_status_msg = "Consultando servidor...";
+			}
 
 			std::string json_body;
 			bool ok = HttpFetchData(UPDATE_MANIFEST_URL, &json_body, NULL, NULL, 0, false);
@@ -449,7 +458,7 @@ static DWORD WINAPI UpdaterThreadProc(LPVOID)
 				UpdateInfo parsed_info;
 				if (ParseManifestJson(json_body, parsed_info))
 				{
-					EnterCriticalSection(&g_updater_lock);
+					std::lock_guard<std::mutex> lock(g_updater_lock);
 					g_info = parsed_info;
 					if (UpdaterIsNewerVersion(APP_VERSION, parsed_info.version))
 					{
@@ -461,35 +470,35 @@ static DWORD WINAPI UpdaterThreadProc(LPVOID)
 						g_state = UPDATER_STATE_UP_TO_DATE;
 						g_status_msg = "Voce ja esta na versao mais recente (" APP_VERSION ")";
 					}
-					LeaveCriticalSection(&g_updater_lock);
 				}
 				else
 				{
-					EnterCriticalSection(&g_updater_lock);
+					std::lock_guard<std::mutex> lock(g_updater_lock);
 					g_state = UPDATER_STATE_ERROR;
 					g_status_msg = "Manifesto de versao corrompido.";
-					LeaveCriticalSection(&g_updater_lock);
 				}
 			}
 			else
 			{
-				EnterCriticalSection(&g_updater_lock);
+				std::lock_guard<std::mutex> lock(g_updater_lock);
 				g_state = UPDATER_STATE_ERROR;
 				g_status_msg = "Falha ao conectar com o servidor.";
-				LeaveCriticalSection(&g_updater_lock);
 			}
 		}
 
 		if (do_download)
 		{
-			EnterCriticalSection(&g_updater_lock);
-			g_state = UPDATER_STATE_DOWNLOADING;
-			g_progress = 0;
-			g_status_msg = "Baixando nova versao...";
-			std::string dl_url = g_info.exe_url;
-			std::string expected_sha256 = g_info.exe_sha256;
-			size_t expected_size = g_info.exe_size;
-			LeaveCriticalSection(&g_updater_lock);
+			std::string dl_url, expected_sha256;
+			size_t expected_size;
+			{
+				std::lock_guard<std::mutex> lock(g_updater_lock);
+				g_state = UPDATER_STATE_DOWNLOADING;
+				g_progress = 0;
+				g_status_msg = "Baixando nova versao...";
+				dl_url = g_info.exe_url;
+				expected_sha256 = g_info.exe_sha256;
+				expected_size = g_info.exe_size;
+			}
 
 			if (dl_url.empty())
 			{
@@ -522,7 +531,7 @@ static DWORD WINAPI UpdaterThreadProc(LPVOID)
 				}
 			}
 
-			EnterCriticalSection(&g_updater_lock);
+			std::lock_guard<std::mutex> lock(g_updater_lock);
 			if (dl_ok)
 			{
 				g_state = UPDATER_STATE_READY;
@@ -534,16 +543,13 @@ static DWORD WINAPI UpdaterThreadProc(LPVOID)
 				g_state = UPDATER_STATE_ERROR;
 				g_status_msg = "Erro ao baixar arquivo executavel.";
 			}
-			LeaveCriticalSection(&g_updater_lock);
 		}
 	}
-	return 0;
+	g_updater_thread_done.store(true);
 }
 
 void UpdaterInit()
 {
-	InitializeCriticalSection(&g_updater_lock);
-
 	// Clean up any leftover temporary files from a previous update
 	std::string app_dir = GetExecutableDirectory();
 	std::string old_bat = app_dir + "\\_update_apply.bat";
@@ -552,58 +558,53 @@ void UpdaterInit()
 	if (fs::exists(old_bat)) fs::remove(old_bat);
 	if (fs::exists(old_exe)) fs::remove(old_exe);
 
-	g_updater_event = CreateEvent(NULL, FALSE, FALSE, NULL);
-	g_updater_running = 1;
-	g_updater_thread = CreateThread(NULL, 0, UpdaterThreadProc, NULL, 0, NULL);
+	g_updater_running.store(true);
+	g_updater_thread = std::thread(UpdaterThreadProc);
 }
 
 void UpdaterShutdown()
 {
-	if (g_updater_running)
+	if (g_updater_running.exchange(false))
 	{
-		InterlockedExchange(&g_updater_running, 0);
-		bool thread_exited = true;
-		if (g_updater_event)
+		g_updater_cv.notify_one();
+		if (g_updater_thread.joinable())
 		{
-			SetEvent(g_updater_event);
 			// HttpFetchData sets a 30s WinHTTP send/receive timeout, so the
 			// worker can legitimately still be inside a single WinHTTP call
-			// (about to EnterCriticalSection(&g_updater_lock)) well past a
-			// short wait. Cover that worst case rather than guessing low.
-			thread_exited = (WaitForSingleObject(g_updater_thread, 31000) != WAIT_TIMEOUT);
-			CloseHandle(g_updater_event);
-			g_updater_event = NULL;
+			// (about to lock g_updater_lock) well past a short wait. Cover
+			// that worst case rather than guessing low. std::thread has no
+			// timed join, so poll the "finished" flag instead; if it is still
+			// running past the deadline, detach rather than block forever -
+			// the process is exiting either way, and the OS reclaims it.
+			auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(31);
+			while (!g_updater_thread_done.load() && std::chrono::steady_clock::now() < deadline)
+				std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+			if (g_updater_thread_done.load())
+				g_updater_thread.join();
+			else
+				g_updater_thread.detach();
 		}
-		if (g_updater_thread)
-		{
-			CloseHandle(g_updater_thread);
-			g_updater_thread = NULL;
-		}
-		// Deleting a CRITICAL_SECTION a still-running thread might enter is
-		// undefined behavior. If the wait above timed out, leak it instead -
-		// the process is exiting either way, and the OS reclaims it; the
-		// alternative is a crash or hang during shutdown.
-		if (thread_exited) DeleteCriticalSection(&g_updater_lock);
 	}
 }
 
 void UpdaterCheckAsync(bool manual_trigger)
 {
-	EnterCriticalSection(&g_updater_lock);
-	g_command_check = true;
-	g_manual_check = manual_trigger;
-	LeaveCriticalSection(&g_updater_lock);
-
-	if (g_updater_event) SetEvent(g_updater_event);
+	{
+		std::lock_guard<std::mutex> lock(g_updater_lock);
+		g_command_check = true;
+		g_manual_check = manual_trigger;
+	}
+	g_updater_cv.notify_one();
 }
 
 void UpdaterStartDownload()
 {
-	EnterCriticalSection(&g_updater_lock);
-	g_command_download = true;
-	LeaveCriticalSection(&g_updater_lock);
-
-	if (g_updater_event) SetEvent(g_updater_event);
+	{
+		std::lock_guard<std::mutex> lock(g_updater_lock);
+		g_command_download = true;
+	}
+	g_updater_cv.notify_one();
 }
 
 bool UpdaterApplyAndRestart()
@@ -702,18 +703,14 @@ bool UpdaterApplyAndRestart()
 
 UpdaterState UpdaterGetState()
 {
-	EnterCriticalSection(&g_updater_lock);
-	UpdaterState s = g_state;
-	LeaveCriticalSection(&g_updater_lock);
-	return s;
+	std::lock_guard<std::mutex> lock(g_updater_lock);
+	return g_state;
 }
 
 int UpdaterGetProgress()
 {
-	EnterCriticalSection(&g_updater_lock);
-	int p = g_progress;
-	LeaveCriticalSection(&g_updater_lock);
-	return p;
+	std::lock_guard<std::mutex> lock(g_updater_lock);
+	return g_progress;
 }
 
 UpdateInfo UpdaterGetInfo()
@@ -723,10 +720,8 @@ UpdateInfo UpdaterGetInfo()
 	// handed back exactly that, so the lock protected nothing at all: a
 	// caller reading info.version/info.notes could still race
 	// UpdaterThreadProc's "g_info = parsed_info;" and see a torn std::string.
-	EnterCriticalSection(&g_updater_lock);
-	UpdateInfo info = g_info;
-	LeaveCriticalSection(&g_updater_lock);
-	return info;
+	std::lock_guard<std::mutex> lock(g_updater_lock);
+	return g_info;
 }
 
 std::string UpdaterGetStatusMessage()
@@ -735,8 +730,6 @@ std::string UpdaterGetStatusMessage()
 	// into g_status_msg's buffer after the lock was already released, and a
 	// concurrent reassignment of g_status_msg could free that buffer out from
 	// under the caller. Returning a copy closes that window.
-	EnterCriticalSection(&g_updater_lock);
-	std::string msg = g_status_msg;
-	LeaveCriticalSection(&g_updater_lock);
-	return msg;
+	std::lock_guard<std::mutex> lock(g_updater_lock);
+	return g_status_msg;
 }

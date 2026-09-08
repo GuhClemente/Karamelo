@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
+#include <map>
 #include <set>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,11 +10,11 @@
 #include <unordered_set>
 #include <vector>
 #include <windows.h>
-#include <xinput.h>
 
 #include "app_info.h"
 #include "archive_helper.h"
 #include "core_runner.h"
+#include "gamepad_sdl.h" // pulls in <xinput.h> for the XINPUT_STATE shape
 #include "hw_render.h"
 #include "input_map.h"
 #include "menu.h"
@@ -34,7 +36,8 @@ enum MenuState {
   STATE_CONTROLLER,
   STATE_NETPLAY,
   STATE_ABOUT,
-  STATE_UPDATE
+  STATE_UPDATE,
+  STATE_CORE_OPTIONS
 };
 
 struct MenuItem {
@@ -55,13 +58,22 @@ static int scroll_top = 0;
 // item index changes - including back to one visited earlier - which is
 // exactly "the selection just landed here."
 static int s_scroll_item_idx = -1;
-static DWORD s_scroll_since = 0;
+static uint32_t s_scroll_since = 0;
 
 // Same idea for the vertical title band on the left edge (OsdSetTitle) -
 // a title longer than the 14 characters that fit in the fixed-height card
 // used to just cut off mid-word with no indication, same as the row names.
 static std::string s_title_scroll_last;
-static DWORD s_title_scroll_since = 0;
+static uint32_t s_title_scroll_since = 0;
+
+// Milliseconds on a monotonic clock, truncated to 32 bits like the old
+// GetTickCount() this replaces - every use here is a "how long since X" delta,
+// so wraparound is harmless.
+static uint32_t TickCountMs()
+{
+	using namespace std::chrono;
+	return (uint32_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
 static int main_menu_saved_idx = 0;
 static std::string current_title = "MiSTer 4 ALL";
 static std::string current_dir = "roms";
@@ -130,7 +142,7 @@ static const int kScrollDelays[] = {0, 2, 3, 5, 8, 10};
 static const int kScrollDelayCount = 6;
 
 // Refreshed on every key the menu handles; MenuRun compares against it.
-static DWORD g_last_input_tick = 0;
+static uint32_t g_last_input_tick = 0;
 
 // melonds_screen_layout, verbatim from the core's own declaration.
 static const char *kNdsLayoutVals[] = {
@@ -164,23 +176,35 @@ static const int kCitraLayoutCount = 4;
 static int setting_wallpaper =
     1; // 0=None, 1=Static Noise, 2=Parallax Stars, 3=Cyber Grid
 static bool setting_fullscreen = false;
+// -1 sentinel = never saved yet (fresh install, or an old config from before
+// this existed) - main_win32.cpp keeps its own built-in default in that case
+// instead of restoring a bogus 0x0 window. Only setting_win_w/h are actually
+// read as that sentinel (see MenuGetWindowRect): x and y are legitimately
+// negative on any display placed left of, or above, the primary one.
+static int setting_win_x = -1;
+static int setting_win_y = -1;
+static int setting_win_w = -1;
+static int setting_win_h = -1;
 static int setting_theme =
     0; // 0=Red/Burgundy, 1=Blue, 2=Green, 3=Amber, 4=Gray, 5=Dark
 static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
-// Audio buffer depth. Below 64ms the waveOut queue cannot stay ahead of the
-// mixer on a loaded machine; above 512ms the delay is audible against input.
+// Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
+// the mixer on a loaded machine; above 512ms the delay is audible against input.
 static const int kAudioLatencyMs[4] = { 64, 128, 256, 512 };
-// Vulkan and DirectX 11 used to be listed here too, but hw_render.cpp only
-// ever implements OpenGL/WGL - picking either one silently ran OpenGL
-// anyway, with no indication anything different had happened. Only list
-// backends that actually exist until a real Vulkan/D3D11 backend lands.
+// A single on/off toggle, not a per-API picker: OpenGL, Vulkan and D3D11
+// backends (hw_render.cpp/hw_render_vulkan.cpp/hw_render_d3d11.cpp) all sit
+// behind this one setting via MenuGetHwRender() - a core requests whichever
+// context type it prefers, and CB_Environment's SET_HW_RENDER case dispatches
+// to whichever of the three backends matches. There is no way for the user to
+// force one specific API over another; only to allow hardware rendering at
+// all or fall back to every core's own software renderer.
 static const char *kVideoDrivers[] = {
     "Software (CPU)",
-    "OpenGL (GPU 3D)"
+    "Hardware (GPU 3D)"
 };
 static const int kVideoDriverCount = 2;
-static int setting_driver = 1; // Default to OpenGL (GPU 3D)
+static int setting_driver = 1; // Default to Hardware (GPU 3D)
 static int setting_sync = 1;  // 0=Native (Game Rate), 1=Sync to Display
 static int setting_vsync = 1; // 0=Disabled, 1=Enabled
 // ParaLLEl N64 is the primary robust core with Ari64 Dynarec and RetroAchievements.
@@ -205,55 +229,40 @@ static int g_system_count = 0;
 static int setting_cd_precache = 0; // 0=disabled, 1=enabled
 static int setting_cd_latency = 0;  // 0=enabled (real), 1=disabled (fast)
 
-// Pushes the saved per-core options into the core. Called on load as well as
-// on change: without the load-time call a layout restored from the config
-// only took effect if the player toggled it again by hand.
-static void ApplyPersistedCoreOptions() {
-  // Two different cores can end up running a Master System game and they use
-  // different option keys: cores/sms.dll is Gearsystem, cores/genesis.dll is
-  // Genesis Plus GX. Setting only the Genesis one meant the FM toggle did
-  // nothing at all for .sms files, which load Gearsystem. Each core ignores
-  // the key it does not know.
-  const char *fm_gpgx[] = {"auto", "disabled", "enabled"};
-  // Gearsystem offers only Auto and Disabled - it has no force-on - so the
-  // menu's "Ligado" maps to Auto there. Genesis Plus GX has all three.
-  const char *fm_gears[] = {"Auto", "Disabled", "Auto"};
-  CoreSetOption("genesis_plus_gx_ym2413", fm_gpgx[setting_sms_fm]);
-  CoreSetOption("gearsystem_ym2413", fm_gears[setting_sms_fm]);
-
-  CoreSetOption("melonds_screen_layout", kNdsLayoutVals[setting_nds_layout]);
-  CoreSetOption("melonds_screen_gap", kNdsGapVals[setting_nds_gap]);
-  CoreSetOption("melonds_hybrid_small_screen",
-                kNdsHybridVals[setting_nds_hybrid]);
-
-  // melonDS defaults touch mode to "Mouse", which is its RETRO_DEVICE_MOUSE
-  // path: relative movement for a captured cursor. What we feed it is
-  // RETRO_DEVICE_POINTER, an absolute position, and only "Touch" reads that.
-  // On the default the stylus did nothing at all.
-  CoreSetOption("melonds_touch_mode", "Touch");
-
-  CoreSetOption("citra_layout_option", kCitraLayoutVals[setting_citra_layout]);
-
-  const char *onoff[] = {"disabled", "enabled"};
-  CoreSetOption("genesis_plus_gx_cd_precache", onoff[setting_cd_precache]);
-  CoreSetOption("genesis_plus_gx_cd_latency",
-                onoff[setting_cd_latency ? 0 : 1]);
-}
-
-// Only reached for a loose (non-archived) MSX file - archived content gets
-// the equivalent check in core_runner.cpp after extraction, since only then
-// is the real inner extension known. See the comment there for why fMSX's
-// "MSX2+" default is not trusted.
+// ApplyPersistedCoreOptions()/ApplyMsxMachineTypeOption() are defined below,
+// after the neo_* dip-switch/system-type globals they also push - see the
+// comment on ApplyPersistedCoreOptions() itself.
+static void ApplyPersistedCoreOptions();
 static void ApplyMsxMachineTypeOption(const std::string &core_dll,
-                                      const std::string &ext) {
-  if (core_dll.find("msx.dll") == std::string::npos) return;
-  CoreSetOption("fmsx_mode", ext == ".mx1" ? "MSX1" : "MSX2");
-}
+                                      const std::string &ext);
+
 static int setting_language = 0; // 0=Português, 1=English
 static std::string join_ip_input = "127.0.0.1";
 
 static void MenuProcessKeyImpl(MenuKey key);
 static void MenuSaveSettings();
+
+// A player's choice on the generic Core Options page (PopulateCoreOptionsSettings/
+// CoreOption* in core_runner.cpp), keyed by the core's own option key so it
+// survives a restart - unlike CoreSetOption's own g_core_options, which is
+// in-memory only and forgotten the moment the process exits. Persisted as
+// "coreopt:<key>=<value>" lines (see SettingsSnapshot/MenuLoadSettings) since
+// the existing settings format is otherwise strictly int-keyed and these are
+// core-declared strings. Flat, not scoped per-core: two cores sharing an
+// option name (rare) would share this too, same tradeoff g_core_options
+// itself already makes.
+static std::map<std::string, std::string> g_persisted_core_options;
+
+const char* MenuGetPersistedCoreOption(const char* key) {
+  if (!key) return NULL;
+  auto it = g_persisted_core_options.find(key);
+  return (it != g_persisted_core_options.end()) ? it->second.c_str() : NULL;
+}
+void MenuSetPersistedCoreOption(const char* key, const char* value) {
+  if (!key || !value) return;
+  g_persisted_core_options[key] = value;
+  MenuSaveSettings();
+}
 
 int MenuGetAspectMode() { return setting_aspect; }
 int MenuGetFilterMode() { return setting_filter; }
@@ -332,6 +341,40 @@ bool MenuGetFullscreen() { return setting_fullscreen; }
 void MenuSetFullscreen(bool fs) {
   bool changed = (setting_fullscreen != fs);
   setting_fullscreen = fs;
+  if (changed)
+    MenuSaveSettings();
+}
+
+// Called once at startup (before the window is shown) and once at shutdown -
+// not on every SDL_EVENT_WINDOW_MOVED/RESIZED, which would mean a disk write
+// per pixel dragged. Returns false (and leaves x/y/w/h untouched) if nothing
+// has ever been saved, so the caller can fall back to its own built-in default
+// instead of restoring a sentinel -1 as a real position or a 0x0 window.
+bool MenuGetWindowRect(int *x, int *y, int *w, int *h) {
+  // Only w/h decide "never saved". A negative x or y is a perfectly real
+  // position - any display placed to the left of, or above, the primary one
+  // has negative coordinates - and treating it as the sentinel meant a window
+  // on such a monitor was saved correctly and then silently refused on the way
+  // back in, landing centered on the primary display every launch instead.
+  // Width and height can never legitimately be <= 0, so they carry the
+  // sentinel on their own; the two are always written together by
+  // MenuSetWindowRect, so there is no config where one is set and the other
+  // is not.
+  if (setting_win_w <= 0 || setting_win_h <= 0)
+    return false;
+  *x = setting_win_x;
+  *y = setting_win_y;
+  *w = setting_win_w;
+  *h = setting_win_h;
+  return true;
+}
+void MenuSetWindowRect(int x, int y, int w, int h) {
+  bool changed = (setting_win_x != x || setting_win_y != y ||
+                   setting_win_w != w || setting_win_h != h);
+  setting_win_x = x;
+  setting_win_y = y;
+  setting_win_w = w;
+  setting_win_h = h;
   if (changed)
     MenuSaveSettings();
 }
@@ -676,6 +719,7 @@ void PopulateControllerSettings();
 void PopulateNetplay();
 void PopulateAbout();
 void PopulateRetroAchievements();
+void PopulateCoreOptionsSettings();
 void PopulateAchievementList();
 void PopulateUpdate();
 
@@ -686,6 +730,74 @@ static int neo_cd_region = 0;    // 0: US, 1: Japan, 2: Europe
 static int neo_memcard = 0;      // 0: Plugged, 1: Unplugged
 static int neo_dip_settings = 0; // 0: OFF, 1: ON
 static int neo_dip_freeplay = 0; // 0: OFF, 1: ON
+
+// Pushes the saved per-core options into the core. Called on load as well as
+// on change: without the load-time call a setting restored from the config
+// only took effect if the player toggled it again by hand - true of every
+// value below (found the hard way for NeoGeo's own dip switches, which
+// persisted correctly to mister4all.cfg and displayed correctly in this
+// menu on the very next launch, but silently never reached Geolith unless
+// re-toggled in that session, since none of them were being re-applied here).
+static void ApplyPersistedCoreOptions() {
+  // Two different cores can end up running a Master System game and they use
+  // different option keys: cores/sms.dll is Gearsystem, cores/genesis.dll is
+  // Genesis Plus GX. Setting only the Genesis one meant the FM toggle did
+  // nothing at all for .sms files, which load Gearsystem. Each core ignores
+  // the key it does not know.
+  const char *fm_gpgx[] = {"auto", "disabled", "enabled"};
+  // Gearsystem offers only Auto and Disabled - it has no force-on - so the
+  // menu's "Ligado" maps to Auto there. Genesis Plus GX has all three.
+  const char *fm_gears[] = {"Auto", "Disabled", "Auto"};
+  CoreSetOption("genesis_plus_gx_ym2413", fm_gpgx[setting_sms_fm]);
+  CoreSetOption("gearsystem_ym2413", fm_gears[setting_sms_fm]);
+
+  CoreSetOption("melonds_screen_layout", kNdsLayoutVals[setting_nds_layout]);
+  CoreSetOption("melonds_screen_gap", kNdsGapVals[setting_nds_gap]);
+  CoreSetOption("melonds_hybrid_small_screen",
+                kNdsHybridVals[setting_nds_hybrid]);
+
+  // melonDS defaults touch mode to "Mouse", which is its RETRO_DEVICE_MOUSE
+  // path: relative movement for a captured cursor. What we feed it is
+  // RETRO_DEVICE_POINTER, an absolute position, and only "Touch" reads that.
+  // On the default the stylus did nothing at all.
+  CoreSetOption("melonds_touch_mode", "Touch");
+
+  CoreSetOption("citra_layout_option", kCitraLayoutVals[setting_citra_layout]);
+
+  const char *onoff[] = {"disabled", "enabled"};
+  CoreSetOption("genesis_plus_gx_cd_precache", onoff[setting_cd_precache]);
+  CoreSetOption("genesis_plus_gx_cd_latency",
+                onoff[setting_cd_latency ? 0 : 1]);
+
+  // NeoGeo/Geolith - value tables kept identical to the interactive
+  // KEY_LEFT/KEY_RIGHT handlers for these (action_id 501-507) on purpose,
+  // since a mismatch here would mean the menu and the actual running core
+  // disagree about what e.g. "MVS" maps to.
+  const char *sys_vals[] = {"aes", "mvs", "uni"};
+  CoreSetOption("geolith_system_type", sys_vals[neo_sys]);
+  const char *bios_vals[] = {"aes", "mvs"};
+  CoreSetOption("geolith_unibios_hw", bios_vals[neo_bios]);
+  const char *cd_vals[] = {"cdz", "cd_top", "cd_front", "cdz_unibios"};
+  CoreSetOption("geolith_cd_system_type", cd_vals[neo_cd_type]);
+  const char *reg_vals[] = {"us", "jp", "as", "eu"};
+  CoreSetOption("geolith_region", reg_vals[neo_cd_region]);
+  const char *mc_vals[] = {"on", "off"};
+  CoreSetOption("geolith_memcard", mc_vals[neo_memcard]);
+  const char *dip_vals[] = {"off", "on"};
+  CoreSetOption("geolith_settingmode", dip_vals[neo_dip_settings]);
+  const char *fp_vals[] = {"off", "on"};
+  CoreSetOption("geolith_freeplay", fp_vals[neo_dip_freeplay]);
+}
+
+// Only reached for a loose (non-archived) MSX file - archived content gets
+// the equivalent check in core_runner.cpp after extraction, since only then
+// is the real inner extension known. See the comment there for why fMSX's
+// "MSX2+" default is not trusted.
+static void ApplyMsxMachineTypeOption(const std::string &core_dll,
+                                      const std::string &ext) {
+  if (core_dll.find("msx.dll") == std::string::npos) return;
+  CoreSetOption("fmsx_mode", ext == ".mx1" ? "MSX1" : "MSX2");
+}
 
 // Which core each system entry needs, so an entry with no DLL behind it can be
 // left out of the menu instead of promising a system that cannot load.
@@ -862,6 +974,14 @@ void PopulateMainMenu() {
           {"Acesso do CD", acc[setting_cd_latency], false, false, 514});
     }
 
+    // 3b. Core Options: whatever the core itself declared via SET_VARIABLES
+    // (internal resolution, region, DSP, ...), generically - only shown when
+    // there is actually something to show, same as every other conditional
+    // block in this menu.
+    if (CoreOptionCount() > 0) {
+      items.push_back({"Core Options", ">", false, true, 221});
+    }
+
     // 4. RetroAchievements, if the integration is configured. None of this
     //    reached the screen before: the status and counters existed as
     //    accessors that nothing called.
@@ -992,7 +1112,7 @@ static void ControllerPageOnEnter() {
   int pads = 0;
   for (DWORD i = 0; i < 4; i++) {
     XINPUT_STATE st;
-    if (XInputGetState(i, &st) == ERROR_SUCCESS)
+    if (GamepadGetState((int)i, &st))
       pads++;
   }
   if (pads == 0)
@@ -1007,7 +1127,7 @@ void PopulateControllerSettings() {
   int pads = 0;
   for (DWORD i = 0; i < 4; i++) {
     XINPUT_STATE st;
-    if (XInputGetState(i, &st) == ERROR_SUCCESS)
+    if (GamepadGetState((int)i, &st))
       pads++;
   }
 
@@ -1230,6 +1350,42 @@ void PopulateAudioSettings() {
   scroll_top = 0;
 }
 
+// Generic "Core Options" page (like RetroArch's Quick Menu > Options): lists
+// whatever options the currently loaded core declared through
+// RETRO_ENVIRONMENT_SET_VARIABLES - internal resolution, region, DSP,
+// whatever - with zero core-specific code here. Reachable only from the
+// in-game main menu (CoreOptionCount() > 0 there), not from Settings, so its
+// own Back row (898) returns to STATE_MAIN/PopulateMainMenu() directly
+// instead of going through the shared 999 handler, which always lands on
+// STATE_SETTINGS - wrong for a page nothing routes through Settings to reach.
+//
+// Rows use action_id 800 + option_index, capped at 98 options (800-897) so
+// the range can never collide with 898 (Back) - two full orders of magnitude
+// past what any real core declares, this is headroom, not a real limit.
+static const int kCoreOptionsMaxRows = 98;
+void PopulateCoreOptionsSettings() {
+  items.clear();
+  current_title = "Core Options";
+
+  int n = CoreOptionCount();
+  if (n > kCoreOptionsMaxRows) n = kCoreOptionsMaxRows;
+  for (int i = 0; i < n; i++) {
+    std::string label = CoreOptionLabel(i);
+    int cur = CoreOptionCurrentChoiceIndex(i);
+    std::string val = CoreOptionChoiceAt(i, cur);
+    items.push_back({label, val, false, false, 800 + i});
+  }
+  if (n == 0)
+    items.push_back({"Este core nao declarou opcoes", "", false, false, 0});
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({"Voltar", "", false, true, 898});
+
+  OsdSetSize((int)items.size());
+  selected_idx = 0;
+  scroll_top = 0;
+}
+
 void PopulateNetplay() {
   items.clear();
   current_title = "Netplay";
@@ -1350,7 +1506,7 @@ void PopulateAbout() {
     }
   }
   if (core_files > 0 && core_files != APP_CORE_FILES) {
-    FILE *lf = fopen("mister_flavor.log", "a");
+    FILE *lf = fopen("mister4all.log", "a");
     if (lf) {
       fprintf(lf,
               "[WARN] [ABOUT] cores/ tem %d DLLs, mas APP_CORE_FILES diz %d - "
@@ -1705,8 +1861,17 @@ static void BrowseGoUp() {
 // volume reset on every launch. Written as plain key=value text next to the
 // executable, under Config/.
 // -------------------------------------------------------------
-static const char *SETTINGS_PATH = "Config/mister_flavor.cfg";
-static const char *LEGACY_SETTINGS_PATH = "Config/sabor_mister.cfg";
+static const char *SETTINGS_PATH = "Config/mister4all.cfg";
+// Older filenames this project shipped under, newest first. Read-only: the
+// first one that exists is loaded, and the very next MenuSaveSettings() writes
+// everything back out to SETTINGS_PATH above, so an upgrading player keeps
+// every binding, video/audio choice and Core Option instead of being silently
+// reset to defaults. "mister_flavor" was the name before this became
+// MiSTer 4 ALL; "sabor_mister" was the one before that.
+static const char *LEGACY_SETTINGS_PATHS[] = {
+    "Config/mister_flavor.cfg",
+    "Config/sabor_mister.cfg",
+};
 
 // One key per call. The previous version was a single snprintf with twenty
 // arguments, and adding a setting to the argument list without adding it to
@@ -1731,6 +1896,10 @@ static std::string SettingsSnapshot() {
   }
   AppendSetting(out, "wallpaper", setting_wallpaper);
   AppendSetting(out, "fullscreen", setting_fullscreen ? 1 : 0);
+  AppendSetting(out, "win_x", setting_win_x);
+  AppendSetting(out, "win_y", setting_win_y);
+  AppendSetting(out, "win_w", setting_win_w);
+  AppendSetting(out, "win_h", setting_win_h);
   AppendSetting(out, "theme", setting_theme);
   AppendSetting(out, "deadzone", setting_deadzone);
   AppendSetting(out, "latency", setting_latency);
@@ -1763,6 +1932,17 @@ static std::string SettingsSnapshot() {
   out += join_ip_input;
   out += "\n";
 
+  // Core Options page choices - see g_persisted_core_options's own comment.
+  // "=" cannot appear in a libretro option key, so this splits back apart
+  // the same simple way every other line in this file does.
+  for (const auto &kv : g_persisted_core_options) {
+    out += "coreopt:";
+    out += kv.first;
+    out += "=";
+    out += kv.second;
+    out += "\n";
+  }
+
   return out;
 }
 
@@ -1774,7 +1954,7 @@ static void MenuSaveSettings() {
   if (!f)
     return;
 
-  fprintf(f, "# MiSTer Flavor - Configuration\n");
+  fprintf(f, "# MiSTer 4 ALL - Configuration\n");
   std::string snap = SettingsSnapshot();
   fwrite(snap.data(), 1, snap.size(), f);
   fclose(f);
@@ -1782,8 +1962,11 @@ static void MenuSaveSettings() {
 
 static void MenuLoadSettings() {
   FILE *f = fopen(SETTINGS_PATH, "rb");
-  if (!f)
-    f = fopen(LEGACY_SETTINGS_PATH, "rb");
+  bool from_legacy = false;
+  for (size_t i = 0; !f && i < sizeof(LEGACY_SETTINGS_PATHS) / sizeof(LEGACY_SETTINGS_PATHS[0]); i++) {
+    f = fopen(LEGACY_SETTINGS_PATHS[i], "rb");
+    if (f) from_legacy = true;
+  }
   if (!f) {
     // Seed default settings file on first launch
     MenuSaveSettings();
@@ -1818,6 +2001,14 @@ static void MenuLoadSettings() {
       setting_wallpaper = ClampInt(iv, 0, WallpaperMaxMode());
     else if (!strcmp(key, "fullscreen"))
       setting_fullscreen = (iv != 0);
+    else if (!strcmp(key, "win_x"))
+      setting_win_x = iv;
+    else if (!strcmp(key, "win_y"))
+      setting_win_y = iv;
+    else if (!strcmp(key, "win_w"))
+      setting_win_w = iv;
+    else if (!strcmp(key, "win_h"))
+      setting_win_h = iv;
     else if (!strcmp(key, "theme"))
       setting_theme = ClampInt(iv, 0, 5);
     else if (!strcmp(key, "deadzone"))
@@ -1885,8 +2076,22 @@ static void MenuLoadSettings() {
       neo_dip_freeplay = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "netplay_ip") && val[0])
       join_ip_input = val;
+    else if (!strncmp(key, "coreopt:", 8) && key[8] && val[0])
+      // See g_persisted_core_options's own comment - key/val are raw
+      // strings here, not the atoi()'d iv used by every setting above.
+      g_persisted_core_options[key + 8] = val;
   }
   fclose(f);
+
+  // Migrate now, not "whenever the player next changes something". Without
+  // this the new file is only created on the first MenuSaveSettings(), so a
+  // player who upgrades and never touches a setting keeps running off the old
+  // filename indefinitely - and the two files then silently diverge the moment
+  // they do change one. Writing immediately makes the rename a one-launch
+  // event. The old file is deliberately left on disk: it costs nothing, and it
+  // is the way back if the player downgrades.
+  if (from_legacy)
+    MenuSaveSettings();
 }
 
 void MenuProcessKey(MenuKey key) {
@@ -1919,10 +2124,10 @@ void MenuRun() {
     int secs = kOsdTimeouts[setting_osd_timeout];
     if (secs > 0) {
       if (g_last_input_tick == 0)
-        g_last_input_tick = GetTickCount();
-      if (GetTickCount() - g_last_input_tick >= (DWORD)secs * 1000) {
+        g_last_input_tick = TickCountMs();
+      if (TickCountMs() - g_last_input_tick >= (uint32_t)secs * 1000) {
         OsdDisable();
-        g_last_input_tick = GetTickCount();
+        g_last_input_tick = TickCountMs();
       }
     }
   }
@@ -1997,12 +2202,12 @@ void MenuRun() {
   const int kVisibleCharsVert = 14;
   if (current_title != s_title_scroll_last) {
     s_title_scroll_last = current_title;
-    s_title_scroll_since = GetTickCount();
+    s_title_scroll_since = TickCountMs();
   }
   if (kScrollDelays[setting_name_scroll] > 0 &&
       (int)current_title.size() > kVisibleCharsVert) {
-    DWORD delay_ms = (DWORD)kScrollDelays[setting_name_scroll] * 1000;
-    DWORD elapsed = GetTickCount() - s_title_scroll_since;
+    uint32_t delay_ms = (uint32_t)kScrollDelays[setting_name_scroll] * 1000;
+    uint32_t elapsed = TickCountMs() - s_title_scroll_since;
     if (elapsed > delay_ms) {
       int gap = kVisibleCharsVert / 2;
       int cycle = (int)current_title.size() - kVisibleCharsVert + gap;
@@ -2076,10 +2281,10 @@ void MenuRun() {
             (int)item.label.size() > kVisibleChars) {
           if (item_idx != s_scroll_item_idx) {
             s_scroll_item_idx = item_idx;
-            s_scroll_since = GetTickCount();
+            s_scroll_since = TickCountMs();
           }
-          DWORD delay_ms = (DWORD)kScrollDelays[setting_name_scroll] * 1000;
-          DWORD elapsed = GetTickCount() - s_scroll_since;
+          uint32_t delay_ms = (uint32_t)kScrollDelays[setting_name_scroll] * 1000;
+          uint32_t elapsed = TickCountMs() - s_scroll_since;
           if (elapsed > delay_ms) {
             // A blank gap half a screen wide between the tail and the loop
             // back to the start, so the seam reads as a pause, not a glitch.
@@ -2103,7 +2308,7 @@ void MenuRun() {
 }
 
 static void MenuProcessKeyImpl(MenuKey key) {
-  g_last_input_tick = GetTickCount();
+  g_last_input_tick = TickCountMs();
 
   // While waiting for a key to bind, the menu must not also act on it.
   if (capture_bind >= 0)
@@ -2479,6 +2684,23 @@ static void MenuProcessKeyImpl(MenuKey key) {
       setting_deadzone = (setting_deadzone + delta + 4) % 4;
       PopulateControllerSettings();
       selected_idx = 2;
+    } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
+    {
+      int opt_index = item.action_id - 800;
+      int choice_count = CoreOptionChoiceCount(opt_index);
+      if (choice_count > 0) {
+        int cur = CoreOptionCurrentChoiceIndex(opt_index);
+        int next = (cur + delta + choice_count) % choice_count;
+        CoreOptionSetChoiceIndex(opt_index, next);
+        // Persist so this choice survives a restart - without this, the
+        // very bug ApplyPersistedCoreOptions() exists to avoid for the
+        // hand-picked settings would apply here too: the value would look
+        // chosen but silently revert to the core's own default next launch.
+        MenuSetPersistedCoreOption(CoreOptionKey(opt_index), CoreOptionChoiceAt(opt_index, next));
+      }
+      int cur_row = selected_idx;
+      PopulateCoreOptionsSettings();
+      selected_idx = cur_row;
     }
     break;
   }
@@ -2496,6 +2718,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
     {
       current_state = STATE_SETTINGS;
       PopulateSettings();
+    } else if (item.action_id == 898) // Back (Core Options -> in-game menu, not Settings)
+    {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
     } else if (current_state == STATE_MAIN) {
       if (item.action_id == 1) // Load another game from the same folder
       {
@@ -2677,6 +2903,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_CONTROLLER;
         ControllerPageOnEnter();
         PopulateControllerSettings();
+      }
+      else if (item.action_id == 221) {
+        current_state = STATE_CORE_OPTIONS;
+        PopulateCoreOptionsSettings();
       }
     } else if (current_state == STATE_SETTINGS) {
       if (item.action_id == 201) {

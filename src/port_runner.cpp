@@ -1,10 +1,20 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+extern char **environ;
+#endif
+#include <SDL3/SDL.h>
 #include <filesystem>
 #include <algorithm>
 #include <thread>
+#include <chrono>
 #include <system_error>
 #include <atomic>
+#include <mutex>
 #include <vector>
 #include <string>
 #include <stdio.h>
@@ -18,7 +28,10 @@
 
 namespace fs = std::filesystem;
 
-extern HWND MainGetHwnd();
+// Minimize/restore/raise the main window through SDL3, which works the same
+// on every platform SDL3 supports - a raw HWND (MainGetHwnd(), still used
+// elsewhere in this project) only exists on Windows.
+extern SDL_Window* MainGetSdlWindow();
 
 static std::atomic<bool> s_port_running(false);
 static std::atomic<bool> s_installing(false);
@@ -43,7 +56,7 @@ static std::atomic<int> s_active_bg_threads(0);
 // now only ever sets this instead, and PortPumpPendingLaunch() - called once
 // per frame from the main loop, i.e. always the UI thread - is the only
 // place that actually performs the launch.
-static CRITICAL_SECTION s_pending_lock;
+static std::mutex       s_pending_lock;
 static std::string      s_pending_launch_id;
 static std::atomic<bool> s_has_pending_launch(false);
 
@@ -161,6 +174,9 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" } },
         { "SM64CoopDX", "Super Mario 64 CoopDX",
           "coop-deluxe/sm64coopdx", "", true, {} },
+        { "CannonballDX", "OutRun (CannonBall DX)",
+          "Endprodukt/cannonball-dx", "cannonball-dx.exe",
+          true, { "outrun" } },
 
         // -----------------------------------------------------------------
         // Not part of the launcher's own default list - these are the rest of
@@ -197,7 +213,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "REDRIVER2", "REDRIVER 2",
           "OpenDriver2/REDRIVER2", "", true, {} },
         { "SymphonyRecomp", "Castlevania: Symphony of the Night",
-          "gfdac/SymphonyRecomp", "", true, {} },
+          "GuhClemente/SymphonyRecomp", "", true, {} },
         { "Sonic1Forever", "Sonic 1 Forever",
           "ElspethThePict/S1Forever", "", true, {} },
         { "Sonic3AIR", "Sonic 3 A.I.R.",
@@ -272,7 +288,18 @@ static std::string FindBestExecutable(const std::string& dir) {
     std::vector<fs::path> top_level, nested;
     for (const auto& e : fs::recursive_directory_iterator(dir, ec)) {
         if (ec || !e.is_regular_file(ec)) continue;
+#ifdef _WIN32
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
+#else
+        // Linux binaries conventionally ship with no extension at all - a
+        // release zip built for Linux is not going to contain a ".exe", so
+        // "no extension" is the closest equivalent signal available from the
+        // filename alone. Files that do have an extension here are data,
+        // scripts, or libraries (.so, .txt, .json, ...), never the binary to
+        // launch, so they are excluded the same way ".exe"-only excludes
+        // everything else on Windows.
+        if (!e.path().extension().empty()) continue;
+#endif
 
         std::string fname = ToLowerStr(e.path().filename().string());
         bool skip = false;
@@ -417,7 +444,7 @@ static bool IsWindowsAssetName(const std::string& lower_name) {
                                    "appimage", "flatpak", ".dmg", ".pkg", "switch", "android", "source" }))
         return false;
     if (ContainsAny(lower_name, { "windows", "win64", "win32", "win-x64", "win-x86",
-                                   "-win.", "_win.", ".exe", ".msi", "msvc", "mingw" }))
+                                   "-win.", "_win.", ".exe", ".msi", "msvc", "mingw", "cannonball" }))
         return true;
     // A handful of projects (Sonic 3 A.I.R. among them) tag their Windows zip
     // with just an architecture - "..._64bit.zip", "...-x64.zip" - and no
@@ -499,6 +526,69 @@ static GhAsset PickWindowsAsset(const std::vector<GhAsset>& assets) {
     return GhAsset{};
 }
 
+#ifndef _WIN32
+// Mirrors IsWindowsAssetName's structure but deliberately does not fall back
+// to an unmarked/generic-architecture asset the way that one does: an
+// untagged single .zip on a small hobby project's release is, in practice,
+// almost always the Windows build (the default most of these recomp/native-
+// port projects target first), not a Linux one, so guessing there would
+// routinely download a Windows binary that can't run at all. Requiring an
+// explicit Linux marker means a release with no Linux build simply returns
+// no match - PickLinuxAsset then returns empty, DownloadAndInstall reports
+// "no Linux build", and the caller can leave that port out of the list
+// instead of offering something that will not run.
+static bool IsLinuxAssetName(const std::string& lower_name) {
+    if (ContainsAny(lower_name, { "windows", "win64", "win32", "win-x64", "win-x86",
+                                   "-win.", "_win.", ".exe", ".msi", "msvc", "mingw",
+                                   "macos", "osx", "darwin", "apple", ".dmg", ".pkg",
+                                   "switch", "android", "source" }))
+        return false;
+    return ContainsAny(lower_name, { "linux", ".deb", ".rpm", "appimage", "flatpak", ".tar.gz", ".tar.xz" });
+}
+
+// Same shape as PickWindowsAsset (arch preference, companion-tool rejection,
+// prefer an archive over a bare binary) but built on IsLinuxAssetName and
+// without that function's "single untagged asset, just take it" fallback -
+// see IsLinuxAssetName's own comment for why that fallback is Windows-only.
+//
+// Restricted to ".zip" even though IsLinuxAssetName also flags .tar.gz/
+// .tar.xz/AppImage as Linux-shaped names: DownloadAndInstall's extraction
+// step below only knows how to unpack a zip (ArchiveExtractAll's Linux
+// backend is "unzip", nothing else). Picking a .tar.gz here would download
+// something the pipeline then fails to extract - worse than just not
+// offering the port. A release that ships only a .tar.gz/AppImage correctly
+// falls through to "no Linux build" until extraction grows those formats too.
+static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
+    auto is_archive = [](const std::string& n) {
+        return n.size() >= 4 && n.substr(n.size() - 4) == ".zip";
+    };
+
+    std::vector<GhAsset> matches;
+    for (const auto& a : assets) {
+        std::string n = ToLowerStr(a.name);
+        if (is_archive(n) && IsLinuxAssetName(n) && !LooksLikeCompanionTool(n)) matches.push_back(a);
+    }
+    if (!matches.empty()) {
+        const GhAsset* best = &matches.front();
+        int best_rank = ArchPreferenceRank(ToLowerStr(best->name));
+        for (const auto& a : matches) {
+            int rank = ArchPreferenceRank(ToLowerStr(a.name));
+            if (rank < best_rank) { best = &a; best_rank = rank; }
+            if (best_rank == 0) break;
+        }
+        return *best;
+    }
+
+    // No fallback loop over non-archive names here, unlike PickWindowsAsset:
+    // that one exists so a Windows .msi still gets identified (and rejected
+    // with a specific "installer, unsupported" error downstream). There is
+    // no equivalent Linux special case, so matching a non-.zip Linux-looking
+    // name here would just fail extraction later with a more confusing
+    // error - better to fall through to "no Linux build" now.
+    return GhAsset{};
+}
+#endif
+
 // Downloads the latest release of def, extracts it into ports/<id>/ and
 // flattens it. Runs on a worker thread - network + disk I/O, seconds to
 // minutes depending on the release size and the user's connection.
@@ -523,8 +613,13 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     }
 
     std::vector<GhAsset> assets = ParseReleaseAssets(json);
+#ifdef _WIN32
     GhAsset asset = PickWindowsAsset(assets);
     if (asset.url.empty()) { out_error = "nenhum build Windows na release"; return false; }
+#else
+    GhAsset asset = PickLinuxAsset(assets);
+    if (asset.url.empty()) { out_error = "nenhum build Linux na release deste port"; return false; }
+#endif
 
     std::string lower_name = ToLowerStr(asset.name);
 
@@ -583,8 +678,6 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
 // -------------------------------------------------------------
 
 void PortInit() {
-    InitializeCriticalSection(&s_pending_lock);
-
     std::error_code ec;
     if (!fs::exists("ports", ec)) {
         fs::create_directories("ports", ec);
@@ -662,7 +755,92 @@ bool PortAutoSetupRom(const std::string& port_id) {
     std::error_code ec;
     fs::create_directories(target_dir, ec);
 
-    // Already has a ROM? Nothing to do.
+    // 1. Special case: Cannonball DX (OutRun Arcade)
+    // Cannonball DX reads MAME's merged outrun.zip inside ports/CannonballDX/roms/
+    if (port_id == "CannonballDX") {
+        fs::path cb_rom_dir = fs::path(target_dir) / "roms";
+        if (fs::exists(cb_rom_dir / "outrun.zip", ec)) return true;
+        if (fs::exists(cb_rom_dir, ec)) {
+            for (const auto& f : fs::directory_iterator(cb_rom_dir, ec)) {
+                if (ToLowerStr(f.path().filename().string()) == "outrun.zip") return true;
+            }
+        }
+
+        static const std::vector<std::string> arcade_dirs = {
+            "roms/Arcade", "app/roms/Arcade", "roms", "app/roms", "roms/MAME", "app/roms/MAME"
+        };
+        for (const auto& sdir : arcade_dirs) {
+            if (!fs::exists(sdir, ec)) continue;
+            for (const auto& entry : fs::directory_iterator(sdir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(entry.path().filename().string());
+                if (fname.find("outrun") != std::string::npos && fname.size() >= 4 && fname.substr(fname.size() - 4) == ".zip") {
+                    fs::create_directories(cb_rom_dir, ec);
+                    fs::copy_file(entry.path(), cb_rom_dir / "outrun.zip", fs::copy_options::overwrite_existing, ec);
+                    return !ec;
+                }
+            }
+        }
+        return false;
+    }
+
+    // 2. SNES Recomps (SuperMetroidRecomp, SuperMarioWorldRecomp, StarFoxEnhanced)
+    if (port_id.find("SuperMetroid") != std::string::npos ||
+        port_id.find("SuperMarioWorld") != std::string::npos ||
+        port_id.find("StarFox") != std::string::npos) {
+        for (const auto& f : fs::directory_iterator(target_dir, ec)) {
+            std::string ext = ToLowerStr(f.path().extension().string());
+            if (ext == ".sfc" || ext == ".smc") return true;
+        }
+        static const std::vector<std::string> snes_dirs = {
+            "roms/SNES", "app/roms/SNES", "roms", "app/roms"
+        };
+        for (const auto& sdir : snes_dirs) {
+            if (!fs::exists(sdir, ec)) continue;
+            for (const auto& entry : fs::directory_iterator(sdir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(entry.path().filename().string());
+                std::string ext = ToLowerStr(entry.path().extension().string());
+                if (ext != ".sfc" && ext != ".smc") continue;
+                bool all_match = true;
+                for (const auto& kw : def->rom_keywords)
+                    if (fname.find(kw) == std::string::npos) { all_match = false; break; }
+                if (!all_match) continue;
+                fs::path dest = fs::path(target_dir) / entry.path().filename();
+                fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
+                return !ec;
+            }
+        }
+    }
+
+    // 3. Genesis / Mega Drive Ports (Sonic1Forever, Sonic3AIR)
+    if (port_id.find("Sonic") != std::string::npos) {
+        for (const auto& f : fs::directory_iterator(target_dir, ec)) {
+            std::string ext = ToLowerStr(f.path().extension().string());
+            if (ext == ".md" || ext == ".gen" || ext == ".bin") return true;
+        }
+        static const std::vector<std::string> gen_dirs = {
+            "roms/Genesis", "app/roms/Genesis", "roms/MegaDrive", "app/roms/MegaDrive", "roms", "app/roms"
+        };
+        for (const auto& sdir : gen_dirs) {
+            if (!fs::exists(sdir, ec)) continue;
+            for (const auto& entry : fs::directory_iterator(sdir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(entry.path().filename().string());
+                std::string ext = ToLowerStr(entry.path().extension().string());
+                if (ext != ".md" && ext != ".gen" && ext != ".bin") continue;
+                bool all_match = true;
+                for (const auto& kw : def->rom_keywords)
+                    if (fname.find(kw) == std::string::npos) { all_match = false; break; }
+                if (!all_match) continue;
+                fs::path dest = fs::path(target_dir) / entry.path().filename();
+                fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
+                return !ec;
+            }
+        }
+    }
+
+    // 4. Default: Nintendo 64 ports (.z64, .n64, .v64)
     for (const auto& f : fs::directory_iterator(target_dir, ec)) {
         std::string ext = ToLowerStr(f.path().extension().string());
         if (ext == ".z64" || ext == ".n64" || ext == ".v64") return true;
@@ -696,9 +874,10 @@ bool PortAutoSetupRom(const std::string& port_id) {
 
 // Does the actual OS-level work of launching an already-installed port:
 // ROM auto-copy, stopping any running libretro core, minimizing the window,
-// CreateProcessW, and spawning the exit-monitor thread. Must only ever be
-// called from the UI thread - it touches CoreShutdown()/window state that
-// core_runner.cpp and main_win32.cpp otherwise only ever touch from there.
+// launching the process, and spawning the exit-monitor thread. Must only
+// ever be called from the UI thread - it touches CoreShutdown()/window state
+// that core_runner.cpp and main_win32.cpp otherwise only ever touch from
+// there.
 static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefinition* def,
                                       const std::string& port_id) {
     // 1. Auto-copy ROM if this port needs one and doesn't have it yet.
@@ -713,16 +892,19 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         CoreShutdown();
     }
 
-    // 3. Minimize MiSTer Window for clean seamless console transition
-    HWND hwnd = MainGetHwnd();
-    if (hwnd) {
-        ShowWindow(hwnd, SW_MINIMIZE);
+    // 3. Minimize MiSTer Window for clean seamless console transition. SDL3
+    // rather than a raw HWND, so this works the same on every platform SDL3
+    // supports.
+    SDL_Window* window = MainGetSdlWindow();
+    if (window) {
+        SDL_MinimizeWindow(window);
     }
 
     // 4. Launch process
     fs::path abs_exe = fs::absolute(exe_path);
     fs::path abs_dir = abs_exe.parent_path();
 
+#ifdef _WIN32
     STARTUPINFOW si = { sizeof(STARTUPINFOW) };
     PROCESS_INFORMATION pi = { 0 };
 
@@ -754,41 +936,77 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     }
 
     if (!ok) {
-        if (hwnd) {
-            ShowWindow(hwnd, SW_RESTORE);
-            SetForegroundWindow(hwnd);
-        }
+        if (window) SDL_RestoreWindow(window);
         CoreSetToast("FALHA AO INICIAR PORT", 180);
         return false;
     }
+
+    HANDLE hProcess = pi.hProcess;
+    HANDLE hThread = pi.hThread;
+#else
+    // No .bat/.cmd-style script launcher exists here - every port definition
+    // in KnownPortDefs() resolves to a real binary (FindBestExecutable() only
+    // ever picks an .exe today; its Linux equivalent would pick the
+    // extracted binary the same way), so a plain fork+exec covers every case
+    // this app actually installs.
+    std::string sexe = abs_exe.string();
+    std::string sdir = abs_dir.string();
+
+    // A freshly-extracted zip does not preserve the Unix execute bit, so the
+    // binary would otherwise refuse to run at all.
+    chmod(sexe.c_str(), 0755);
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        if (window) SDL_RestoreWindow(window);
+        CoreSetToast("FALHA AO INICIAR PORT", 180);
+        return false;
+    }
+    if (pid == 0) {
+        // Child: only async-signal-safe calls until exec, per fork()'s
+        // contract in a multithreaded process.
+        chdir(sdir.c_str());
+        char* argv[] = { const_cast<char*>(sexe.c_str()), nullptr };
+        execv(sexe.c_str(), argv);
+        _exit(127); // exec itself failed (not found / not executable)
+    }
+#endif
 
     s_port_running.store(true);
     CoreSetToast("INICIANDO PORT NATIVO...", 120);
 
     // 5. Monitor in background thread
-    HANDLE hProcess = pi.hProcess;
-    HANDLE hThread = pi.hThread;
-
     try {
-    std::thread([hProcess, hThread, hwnd]() {
+    std::thread([
+#ifdef _WIN32
+        hProcess, hThread,
+#else
+        pid,
+#endif
+        window]() {
         // The wait itself can run for as long as the user plays (hours) - it
         // is not counted in s_active_bg_threads, or PortShutdown() would
         // block app shutdown on the game still being open instead of just
         // waiting out this thread's own brief cleanup tail below, which is
         // the only part that touches shared state (OsdEnable(), and
         // indirectly toast_lock through it) a hung-core recovery could race.
+#ifdef _WIN32
         WaitForSingleObject(hProcess, INFINITE);
         s_active_bg_threads.fetch_add(1);
         CloseHandle(hThread);
         CloseHandle(hProcess);
+#else
+        int status = 0;
+        waitpid(pid, &status, 0);
+        s_active_bg_threads.fetch_add(1);
+#endif
 
         s_port_running.store(false);
 
         // Restore MiSTer window with full focus
-        if (hwnd) {
-            ShowWindow(hwnd, SW_RESTORE);
-            SetForegroundWindow(hwnd);
-            SetFocus(hwnd);
+        if (window) {
+            SDL_RestoreWindow(window);
+            SDL_RaiseWindow(window);
         }
         OsdEnable();
         s_active_bg_threads.fetch_sub(1);
@@ -799,8 +1017,41 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         // left to wait on it or restore the window) and s_port_running would
         // stay stuck at true forever, refusing every future PortLaunch() for
         // the rest of the session.
+#ifdef _WIN32
         CloseHandle(hThread);
         CloseHandle(hProcess);
+#else
+        // Windows just stops tracking the process here and lets it keep
+        // running independently (closing a handle does not kill it) - that
+        // is fine on Windows, which has no reaping requirement. POSIX does:
+        // an un-waited exited child stays a zombie process-table entry until
+        // something calls waitpid() on it, which would otherwise never
+        // happen here since the thread meant to do that never got created.
+        // The exhaustion that made std::thread throw is almost always
+        // transient (a burst of other short-lived threads elsewhere in the
+        // app), so one retry after a brief pause is worth it before settling
+        // for a bounded, non-blocking reap attempt and then - matching the
+        // Windows trade-off above - giving up and letting the child run on,
+        // untracked, rather than blocking here indefinitely.
+        bool reaped = false;
+        for (int attempt = 0; attempt < 2 && !reaped; ++attempt) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            int status = 0;
+            if (waitpid(pid, &status, WNOHANG) == pid) reaped = true;
+        }
+        if (!reaped) {
+            try {
+                std::thread([pid]() {
+                    int status = 0;
+                    waitpid(pid, &status, 0);
+                }).detach();
+            } catch (const std::system_error&) {
+                // Still exhausted - give up exactly like the Windows path
+                // does. The child keeps running untracked; it will finally
+                // be reaped when this app process itself exits.
+            }
+        }
+#endif
         s_port_running.store(false);
         CoreSetToast("FALHA AO MONITORAR PORT - TENTE NOVAMENTE", 200);
         return false;
@@ -860,9 +1111,10 @@ bool PortLaunch(const std::string& port_id) {
 
             // Hand off to the UI thread instead of launching from here - see
             // the comment on s_pending_lock above for why.
-            EnterCriticalSection(&s_pending_lock);
-            s_pending_launch_id = def_copy.id;
-            LeaveCriticalSection(&s_pending_lock);
+            {
+                std::lock_guard<std::mutex> lock(s_pending_lock);
+                s_pending_launch_id = def_copy.id;
+            }
             s_has_pending_launch.store(true);
             s_active_bg_threads.fetch_sub(1);
         }).detach();
@@ -877,9 +1129,10 @@ void PortPumpPendingLaunch() {
     if (!s_has_pending_launch.exchange(false)) return;
 
     std::string id;
-    EnterCriticalSection(&s_pending_lock);
-    id = s_pending_launch_id;
-    LeaveCriticalSection(&s_pending_lock);
+    {
+        std::lock_guard<std::mutex> lock(s_pending_lock);
+        id = s_pending_launch_id;
+    }
 
     // Re-resolve rather than trust anything captured before the download
     // finished - the files just landed on disk and this is the first look
@@ -907,9 +1160,9 @@ bool PortIsRunning() {
 // that would block shutdown on the user's game instead of on this file's own
 // brief cleanup work.
 void PortShutdown() {
-    DWORD waited_ms = 0;
+    unsigned waited_ms = 0;
     while (s_active_bg_threads.load() > 0 && waited_ms < 5000) {
-        Sleep(50);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
         waited_ms += 50;
     }
 }

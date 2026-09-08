@@ -40,6 +40,23 @@ const char* MenuGetWallpaperCustomPath(int index);
 int  MenuGetOsdTheme();
 bool MenuGetFullscreen();
 void MenuSetFullscreen(bool fs);
+// Windowed-mode position/size, persisted across restarts. Get returns false
+// (leaving x/y/w/h untouched) if nothing has been saved yet - caller should
+// keep its own built-in default in that case. Set is meant to be called once
+// at shutdown with the current geometry, not on every move/resize event.
+bool MenuGetWindowRect(int* x, int* y, int* w, int* h);
+void MenuSetWindowRect(int x, int y, int w, int h);
+
+// A player's choice on the generic Core Options page (menu.cpp), persisted
+// across restarts by option key - unlike CoreGetOption/g_core_options, which
+// only remembers a choice for the current run. Returns NULL if this key has
+// never been set from that page. core_runner.cpp calls this once per
+// declared key when a core reports SET_VARIABLES, to re-apply a saved choice
+// before the core ever reads it back through GET_VARIABLE.
+const char* MenuGetPersistedCoreOption(const char* key);
+// Called by the Core Options page itself when the player changes a value -
+// not meant to be called from outside menu.cpp.
+void MenuSetPersistedCoreOption(const char* key, const char* value);
 int  MenuGetDeadzone();
 int  MenuGetAudioLatencyMs();
 int  MenuGetVideoDriver();

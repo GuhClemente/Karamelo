@@ -6,6 +6,7 @@
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <xinput.h>
+#include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,21 +20,39 @@
 #include <unordered_set>
 #include <fstream>
 
+// LoadLibraryA/GetProcAddress/FreeLibrary have no direct Windows-only
+// dependency other than the calling convention and the handle type - dlopen/
+// dlsym/dlclose take the same (path, RTLD_NOW)/(handle, name)/(handle)
+// shapes, so every existing call site below can stay exactly as written.
+// windows.h above still makes the rest of this file Windows-only for now
+// (WASAPI, XInput, __try/__except); this shim just means the core-loading
+// code specifically won't need touching again once those other blockers
+// are addressed.
+#ifndef _WIN32
+#include <dlfcn.h>
+typedef void* HMODULE;
+#define LoadLibraryA(path) dlopen(path, RTLD_NOW)
+#define GetProcAddress(h, name) dlsym(h, name)
+#define FreeLibrary(h) dlclose(h)
+#endif
+
 #include "libretro.h"
 #include "core_runner.h"
 #include "menu.h"
 #include "input_map.h"
+#include "gamepad_sdl.h"
 #include "archive_helper.h"
 #include "retroachievements.h"
 #include "mister_math.h"
 #include "osd.h"
 #include "netplay.h"
 #include "hw_render.h"
+#include "hw_render_vulkan.h"
+#include "hw_render_d3d11.h"
 
 namespace fs = std::filesystem;
 
 #pragma comment(lib, "winmm.lib")
-#pragma comment(lib, "xinput.lib")
 
 // Libretro Core Function Pointers
 typedef void (*retro_init_t)(void);
@@ -243,6 +262,11 @@ const void* CoreGetMemoryMap()
 
 static long g_video_diag_frames = 0;
 static bool g_render_diag_done = false;
+// Set by RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE, read
+// by RETRO_ENVIRONMENT_SET_HW_RENDER (see both cases in CB_Environment) -
+// reset per load so a stale true from a previous core cannot wrongly refuse
+// Vulkan to the next one that never asked for negotiation at all.
+static bool g_core_wants_vk_negotiation = false;
 static std::string   g_pending_rom;
 static std::string   g_pending_core_hint;
 
@@ -327,7 +351,7 @@ void CoreUpdateToast()
 #define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz
 
 // A card whose shared-mode mix format is natively 44.1kHz still accepts a
-// 48kHz waveOutOpen() - the OS mixer resamples - but that is a second
+// 48kHz SDL_OpenAudioDeviceStream() - the OS mixer resamples - but that is a second
 // conversion stage stacked on top of the one this file already does from the
 // core's rate. DetectPreferredOutputSampleRate() asks the device what it
 // actually wants, once, so most machines end up doing only one conversion
@@ -341,18 +365,23 @@ static int g_output_sample_rate = 48000;
 #define UNDERRUN_ESCALATE_WINDOW_MS    2000 // how often the underrun count is judged
 #define UNDERRUN_ESCALATE_THRESHOLD    3    // this many starved passes in the window...
 #define UNDERRUN_ESCALATE_STEP_BUFFERS 4    // ...grows the queue by this many buffers
+#define DEESCALATE_CLEAN_WINDOWS_NEEDED 8   // this many perfectly clean windows in a row (16s)...
+                                             // ...shrinks it back by UNDERRUN_ESCALATE_STEP_BUFFERS
 
-static HWAVEOUT h_wave_out = NULL;
+// dev-sdl3: g_audio_stream replaces HWAVEOUT/WAVEHDR. SDL_OpenAudioDeviceStream
+// hands back a stream already bound to the default output device; feeding it
+// is just SDL_PutAudioStreamData with no header prepare/unprepare bookkeeping.
+static SDL_AudioStream* g_audio_stream = nullptr;
 static HANDLE   h_audio_event = NULL;
 static HANDLE   h_audio_thread = NULL;
 static bool     audio_thread_running = false;
 
-static WAVEHDR  wave_headers[NUM_WAVE_BUFFERS];
-static int16_t  wave_buffer_data[NUM_WAVE_BUFFERS][SAMPLES_PER_BUFFER * 2];
-
-// How many of the NUM_WAVE_BUFFERS are actually queued. Set from the Audio
-// Latency setting when a game loads; the rest stay idle. A deeper queue rides
-// out longer hitches, a shallower one responds faster.
+// How many SAMPLES_PER_BUFFER-sized chunks of latency to keep queued in the
+// stream. Set from the Audio Latency setting when a game loads. A deeper
+// queue rides out longer hitches, a shallower one responds faster - same
+// role NUM_WAVE_BUFFERS/g_active_wave_buffers played for the WAVEHDR array,
+// just measured against SDL_GetAudioStreamQueued() now instead of counting
+// how many discrete headers are still WHDR_INQUEUE.
 static volatile LONG g_active_wave_buffers = 12;
 
 // Passes (not samples) that starved during the current judging window, and
@@ -371,6 +400,28 @@ static int16_t  g_hist_r[4] = { 0, 0, 0, 0 };
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
+
+// Set once SendAudioSamples has ever pushed real frames from the core into
+// the ring buffer for the current game; reset on every load. A handful of
+// cores go a real stretch after retro_load_game before their first sample -
+// the audio thread has nothing to play yet and correctly pads with silence,
+// which should never count as a real underrun. Measured to matter little for
+// Gopher64 specifically (it starts submitting audio almost immediately), but
+// it costs nothing and is correct for cores that do have a genuine silent
+// gap, so it stays as a first filter ahead of the de-escalation below, which
+// is what actually addresses a core that runs below realtime for a few
+// seconds of boot (JIT/cache warmup, disc parsing) and then recovers.
+static volatile LONG g_core_ever_produced_audio = 0;
+
+// The queue depth InitAudio computed from the Audio Latency setting, before
+// any EscalateWaveQueue growth - the floor DeescalateWaveQueue will not step
+// below. Without a floor, a long enough clean stretch would erode the user's
+// own chosen latency, not just an escalation this session added on top of it.
+static volatile LONG g_baseline_wave_buffers = 12;
+
+// Consecutive fully-elapsed judging windows with zero starved passes, at the
+// current (possibly escalated) queue depth. Touched only by the audio thread.
+static LONG s_clean_windows = 0;
 static bool          s_loaded_core_is_pcsx2 = false;
 static std::string   s_loaded_core_path = "";
 
@@ -420,8 +471,8 @@ static void ResetAudioRateController()
 }
 
 // Queries the default render device's shared-mode mix format once, so
-// InitAudio can open waveOut at the rate the card actually runs instead of
-// an assumed 48000. Every failure path falls back to 48000, which every
+// InitAudio can open the audio stream at the rate the card actually runs
+// instead of an assumed 48000. Every failure path falls back to 48000, which every
 // device accepts (the OS mixer resamples for it, same as it always has).
 static int DetectPreferredOutputSampleRate()
 {
@@ -451,7 +502,7 @@ static int DetectPreferredOutputSampleRate()
 	if (enumerator)  enumerator->Release();
 	if (need_uninit) CoUninitialize();
 
-	FILE* lf = fopen("mister_flavor.log", "a");
+	FILE* lf = fopen("mister4all.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] dispositivo de saida: %d Hz%s\n",
@@ -481,7 +532,7 @@ static inline int16_t HermiteInterpolate(int16_t y0, int16_t y1, int16_t y2, int
 // Latency menu setting only ever picks the *starting* depth; this is what
 // lets the same build hold up on hardware weaker than whatever it was tuned
 // on, without the user ever finding the setting. Called only from the audio
-// thread, which is the sole owner of h_wave_out and wave_headers.
+// thread, which is the sole owner of g_audio_stream.
 static void EscalateWaveQueue()
 {
 	LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
@@ -489,26 +540,44 @@ static void EscalateWaveQueue()
 	if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
 	if (want <= active) return;
 
-	for (LONG i = active; i < want; i++)
-	{
-		if (!(wave_headers[i].dwFlags & WHDR_PREPARED))
-		{
-			memset(&wave_headers[i], 0, sizeof(WAVEHDR));
-			memset(wave_buffer_data[i], 0, sizeof(wave_buffer_data[i]));
-			wave_headers[i].lpData = (LPSTR)wave_buffer_data[i];
-			wave_headers[i].dwBufferLength = sizeof(wave_buffer_data[i]);
-			waveOutPrepareHeader(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-		}
-		wave_headers[i].dwFlags &= ~WHDR_DONE;
-		waveOutWrite(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-	}
-
+	// Nothing to prepare/queue up front the way WAVEHDR needed - the target
+	// byte count AudioThreadProc tops the stream up to is derived from this
+	// value on every pass, so raising it takes effect on the very next one.
 	InterlockedExchange(&g_active_wave_buffers, want);
 
-	FILE* lf = fopen("mister_flavor.log", "a");
+	FILE* lf = fopen("mister4all.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] underruns recorrentes; fila ampliada de %ldms para %ldms\n",
+			(long)((long long)active * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate),
+			(long)((long long)want * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate));
+		fclose(lf);
+	}
+}
+
+// The other half of EscalateWaveQueue: a boot-time hiccup (JIT/cache warmup,
+// disc parsing running a few seconds below realtime - N64 cores are the
+// common case) escalates the queue exactly like a genuinely weak machine
+// would, and had no way back down once the core reached full speed. That
+// left every affected session carrying extra fixed latency for the rest of
+// its run for no ongoing reason. Symmetric with the escalation side: only
+// after a long enough *clean* stretch at the current depth, step back down
+// one notch at a time, never below the depth the user's own Latency setting
+// asked for. Called only from the audio thread.
+static void DeescalateWaveQueue()
+{
+	LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+	LONG baseline = InterlockedCompareExchange(&g_baseline_wave_buffers, 0, 0);
+	LONG want = active - UNDERRUN_ESCALATE_STEP_BUFFERS;
+	if (want < baseline) want = baseline;
+	if (want >= active) return;
+
+	InterlockedExchange(&g_active_wave_buffers, want);
+
+	FILE* lf = fopen("mister4all.log", "a");
+	if (lf)
+	{
+		fprintf(lf, "[INFO] [AUDIO] audio estavel; fila reduzida de %ldms para %ldms\n",
 			(long)((long long)active * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate),
 			(long)((long long)want * SAMPLES_PER_BUFFER * 1000 / g_output_sample_rate));
 		fclose(lf);
@@ -524,30 +593,31 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 	{
 		WaitForSingleObject(h_audio_event, 5);
 
-		if (!audio_thread_running || !h_wave_out) break;
+		if (!audio_thread_running || !g_audio_stream) break;
 
+		// Top the stream up to the target queue depth rather than always
+		// pushing one fixed chunk - SDL_GetAudioStreamQueued() is the
+		// byte-level equivalent of "how many WAVEHDRs are still WHDR_INQUEUE"
+		// the old loop tracked per-buffer. Looping in SAMPLES_PER_BUFFER-sized
+		// chunks keeps the underrun/hold-last-sample behavior identical to
+		// before instead of computing one enormous catch-up chunk.
 		const LONG active = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+		const int target_bytes = (int)active * SAMPLES_PER_BUFFER * 2 * (int)sizeof(int16_t);
 		bool pass_underran = false;
-		for (int i = 0; i < active; i++)
-		{
-			WAVEHDR* hdr = &wave_headers[i];
-			// Only refill a buffer the driver has finished with. Touching one
-			// that is still WHDR_INQUEUE corrupts the playing audio.
-			if (!(hdr->dwFlags & WHDR_DONE) && (hdr->dwFlags & WHDR_INQUEUE))
-				continue;
 
+		static int16_t s_hold_l = 0;
+		static int16_t s_hold_r = 0;
+		int16_t chunk[SAMPLES_PER_BUFFER * 2];
+
+		while (SDL_GetAudioStreamQueued(g_audio_stream) < target_bytes)
+		{
 			LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
 			LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
-
 			LONG available = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
 
 			// Always keep the device fed. Letting the queue run dry stops
 			// playback outright, which is what produced the periodic gaps;
 			// short frames are padded by holding the last sample instead.
-			int16_t* dst = wave_buffer_data[i];
-			static int16_t s_hold_l = 0;
-			static int16_t s_hold_r = 0;
-
 			for (int s = 0; s < SAMPLES_PER_BUFFER; s++)
 			{
 				if (available > 0)
@@ -559,35 +629,80 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 				}
 				else
 				{
-					// Underrun: decay smoothly to silence from last sample
-					InterlockedIncrement(&g_audio_underrun_count);
+					// Underrun: decay smoothly to silence from last sample.
+					// Only counted once the core has produced its first real
+					// sample - padding before that is the loading screen
+					// playing silence as intended, not a real underrun (see
+					// g_core_ever_produced_audio), and was otherwise drowning
+					// out the [PERF] log's underrun count with tens of
+					// thousands of false hits during every boot.
+					if (InterlockedCompareExchange(&g_core_ever_produced_audio, 0, 0))
+						InterlockedIncrement(&g_audio_underrun_count);
 					pass_underran = true;
 					s_hold_l = (int16_t)(s_hold_l * 63 / 64);
 					s_hold_r = (int16_t)(s_hold_r * 63 / 64);
 				}
-				dst[s * 2 + 0] = s_hold_l;
-				dst[s * 2 + 1] = s_hold_r;
+				chunk[s * 2 + 0] = s_hold_l;
+				chunk[s * 2 + 1] = s_hold_r;
 			}
 
-
 			InterlockedExchange(&g_ring_read_pos, rp);
-
-			hdr->dwFlags &= ~WHDR_DONE;
-			waveOutWrite(h_wave_out, hdr, sizeof(WAVEHDR));
+			// A false return means nothing was actually queued - breaking
+			// here avoids ever spinning forever on a while condition that
+			// SDL_GetAudioStreamQueued() would otherwise never satisfy.
+			if (!SDL_PutAudioStreamData(g_audio_stream, chunk, (int)sizeof(chunk)))
+				break;
 		}
 
 		DWORD now_tick = GetTickCount();
 		if (s_escalate_window_start == 0) s_escalate_window_start = now_tick;
-		if (pass_underran) s_escalate_window_underruns++;
+		// Ignore pre-first-sample padding (see g_core_ever_produced_audio) -
+		// that silence is expected and not evidence the machine is struggling.
+		if (pass_underran && InterlockedCompareExchange(&g_core_ever_produced_audio, 0, 0))
+			s_escalate_window_underruns++;
 		if (now_tick - s_escalate_window_start >= UNDERRUN_ESCALATE_WINDOW_MS)
 		{
 			if (s_escalate_window_underruns >= UNDERRUN_ESCALATE_THRESHOLD)
+			{
 				EscalateWaveQueue();
+				s_clean_windows = 0;
+			}
+			else if (s_escalate_window_underruns == 0)
+			{
+				// A window with SOME underruns but below the escalate
+				// threshold is not "clean" either - only a perfectly quiet
+				// window counts, so a machine hovering right at the edge
+				// doesn't get de-escalated back into audible trouble.
+				if (++s_clean_windows >= DEESCALATE_CLEAN_WINDOWS_NEEDED)
+				{
+					DeescalateWaveQueue();
+					s_clean_windows = 0;
+				}
+			}
+			else
+			{
+				s_clean_windows = 0;
+			}
 			s_escalate_window_start = now_tick;
 			s_escalate_window_underruns = 0;
 		}
 	}
 	return 0;
+}
+
+// Translates the user's Latency setting (milliseconds) into a wave-buffer
+// queue depth at the given output sample rate. Shared by InitAudio's primary
+// path and its 48kHz fallback so the PCSX2 floor and the MIN/MAX clamp can't
+// drift out of sync between them the way they already once did (the fallback
+// path silently dropped the PCSX2 floor and never updated
+// g_baseline_wave_buffers until that was caught and fixed in place).
+static int ComputeWantedQueueDepth(int output_sample_rate)
+{
+	int want = (MenuGetAudioLatencyMs() * output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
+	if (s_loaded_core_is_pcsx2 && want < 20) want = 20; // 20 buffers = ~213ms headroom for PCSX2 multi-threading
+	if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
+	if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+	return want;
 }
 
 static void InitAudio(int sample_rate)
@@ -608,11 +723,12 @@ static void InitAudio(int sample_rate)
 	// already-initialised early return so changing it and loading another
 	// game takes effect without restarting the app.
 	{
-		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
-		if (s_loaded_core_is_pcsx2 && want < 20) want = 20; // 20 buffers = ~213ms headroom for PCSX2 multi-threading
-		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
-		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+		int want = ComputeWantedQueueDepth(g_output_sample_rate);
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
+		// Floor for DeescalateWaveQueue - a long clean stretch should only ever
+		// unwind an escalation this session added, never erode below what the
+		// user's own Latency setting asked for.
+		InterlockedExchange(&g_baseline_wave_buffers, (LONG)want);
 	}
 
 	g_core_sample_rate = sample_rate > 0 ? (double)sample_rate : 48000.0;
@@ -626,6 +742,8 @@ static void InitAudio(int sample_rate)
 	ResetAudioRateController();
 	s_escalate_window_start = 0;
 	s_escalate_window_underruns = 0;
+	s_clean_windows = 0;
+	InterlockedExchange(&g_core_ever_produced_audio, 0);
 
 	// Anti-pop: Zero ring buffer and activate soft startup ramp
 	InterlockedExchange(&g_startup_mute_samples, (LONG)(g_output_sample_rate * 0.15));
@@ -644,46 +762,45 @@ static void InitAudio(int sample_rate)
 		return;
 	}
 
-	WAVEFORMATEX wfx = { 0 };
-	wfx.wFormatTag = WAVE_FORMAT_PCM;
-	wfx.nChannels = 2;
-	wfx.nSamplesPerSec = g_output_sample_rate;
-	wfx.wBitsPerSample = 16;
-	wfx.nBlockAlign = (wfx.nChannels * wfx.wBitsPerSample) / 8;
-	wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+	SDL_AudioSpec spec = { 0 };
+	spec.format = SDL_AUDIO_S16;
+	spec.channels = 2;
+	spec.freq = g_output_sample_rate;
 
 	h_audio_event = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-	if (waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR)
+	g_audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
+	if (!g_audio_stream)
 	{
-		// The exact device rate can still be rejected outright (a WDM driver
-		// advertising a shared-mode format waveOut's older API path does not
-		// know how to open). Fall back to the one rate every Windows audio
-		// driver since XP is required to accept, rather than leaving audio
-		// silently dead for the rest of the session.
+		// The exact device rate can still be rejected outright by some
+		// drivers. Fall back to the one rate every Windows audio stack has
+		// accepted since XP, rather than leaving audio silently dead for the
+		// rest of the session.
 		g_output_sample_rate = 48000;
-		wfx.nSamplesPerSec = g_output_sample_rate;
-		wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
-		int want = (MenuGetAudioLatencyMs() * g_output_sample_rate / 1000) / SAMPLES_PER_BUFFER;
-		if (want < MIN_WAVE_BUFFERS) want = MIN_WAVE_BUFFERS;
-		if (want > NUM_WAVE_BUFFERS) want = NUM_WAVE_BUFFERS;
+		spec.freq = g_output_sample_rate;
+		// Recomputed at the new rate via the same ComputeWantedQueueDepth() the
+		// primary path above uses, so the PCSX2 floor and g_baseline_wave_buffers
+		// can no longer silently drift out of sync between the two paths the way
+		// they already once did here.
+		int want = ComputeWantedQueueDepth(g_output_sample_rate);
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
+		InterlockedExchange(&g_baseline_wave_buffers, (LONG)want);
 		InterlockedExchange(&g_ring_write_pos, want * SAMPLES_PER_BUFFER);
-		waveOutOpen(&h_wave_out, WAVE_MAPPER, &wfx, (DWORD_PTR)h_audio_event, 0, CALLBACK_EVENT);
+		g_audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
 	}
 
-	if (h_wave_out)
+	if (g_audio_stream)
 	{
+		SDL_ResumeAudioStreamDevice(g_audio_stream);
+
+		// Prime the stream with silence up to the target queue depth - the
+		// same preload the old code did by writing N zeroed WAVEHDR buffers,
+		// so playback starts already at target latency instead of climbing
+		// to it (the startup mute ramp above covers the pop, not the climb).
 		const LONG prime = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0);
+		static const int16_t s_silence[SAMPLES_PER_BUFFER * 2] = { 0 };
 		for (int i = 0; i < prime; i++)
-		{
-			memset(&wave_headers[i], 0, sizeof(WAVEHDR));
-			memset(wave_buffer_data[i], 0, sizeof(wave_buffer_data[i]));
-			wave_headers[i].lpData = (LPSTR)wave_buffer_data[i];
-			wave_headers[i].dwBufferLength = sizeof(wave_buffer_data[i]);
-			waveOutPrepareHeader(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-			waveOutWrite(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-		}
+			SDL_PutAudioStreamData(g_audio_stream, s_silence, (int)sizeof(s_silence));
 
 		// Ring positions were already set above, including the target-occupancy
 		// preload; resetting them here would empty it on the first game.
@@ -691,11 +808,28 @@ static void InitAudio(int sample_rate)
 		h_audio_thread = CreateThread(NULL, 0, AudioThreadProc, NULL, 0, NULL);
 		audio_initialized = true;
 	}
+	else
+	{
+		// Both attempts failed - every game from here on plays completely
+		// silent with nothing else in the log to explain why (audio_initialized
+		// stays false, so SendAudioSamples() no-ops every call with no error of
+		// its own). This is exactly the failure mode that happens if SDL_INIT_AUDIO
+		// was never passed to SDL_Init() - the subsystem call fails quietly
+		// rather than crashing.
+		FILE* lf = fopen("mister4all.log", "a");
+		if (lf)
+		{
+			fprintf(lf, "[ERROR] [AUDIO] SDL_OpenAudioDeviceStream falhou: %s\n", SDL_GetError());
+			fclose(lf);
+		}
+	}
 }
 
 static void SendAudioSamples(const int16_t* data, size_t frames)
 {
 	if (!audio_initialized || !data || frames == 0) return;
+
+	InterlockedExchange(&g_core_ever_produced_audio, 1);
 
 	float vol_mult = audio_muted ? 0.0f : (master_volume / 100.0f);
 
@@ -779,7 +913,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 					if (++s_agree_count >= 3)
 					{
 						s_locked_step = measured / (double)g_output_sample_rate;
-						FILE* lf = fopen("mister_flavor.log", "a");
+						FILE* lf = fopen("mister4all.log", "a");
 						if (lf)
 						{
 							fprintf(lf, "[INFO] [AUDIO] taxa travada em %.0f Hz (declarada %.0f Hz), passo %.5f\n",
@@ -805,7 +939,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	double step = s_step;
 	if (s_locked_step > 0.0)
 	{
-		// One waveOut queue in reserve, not half the ring. The ring is 65536
+		// One audio-stream queue in reserve, not half the ring. The ring is 65536
 		// frames of headroom for bursts; aiming at the middle of it would mean
 		// holding 683ms of audio, and the slow climb toward that target is
 		// itself an audible drift. 12 buffers of 512 frames is 128ms, which is
@@ -1042,7 +1176,7 @@ static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 
 	// Kept open: reopening per line meant 35 open/close pairs just to
 	// list the tracks of one CD image.
-	static FILE* f = fopen("mister_flavor.log", "a");
+	static FILE* f = fopen("mister4all.log", "a");
 	if (f)
 	{
 		fprintf(f, "[%s] %s\n", lvl, buf);
@@ -1058,6 +1192,24 @@ static std::map<std::string, std::string> g_core_options;
 // overrides one of these; without a choice the core must still get its own
 // default back, not nothing.
 static std::map<std::string, std::string> g_core_defaults;
+
+// g_core_defaults is a std::map, so iterating it directly for the Core
+// Options menu page would list keys alphabetically instead of in the order
+// the core actually declared them (RETRO_ENVIRONMENT_SET_VARIABLES hands them
+// over as a plain array) - a cosmetic difference from RetroArch's own Quick
+// Menu, but confusing when a core groups related options together on
+// purpose. This mirrors that declaration order; kept in lockstep with
+// g_core_defaults at both of its own clear/populate sites.
+static std::vector<std::string> g_core_defaults_order;
+
+// g_core_defaults itself only ever holds the resolved default VALUE (see
+// ParsedCoreVar::value's own comment - just the first choice, nothing else),
+// because that is all GET_VARIABLE's fallback path has ever needed. The Core
+// Options menu page needs the label and the full choice list too, so this
+// keeps each key's untouched declaration ("Label; choice1|choice2|...")
+// separately instead of changing what g_core_defaults itself stores. Kept in
+// lockstep with g_core_defaults at both of its own clear/populate sites.
+static std::map<std::string, std::string> g_core_option_raw;
 
 // The map is written by the UI thread and read by the core thread from inside
 // retro_run. Guarded, and values are handed out through a rotating buffer so a
@@ -1128,6 +1280,130 @@ const char* CoreGetOption(const char* key)
 	const char* result = (it != g_core_options.end()) ? StableOptionValue(it->second) : "";
 	LeaveCriticalSection(&options_lock);
 	return result;
+}
+
+// Splits a core-declared SET_VARIABLES value ("Label; choice1|choice2|...")
+// into its display label and pipe-separated choice list - every core follows
+// this exact shape (see the SET_VARIABLES case's own comment above).
+static void SplitCoreOptionDecl(const std::string& raw, std::string* label, std::vector<std::string>* choices)
+{
+	size_t semi = raw.find(';');
+	*label = (semi == std::string::npos) ? raw : raw.substr(0, semi);
+	std::string rest = (semi == std::string::npos) ? std::string() : raw.substr(semi + 1);
+	size_t start = rest.find_first_not_of(' '); // conventional space after ";", not guaranteed
+	if (start != std::string::npos) rest = rest.substr(start);
+
+	choices->clear();
+	size_t pos = 0;
+	while (pos <= rest.size())
+	{
+		size_t bar = rest.find('|', pos);
+		if (bar == std::string::npos) { choices->push_back(rest.substr(pos)); break; }
+		choices->push_back(rest.substr(pos, bar - pos));
+		pos = bar + 1;
+	}
+}
+
+// Shared by every CoreOption* accessor below - caller must hold options_lock.
+static bool GetCoreOptionDeclLocked(int index, std::string* key_out, std::string* label_out, std::vector<std::string>* choices_out)
+{
+	if (index < 0 || index >= (int)g_core_defaults_order.size()) return false;
+	*key_out = g_core_defaults_order[index];
+	auto it = g_core_option_raw.find(*key_out);
+	if (it == g_core_option_raw.end()) return false;
+	SplitCoreOptionDecl(it->second, label_out, choices_out);
+	return true;
+}
+
+// Generic Core Options menu support (menu.cpp's "Core Options" page): the
+// currently loaded core's own SET_VARIABLES declarations, exposed as
+// key/label/choice-list/current-selection so any core's options - internal
+// resolution, region, DSP, whatever it declared - get a working menu row
+// with zero core-specific code, the same way RetroArch's Quick Menu >
+// Options does. Choices set here go through the existing CoreSetOption(),
+// so they only last for the current run, exactly like every other option
+// set this way - not persisted to mister4all.cfg across restarts.
+int CoreOptionCount()
+{
+	EnterCriticalSection(&options_lock);
+	int n = (int)g_core_defaults_order.size();
+	LeaveCriticalSection(&options_lock);
+	return n;
+}
+
+const char* CoreOptionKey(int index)
+{
+	EnterCriticalSection(&options_lock);
+	const char* result = (index >= 0 && index < (int)g_core_defaults_order.size())
+		? StableOptionValue(g_core_defaults_order[index]) : "";
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+const char* CoreOptionLabel(int index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	const char* result = ok ? StableOptionValue(label) : "";
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+int CoreOptionChoiceCount(int index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	int n = ok ? (int)choices.size() : 0;
+	LeaveCriticalSection(&options_lock);
+	return n;
+}
+
+const char* CoreOptionChoiceAt(int index, int choice_index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	const char* result = (ok && choice_index >= 0 && choice_index < (int)choices.size())
+		? StableOptionValue(choices[choice_index]) : "";
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+// The user's override if one has been set this run, else choice 0 - the
+// first choice in the list is always the core's own declared default, per
+// the SET_VARIABLES contract.
+int CoreOptionCurrentChoiceIndex(int index)
+{
+	std::string key, label; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	int result = 0;
+	if (ok)
+	{
+		auto ov = g_core_options.find(key);
+		const std::string* current = (ov != g_core_options.end()) ? &ov->second
+			: (!choices.empty() ? &choices[0] : nullptr);
+		if (current)
+			for (size_t c = 0; c < choices.size(); c++)
+				if (choices[c] == *current) { result = (int)c; break; }
+	}
+	LeaveCriticalSection(&options_lock);
+	return result;
+}
+
+void CoreOptionSetChoiceIndex(int index, int choice_index)
+{
+	std::string key, label, value; std::vector<std::string> choices;
+	EnterCriticalSection(&options_lock);
+	bool ok = GetCoreOptionDeclLocked(index, &key, &label, &choices);
+	if (ok && choice_index >= 0 && choice_index < (int)choices.size())
+		value = choices[choice_index];
+	LeaveCriticalSection(&options_lock);
+
+	if (!key.empty() && !value.empty())
+		CoreSetOption(key.c_str(), value.c_str());
 }
 
 // PS2 BIOS discovery and auto-preparation
@@ -1273,7 +1549,15 @@ static std::string ResolveAndPreparePs2Bios()
 // a POD buffer first, entirely before options_lock is ever taken, means the only
 // memory touched while the lock is held is our own - a bad core can now fail
 // this call, but it can never wedge the lock.
-struct ParsedCoreVar { char key[80]; char value[400]; };
+// `value` keeps only this call's original purpose (the GET_VARIABLE
+// fallback default - just the first choice, nothing else). `raw` is the
+// core's entire declaration untouched ("Label; choice1|choice2|...") for the
+// Core Options menu page, which needs the label and the full choice list -
+// data `value` alone deliberately throws away. Both are copied out under the
+// same SEH guard below, for the same reason `value` already was: a core is
+// free to unload the memory `vars` points into as soon as this call returns,
+// so nothing outside this function may ever read through `vars` again.
+struct ParsedCoreVar { char key[80]; char value[400]; char raw[600]; };
 
 static bool ParseCoreVariablesGuarded(const struct retro_variable* vars,
 	ParsedCoreVar* out, int max_out, int* out_count)
@@ -1300,6 +1584,8 @@ static bool ParseCoreVariablesGuarded(const struct retro_variable* vars,
 			out[n].key[sizeof(out[n].key) - 1] = 0;
 			memcpy(out[n].value, first, len);
 			out[n].value[len] = 0;
+			strncpy(out[n].raw, vars->value, sizeof(out[n].raw) - 1);
+			out[n].raw[sizeof(out[n].raw) - 1] = 0;
 			n++;
 		}
 		*out_count = n;
@@ -1573,6 +1859,24 @@ static bool CB_Environment(unsigned cmd, void* data)
 		return true;
 	}
 
+	case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE:
+		// A core provides this when it needs to dictate its own Vulkan device
+		// extensions/features rather than accept whatever "default" device we
+		// hand it - flycast confirmed needing this: given a vanilla device
+		// with no negotiation, it crashed with a null-pointer GPF deep in its
+		// own renderer setup (presumably relying on a feature/extension only
+		// negotiation would have enabled) rather than failing cleanly. We do
+		// not implement negotiation (a real create_device/create_device2
+		// wrapper letting the core choose), so remember that this core asked
+		// for it and have SET_HW_RENDER below refuse Vulkan outright instead
+		// of repeating that crash - the core then falls back to its next
+		// preferred context type (OpenGL, which we do support).
+		g_core_wants_vk_negotiation = true;
+		CoreLogPrintf(RETRO_LOG_INFO,
+			"[HW] core pediu negociacao de contexto Vulkan - nao implementada, "
+			"Vulkan sera recusado para forcar fallback");
+		return false;
+
 	case RETRO_ENVIRONMENT_SET_HW_RENDER:
 		// Accepting this is what lets mupen64plus-next, flycast and dolphin
 		// load at all - they refuse outright without OpenGL. But saying yes
@@ -1585,7 +1889,41 @@ static bool CB_Environment(unsigned cmd, void* data)
 				"(3D Acceleration esta Off em Settings > Video)");
 			return false;
 		}
-		return HwSetRenderCallback((struct retro_hw_render_callback*)data);
+		{
+			struct retro_hw_render_callback* cb = (struct retro_hw_render_callback*)data;
+			if (cb && cb->context_type == RETRO_HW_CONTEXT_D3D11)
+				return D3D11HwSetRenderCallback(cb);
+			if (cb && cb->context_type == RETRO_HW_CONTEXT_VULKAN)
+			{
+				if (g_core_wants_vk_negotiation)
+				{
+					CoreLogPrintf(RETRO_LOG_INFO,
+						"[HW] recusando Vulkan (negociacao de contexto nao suportada) - "
+						"core deve tentar o proximo tipo de contexto");
+					return false;
+				}
+				return VkHwSetRenderCallback(cb);
+			}
+			return HwSetRenderCallback(cb);
+		}
+
+	case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
+	{
+		// Handshake companion to SET_HW_RENDER above: called (usually right
+		// after context_reset) once the core wants the actual D3D11/Vulkan
+		// handles - device/context/set_image/etc - rather than just having
+		// been told "yes, hardware rendering is available". Only meaningful
+		// once that context actually exists; the OpenGL path has no
+		// equivalent (get_proc_address and get_current_framebuffer are
+		// handed to the core directly on its own retro_hw_render_callback
+		// instead). D3D11HwGetRenderInterface/VkHwGetRenderInterface each
+		// return NULL when their own backend isn't the active one.
+		const void* iface = D3D11HwGetRenderInterface();
+		if (!iface) iface = VkHwGetRenderInterface();
+		if (!iface) return false;
+		*(const void**)data = iface;
+		return true;
+	}
 
 	case RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION:
 	{
@@ -1650,10 +1988,42 @@ static bool CB_Environment(unsigned cmd, void* data)
 
 		EnterCriticalSection(&options_lock);
 		g_core_defaults.clear();
+		g_core_defaults_order.clear();
+		g_core_option_raw.clear();
 		for (int i = 0; i < count; i++)
+		{
+			// A core is free to declare the same key twice (rare, but seen) -
+			// only record it in the order list once, at its first appearance,
+			// so the Core Options menu does not list it twice.
+			if (g_core_defaults.find(s_parsed[i].key) == g_core_defaults.end())
+				g_core_defaults_order.push_back(s_parsed[i].key);
 			g_core_defaults[s_parsed[i].key] = s_parsed[i].value;
+			g_core_option_raw[s_parsed[i].key] = s_parsed[i].raw;
+		}
 		size_t n = g_core_defaults.size();
 		LeaveCriticalSection(&options_lock);
+
+		// The generic Core Options menu page persists a player's choice to
+		// mister4all.cfg (see menu.cpp's g_persisted_core_options); re-apply
+		// any match now, the same way ApplyPersistedCoreOptions() already does
+		// for the older, hand-picked per-core settings - without this a chosen
+		// Internal Resolution (or any other generic option) silently reverted
+		// to the core's own default on every fresh launch, which is exactly
+		// the bug that function's own comment was written to avoid for the
+		// settings it already covers. Skips a key the user already set this
+		// session (g_core_options), so a core that re-declares SET_VARIABLES
+		// mid-session cannot clobber a choice just made with a stale disk value.
+		for (int i = 0; i < count; i++)
+		{
+			EnterCriticalSection(&options_lock);
+			bool already_set = g_core_options.find(s_parsed[i].key) != g_core_options.end();
+			LeaveCriticalSection(&options_lock);
+			if (already_set) continue;
+
+			const char* persisted = MenuGetPersistedCoreOption(s_parsed[i].key);
+			if (persisted && persisted[0])
+				CoreSetOption(s_parsed[i].key, persisted);
+		}
 
 		for (int i = 0; i < count; i++)
 			CoreLogPrintf(RETRO_LOG_DEBUG, "[OPT] opcao: %s = %s", s_parsed[i].key, s_parsed[i].value);
@@ -1745,8 +2115,12 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 	{
 		// One copy GPU -> CPU per frame. That is the deliberate trade: the CRT
 		// filters, the OSD and the blit all stay on the software path instead
-		// of being rewritten as shaders.
-		if (!HwReadPixels(dst_fb, width, height)) return;
+		// of being rewritten as shaders. Only one of these three is ever active
+		// for a given loaded core - dispatch on whichever it is.
+		bool hw_ok = D3D11HwIsActive() ? D3D11HwReadPixels(dst_fb, width, height)
+		           : VkHwIsActive()    ? VkHwReadPixels(dst_fb, width, height)
+		                               : HwReadPixels(dst_fb, width, height);
+		if (!hw_ok) return;
 
 		// 480i / 448i Motion-Adaptive Deinterlacing for PS2 (Play! core only).
 		// PCSX2 handles hardware deinterlacing natively in its OpenGL GS pipeline.
@@ -1903,11 +2277,11 @@ static void CB_InputPoll(void)
 	// Analog deadzone, read once rather than per pad.
 	const int deadzone_thresh = (MenuGetDeadzone() * 32768) / 100;
 
-	// 1. Direct JIT Hardware Polling via XInput (Zero Windows Queue Latency)
+	// 1. Direct JIT Hardware Polling via SDL_Gamepad (dev-sdl3: was XInput)
 	for (DWORD pad = 0; pad < 4; pad++)
 	{
 		XINPUT_STATE state;
-		if (XInputGetState(pad, &state) != ERROR_SUCCESS) continue;
+		if (!GamepadGetState((int)pad, &state)) continue;
 
 		WORD w = state.Gamepad.wButtons;
 		if (state.Gamepad.bLeftTrigger > 50) w |= PAD_BTN_LT;
@@ -2756,8 +3130,16 @@ void CoreRecoverLocksHeldByThread(unsigned long thread_id)
 	}
 }
 
+// Defined further down, next to the buffer it owns.
+static void FreeLoadedRomData();
+
 static void RecoverAfterKilledCore()
 {
+	// The core thread was killed, so RetroUnloadGameGuarded never ran and never
+	// got to release the game buffer. Nothing can still be reading it - the only
+	// thing that ever held the pointer was the core we just terminated.
+	FreeLoadedRomData();
+
 	// A critical section owned by a dead thread is never released. Recreating it
 	// is the only way back; nothing else can be running against it here, because
 	// the only other user was the thread we just killed.
@@ -2768,7 +3150,11 @@ static void RecoverAfterKilledCore()
 	DeleteCriticalSection(&toast_lock);
 	InitializeCriticalSection(&toast_lock);
 
+	// All three are safe to call unconditionally - each only acts if its own
+	// g_hw_active is set, and a given core only ever activates one of them.
 	HwContextDestroy();
+	VkHwContextDestroy();
+	D3D11HwContextDestroy();
 
 	is_game_loaded = false;
 	is_core_loaded = false;
@@ -2780,9 +3166,10 @@ static void RecoverAfterKilledCore()
 	h_core_dll = NULL;
 
 	// Stop-then-close, same order as CoreUnload: AudioThreadProc is a separate
-	// live thread the core-thread kill above never touched. Closing h_wave_out
-	// out from under it while it can still be mid-waveOutWrite() races the
-	// handle close against that thread's own use of it.
+	// live thread the core-thread kill above never touched. Destroying
+	// g_audio_stream out from under it while it can still be mid-
+	// SDL_PutAudioStreamData() races the handle close against that thread's
+	// own use of it.
 	if (audio_thread_running)
 	{
 		audio_thread_running = false;
@@ -2791,10 +3178,10 @@ static void RecoverAfterKilledCore()
 		{
 			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
 			{
-				// Still inside a waveOut* call (a wedged driver) - closing
-				// h_wave_out out from under it right below would race that
+				// Still inside an SDL audio call (a wedged driver) - closing
+				// the stream out from under it right below would race that
 				// call. Force it down first; it holds no C++ objects that
-				// need unwinding, just WinMM buffers we are about to
+				// need unwinding, just an audio buffer we are about to
 				// release anyway.
 				TerminateThread(h_audio_thread, 1);
 			}
@@ -2803,11 +3190,12 @@ static void RecoverAfterKilledCore()
 		}
 	}
 
-	if (h_wave_out)
+	if (g_audio_stream)
 	{
-		waveOutReset(h_wave_out);
-		waveOutClose(h_wave_out);
-		h_wave_out = NULL;
+		// Destroying the stream also closes the device it was opened
+		// against - SDL_OpenAudioDeviceStream's own contract.
+		SDL_DestroyAudioStream(g_audio_stream);
+		g_audio_stream = nullptr;
 		audio_initialized = false;
 	}
 	if (h_audio_event) { CloseHandle(h_audio_event); h_audio_event = NULL; }
@@ -2977,10 +3365,38 @@ static bool RetroLoadGameGuarded(const struct retro_game_info* info)
 	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
+// The buffer handed to the core as retro_game_info::data, kept alive for
+// exactly as long as the libretro spec requires.
+//
+// When need_fullpath is false the frontend loads the content itself, and the
+// pointer it passes has to stay valid until retro_unload_game() returns - the
+// whole point of that path is that a core may keep the pointer instead of
+// copying the ROM. This used to be free()d on the line right after
+// retro_load_game(), which is fine for the cores that do copy (mupen, mGBA -
+// most of them) and a use-after-free for the ones that do not.
+//
+// This was found while chasing gopher64's heap corruption on unload, and it
+// is worth being explicit that it did NOT fix it: gopher64 still dies inside
+// its own retro_unload_game() with the buffer kept alive, with it allocated
+// from the process heap instead of the CRT's, and with the free removed
+// entirely. So this is a real latent use-after-free that was waiting for the
+// next core that keeps the pointer - not an explanation of that crash.
+static uint8_t* g_loaded_rom_data = nullptr;
+
+static void FreeLoadedRomData()
+{
+	if (g_loaded_rom_data) { free(g_loaded_rom_data); g_loaded_rom_data = nullptr; }
+}
+
 static void RetroUnloadGameGuarded()
 {
 	__try { if (p_retro_unload_game) p_retro_unload_game(); }
 	__except (EXCEPTION_EXECUTE_HANDLER) {}
+
+	// Only now is the core guaranteed to be done with it. Every call site of
+	// this function is a point where the game is going away, so freeing here
+	// covers all of them at once instead of relying on each to remember.
+	FreeLoadedRomData();
 }
 
 static bool RetroGetSystemAvInfoGuarded(struct retro_system_av_info* av_info)
@@ -3027,6 +3443,7 @@ static bool CoreLoad(const char* core_dll_path)
 	// A core that sends no descriptors must not inherit the previous one's
 	// names, so this is cleared on the way in rather than only on the way out.
 	ClearInputDescriptors();
+	g_core_wants_vk_negotiation = false;
 
 	InterlockedExchange(&g_core_in_module_op, 1);
 	h_core_dll = LoadLibraryA(core_dll_path);
@@ -3197,9 +3614,13 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	std::string abs_rom_path = fs::absolute(p).string();
 	game_info.path = abs_rom_path.c_str();
 
+	// A previous game's buffer must never outlive its own unload; if anything
+	// slipped through, drop it before taking ownership of a new one.
+	FreeLoadedRomData();
 	uint8_t* rom_data = nullptr;
 
 	const bool is_archive = (ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".tar" || ext == ".gz");
+
 	const bool is_arcade_or_disc = (sys_info.need_fullpath || is_disc || is_archive ||
 		loaded_core_name == "Arcade" || loaded_core_name == "MS-DOS" ||
 		loaded_core_name == "Dreamcast" || loaded_core_name == "GameCube" ||
@@ -3228,11 +3649,18 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		}
 	}
 
+	// Handed over, not released: the core may have kept this pointer (see
+	// g_loaded_rom_data). RetroUnloadGameGuarded frees it once the core is
+	// actually done with it.
+	g_loaded_rom_data = rom_data;
+
 	bool ok = RetroLoadGameGuarded(&game_info);
-	if (rom_data) free(rom_data);
 
 	if (!ok)
 	{
+		// The load failed, so retro_unload_game() will not be called for it and
+		// nothing can still be holding the buffer - release it here instead.
+		FreeLoadedRomData();
 		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] Core failed to load game: %s", rom_path);
 
 		if (!suppress_toast)
@@ -3277,7 +3705,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			}
 			else
 			{
-				CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
+				CoreSetToast("FALHA AO CARREGAR - VEJA mister4all.log", 240);
 			}
 		}
 		// The core can have already called SET_MEMORY_MAPS from inside this
@@ -3301,7 +3729,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		CoreLogPrintf(RETRO_LOG_ERROR,
 			"[CoreRunner] Core faulted inside retro_get_system_av_info: %s", rom_path);
 		if (!suppress_toast)
-			CoreSetToast("FALHA AO CARREGAR - VEJA mister_flavor.log", 240);
+			CoreSetToast("FALHA AO CARREGAR - VEJA mister4all.log", 240);
 		RetroUnloadGameGuarded();
 		// is_game_loaded is still false here, so CoreUnload()'s own
 		// CoreReleaseMemoryMap() call (gated on is_game_loaded) never runs -
@@ -3335,7 +3763,32 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 
 
-	if (HwIsActive())
+	if (VkHwIsActive() && g_core_wants_vk_negotiation)
+	{
+		// The core already asked for the Vulkan context negotiation interface
+		// (create_device/create_device2) somewhere during retro_load_game -
+		// every RETRO_ENVIRONMENT_* call it was going to make has happened by
+		// now regardless of the order it made them in, so this check is safe
+		// even for cores (e.g. Flycast) that call SET_HW_RENDER before
+		// SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE. We don't implement that
+        // interface, so the core would be handed a generic device it doesn't
+		// know how to drive; letting it proceed into context_reset() crashes
+        // it (confirmed with Flycast/Dreamcast: the fault happens on the
+		// core's own internal threaded-renderer thread, asynchronously, which
+		// no SEH __try/__except on this thread can ever catch) - so bail out
+		// here, before ever calling context_reset(), instead of trying to
+		// recover from a crash we cannot actually contain.
+		CoreLogPrintf(RETRO_LOG_ERROR,
+			"[HW-VK] '%s' exige negociacao de contexto Vulkan (nao implementada) - recusando carregamento para evitar crash",
+			loaded_core_name.c_str());
+		if (!suppress_toast)
+			CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
+		RetroUnloadGameGuarded();
+		CoreReleaseMemoryMap();
+		return false;
+	}
+
+	if (HwIsActive() || VkHwIsActive() || D3D11HwIsActive())
 	{
 		unsigned hw_w = av_info.geometry.max_width  ? av_info.geometry.max_width  : core_fb_width;
 		unsigned hw_h = av_info.geometry.max_height ? av_info.geometry.max_height : core_fb_height;
@@ -3347,11 +3800,37 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			av_info.geometry.base_width, av_info.geometry.base_height,
 			av_info.geometry.max_width, av_info.geometry.max_height, hw_w, hw_h);
 
-		if (HwEnsureSurface(hw_w, hw_h))
+		bool surface_ok = D3D11HwIsActive() ? D3D11HwEnsureSurface(hw_w, hw_h)
+		                : VkHwIsActive()    ? VkHwEnsureSurface(hw_w, hw_h)
+		                                    : HwEnsureSurface(hw_w, hw_h);
+		if (surface_ok)
 		{
-			// The core allocates its GL resources here, so it has to happen
-			// after load and before the first retro_run.
-			HwContextReset();
+			// The core allocates its GL/Vulkan/D3D11 resources here, so it has
+			// to happen after load and before the first retro_run. Only
+			// Vulkan's reset can fail from a known cause (context negotiation,
+			// checked above before we get here) - D3D11HwContextReset/
+			// HwContextReset returning false means an actually unexpected
+			// native fault, not something we already know how to avoid.
+			bool using_hw_reset = VkHwIsActive() || D3D11HwIsActive();
+			bool context_ok = D3D11HwIsActive() ? D3D11HwContextReset()
+			                : VkHwIsActive()    ? VkHwContextReset()
+			                                    : (HwContextReset(), true);
+			if (using_hw_reset && !context_ok)
+			{
+				// Belt-and-suspenders: covers a core that crashes synchronously
+				// inside context_reset() itself (caught by the SEH guard in
+				// VkHwContextReset/D3D11HwContextReset) without having set
+				// g_core_wants_vk_negotiation - the check above only handles
+				// the known Vulkan-negotiation case.
+				CoreLogPrintf(RETRO_LOG_ERROR,
+					"[HW] context_reset falhou/crashou para '%s'",
+					loaded_core_name.c_str());
+				if (!suppress_toast)
+					CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
+				RetroUnloadGameGuarded();
+				CoreReleaseMemoryMap();
+				return false;
+			}
 		}
 	}
 
@@ -3382,21 +3861,15 @@ static void CoreUnload()
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Audio thread finalizada.");
 	}
 
-	if (h_wave_out)
+	if (g_audio_stream)
 	{
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Fechando waveOut...");
-		waveOutReset(h_wave_out);
-		for (int i = 0; i < NUM_WAVE_BUFFERS; i++)
-		{
-			if (wave_headers[i].dwFlags & WHDR_PREPARED)
-			{
-				waveOutUnprepareHeader(h_wave_out, &wave_headers[i], sizeof(WAVEHDR));
-			}
-		}
-		waveOutClose(h_wave_out);
-		h_wave_out = NULL;
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Fechando audio stream...");
+		// Destroying the stream also closes the device it was opened
+		// against - SDL_OpenAudioDeviceStream's own contract.
+		SDL_DestroyAudioStream(g_audio_stream);
+		g_audio_stream = nullptr;
 		audio_initialized = false;
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] waveOut finalizado.");
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] audio stream finalizado.");
 	}
 
 	if (h_audio_event)
@@ -3418,6 +3891,8 @@ static void CoreUnload()
 
 		EnterCriticalSection(&options_lock);
 		g_core_defaults.clear();
+		g_core_defaults_order.clear();
+		g_core_option_raw.clear();
 		LeaveCriticalSection(&options_lock);
 
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroUnloadGameGuarded...");
@@ -3428,6 +3903,8 @@ static void CoreUnload()
 
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando HwContextDestroy...");
 	HwContextDestroy();
+	VkHwContextDestroy();
+	D3D11HwContextDestroy();
 	HwReleaseCurrent();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy concluido.");
 

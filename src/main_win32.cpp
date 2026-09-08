@@ -31,13 +31,28 @@ namespace fs = std::filesystem;
 #include "updater.h"
 #include "port_runner.h"
 #include "hw_render.h"
+#include "hw_render_vulkan.h"
+#include "hw_render_d3d11.h"
 #include "resource.h"
 #include "mister_math.h"
+#include "gamepad_sdl.h"
+
+// dev-sdl3: first slice of the SDL3 migration. This only proves the vendored,
+// statically-linked SDL3 build actually links and runs inside this exe - it
+// does not replace any Win32 window/input/audio code yet. That happens
+// incrementally in later commits on this branch.
+//
+// SDL_MAIN_HANDLED tells SDL_main.h not to #define main SDL_main / wrap the
+// entry point - this app's entry point is its own WinMain, not something
+// SDL should own. Only pulled in for the SDL_RegisterApp() declaration
+// below (see its call site in WinMain for why it's needed).
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "xinput.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "dwmapi.lib")
 
@@ -84,7 +99,11 @@ static uint32_t* pixel_buffer = nullptr;
 static HBITMAP h_bitmap = nullptr;
 static HDC h_mem_dc = nullptr;
 static HWND g_hwnd = nullptr;
+static SDL_Window* g_sdl_window = nullptr;
 HWND MainGetHwnd() { return g_hwnd; }
+// Cross-platform equivalent for callers (port_runner.cpp) that only need to
+// minimize/restore/raise the main window, not a raw platform HWND.
+SDL_Window* MainGetSdlWindow() { return g_sdl_window; }
 static bool g_running = true;
 static bool g_is_fullscreen = false;
 
@@ -320,35 +339,20 @@ static void DrawToast(uint32_t* buf, int bw, int bh, const ThemeColor& theme)
 	DrawStringToScaled(buf, bw, bh, tx + 12 * scale, ty + 5 * scale, msg, theme.text_white, scale);
 }
 
+// dev-sdl3: the window itself is now created and owned by SDL3 (see WinMain),
+// so toggling its style bits directly via SetWindowLong/SetWindowPos - as this
+// function used to - would change the real Win32 window out from under SDL's
+// own internal state cache without SDL ever finding out, desyncing anything
+// that later asks SDL for the window's flags/size. SDL_SetWindowFullscreen is
+// the API that keeps both in agreement; the (void)hwnd is here only because
+// PollGamepad-era callers still pass one - the SDL window is the actual
+// source of truth now.
 static void ToggleFullscreen(HWND hwnd)
 {
-	static WINDOWPLACEMENT g_wpPrev = { sizeof(g_wpPrev) };
-	DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
-
-	if (dwStyle & WS_OVERLAPPEDWINDOW)
-	{
-		MONITORINFO mi = { sizeof(mi) };
-		if (GetWindowPlacement(hwnd, &g_wpPrev) &&
-			GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi))
-		{
-			SetWindowLong(hwnd, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
-			SetWindowPos(hwnd, HWND_TOP,
-				mi.rcMonitor.left, mi.rcMonitor.top,
-				mi.rcMonitor.right - mi.rcMonitor.left,
-				mi.rcMonitor.bottom - mi.rcMonitor.top,
-				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-			g_is_fullscreen = true;
-		}
-	}
-	else
-	{
-		SetWindowLong(hwnd, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
-		SetWindowPlacement(hwnd, &g_wpPrev);
-		SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-			SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-		g_is_fullscreen = false;
-	}
+	(void)hwnd;
+	g_is_fullscreen = !g_is_fullscreen;
+	SDL_SetWindowFullscreen(g_sdl_window, g_is_fullscreen);
+	SDL_SyncWindow(g_sdl_window);
 	MenuSetFullscreen(g_is_fullscreen);
 }
 
@@ -449,7 +453,7 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 		}
 	}
 
-	FILE* f = fopen("mister_flavor.log", "a");
+	FILE* f = fopen("mister4all.log", "a");
 	if (f)
 	{
 		fprintf(f, "[ERROR] [CRASH] codigo=0x%08lX modulo=%s offset=0x%llX thread=%lu\n",
@@ -582,7 +586,7 @@ static void CheckWindowsCrashReportsOnStartup()
 
 	if (EvtNext(hResults, 10, events, 2000, 0, &returned))
 	{
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 
 		for (DWORD i = 0; i < returned; i++)
 		{
@@ -1042,7 +1046,7 @@ static void PollGamepad()
 	XINPUT_STATE state;
 	ZeroMemory(&state, sizeof(XINPUT_STATE));
 
-	if (XInputGetState(0, &state) == ERROR_SUCCESS)
+	if (GamepadGetState(0, &state))
 	{
 		WORD wButtons = state.Gamepad.wButtons;
 		SHORT sThumbY = state.Gamepad.sThumbLY;
@@ -1139,10 +1143,91 @@ static void PollGamepad()
 	}
 }
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+// dev-sdl3: the window is now created by SDL3, which installs its own
+// internal WndProc - this app no longer registers one of its own. SDL runs
+// this hook for every raw Windows message before its own processing (see
+// SDL_SetWindowsMessageHook in WinMain), which is the supported way to keep
+// exactly this switch-statement's worth of custom handling working
+// unmodified. The bool return replaces "return 0 to say handled" (false =
+// drop it here, matching every explicit `return 0/1` case below) vs.
+// "return DefWindowProc" (true = let SDL's own default handling continue).
+static void BlitToDc(HDC hdc, HWND hwnd)
 {
+	RECT client;
+	GetClientRect(hwnd, &client);
+
+	SetStretchBltMode(hdc, COLORONCOLOR);
+
+	if (g_use_present && h_present_dc)
+	{
+		if (present_w == client.right && present_h == client.bottom)
+			BitBlt(hdc, 0, 0, client.right, client.bottom, h_present_dc, 0, 0, SRCCOPY);
+		else
+			StretchBlt(hdc, 0, 0, client.right, client.bottom,
+				h_present_dc, 0, 0, present_w, present_h, SRCCOPY);
+	}
+	else
+	{
+		StretchBlt(
+			hdc, 0, 0, client.right, client.bottom,
+			h_mem_dc, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
+			SRCCOPY
+		);
+	}
+}
+
+// dev-sdl3: PresentFrame calls this directly, once per frame, instead of the
+// old InvalidateRect(hwnd)+UpdateWindow(hwnd) pair. UpdateWindow sends
+// WM_PAINT straight to the window's WNDPROC, bypassing the message queue
+// entirely (that is its documented, intentional behavior) - which meant it
+// never passed through SDL_SetWindowsMessageHook at all, since that hook
+// only fires for messages SDL's own pump actually retrieves from the queue.
+// The window rendered solid black until this was found: PresentFrame kept
+// running every frame with no crash and nothing in the log to explain it,
+// because internally nothing WAS wrong - the paint code the whole rest of
+// the frame's work was building towards simply never ran.
+//
+// GetDC/ReleaseDC, not BeginPaint/EndPaint: BeginPaint clips the returned DC
+// to whatever the currently-pending invalid region happens to be, which can
+// be empty outside of actually handling a real WM_PAINT - drawing would
+// silently be clipped away instead of erroring. WM_PAINT's own case below,
+// which IS a real response to that message, still uses BeginPaint/EndPaint
+// correctly.
+static void PaintNow(HWND hwnd)
+{
+	HDC hdc = GetDC(hwnd);
+	BlitToDc(hdc, hwnd);
+	ReleaseDC(hwnd, hdc);
+}
+
+static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
+{
+	(void)userdata;
+	HWND hwnd = msg_ptr->hwnd;
+	UINT msg = msg_ptr->message;
+	WPARAM wParam = msg_ptr->wParam;
+	LPARAM lParam = msg_ptr->lParam;
+	(void)lParam;
+
 	switch (msg)
 	{
+	// Windows posts WM_SYSKEYDOWN, not WM_KEYDOWN, for any key pressed while
+	// ALT is held down - Alt+Enter included. The check below lived inside
+	// "case WM_KEYDOWN:" since long before this SDL3 branch (confirmed back
+	// to this file's earliest committed version), so it could never have
+	// fired: this is a pre-existing, unrelated bug this pass happened to
+	// catch while testing fullscreen toggling, not a regression from the
+	// SDL3 migration. Only VK_RETURN is handled here - everything else falls
+	// through to `return true` so Alt+F4, Alt+Space (system menu) and F10
+	// keep working exactly as Windows expects.
+	case WM_SYSKEYDOWN:
+		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000))
+		{
+			ToggleFullscreen(hwnd);
+			return false;
+		}
+		return true;
+
 	case WM_KEYDOWN:
 		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000))
 		{
@@ -1208,53 +1293,42 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			}
 		}
 		InvalidateRect(hwnd, NULL, FALSE);
-		return 0;
+		return false;
 
 	case WM_KEYUP:
 		// Nothing to do: the core thread samples the keyboard directly with
 		// GetAsyncKeyState, so key-up needs no bookkeeping here.
-		return 0;
+		return false;
 
 	case WM_PAINT:
 	{
+		// The frame-loop-driven redraw (PresentFrame, every frame) uses
+		// PaintNow()/GetDC below instead of InvalidateRect+UpdateWindow - see
+		// the comment on PaintNow for why. This case only remains to answer a
+		// genuine OS-driven repaint request (another window dragged over
+		// ours, restoring from minimize), which arrives as a real queued
+		// message and so still reaches this hook normally; BeginPaint/
+		// EndPaint is correct here specifically because it IS responding to
+		// an actual WM_PAINT.
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hwnd, &ps);
-		RECT client;
-		GetClientRect(hwnd, &client);
-
-		SetStretchBltMode(hdc, COLORONCOLOR);
-
-		if (g_use_present && h_present_dc)
-		{
-			if (present_w == client.right && present_h == client.bottom)
-				BitBlt(hdc, 0, 0, client.right, client.bottom, h_present_dc, 0, 0, SRCCOPY);
-			else
-				StretchBlt(hdc, 0, 0, client.right, client.bottom,
-					h_present_dc, 0, 0, present_w, present_h, SRCCOPY);
-		}
-		else
-		{
-			StretchBlt(
-				hdc, 0, 0, client.right, client.bottom,
-				h_mem_dc, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
-				SRCCOPY
-			);
-		}
-
+		BlitToDc(hdc, hwnd);
 		EndPaint(hwnd, &ps);
-		return 0;
+		return false;
 	}
 
 	case WM_ERASEBKGND:
-		return 1;
-
-	case WM_DESTROY:
-		g_running = false;
-		PostQuitMessage(0);
-		return 0;
+		// Dropping the message entirely (false) is the hook-model equivalent
+		// of a WndProc returning nonzero here: either way, nothing ever
+		// erases the background before WM_PAINT draws over it, which is the
+		// whole point - it avoids the visible flicker a real erase causes.
+		return false;
 	}
 
-	return DefWindowProc(hwnd, msg, wParam, lParam);
+	// Every other message (WM_DESTROY included - SDL's own handling of it is
+	// what generates SDL_EVENT_QUIT on the last window closing, watched for
+	// in WinMain's loop) continues on to SDL's default processing.
+	return true;
 }
 
 static void PresentFrame(HWND hwnd)
@@ -1269,8 +1343,7 @@ static void PresentFrame(HWND hwnd)
 	MenuRun();
 	RenderFrame();
 
-	InvalidateRect(hwnd, NULL, FALSE);
-	UpdateWindow(hwnd);
+	PaintNow(hwnd);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -1299,6 +1372,40 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	CheckWindowsCrashReportsOnStartup();
 
+	// Root cause of a real crash: SDL_Init(SDL_INIT_VIDEO) registers a Win32
+	// window class named "SDL_app" (SDL's own hardcoded default) under
+	// GetModuleHandle(NULL) - which always resolves to THIS EXE's module
+	// handle, even when the call originates inside a loaded DLL. gopher64
+	// links its own, entirely separate, statically-linked copy of SDL3, and
+	// when it calls its own SDL_Init(SDL_INIT_VIDEO) on the core thread
+	// during retro_load_game(), it tries to register that exact same
+	// (class name, hInstance) pair again. RegisterClassEx fails
+	// (ERROR_CLASS_ALREADY_EXISTS) - and SDL's own WIN_CreateDevice()
+	// ignores that failure's return value, leaving gopher64's copy of
+	// SDL_Appname NULL. Its later SDL_CreateWindow(..., SDL_Appname, ...)
+	// then fails with ERROR_INVALID_PARAMETER ("Parametro incorreto"),
+	// panicking gopher64's Rust side. Registering our OWN class under a
+	// name other than the default here, before SDL_Init ever runs, means
+	// gopher64's later default "SDL_app" registration is the only one
+	// under that name and succeeds cleanly instead of colliding with ours.
+	SDL_RegisterApp("MiSTer4ALL_SDL", 0, NULL);
+
+	// dev-sdl3 smoke test: confirms the statically-linked SDL3 build actually
+	// initializes inside this exe before any of the real Win32 windowing/
+	// input/audio code is touched. Nothing downstream depends on this yet.
+	{
+		FILE* lf = fopen("mister4all.log", "a");
+		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
+		{
+			if (lf) fprintf(lf, "[INFO] [SDL3] inicializado, versao=%d\n", SDL_GetVersion());
+		}
+		else if (lf)
+		{
+			fprintf(lf, "[ERROR] [SDL3] SDL_Init falhou: %s\n", SDL_GetError());
+		}
+		if (lf) fclose(lf);
+	}
+
 	// Headless port install: "MiSTer_4_ALL.exe --install-port <id>" downloads
 	// and extracts a known port and exits, before any window is created, so
 	// ports/ can be pre-populated (packaging, CI, or just getting ahead of a
@@ -1308,7 +1415,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		PortInit();
 		std::string install_error;
 		bool ok = PortInstallOnly(__argv[2], install_error);
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[INFO] [PORT-INSTALL] %s -> %s%s%s\n", __argv[2],
@@ -1330,7 +1437,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	{
 		PortInit();
 		bool started = PortLaunch(__argv[2]);
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 
 		DWORD waited_ms = 0;
 		while (started && !PortIsRunning() && waited_ms < 180000)
@@ -1356,7 +1463,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (__argc > 1 && _stricmp(__argv[1], "--list-ports") == 0)
 	{
 		PortInit();
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		if (lf)
 		{
 			for (const auto& p : PortGetAvailableList())
@@ -1380,7 +1487,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// real core hang by hand.
 	if (__argc > 3 && _stricmp(__argv[1], "--core-selftest") == 0)
 	{
-		FILE* lf = fopen("mister_flavor.log", "a");
+		FILE* lf = fopen("mister4all.log", "a");
 		auto log = [&](const char* fmt, ...) {
 			if (!lf) return;
 			va_list ap; va_start(ap, fmt);
@@ -1460,40 +1567,88 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return pass ? 0 : 1;
 	}
 
-	WNDCLASSEX wc = { 0 };
-	wc.cbSize = sizeof(WNDCLASSEX);
-	wc.style = CS_HREDRAW | CS_VREDRAW;
-	wc.lpfnWndProc = WndProc;
-	wc.hInstance = hInstance;
-	wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
-	wc.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON, 16, 16, 0);
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-	wc.lpszClassName = "MiSTerFlavorWindowClass";
-
-	if (!RegisterClassEx(&wc)) return 1;
-
-	RECT wr = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
-	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
-
-	HWND hwnd = CreateWindowEx(
-		0,
-		wc.lpszClassName,
+	// dev-sdl3: window creation and the message pump are now SDL3's - see
+	// SdlWindowsMsgHook above for where the old WndProc's switch statement
+	// moved to, and ToggleFullscreen for why that one specifically had to be
+	// rewritten (not just relocated) once SDL owned the window. Everything
+	// else downstream (GDI blit in the paint handler, WGL in hw_render.cpp,
+	// XInput/GetAsyncKeyState polling, mouse-as-stylus) still operates on the
+	// real HWND pulled out of the SDL window below, unchanged.
+	//
+	// SDL_CreateWindow's w/h size the client area directly - the manual
+	// AdjustWindowRect dance the old CreateWindowEx call needed to make its
+	// *outer* window rect produce a WINDOW_WIDTH x WINDOW_HEIGHT *client*
+	// area is not needed here.
+	// Created hidden: MenuInit() below (which loads the saved window rect)
+	// has to run before the geometry below can be applied, and there is no
+	// point flashing the default 1280x720 centered window for one frame only
+	// to jump to the restored size/position immediately after. Shown once
+	// that geometry has been applied.
+	g_sdl_window = SDL_CreateWindow(
 		APP_NAME " v" APP_VERSION " " APP_ARCH " [mister4all.com | @GuhClemente]",
-		WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-		CW_USEDEFAULT, CW_USEDEFAULT,
-		wr.right - wr.left, wr.bottom - wr.top,
-		NULL, NULL, hInstance, NULL
-	);
+		WINDOW_WIDTH, WINDOW_HEIGHT,
+		SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
+	if (!g_sdl_window) return 1;
 
-	if (!hwnd) return 1;
-	g_hwnd = hwnd;
+	SDL_PropertiesID win_props = SDL_GetWindowProperties(g_sdl_window);
+	g_hwnd = (HWND)SDL_GetPointerProperty(win_props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	if (!g_hwnd) return 1;
+
+	// SDL has no idea this exe carries its own icon resource (src\resource.rc)
+	// - the old WNDCLASSEX registration set it via wc.hIcon/hIconSm, which no
+	// longer exists. WM_SETICON on the real HWND is the direct equivalent.
+	HICON h_icon_big = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+	HICON h_icon_small = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON, 16, 16, 0);
+	SendMessage(g_hwnd, WM_SETICON, ICON_BIG, (LPARAM)h_icon_big);
+	SendMessage(g_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)h_icon_small);
+
+	SDL_SetWindowsMessageHook(SdlWindowsMsgHook, NULL);
+
+	// Kept so the rest of this function - written for the old CreateWindowEx
+	// local of the same name - did not need touching line by line.
+	HWND hwnd = g_hwnd;
 
 	HDC hdc = GetDC(hwnd);
 	InitBackbuffer(hdc);
 	ReleaseDC(hwnd, hdc);
 
 	MenuInit();
+
+	// Restore the windowed-mode size/position saved on a previous exit, now
+	// that MenuInit() has loaded it. Guards against a monitor that is no
+	// longer connected (laptop undocked, a second monitor unplugged): if the
+	// saved rect's center would not land on any currently-connected display,
+	// only the size is restored and the position stays at SDL's own default
+	// (centered on the primary display) instead of placing the window
+	// somewhere the user cannot see or reach it.
+	{
+		int wx, wy, ww, wh;
+		if (MenuGetWindowRect(&wx, &wy, &ww, &wh))
+		{
+			bool visible_on_a_display = false;
+			int display_count = 0;
+			SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+			if (displays)
+			{
+				SDL_Point center = { wx + ww / 2, wy + wh / 2 };
+				for (int i = 0; i < display_count; i++)
+				{
+					SDL_Rect bounds;
+					if (SDL_GetDisplayBounds(displays[i], &bounds) && SDL_PointInRect(&center, &bounds))
+					{
+						visible_on_a_display = true;
+						break;
+					}
+				}
+				SDL_free(displays);
+			}
+
+			SDL_SetWindowSize(g_sdl_window, ww, wh);
+			if (visible_on_a_display)
+				SDL_SetWindowPosition(g_sdl_window, wx, wy);
+		}
+	}
+	SDL_ShowWindow(g_sdl_window);
 
 	// Probe OpenGL once, here on the main thread. Doing it lazily from a core
 	// callback created a window on the core thread, which is a bad place for one.
@@ -1566,18 +1721,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	QueryPerformanceCounter(&next_frame);
 	next_frame.QuadPart += target_ticks;
 
-	MSG msg;
+	SDL_Event sdl_event;
 	while (g_running)
 	{
-		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		// SDL_PollEvent pumps the real Win32 message queue internally (via
+		// PeekMessage/TranslateMessage/DispatchMessage) - SdlWindowsMsgHook
+		// above still fires for every one of those raw messages exactly as
+		// it did as a real WndProc. SDL_EVENT_QUIT is what SDL raises once
+		// its own WM_DESTROY handling notices the last window closed.
+		while (SDL_PollEvent(&sdl_event))
 		{
-			if (msg.message == WM_QUIT)
+			if (sdl_event.type == SDL_EVENT_QUIT)
 			{
 				g_running = false;
 				break;
 			}
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
+			GamepadHandleDeviceEvent(&sdl_event);
 		}
 
 		PollGamepad();
@@ -1655,7 +1814,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// CoreShutdown() has already joined the core thread, so nothing else can
 	// be holding the GL context current at this point - safe to tear it down
 	// here even though HwInit()/HwMakeCurrent() are otherwise core-thread-only.
+	//
+	// All three backends, not just OpenGL: VkHwShutdown/D3D11HwShutdown had no
+	// call site anywhere, so the VkInstance/VkDevice/command pool/staging buffer
+	// and the ID3D11Device/Context/staging texture were never released, and
+	// their g_*_ready flags stayed true for the life of the process. Same
+	// reasoning as HwShutdown() above applies to both: the core thread is
+	// already joined, so nothing can still be issuing GPU work through them.
 	HwShutdown();
+	VkHwShutdown();
+	D3D11HwShutdown();
+
+	// Save the windowed-mode geometry for MenuGetWindowRect to restore next
+	// launch. Skipped while fullscreen (SDL reports the fullscreen rect, not
+	// the windowed one it would return to) or minimized (Windows reports a
+	// minimized window's position as roughly -32000,-32000, which would
+	// otherwise get saved as if it were a real, deliberate position).
+	if (!g_is_fullscreen && !(SDL_GetWindowFlags(g_sdl_window) & SDL_WINDOW_MINIMIZED))
+	{
+		int wx = 0, wy = 0, ww = 0, wh = 0;
+		SDL_GetWindowPosition(g_sdl_window, &wx, &wy);
+		SDL_GetWindowSize(g_sdl_window, &ww, &wh);
+		if (ww > 0 && wh > 0)
+			MenuSetWindowRect(wx, wy, ww, wh);
+	}
+
+	SDL_Quit();
 
 	if (h_mem_dc) DeleteDC(h_mem_dc);
 	if (h_bitmap) DeleteObject(h_bitmap);
