@@ -1534,7 +1534,7 @@ void PopulateAbout() {
   items.push_back({"Netplay", "2P TCP/IP", false, false, 0});
   items.push_back({"Conquistas", RaIsEnabled() ? "Ativado" : "Desativado",
                    false, false, 0});
-  items.push_back({"License", "Open Source", false, false, 0});
+  items.push_back({"License", "Freeware", false, false, 0});
   items.push_back({"Back", "", false, true, 999});
 
   selected_idx = 11;

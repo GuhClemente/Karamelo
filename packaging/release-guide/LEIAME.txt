@@ -46,7 +46,8 @@
    - Consulte o guia completo e tabela MD5 em: bios\GUIA_COMPLETO_BIOS.md
 
 7. AVISO LEGAL / LEGAL DISCLAIMER:
-   - O MiSTer 4 ALL e um projeto de preservacao e codigo aberto (Open Source).
+   - O MiSTer 4 ALL e um software independente e gratuito (Freeware) voltado a preservacao.
+   - Nao possui filiacao ou vinculo com o projeto de hardware MiSTer FPGA oficial.
    - Esta distribuicao NAO CONTEM nenhum arquivo de BIOS protegida ou ROM de jogo.
    - O usuario deve utilizar seus proprios backups de jogos e BIOS legalmente adquiridos.
 

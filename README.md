@@ -1,6 +1,6 @@
-# MiSTer 4 ALL — Native Windows x64 Port & Open Source Emulation Suite
+# MiSTer 4 ALL — Native Windows x64 Frontend & Retrogaming Emulation Suite
 
-> **Projeto Oficial de Código Aberto**  
+> **Software Gratuito e Independente (Freeware)**  
 > Canal do YouTube: **[@GuhClemente](https://youtube.com/@GuhClemente)**  
 > Desenvolvido por: **Guh Clemente & Antigravity Pair Team**  
 > Core Engine: **Libretro API Architecture**
@@ -229,12 +229,14 @@ guias de BIOS/ROM e cores prontos), use `package_release.bat` em vez de
 
 ---
 
-## 📜 Licença e Créditos
+## 📜 Licença, Isenção de Responsabilidade e Créditos
 
 * **Canal do YouTube:** [@GuhClemente](https://youtube.com/@GuhClemente)
 * **Desenvolvedor:** Guh Clemente
 * **Engine de Emulação:** Libretro API Architecture
-* **Licença:** Código aberto e público para todos os entusiastas e comunidade retrogamer!
+* **Licença do Frontend:** Software Gratuito / Freeware (Uso pessoal, não comercial). Código e frontend independentes.
+* **Aviso Legal / Disclaimer:** O **MiSTer 4 ALL** é um projeto de software independente desenvolvido para o ecossistema Windows e **NÃO possui qualquer afiliação, vínculo ou endosso de Alexey Melnikov, do projeto oficial MiSTer FPGA ou de seus mantenedores**.
+* **Cores e Emuladores:** Todos os motores de emulação utilizados são plugins externos independentes compatíveis com a especificação Libretro, desenvolvidos por suas respectivas comunidades e regidos por suas licenças originais.
 
 Lista completa e verificada de cada core/motor/port recompilado, com a
 metodologia usada para identificar cada um: [CREDITS.md](CREDITS.md).
