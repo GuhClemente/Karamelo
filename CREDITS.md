@@ -1,4 +1,4 @@
-# Créditos dos cores
+﻿# Créditos dos cores
 
 O Karamelo não emula nada por conta própria. Ele é um frontend: carrega
 cores [libretro](https://www.libretro.com/) de terceiros, que são quem faz a
@@ -8,7 +8,7 @@ emulação. Este arquivo diz qual projeto está por trás de cada DLL.
 
 Cada core foi verificado de duas formas, sem confiar no nome do arquivo:
 
-1. **Tabela de exports do PE** — os 40 arquivos exportam os seis símbolos que a
+1. **Tabela de exports do PE** — os 45 arquivos exportam os seis símbolos que a
    API libretro exige (`retro_api_version`, `retro_init`, `retro_run`,
    `retro_load_game`, `retro_get_system_info`, `retro_set_environment`).
 2. **Extensões declaradas pelo próprio core**, que são a assinatura do sistema.
@@ -68,12 +68,26 @@ o do log é sempre o real.
 | `mame2003.dll` | MAME 2003 | Arcade (romset 0.78) |
 | `mame2010.dll` | MAME 2010 | Arcade (romset 0.139) |
 
-**40 motores distintos em 42 arquivos.** Dois são peso morto: `play_libretro.dll`
-é cópia byte a byte de `ps2.dll` e nada no código a referencia; `bluemsx.dll`
-sobrou de uma tentativa abandonada de rotear MSX para blueMSX em vez de fMSX
-(revertida por completo no código, o arquivo só nunca foi apagado do disco).
-Nenhum dos dois é referenciado por `MenuResolveCoreForPath()` nem por qualquer
-outro caminho de carregamento.
+**41 motores distintos em 45 arquivos.** Quatro arquivos são o mesmo core sob um
+segundo nome, conferido por hash e não pelo nome: `n64_parallel.dll` = `n64.dll`,
+`pcsx2.dll` e `pcsx2_libretro.dll` = `ps2.dll`, `play_libretro.dll` =
+`ps2_play.dll`.
+
+Dessas cópias só o par do N64 está em uso — o menu carrega `n64_parallel.dll`
+pelo nome e `n64.dll` é o último recurso genérico. As outras três são peso
+morto, e `bluemsx.dll` também: sobrou de uma tentativa abandonada de rotear MSX
+para blueMSX em vez de fMSX, revertida por completo no código, o arquivo só
+nunca foi apagado do disco. Nenhum dos quatro é referenciado por
+`MenuResolveCoreForPath()` nem por qualquer outro caminho de carregamento:
+
+| arquivo morto | tamanho |
+|---|---|
+| `pcsx2.dll` | 10,5 MB |
+| `pcsx2_libretro.dll` | 10,5 MB |
+| `play_libretro.dll` | 2,8 MB |
+| `bluemsx.dll` | 1,5 MB |
+
+São 25 MB empacotados em todo release sem que nada possa carregá-los.
 
 Três observações:
 
@@ -175,7 +189,7 @@ Essas duas estão em `third_party/` com o fonte junto.
 ## ⚠ Licenças dos cores: pendência antes de distribuir
 
 **Esta lista identifica os cores, mas não resolve a questão de licenciamento** —
-e ela ficou maior, porque o projeto passou de 22 para 39 motores.
+e ela ficou maior, porque o projeto passou de 22 para 41 motores.
 
 As licenças diferem entre si. Vários são GPL, o que exige disponibilizar o
 código-fonte correspondente a quem recebe o binário. E alguns têm,
