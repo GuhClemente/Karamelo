@@ -1339,6 +1339,26 @@ void PopulateResetConfirm() {
   scroll_top = 0;
 }
 
+// Repopular uma tela reconstroi items[] inteiro, e a selecao precisa voltar
+// para onde estava. Fazer isso por indice fixo quebra em silencio no dia em que
+// alguem insere ou remove uma linha no meio: ao remover "Arcade Core" de
+// Settings > Video, quatro indices tiveram de ser corrigidos na mao, e nada
+// teria avisado se um passasse batido - a tela so escolheria a linha errada.
+//
+// Procurar pelo action_id nao tem esse problema. O indice continua aceito como
+// segunda opcao porque nem toda chamada quer a propria linha de volta: algumas
+// navegam para outra tela e escolhem uma linha de la, onde o action_id de
+// origem nao existe.
+static void SelectByAction(int action_id, int fallback_idx) {
+  for (size_t i = 0; i < items.size(); i++) {
+    if (action_id != 0 && items[i].action_id == action_id) {
+      selected_idx = (int)i;
+      return;
+    }
+  }
+  selected_idx = fallback_idx;
+}
+
 void PopulateVideoSettings() {
   items.clear();
   current_title = "Video";
@@ -2569,17 +2589,17 @@ static void MenuProcessKeyImpl(MenuKey key) {
       if (count > 0)
         setting_wallpaper = (setting_wallpaper + delta + count) % count;
       PopulateVideoSettings();
-      selected_idx = 2;
+      SelectByAction(item.action_id, 2);
     } else if (item.action_id == 304) // Fullscreen
     {
       setting_fullscreen = !setting_fullscreen;
       PopulateVideoSettings();
-      selected_idx = 3;
+      SelectByAction(item.action_id, 3);
     } else if (item.action_id == 305) // OSD Color
     {
       setting_theme = (setting_theme + delta + 6) % 6;
       PopulateVideoSettings();
-      selected_idx = 4;
+      SelectByAction(item.action_id, 4);
     } else if (item.action_id == 509) // Master System FM
     {
       int cur = selected_idx;
@@ -2680,7 +2700,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
                (setting_n64_core < 2 && !HwIsAvailable()) ? " (NO GL!)" : "");
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
-      selected_idx = 6;
+      SelectByAction(item.action_id, 6);
     } else if (item.action_id == 312) // OSD auto-hide
     {
       setting_osd_timeout =
@@ -2693,7 +2713,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
                  kOsdTimeouts[setting_osd_timeout]);
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
-      selected_idx = 7;
+      SelectByAction(item.action_id, 7);
     } else if (item.action_id == 313) // Name scroll delay
     {
       setting_name_scroll =
@@ -2706,21 +2726,21 @@ static void MenuProcessKeyImpl(MenuKey key) {
                  kScrollDelays[setting_name_scroll]);
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
-      selected_idx = 11;
+      SelectByAction(item.action_id, 11);
     } else if (item.action_id == 308) // V-Sync
     {
       setting_vsync = (setting_vsync + delta + 2) % 2;
       CoreSetToast(setting_vsync == 1 ? "V-SYNC ENABLED" : "V-SYNC DISABLED",
                    120);
       PopulateVideoSettings();
-      selected_idx = 8;
+      SelectByAction(item.action_id, 8);
     } else if (item.action_id == 307) // Sincronia
     {
       setting_sync = (setting_sync + delta + 2) % 2;
       CoreSetDisplaySync(setting_sync == 1, CoreGetDisplayFps());
       CoreSetToast(setting_sync == 1 ? "SYNC: DISPLAY" : "SYNC: NATIVE", 120);
       PopulateVideoSettings();
-      selected_idx = 9;
+      SelectByAction(item.action_id, 9);
     } else if (item.action_id == 306) // Video Driver
     {
       CycleDriver(delta);
@@ -2734,23 +2754,23 @@ static void MenuProcessKeyImpl(MenuKey key) {
       }
       CoreSetToast(msg, 90);
       PopulateVideoSettings();
-      selected_idx = 5;
+      SelectByAction(item.action_id, 5);
     } else if (item.action_id == 401) // Mute
     {
       CoreSetMute(!CoreGetMute());
       PopulateAudioSettings();
-      selected_idx = 0;
+      SelectByAction(item.action_id, 0);
     } else if (item.action_id == 402) // Latency
     {
       setting_latency = (setting_latency + delta + 4) % 4;
       PopulateAudioSettings();
-      selected_idx = 1;
+      SelectByAction(item.action_id, 1);
     } else if (item.action_id == 403) // Volume
     {
       int v = std::clamp(CoreGetVolume() + delta * 5, 0, 100);
       CoreSetVolume(v);
       PopulateAudioSettings();
-      selected_idx = 2;
+      SelectByAction(item.action_id, 2);
     } else if (item.action_id == 501) // System Type
     {
       neo_sys = (neo_sys + delta + 3) % 3;
@@ -2759,7 +2779,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       const char *sys_vals[] = {"aes", "mvs", "uni"};
       CoreSetOption("geolith_system_type", sys_vals[neo_sys]);
       PopulateMainMenu();
-      selected_idx = 2;
+      SelectByAction(item.action_id, 2);
     } else if (item.action_id == 502) // BIOS
     {
       neo_bios = (neo_bios + delta + 2) % 2;
@@ -2767,52 +2787,52 @@ static void MenuProcessKeyImpl(MenuKey key) {
       const char *bios_vals[] = {"aes", "mvs"};
       CoreSetOption("geolith_unibios_hw", bios_vals[neo_bios]);
       PopulateMainMenu();
-      selected_idx = 3;
+      SelectByAction(item.action_id, 3);
     } else if (item.action_id == 503) // CD Type
     {
       neo_cd_type = (neo_cd_type + delta + 4) % 4;
       const char *cd_vals[] = {"cdz", "cd_top", "cd_front", "cdz_unibios"};
       CoreSetOption("geolith_cd_system_type", cd_vals[neo_cd_type]);
       PopulateMainMenu();
-      selected_idx = 4;
+      SelectByAction(item.action_id, 4);
     } else if (item.action_id == 504) // CD Region
     {
       neo_cd_region = (neo_cd_region + delta + 4) % 4;
       const char *reg_vals[] = {"us", "jp", "as", "eu"};
       CoreSetOption("geolith_region", reg_vals[neo_cd_region]);
       PopulateMainMenu();
-      selected_idx = 5;
+      SelectByAction(item.action_id, 5);
     } else if (item.action_id == 505) // Memory Card
     {
       neo_memcard = (neo_memcard + delta + 2) % 2;
       const char *mc_vals[] = {"on", "off"};
       CoreSetOption("geolith_memcard", mc_vals[neo_memcard]);
       PopulateMainMenu();
-      selected_idx = 6;
+      SelectByAction(item.action_id, 6);
     } else if (item.action_id == 506) // [DIP] Settings
     {
       neo_dip_settings = (neo_dip_settings + delta + 2) % 2;
       const char *dip_vals[] = {"off", "on"};
       CoreSetOption("geolith_settingmode", dip_vals[neo_dip_settings]);
       PopulateMainMenu();
-      selected_idx = 7;
+      SelectByAction(item.action_id, 7);
     } else if (item.action_id == 507) // [DIP] Freeplay
     {
       neo_dip_freeplay = (neo_dip_freeplay + delta + 2) % 2;
       const char *fp_vals[] = {"off", "on"};
       CoreSetOption("geolith_freeplay", fp_vals[neo_dip_freeplay]);
       PopulateMainMenu();
-      selected_idx = 8;
+      SelectByAction(item.action_id, 8);
     } else if (item.action_id == 500) // Dispositivo (Gamepad vs Teclado)
     {
       setting_pad_device = (setting_pad_device + delta + 2) % 2;
       PopulateControllerSettings();
-      selected_idx = 1;
+      SelectByAction(item.action_id, 1);
     } else if (item.action_id == 508) // Deadzone
     {
       setting_deadzone = (setting_deadzone + delta + 4) % 4;
       PopulateControllerSettings();
-      selected_idx = 2;
+      SelectByAction(item.action_id, 2);
     } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
     {
       int opt_index = item.action_id - 800;
@@ -2847,7 +2867,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
     {
       current_state = STATE_ABOUT;
       PopulateAbout();
-      selected_idx = 6;
+      selected_idx = 6;   // linha "Cores" na tela About, de onde se veio
     } else if (item.action_id == 999) // Back
     {
       current_state = STATE_SETTINGS;
@@ -3078,19 +3098,19 @@ static void MenuProcessKeyImpl(MenuKey key) {
       if (item.action_id == 211) {
         current_state = STATE_SETTINGS;
         PopulateSettings();
-        selected_idx = 6;
+        SelectByAction(item.action_id, 6);
       } else if (item.action_id == 212) {
         ResetAllSettingsToDefault();
         current_state = STATE_SETTINGS;
         PopulateSettings();
-        selected_idx = 6;
+        SelectByAction(item.action_id, 6);
         CoreSetToast("CONFIGURACOES RESTAURADAS AO PADRAO", 180);
       }
     } else if (current_state == STATE_CONTROLLER) {
       if (item.action_id == 500) {
         setting_pad_device = (setting_pad_device + 1) % 2;
         PopulateControllerSettings();
-        selected_idx = 1;
+        SelectByAction(item.action_id, 1);
       } else if (item.action_id >= 700 && item.action_id < 700 + BIND_COUNT) {
         capture_bind = item.action_id - 700;
         capture_armed = false;
@@ -3120,17 +3140,17 @@ static void MenuProcessKeyImpl(MenuKey key) {
       if (item.action_id == 304) {
         setting_fullscreen = !setting_fullscreen;
         PopulateVideoSettings();
-        selected_idx = 3;
+        SelectByAction(item.action_id, 3);
       } else if (item.action_id == 305) {
         setting_theme = (setting_theme + 1) % 6;
         PopulateVideoSettings();
-        selected_idx = 4;
+        SelectByAction(item.action_id, 4);
       }
     } else if (current_state == STATE_AUDIO) {
       if (item.action_id == 401) {
         CoreSetMute(!CoreGetMute());
         PopulateAudioSettings();
-        selected_idx = 0;
+        SelectByAction(item.action_id, 0);
       }
     } else if (current_state == STATE_UPDATE) {
       if (item.action_id == 391) {
@@ -3201,11 +3221,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (current_state == STATE_ABOUT_CORES) {
       current_state = STATE_ABOUT;
       PopulateAbout();
-      selected_idx = 6;
+      selected_idx = 6;   // linha "Cores" na tela About, de onde se veio
     } else if (current_state == STATE_RESET_CONFIRM) {
       current_state = STATE_SETTINGS;
       PopulateSettings();
-      selected_idx = 6;
+      selected_idx = 6;   // linha de onde a confirmacao foi aberta
     } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
                current_state == STATE_CONTROLLER ||
                current_state == STATE_NETPLAY || current_state == STATE_ABOUT) {

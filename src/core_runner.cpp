@@ -444,6 +444,9 @@ static double   g_core_sample_rate = 48000.0;
 static double   g_resample_phase = 0.0;
 static int16_t  g_hist_l[4] = { 0, 0, 0, 0 };
 static int16_t  g_hist_r[4] = { 0, 0, 0, 0 };
+// Marcada quando a thread de audio nao respondeu e foi abandonada: o stream
+// dela nao pode ser destruido, porque ela pode estar dentro dele.
+static bool     audio_abandoned = false;
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
@@ -3298,14 +3301,21 @@ static void RecoverAfterKilledCore()
 		{
 			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
 			{
-				// Still inside an SDL audio call (a wedged driver) - closing
-				// the stream out from under it right below would race that
-				// call. Force it down first; it holds no C++ objects that
-				// need unwinding, just an audio buffer we are about to
-				// release anyway.
+				// Presa dentro de uma chamada do SDL (driver travado). Nao se
+				// mata: TerminateThread solta a thread sem soltar os locks que
+				// ela segura, e se um deles for interno do SDL a proxima
+				// chamada de audio trava para sempre. Foi essa a mecanica que
+				// deixou a interface presa em "LOADING..." no PS2, por outro
+				// caminho.
+				//
+				// Abandona-se a thread E o stream juntos. Destruir o stream
+				// aqui correria contra a chamada em que ela esta parada, que e
+				// o motivo original de existir um kill. Deixando os dois de pe
+				// nada corre risco: ela sai sozinha se a chamada retornar, e um
+				// jogo novo abre um stream novo.
+				audio_abandoned = true;
 				CoreLogPrintf(RETRO_LOG_WARN,
-					"[CoreShutdown] audio thread nao respondeu em 1s (driver travado?) - forcando encerramento");
-				TerminateThread(h_audio_thread, 1);
+					"[CoreShutdown] audio thread nao respondeu em 1s (driver travado?) - abandonando thread e stream (vazam ate fechar o app)");
 			}
 			CloseHandle(h_audio_thread);
 			h_audio_thread = NULL;
@@ -3316,9 +3326,11 @@ static void RecoverAfterKilledCore()
 	{
 		// Destroying the stream also closes the device it was opened
 		// against - SDL_OpenAudioDeviceStream's own contract.
-		SDL_DestroyAudioStream(g_audio_stream);
+		if (!audio_abandoned)
+			SDL_DestroyAudioStream(g_audio_stream);
 		g_audio_stream = nullptr;
 		audio_initialized = false;
+		audio_abandoned = false;
 	}
 	if (h_audio_event) { CloseHandle(h_audio_event); h_audio_event = NULL; }
 
@@ -4007,9 +4019,11 @@ static void CoreUnload()
 		{
 			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
 			{
+				// Mesmo raciocinio do CoreShutdown: abandonar em vez de matar.
+				// Ver o comentario la para o porque.
+				audio_abandoned = true;
 				CoreLogPrintf(RETRO_LOG_WARN,
-					"[CoreUnload] Audio thread nao respondeu a tempo (driver travado?) - forcando encerramento");
-				TerminateThread(h_audio_thread, 1);
+					"[CoreUnload] audio thread nao respondeu a tempo (driver travado?) - abandonando thread e stream (vazam ate fechar o app)");
 			}
 			CloseHandle(h_audio_thread);
 			h_audio_thread = NULL;
@@ -4022,9 +4036,11 @@ static void CoreUnload()
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Fechando audio stream...");
 		// Destroying the stream also closes the device it was opened
 		// against - SDL_OpenAudioDeviceStream's own contract.
-		SDL_DestroyAudioStream(g_audio_stream);
+		if (!audio_abandoned)
+			SDL_DestroyAudioStream(g_audio_stream);
 		g_audio_stream = nullptr;
 		audio_initialized = false;
+		audio_abandoned = false;
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] audio stream finalizado.");
 	}
 
