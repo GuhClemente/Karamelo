@@ -3992,12 +3992,19 @@ static void CoreUnload()
 		is_game_loaded = false;
 	}
 
-	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando HwContextDestroy...");
+	// Uma linha por backend, e nao uma para os quatro juntos. Cada um destes
+	// chama de volta o context_destroy do core, que e codigo de terceiro e pode
+	// nao voltar: com um unico log antes do bloco, o que se via era "Chamando
+	// HwContextDestroy..." e silencio, sem dizer qual dos quatro prendeu.
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy (GL)...");
 	HwContextDestroy();
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] VkHwContextDestroy...");
 	VkHwContextDestroy();
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] D3D11HwContextDestroy...");
 	D3D11HwContextDestroy();
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwReleaseCurrent...");
 	HwReleaseCurrent();
-	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy concluido.");
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] teardown de video concluido.");
 
 	if (is_core_loaded)
 	{

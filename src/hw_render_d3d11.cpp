@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "libretro.h"
 #include "libretro_d3d11.h"
@@ -218,14 +219,59 @@ bool D3D11HwContextReset()
 	return true;
 }
 
+// context_destroy pertence ao core, e nem todo core volta dele. O PCSX2 nao
+// volta: medido, ele gira a 96% de um nucleo indefinidamente, com a memoria
+// parada, e o app so saia dali por TerminateThread - que mata a thread sem
+// soltar os locks dela e deixa a interface presa em "LOADING..." para sempre.
+//
+// Chamar numa thread propria e esperar com prazo troca uma trava garantida por
+// um vazamento de contexto D3D11 quando o prazo estoura. O vazamento e feio e
+// dura ate o app fechar; a trava e definitiva. Entre os dois nao ha duvida.
+// O parametro vai no heap, nao na pilha: quando o prazo estoura esta funcao
+// retorna e a thread continua viva: um ponteiro para variavel local viraria
+// lixo debaixo dela. Quem libera e a propria thread, se um dia terminar.
+static DWORD WINAPI D3D11DestroyThreadProc(LPVOID param)
+{
+	retro_hw_context_reset_t fn = *(retro_hw_context_reset_t*)param;
+	__try { fn(); }
+	__except (EXCEPTION_EXECUTE_HANDLER) {}
+	free(param);
+	return 0;
+}
+
 void D3D11HwContextDestroy()
 {
 	if (!g_hw_active) return;
 
 	if (g_context_live && g_hw_cb.context_destroy)
 	{
-		__try { g_hw_cb.context_destroy(); }
-		__except (EXCEPTION_EXECUTE_HANDLER) {}
+		retro_hw_context_reset_t* fn =
+			(retro_hw_context_reset_t*)malloc(sizeof(retro_hw_context_reset_t));
+		HANDLE h = NULL;
+		if (fn)
+		{
+			*fn = g_hw_cb.context_destroy;
+			h = CreateThread(NULL, 0, D3D11DestroyThreadProc, fn, 0, NULL);
+			if (!h) free(fn);
+		}
+		if (h)
+		{
+			// 5s e folgado para um teardown honesto e curto o bastante para o
+			// jogador nao achar que o app morreu.
+			if (WaitForSingleObject(h, 5000) == WAIT_TIMEOUT)
+			{
+				D3D11HwLog("context_destroy do core nao retornou em 5s - seguindo sem ele (contexto vazado ate fechar o app)");
+				// A thread fica onde esta. Nao se mata: ela esta dentro do
+				// core, provavelmente segurando algum lock, e TerminateThread
+				// aqui reproduziria exatamente o problema que isto evita.
+			}
+			CloseHandle(h);
+		}
+		else
+		{
+			__try { g_hw_cb.context_destroy(); }
+			__except (EXCEPTION_EXECUTE_HANDLER) {}
+		}
 	}
 
 	g_context_live = false;
