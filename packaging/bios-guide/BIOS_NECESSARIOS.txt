@@ -136,9 +136,11 @@ JA COMPLETO - confira o MD5 se algum jogo especifico reclamar
 
 [PlayStation] cores/psx.dll (Beetle PSX)
   Status: PRESENTE PARA NTSC-U E PAL, FALTA NTSC-J
-    scph5501.bin (NTSC-U)   - presente
-    scph5502.bin (PAL)      - presente
-    scph5500.bin (NTSC-J)   - FALTANDO
+    scph5501.bin (NTSC-U)   MD5 1e68c231d0896b7eadcad1d7d8e76129
+    scph5502.bin (PAL)      MD5 32736f17079d0b2b7024407c39bd3050
+    scph5500.bin (NTSC-J)   MD5 8dd7d5296a650fac7319bce665a6a53c
+    Os tres tem 524288 bytes. Se algum vier menor, nao e BIOS - conferir
+    com tools/check_bios.ps1 antes de culpar o core.
   Pasta: app/bios/
   Um jogo japones sem o scph5500.bin ainda tenta bootar com outra regiao
   e o core avisa "Firmware is missing: scph5500.bin" - vale completar se
