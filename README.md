@@ -9,7 +9,7 @@
 
 ## 🌟 Visão Geral
 
-O **Karamelo Emulador** é um port nativo em C++20 (64-bit) de alto desempenho da interface de usuário e OSD do MiSTer para o ambiente Windows x86_64, integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **35 sistemas** através de **40 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, e dezenas de outros — ver CREDITS.md).
+O **Karamelo Emulador** é um frontend nativo em C++20 (64-bit) de alto desempenho para Windows x86_64. A interface e o OSD são inspirados no visual do MiSTer, mas são **implementação própria, escrita do zero** — nada aqui é porte de código do Main_MiSTer; o que foi preservado é a aparência e o contrato de dados, detalhado arquivo a arquivo em [docs/FRONTEND.md](docs/FRONTEND.md). O frontend é integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **35 sistemas** através de **40 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, e dezenas de outros — ver CREDITS.md).
 
 ---
 
