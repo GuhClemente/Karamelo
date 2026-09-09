@@ -1569,6 +1569,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		bool pass = started && running && (__argc <= 5 || (retry_started && retry_running));
 		log("RESULT=%s", pass ? "PASS" : "FAIL");
 		if (lf) fclose(lf);
+		// Mesmo motivo do fim do WinMain: a destruicao estatica da DLL do core
+		// derruba o processo depois do teste terminar, e a bateria leria isso
+		// como crash de um teste que passou. O codigo de saida e preservado,
+		// que e o que ela le.
+		TerminateProcess(GetCurrentProcess(), pass ? 0 : 1);
 		return pass ? 0 : 1;
 	}
 
@@ -1853,5 +1858,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (h_present_dc) DeleteDC(h_present_dc);
 	if (h_present_bitmap) DeleteObject(h_present_bitmap);
 
+	// Sai sem devolver o controle ao runtime do C, de proposito.
+	//
+	// Um core mantido mapeado roda os destrutores estaticos dele no fim do
+	// processo, e o PPSSPP nao sobrevive a isso: medido, o processo terminava
+	// com 0xC0000409 (fast-fail de estouro de pilha) **depois** de o jogo
+	// carregar, rodar, descarregar e o log fechar - todo o trabalho ja feito,
+	// e ainda assim uma janela de erro do Windows na cara do jogador.
+	//
+	// Aqui nao ha mais nada a preservar: as configuracoes sao gravadas quando
+	// mudam (MenuSaveSettings) e a geometria da janela foi gravada logo acima,
+	// e o log e aberto e fechado a cada escrita, sem buffer pendente. O que
+	// TerminateProcess pula e exatamente a parte que quebra.
+	//
+	// Se um dia algo passar a depender de limpeza no fim do processo, este e o
+	// ponto que vai engoli-la em silencio.
+	TerminateProcess(GetCurrentProcess(), 0);
 	return 0;
 }
