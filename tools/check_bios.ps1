@@ -61,10 +61,36 @@ foreach ($e in $expected) {
         continue
     }
 
+    # Um arquivo minusculo nunca e uma BIOS. O caso real que motivou isto: o
+    # scph5500.bin e o panafz1.bin baixados tinham 131 e 132 bytes porque o
+    # servidor entregou o ponteiro do Git LFS em vez do arquivo. Sem MD5 no
+    # guia, a checagem de hash nao pega, e o arquivo passava como "presente".
+    $size = (Get-Item $path).Length
+    $head = ""
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($path)
+        $head  = [System.Text.Encoding]::ASCII.GetString($bytes[0..([Math]::Min(63, $bytes.Length - 1))])
+    } catch {}
+
+    if ($head -like "version https://git-lfs*") {
+        Write-Host ("  LFS STUB  {0,-22} {1}" -f $e.n, $e.sys) -ForegroundColor Red
+        Write-Host ("            {0} bytes - e um ponteiro do Git LFS, nao a BIOS. Baixe de novo." -f $size) -ForegroundColor DarkRed
+        $bad++
+        continue
+    }
+
+    # O palpite por tamanho so vale quando nao ha hash. O MD5 e autoritativo:
+    # a BIOS do Atari 5200 tem 2 KB legitimos, e uma primeira versao deste
+    # script a reprovou por ser "pequena demais" mesmo com o hash batendo.
     if ([string]::IsNullOrEmpty($e.md5)) {
-        $size = (Get-Item $path).Length
-        Write-Host ("  presente  {0,-22} {1} ({2:N0} bytes, sem MD5 no guia)" -f $e.n, $e.sys, $size) -ForegroundColor Yellow
-        $ok++
+        if ($size -lt 512) {
+            Write-Host ("  SUSPEITO  {0,-22} {1}" -f $e.n, $e.sys) -ForegroundColor Red
+            Write-Host ("            so {0} bytes - pequeno demais para ser uma BIOS." -f $size) -ForegroundColor DarkRed
+            $bad++
+        } else {
+            Write-Host ("  presente  {0,-22} {1} ({2:N0} bytes, sem MD5 no guia)" -f $e.n, $e.sys, $size) -ForegroundColor Yellow
+            $ok++
+        }
         continue
     }
 
@@ -91,7 +117,8 @@ if (Test-Path $log) {
              Select-Object -Last 12 -ExpandProperty Line
     if ($lines) {
         Write-Host ""
-        Write-Host "  Ultimas reclamacoes dos cores no log:" -ForegroundColor Cyan
+        $age = [int]((Get-Date) - (Get-Item $log).LastWriteTime).TotalMinutes
+        Write-Host ("  Reclamacoes dos cores no log (ultima escrita ha {0} min - pode ser de ANTES de voce copiar os arquivos):" -f $age) -ForegroundColor Cyan
         $lines | ForEach-Object { Write-Host ("    " + $_.Trim()) -ForegroundColor DarkYellow }
     }
 }
