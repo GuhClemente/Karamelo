@@ -1,0 +1,20 @@
+# Fim de linha por tipo de arquivo, explicito.
+#
+# Esta maquina usa core.autocrlf=true, entao o checkout converte LF para CRLF
+# em tudo que o git considera texto. Sem as regras abaixo isso alcanca tambem
+# os scripts que rodam no Linux, e um .sh com CRLF nao executa: o kernel le o
+# shebang literalmente e sai procurando um interpretador chamado "/bin/bash\r",
+# falhando com "cannot execute: required file not found". Foi exatamente assim
+# que o fix_server.sh parou de rodar no servidor - os arquivos de release
+# chegavam em /data/downloads/ e nunca eram sincronizados para os containers,
+# entao os downloads davam 404 enquanto o version.json anunciava a versao nova.
+#
+# O conteudo guardado no repositorio sempre foi LF; o que mudava era so a copia
+# do working tree. Estas regras valem no checkout e no commit, entao o problema
+# nao volta.
+
+*.sh   text eol=lf
+
+# Estes so rodam no Windows, onde CRLF e o esperado.
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
