@@ -38,11 +38,21 @@ $log = Join-Path $app "karamelo.log"
 # Duas baterias ao mesmo tempo disputam o mesmo executavel e o mesmo log, e o
 # resultado das duas fica sem valor. Aconteceu: uma rodada acusou dois sistemas
 # de derrubar o processo, e nenhum dos dois havia crashado.
-$outros = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
-            Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like "*stress_cores*" })
-if ($outros.Count -gt 0) {
-    throw ("Ja existe uma bateria rodando (PID {0}). Espere ela terminar - duas ao mesmo tempo invalidam as duas." -f $outros[0].ProcessId)
+#
+# A trava e um arquivo com o PID, e nao uma varredura de linhas de comando: a
+# varredura enxergava o proprio processo que lanca o script - quando ele e
+# chamado por outro powershell, o texto "stress_cores" aparece na linha de
+# comando do pai, e a bateria se recusava a rodar por causa de si mesma.
+$lock = Join-Path $env:TEMP "karamelo_stress.lock"
+if (Test-Path $lock) {
+    $donoPid = (Get-Content $lock -ErrorAction SilentlyContinue | Select-Object -First 1)
+    $vivo = $donoPid -and (Get-Process -Id $donoPid -ErrorAction SilentlyContinue)
+    if ($vivo) {
+        throw ("Ja existe uma bateria rodando (PID {0}). Espere ela terminar - duas ao mesmo tempo invalidam as duas." -f $donoPid)
+    }
+    Remove-Item $lock -Force -ErrorAction SilentlyContinue   # trava orfa de uma rodada interrompida
 }
+Set-Content -Path $lock -Value $PID -Encoding ascii
 
 # Pasta em roms/ -> core que a atende. Espelha o roteamento do menu nos casos
 # obvios; para Arcade entrega o primeiro da cadeia e deixa o proprio app
@@ -170,6 +180,8 @@ if ($fail.Count) {
     Write-Host "  Recusaram carregar (pode ser romset/BIOS, nao necessariamente bug):" -ForegroundColor Yellow
     $fail | ForEach-Object { Write-Host ("    {0,-14} {1}" -f $_.Sistema, $_.Rom) -ForegroundColor Yellow }
 }
+
+Remove-Item $lock -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
 if ($crash.Count) { exit 2 } elseif ($fail.Count) { exit 1 } else { exit 0 }
