@@ -93,7 +93,6 @@ $map = [ordered]@{
     "GameCube"      = "cores/gamecube.dll"
     "3DS"           = "cores/3ds.dll"
     "DOS"           = "cores/dosbox_pure.dll"
-    "MegaDrive"     = "cores/genesis.dll"
 }
 
 # O que NAO e ROM. A versao anterior usava lista branca de extensoes, e todo
