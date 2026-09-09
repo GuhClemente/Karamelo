@@ -139,5 +139,10 @@ powershell -NoProfile -Command "$exe = Get-Item 'dist\Karamelo.exe'; $exeHash = 
 
 echo   Updater: dist\Karamelo.exe
 echo   Manifest: dist\version.json
+echo.
+echo   [LEMBRETE] dist\version.json e versionado de proposito: e a copia que
+echo   o auto-update le no GitHub quando karamelo-emu.com nao responde.
+echo   Sem commit + push dele, o fallback anuncia a versao anterior:
+echo       git add dist/version.json ^&^& git commit -m "release: v%APP_VER%" ^&^& git push
 echo =======================================================
 echo.
