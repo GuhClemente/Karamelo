@@ -267,7 +267,6 @@ static int setting_vsync = 1; // 0=Disabled, 1=Enabled
 // ParaLLEl N64 is the primary robust core with Ari64 Dynarec and RetroAchievements.
 // Defaulting to it provides 60fps locked emulation and rock-solid stability.
 static int setting_n64_core = 0;
-static int setting_arcade_core = 0; // 0=FBNeo, 1=MAME 2003, 2=MAME 2010
 static int setting_osd_timeout = 0; // index into kOsdTimeouts
 static int setting_name_scroll = 3; // index into kScrollDelays; default 5s
 static int setting_sms_fm = 0; // 0=auto, 1=desligado, 2=ligado
@@ -441,15 +440,16 @@ int MenuGetVideoDriver() { return setting_driver; }
 int MenuGetSyncMode() { return setting_sync; }
 int MenuGetVsync() { return setting_vsync; }
 int MenuGetN64Core() { return setting_n64_core; }
+// Arcade routing is automatic and deliberately has no setting. There used to
+// be one, offering "FinalBurn Neo", "MAME 2003", "MAME 2010" and "Flycast".
+// Picking wrong was not a harmless mistake: handing a romset to a MAME build
+// that expects a different one made the core fault hard enough to corrupt the
+// process heap (0xC0000374), and Windows kills that instantly - no exception
+// raised, so no crash handler, no log entry, the window just vanishes. A
+// player has no way to know which of four cores their dump was built for, so
+// the setting was a loaded gun pointed at the application.
 static const char *GetArcadeCoreDll(const std::string &file_path = "") {
-  if (setting_arcade_core == 1)
-    return "cores/mame2003.dll";
-  if (setting_arcade_core == 2)
-    return "cores/mame2010.dll";
-  if (setting_arcade_core == 3)
-    return "cores/dreamcast.dll";
-
-  // Auto mode (setting_arcade_core == 0): intelligently route arcade boards
+  // Route each board to the core that actually emulates it
   if (!file_path.empty()) {
     std::string stem = fs::path(file_path).stem().string();
     std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
@@ -1284,7 +1284,6 @@ static void ResetAllSettingsToDefault() {
   setting_sync = 1;
   setting_vsync = 1;
   setting_n64_core = 0; // ParaLLEl N64 - see the comment on its declaration
-  setting_arcade_core = 0;
   setting_osd_timeout = 0;
   setting_name_scroll = 3;
   setting_sms_fm = 0;
@@ -1366,11 +1365,6 @@ void PopulateVideoSettings() {
   // the OSD value column shows.
   const char *n64_cores[] = {"ParaLLEl N64", "Mupen64+ Next", "Gopher64"};
   items.push_back({"N64 Core", n64_cores[setting_n64_core], false, false, 309});
-
-  const char *arcade_cores[] = {"FinalBurn Neo", "MAME 2003", "MAME 2010",
-                                "Flycast Naomi"};
-  items.push_back(
-      {"Arcade Core", arcade_cores[setting_arcade_core], false, false, 311});
 
   char osd_to[16];
   if (kOsdTimeouts[setting_osd_timeout] == 0)
@@ -2051,7 +2045,6 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "sync", setting_sync);
   AppendSetting(out, "vsync", setting_vsync);
   AppendSetting(out, "n64_core", setting_n64_core);
-  AppendSetting(out, "arcade_core", setting_arcade_core);
   AppendSetting(out, "osd_timeout", setting_osd_timeout);
   AppendSetting(out, "name_scroll", setting_name_scroll);
   AppendSetting(out, "hw_render", (setting_driver != VIDEO_DRIVER_SOFTWARE) ? 1 : 0);
@@ -2173,8 +2166,6 @@ static void MenuLoadSettings() {
       setting_vsync = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "n64_core"))
       setting_n64_core = ClampInt(iv, 0, 2);
-    else if (!strcmp(key, "arcade_core"))
-      setting_arcade_core = ClampInt(iv, 0, 3);
     else if (!strcmp(key, "osd_timeout"))
       setting_osd_timeout = ClampInt(iv, 0, kOsdTimeoutCount - 1);
     else if (!strcmp(key, "name_scroll"))
@@ -2702,7 +2693,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
                  kOsdTimeouts[setting_osd_timeout]);
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
-      selected_idx = 8;
+      selected_idx = 7;
     } else if (item.action_id == 313) // Name scroll delay
     {
       setting_name_scroll =
@@ -2715,32 +2706,21 @@ static void MenuProcessKeyImpl(MenuKey key) {
                  kScrollDelays[setting_name_scroll]);
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
-      selected_idx = 12;
-    } else if (item.action_id == 311) // Arcade core
-    {
-      setting_arcade_core = (setting_arcade_core + delta + 4) % 4;
-      const char *names[] = {"FINALBURN NEO", "MAME 2003 (romset 0.78)",
-                             "MAME 2010 (romset 0.139)",
-                             "FLYCAST (NAOMI / ATOMISWAVE)"};
-      char msg[80];
-      snprintf(msg, sizeof(msg), "ARCADE: %s", names[setting_arcade_core]);
-      CoreSetToast(msg, 180);
-      PopulateVideoSettings();
-      selected_idx = 7;
+      selected_idx = 11;
     } else if (item.action_id == 308) // V-Sync
     {
       setting_vsync = (setting_vsync + delta + 2) % 2;
       CoreSetToast(setting_vsync == 1 ? "V-SYNC ENABLED" : "V-SYNC DISABLED",
                    120);
       PopulateVideoSettings();
-      selected_idx = 9;
+      selected_idx = 8;
     } else if (item.action_id == 307) // Sincronia
     {
       setting_sync = (setting_sync + delta + 2) % 2;
       CoreSetDisplaySync(setting_sync == 1, CoreGetDisplayFps());
       CoreSetToast(setting_sync == 1 ? "SYNC: DISPLAY" : "SYNC: NATIVE", 120);
       PopulateVideoSettings();
-      selected_idx = 10;
+      selected_idx = 9;
     } else if (item.action_id == 306) // Video Driver
     {
       CycleDriver(delta);
