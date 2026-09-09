@@ -4037,6 +4037,29 @@ static void CoreUnload()
 		std::string lower_path = s_loaded_core_path;
 		for (char& c : lower_path) c = (char)tolower((unsigned char)c);
 
+		// Só o GameCube continua aqui. Cada core que saiu desta lista parou de
+		// quebrar ao ser recarregado: manter a DLL mapeada preserva os globais
+		// do core, e a inicialização seguinte reencontra estado de uma sessão
+		// que já terminou. Foi assim com o MAME (recusava o segundo load), com
+		// o Flycast (DEBUGBREAK no segundo retro_init) e com o PCSX2, que na
+		// terceira carga escreveu num ponteiro de fastmem morto e levou o
+		// processo junto - 0xC0000005 em 0x7FFEA0000000, logo após
+		// "Resetting host memory for virtual systems".
+		// MAME, FBNeo e Flycast saíram desta lista com prova: os três voltaram
+		// a suportar recarga depois disso, verificado pela bateria.
+		//
+		// PCSX2 e PPSSPP continuam aqui, e a tentativa de tirá-los foi
+		// desfeita. Não porque tenha piorado, mas porque não melhorou nada
+		// mensurável e o risco não é simétrico: o que esta lista evita é
+		// deadlock de loader lock no descarregamento, e o travamento que este
+		// projeto tem hoje - a thread do core morta por TerminateThread
+		// segurando um lock - é exatamente dessa família. Trocar um crash
+		// conhecido por um deadlock possível, sem evidência, não é troca boa.
+		//
+		// O que falta para decidir: carregar um jogo de PS2 três vezes seguidas
+		// no app com janela, com e sem a DLL liberada. A bateria headless não
+		// serve - o PCSX2 trava nela por falta de contexto de GPU, antes de
+		// chegar no ponto que interessa.
 		if (s_loaded_core_is_pcsx2 ||
 		    loaded_core_name == "PlayStation 2" ||
 		    loaded_core_name == "PSP" ||

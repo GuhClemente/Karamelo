@@ -209,3 +209,53 @@ e a BIOS japonesa de PlayStation.
 - **A marca antiga continua na arte** de 16 wallpapers mais o `karamelo_chef` e
   o `karamelo_arcade`. O `wallpaper_08` foi removido do projeto a pedido; a
   purga dele do histórico do git ficou por fazer.
+
+
+---
+
+## 5. PlayStation 2: crash na terceira carga, e a tela congela depois — EM ABERTO
+
+Reportado com o app rodando de verdade, não pelo teste headless. O jogador
+abriu um jogo de PS2, saiu, abriu outro, e na **terceira** carga do core na
+mesma sessão:
+
+```
+Resetting host memory for virtual systems...
+[CRASH] codigo=0xC0000005 modulo=ps2.dll offset=0xA94F4
+[CRASH] escrita no endereco 0x7FFEA0000000
+[CoreShutdown] Timeout aguardando core thread. Verificando module_op=0
+[CoreShutdown] Matando core thread via TerminateThread...
+[CoreRunner] o core nao encerrou sozinho; estado recuperado a forca
+[CoreShutdown] Finalizado apos recuperacao forcada.
+```
+
+E o log **para aí**. A tela fica em `LOADING...` para sempre.
+
+**Duas coisas separadas, e a segunda é a pior.**
+
+**O crash.** Terceira inicialização do PCSX2 no mesmo processo. O padrão é o
+mesmo que quebrou MAME e Flycast — DLL mantida mapeada, globais sobrevivem, a
+inicialização seguinte reencontra estado morto. A diferença é que ali havia
+prova e aqui não: tirar `ps2.dll` da lista de "não liberar" **não mudou nada**
+que se pudesse medir, e a mudança foi desfeita. Ver o comentário no
+`skip_free` para o raciocínio e para o teste que falta.
+
+**O congelamento.** Não é falta de tratamento: `main_win32.cpp:1345` já reabre
+o menu quando uma carga termina sem core rodando. A tela congela porque **a
+thread principal travou**. `TerminateThread` mata a thread do core sem liberar
+nada que ela segurava, e quem tentar o mesmo lock depois para para sempre. É
+documentado da API, não é bug de uso.
+
+Isso significa que **a recuperação forçada não é recuperável** no caso geral.
+Enquanto o core rodar dentro do processo do app, todo crash de core que não
+encerre sozinho pode levar a UI junto. As saídas de verdade são duas, e as
+duas são mudança de arquitetura: não matar thread nenhuma (aceitar que um core
+travado trava o app, e dizer isso ao jogador), ou rodar cores em processo
+separado, onde a morte de um não alcança a interface.
+
+**Por que a bateria headless não ajuda aqui.** PS2 e PSP falham nela antes de
+chegar ao ponto que interessa - o PCSX2 pede contexto D3D12, cai para D3D11 e
+trava; o PPSSPP exige negociação de contexto Vulkan que o app não implementa,
+é recusado e crasha assim mesmo. Os dois precisam de janela. O que confirma ou
+derruba a hipótese da DLL é carregar um jogo de PS2 três vezes seguidas no app
+de verdade, com e sem a DLL liberada.
