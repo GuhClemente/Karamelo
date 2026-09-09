@@ -129,8 +129,13 @@
 *.7z
 *.rar
 /temp_cores_dl/
-/dist/*.*
-/dist
+# Saida de build. Uma excecao: o dist/version.json e o manifesto do
+# auto-update, e o updater usa a copia dele no GitHub como fallback quando
+# karamelo-emu.com nao responde - por isso ele precisa estar versionado.
+# Git nao consegue reincluir um arquivo dentro de um diretorio excluido,
+# entao a regra ignora o conteudo (/dist/*) em vez do diretorio (/dist).
+/dist/*
+!/dist/version.json
 
 # ---------------------------------------------------------------------------
 # Rust / Cargo build artifacts (evita inflar o repo com gigabytes de binários)

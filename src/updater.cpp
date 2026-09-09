@@ -29,6 +29,13 @@
 namespace fs = std::filesystem;
 
 // Configuration
+// O manifesto oficial vem do site. O fallback existe para o caso de o site
+// estar fora do ar, e le a copia versionada do MESMO arquivo no GitHub -
+// dist/version.json e a unica excecao dentro de /dist no .gitignore, exatamente
+// por causa disto. Ele so fica atualizado se o commit do version.json for
+// enviado depois de cada release; package_release.bat lembra disso no final.
+// Ambos por https: o manifesto decide qual .exe sera baixado e executado, e em
+// http puro qualquer um no caminho poderia trocar a URL e o hash.
 static const char* UPDATE_MANIFEST_URL = "https://karamelo-emu.com/downloads/version.json";
 static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/GuhClemente/Karamelo/main/dist/version.json";
 static const wchar_t* USER_AGENT = L"Karamelo-Updater/1.0";
@@ -449,7 +456,7 @@ static void UpdaterThreadProc()
 			bool ok = HttpFetchData(UPDATE_MANIFEST_URL, &json_body, NULL, NULL, 0, false);
 			if (!ok)
 			{
-				// Fallback to GitHub raw
+				// Site fora do ar: tenta a copia versionada no GitHub.
 				ok = HttpFetchData(UPDATE_FALLBACK_URL, &json_body, NULL, NULL, 0, false);
 			}
 
