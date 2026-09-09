@@ -5,8 +5,8 @@ if (-not (Test-Path "dist")) {
 }
 
 Write-Host "==================================================="
-Write-Host "1. Criando Pack de BIOS (dist\MiSTer_4_ALL_Pack_BIOS.zip)..."
-$biosZip = "dist\MiSTer_4_ALL_Pack_BIOS.zip"
+Write-Host "1. Criando Pack de BIOS (dist\Karamelo_Pack_BIOS.zip)..."
+$biosZip = "dist\Karamelo_Pack_BIOS.zip"
 if (Test-Path $biosZip) {
     Remove-Item $biosZip -Force
 }
@@ -33,7 +33,7 @@ foreach ($rf in $romFiles) {
     Copy-Item -Path $rf.FullName -Destination $destFolder -Force
 }
 
-$romsZip = "dist\MiSTer_4_ALL_Pack_ROMs_Pequenos.zip"
+$romsZip = "dist\Karamelo_Pack_ROMs_Pequenos.zip"
 if (Test-Path $romsZip) {
     Remove-Item $romsZip -Force
 }

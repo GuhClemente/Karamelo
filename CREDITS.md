@@ -1,6 +1,6 @@
 # Créditos dos cores
 
-O MiSTer 4 ALL não emula nada por conta própria. Ele é um frontend: carrega
+O Karamelo não emula nada por conta própria. Ele é um frontend: carrega
 cores [libretro](https://www.libretro.com/) de terceiros, que são quem faz a
 emulação. Este arquivo diz qual projeto está por trás de cada DLL.
 
@@ -96,7 +96,7 @@ estaticamente para rodar como executável nativo do Windows (tecnologia
 [N64Recomp](https://github.com/N64Recomp/N64Recomp) e variações da mesma
 técnica para outras plataformas), baixados sob demanda da API de Releases do
 GitHub direto do projeto de cada um - nada disso vem empacotado dentro do
-instalador do MiSTer 4 ALL. Cada linha foi baixada, extraída e aberta de
+instalador do Karamelo. Cada linha foi baixada, extraída e aberta de
 verdade nesta sessão para confirmar que o link ainda é válido e que o
 executável certo é identificado (o app prefere o maior/mais raso `.exe` do
 pacote, evitando instaladores, ferramentas de build e outros arquivos que às

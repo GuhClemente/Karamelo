@@ -66,7 +66,7 @@ static void ChdLog(const char* fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	FILE* f = fopen("mister4all.log", "a");
+	FILE* f = fopen("karamelo.log", "a");
 	if (f) { fprintf(f, "[INFO] [CHD] %s\n", buf); fclose(f); }
 }
 

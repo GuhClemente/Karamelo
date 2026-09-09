@@ -29,9 +29,9 @@
 namespace fs = std::filesystem;
 
 // Configuration
-static const char* UPDATE_MANIFEST_URL = "https://mister4all.com/downloads/version.json";
-static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/GuhClemente/MiSTer-4-All/main/dist/version.json";
-static const wchar_t* USER_AGENT = L"MiSTer-4-ALL-Updater/1.0";
+static const char* UPDATE_MANIFEST_URL = "https://karamelo-emu.com/downloads/version.json";
+static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/GuhClemente/Karamelo/main/dist/version.json";
+static const wchar_t* USER_AGENT = L"Karamelo-Updater/1.0";
 
 // Internal State
 static std::mutex              g_updater_lock;
@@ -295,7 +295,7 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 					bool need_dest_file = (out_bin == NULL && out_str == NULL && track_progress);
 					if (need_dest_file)
 					{
-						temp_new_path = GetExecutableDirectory() + "\\MiSTer_4_ALL.new";
+						temp_new_path = GetExecutableDirectory() + "\\Karamelo.new";
 						dest_file = fopen(temp_new_path.c_str(), "wb");
 						if (!dest_file)
 						{
@@ -502,7 +502,7 @@ static void UpdaterThreadProc()
 
 			if (dl_url.empty())
 			{
-				dl_url = "https://mister4all.com/downloads/MiSTer_4_ALL.exe";
+				dl_url = "https://karamelo-emu.com/downloads/Karamelo.exe";
 			}
 
 			size_t total_size = 0;
@@ -517,7 +517,7 @@ static void UpdaterThreadProc()
 			std::string new_exe_path;
 			if (dl_ok && !expected_sha256.empty())
 			{
-				new_exe_path = GetExecutableDirectory() + "\\MiSTer_4_ALL.new";
+				new_exe_path = GetExecutableDirectory() + "\\Karamelo.new";
 				std::string actual_sha256 = Sha256File(new_exe_path);
 
 				std::string expected_lower = expected_sha256, actual_lower = actual_sha256;
@@ -553,7 +553,7 @@ void UpdaterInit()
 	// Clean up any leftover temporary files from a previous update
 	std::string app_dir = GetExecutableDirectory();
 	std::string old_bat = app_dir + "\\_update_apply.bat";
-	std::string old_exe = app_dir + "\\MiSTer_4_ALL.exe.old";
+	std::string old_exe = app_dir + "\\Karamelo.exe.old";
 
 	if (fs::exists(old_bat)) fs::remove(old_bat);
 	if (fs::exists(old_exe)) fs::remove(old_exe);
@@ -611,7 +611,7 @@ bool UpdaterApplyAndRestart()
 {
 	std::string app_dir = GetExecutableDirectory();
 	std::string target_exe = GetCurrentExecutablePath();
-	std::string new_exe = app_dir + "\\MiSTer_4_ALL.new";
+	std::string new_exe = app_dir + "\\Karamelo.new";
 
 	if (!fs::exists(new_exe))
 	{

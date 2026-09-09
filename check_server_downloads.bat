@@ -3,7 +3,7 @@ setlocal
 cls
 
 echo =======================================================
-echo   MiSTer 4 ALL - Verificador de Arquivos no Servidor
+echo   Karamelo - Verificador de Arquivos no Servidor
 echo =======================================================
 echo.
 echo Conectando em root@187.127.59.127:/data/downloads/...

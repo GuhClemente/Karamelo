@@ -43,7 +43,7 @@ typedef void* HMODULE;
 #include "gamepad_sdl.h"
 #include "archive_helper.h"
 #include "retroachievements.h"
-#include "mister_math.h"
+#include "karamelo_math.h"
 #include "osd.h"
 #include "netplay.h"
 #include "hw_render.h"
@@ -502,7 +502,7 @@ static int DetectPreferredOutputSampleRate()
 	if (enumerator)  enumerator->Release();
 	if (need_uninit) CoUninitialize();
 
-	FILE* lf = fopen("mister4all.log", "a");
+	FILE* lf = fopen("karamelo.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] dispositivo de saida: %d Hz%s\n",
@@ -545,7 +545,7 @@ static void EscalateWaveQueue()
 	// value on every pass, so raising it takes effect on the very next one.
 	InterlockedExchange(&g_active_wave_buffers, want);
 
-	FILE* lf = fopen("mister4all.log", "a");
+	FILE* lf = fopen("karamelo.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] underruns recorrentes; fila ampliada de %ldms para %ldms\n",
@@ -574,7 +574,7 @@ static void DeescalateWaveQueue()
 
 	InterlockedExchange(&g_active_wave_buffers, want);
 
-	FILE* lf = fopen("mister4all.log", "a");
+	FILE* lf = fopen("karamelo.log", "a");
 	if (lf)
 	{
 		fprintf(lf, "[INFO] [AUDIO] audio estavel; fila reduzida de %ldms para %ldms\n",
@@ -816,7 +816,7 @@ static void InitAudio(int sample_rate)
 		// its own). This is exactly the failure mode that happens if SDL_INIT_AUDIO
 		// was never passed to SDL_Init() - the subsystem call fails quietly
 		// rather than crashing.
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[ERROR] [AUDIO] SDL_OpenAudioDeviceStream falhou: %s\n", SDL_GetError());
@@ -913,7 +913,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 					if (++s_agree_count >= 3)
 					{
 						s_locked_step = measured / (double)g_output_sample_rate;
-						FILE* lf = fopen("mister4all.log", "a");
+						FILE* lf = fopen("karamelo.log", "a");
 						if (lf)
 						{
 							fprintf(lf, "[INFO] [AUDIO] taxa travada em %.0f Hz (declarada %.0f Hz), passo %.5f\n",
@@ -1176,7 +1176,7 @@ static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 
 	// Kept open: reopening per line meant 35 open/close pairs just to
 	// list the tracks of one CD image.
-	static FILE* f = fopen("mister4all.log", "a");
+	static FILE* f = fopen("karamelo.log", "a");
 	if (f)
 	{
 		fprintf(f, "[%s] %s\n", lvl, buf);
@@ -1322,7 +1322,7 @@ static bool GetCoreOptionDeclLocked(int index, std::string* key_out, std::string
 // with zero core-specific code, the same way RetroArch's Quick Menu >
 // Options does. Choices set here go through the existing CoreSetOption(),
 // so they only last for the current run, exactly like every other option
-// set this way - not persisted to mister4all.cfg across restarts.
+// set this way - not persisted to karamelo.cfg across restarts.
 int CoreOptionCount()
 {
 	EnterCriticalSection(&options_lock);
@@ -2019,7 +2019,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 		LeaveCriticalSection(&options_lock);
 
 		// The generic Core Options menu page persists a player's choice to
-		// mister4all.cfg (see menu.cpp's g_persisted_core_options); re-apply
+		// karamelo.cfg (see menu.cpp's g_persisted_core_options); re-apply
 		// any match now, the same way ApplyPersistedCoreOptions() already does
 		// for the older, hand-picked per-core settings - without this a chosen
 		// Internal Resolution (or any other generic option) silently reverted
@@ -3539,8 +3539,8 @@ static bool CoreLoad(const char* core_dll_path)
 
 	// Substring tests, so the order is load-bearing: "nes" is inside "snes",
 	// and checking it first labelled every SNES game as NES. Cores missing
-	// from this list got an empty name, which is why the in-game menu showed
-	// "MiSTer Flavor" for them and no per-core options could ever appear.
+	// from this list got an empty name, which is why the in-game menu fell back
+	// to the application title for them and no per-core options could appear.
 	EnterCriticalSection(&name_lock);
 	if (strstr(core_dll_path, "n64")) loaded_core_name = "Nintendo 64";
 	else if (strstr(core_dll_path, "snes")) loaded_core_name = "SNES";
@@ -3720,7 +3720,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			}
 			else
 			{
-				CoreSetToast("FALHA AO CARREGAR - VEJA mister4all.log", 240);
+				CoreSetToast("FALHA AO CARREGAR - VEJA karamelo.log", 240);
 			}
 		}
 		// The core can have already called SET_MEMORY_MAPS from inside this
@@ -3744,7 +3744,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		CoreLogPrintf(RETRO_LOG_ERROR,
 			"[CoreRunner] Core faulted inside retro_get_system_av_info: %s", rom_path);
 		if (!suppress_toast)
-			CoreSetToast("FALHA AO CARREGAR - VEJA mister4all.log", 240);
+			CoreSetToast("FALHA AO CARREGAR - VEJA karamelo.log", 240);
 		RetroUnloadGameGuarded();
 		// is_game_loaded is still false here, so CoreUnload()'s own
 		// CoreReleaseMemoryMap() call (gated on is_game_loaded) never runs -

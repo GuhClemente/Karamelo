@@ -1,4 +1,4 @@
-# bump_version.ps1 - Gerenciador flexivel de versao do MiSTer 4 ALL
+# bump_version.ps1 - Gerenciador flexivel de versao do Karamelo
 # Uso:
 #   .\bump_version.ps1                   -> Exibe a versao atual
 #   .\bump_version.ps1 0.9.0             -> Define a versao exata para 0.9.0
@@ -54,7 +54,7 @@ if ($content -match '#define\s+APP_VERSION\s+"([^"]+)"') {
         $newVer = "$major.$minor.$patch"
     }
 
-    $newExeName = "MiSTer_4_ALL_v$newVer.exe"
+    $newExeName = "Karamelo_v$newVer.exe"
 
     $content = $content -replace '#define\s+APP_VERSION\s+"[^"]+"', "#define APP_VERSION     `"$newVer`""
     $content = $content -replace '#define\s+APP_EXE_NAME\s+"[^"]+"', "#define APP_EXE_NAME    `"$newExeName`""

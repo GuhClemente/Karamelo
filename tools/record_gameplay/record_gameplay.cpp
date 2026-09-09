@@ -2,8 +2,8 @@
 // it for a fixed duration with a couple of scripted button presses to get
 // past a boot/title screen, and records the output to an MP4/WEBM plus a
 // handful of JPG screenshots (including one with the CRT filter applied).
-// Built for producing preview media for the mister4all.com site - it is not
-// part of the shipped app and is never linked into MiSTer_4_ALL.exe.
+// Built for producing preview media for the karamelo-emu.com site - it is not
+// part of the shipped app and is never linked into Karamelo.exe.
 //
 // Usage: record_gameplay.exe <core_dll> <rom_path> <duration_sec> <out_dir> [base_name]
 #define WIN32_LEAN_AND_MEAN

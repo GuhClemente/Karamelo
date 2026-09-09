@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 cls
 echo =====================================================================
-echo   MiSTer 4 ALL - Pipeline All-in-One: Build, Test, Package ^& Deploy
+echo   Karamelo - Pipeline All-in-One: Build, Test, Package ^& Deploy
 echo =====================================================================
 echo.
 
@@ -12,8 +12,8 @@ cd /d "%~dp0"
 set SERVER_IP=187.127.59.127
 set SERVER_USER=root
 set REMOTE_DIR=/data/downloads/
-set LOCAL_ZIP=dist\MiSTer_4_ALL_v1.0_Win64.zip
-set LOCAL_EXE=dist\MiSTer_4_ALL.exe
+set LOCAL_ZIP=dist\Karamelo_v1.0_Win64.zip
+set LOCAL_EXE=dist\Karamelo.exe
 set LOCAL_JSON=dist\version.json
 
 rem -------------------------------------------------------------
@@ -34,8 +34,8 @@ if errorlevel 1 (
 )
 
 for /f "tokens=3" %%v in ('findstr /c:"#define APP_VERSION " include\app_info.h') do set APP_VER=%%~v
-set LOCAL_ZIP=dist\MiSTer_4_ALL_v%APP_VER%_Win64.zip
-set LOCAL_EXE=dist\MiSTer_4_ALL.exe
+set LOCAL_ZIP=dist\Karamelo_v%APP_VER%_Win64.zip
+set LOCAL_EXE=dist\Karamelo.exe
 set LOCAL_JSON=dist\version.json
 
 if not exist "%LOCAL_ZIP%" (
@@ -53,7 +53,7 @@ echo [2/2] Enviando pacote (v%APP_VER%), executavel e version.json para o servid
 echo.
 
 set EXTRA_FILES=
-if exist "%~dp0dist\MiSTer_4_ALL_Pack_BIOS.zip" set EXTRA_FILES="%~dp0dist\MiSTer_4_ALL_Pack_BIOS.zip"
+if exist "%~dp0dist\Karamelo_Pack_BIOS.zip" set EXTRA_FILES="%~dp0dist\Karamelo_Pack_BIOS.zip"
 
 scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" "%~dp0fix_server.sh" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 if errorlevel 1 (
@@ -61,9 +61,9 @@ if errorlevel 1 (
     echo [AVISO] Falha no upload via SCP - verifique se a chave SSH esta configurada.
     echo Os arquivos estao prontos na pasta dist\ para upload manual no Coolify:
     echo   - dist\version.json
-    echo   - dist\MiSTer_4_ALL.exe
+    echo   - dist\Karamelo.exe
     echo   - %LOCAL_ZIP%
-    if exist "dist\MiSTer_4_ALL_Pack_BIOS.zip" echo   - dist\MiSTer_4_ALL_Pack_BIOS.zip
+    if exist "dist\Karamelo_Pack_BIOS.zip" echo   - dist\Karamelo_Pack_BIOS.zip
     echo.
 ) else (
     echo.
@@ -83,13 +83,13 @@ echo   Arquivos Gerados na pasta dist\:
 echo   - %LOCAL_JSON%
 echo   - %LOCAL_EXE%
 echo   - %LOCAL_ZIP%
-if exist "dist\MiSTer_4_ALL_Pack_BIOS.zip" echo   - dist\MiSTer_4_ALL_Pack_BIOS.zip
+if exist "dist\Karamelo_Pack_BIOS.zip" echo   - dist\Karamelo_Pack_BIOS.zip
 echo.
 echo   Links Oficiais:
-echo   - https://mister4all.com/downloads/version.json
-echo   - https://mister4all.com/downloads/MiSTer_4_ALL.exe
-echo   - https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip
-if exist "dist\MiSTer_4_ALL_Pack_BIOS.zip" echo   - https://mister4all.com/downloads/MiSTer_4_ALL_Pack_BIOS.zip
+echo   - https://karamelo-emu.com/downloads/version.json
+echo   - https://karamelo-emu.com/downloads/Karamelo.exe
+echo   - https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip
+if exist "dist\Karamelo_Pack_BIOS.zip" echo   - https://karamelo-emu.com/downloads/Karamelo_Pack_BIOS.zip
 echo.
 echo =====================================================================
 echo.

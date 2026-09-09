@@ -48,7 +48,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- ^
     /DRC_CLIENT_SUPPORTS_HASH ^
     /DZSTD_DISABLE_ASM ^
     /Fobuild\ ^
-    src\mister_math.cpp ^
+    src\karamelo_math.cpp ^
     src\input_map.cpp ^
     src\gamepad_sdl.cpp ^
     src\hw_render.cpp ^

@@ -34,7 +34,7 @@ static void VkHwLog(const char* fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	FILE* f = fopen("mister4all.log", "a");
+	FILE* f = fopen("karamelo.log", "a");
 	if (f) { fprintf(f, "[INFO] [HW-VK] %s\n", buf); fclose(f); }
 }
 
@@ -288,9 +288,9 @@ static bool VkHwInit()
 	}
 
 	VkApplicationInfo app_info = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
-	app_info.pApplicationName = "MiSTer 4 ALL";
+	app_info.pApplicationName = "Karamelo";
 	app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	app_info.pEngineName = "MiSTer 4 ALL";
+	app_info.pEngineName = "Karamelo";
 	app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	app_info.apiVersion = api_version;
 

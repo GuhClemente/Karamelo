@@ -892,7 +892,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         CoreShutdown();
     }
 
-    // 3. Minimize MiSTer Window for clean seamless console transition. SDL3
+    // 3. Minimize the Karamelo window for a clean seamless console transition. SDL3
     // rather than a raw HWND, so this works the same on every platform SDL3
     // supports.
     SDL_Window* window = MainGetSdlWindow();
@@ -1003,7 +1003,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
         s_port_running.store(false);
 
-        // Restore MiSTer window with full focus
+        // Restore the Karamelo window with full focus
         if (window) {
             SDL_RestoreWindow(window);
             SDL_RaiseWindow(window);

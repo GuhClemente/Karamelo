@@ -1,5 +1,5 @@
 ==========================================================================
- BIOS NECESSARIAS - MiSTer 4 ALL
+ BIOS NECESSARIAS - Karamelo
  Lista completa, sistema por sistema, com nome exato de arquivo, MD5
  esperado (quando documentado pelo core) e onde colocar.
  Gerado em 2026-09-04. Fonte: documentacao oficial de cada core em
@@ -151,7 +151,7 @@ JA COMPLETO - confira o MD5 se algum jogo especifico reclamar
     SCPH-70012_BIOS_V12_USA_200.nvm   MD5 116b0e0f3d0ecef3997cf53266fa27a1   [memoria NVRAM persistente]
     GameIndex.yaml                    (base de dados de compatibilidade e correcoes do PCSX2)
   Pasta: pode ficar solto direto em app/bios/ ou bios/, ou na subpasta app/bios/pcsx2/bios/
-  (o MiSTer 4 ALL detecta automaticamente qualquer BIOS de PS2 solta na pasta bios,
+  (o Karamelo detecta automaticamente qualquer BIOS de PS2 solta na pasta bios,
   sincroniza para a subpasta do PCSX2 e repassa para o core sem necessidade de configuracao manual).
   Nota: O core oficial PCSX2 / LRPS2 utiliza BIOS real para emulacao precisa,
   permitindo mapeamento integral de 32MB de memoria RAM para RetroAchievements
