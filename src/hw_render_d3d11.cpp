@@ -239,11 +239,23 @@ static DWORD WINAPI D3D11DestroyThreadProc(LPVOID param)
 	return 0;
 }
 
+// Um core cujo context_destroy estourou o prazo uma vez nao vai voltar na
+// proxima: medido, o PCSX2 estourou em 20 de 20 descarregamentos. Chamar de
+// novo so cria mais uma thread presa girando a 96% de um nucleo, e elas se
+// acumulam dentro do processo - quem abrisse cinco jogos de PS2 numa sessao
+// ficaria com cinco. Depois do primeiro estouro, o teardown e simplesmente
+// pulado: o contexto vaza igual, sem thread nova e sem os 5s de espera.
+static bool g_destroy_never_returns = false;
+
 void D3D11HwContextDestroy()
 {
 	if (!g_hw_active) return;
 
-	if (g_context_live && g_hw_cb.context_destroy)
+	if (g_destroy_never_returns && g_context_live && g_hw_cb.context_destroy)
+	{
+		D3D11HwLog("pulando context_destroy - este core ja provou que nao retorna");
+	}
+	else if (g_context_live && g_hw_cb.context_destroy)
 	{
 		retro_hw_context_reset_t* fn =
 			(retro_hw_context_reset_t*)malloc(sizeof(retro_hw_context_reset_t));
@@ -260,7 +272,8 @@ void D3D11HwContextDestroy()
 			// jogador nao achar que o app morreu.
 			if (WaitForSingleObject(h, 5000) == WAIT_TIMEOUT)
 			{
-				D3D11HwLog("context_destroy do core nao retornou em 5s - seguindo sem ele (contexto vazado ate fechar o app)");
+				g_destroy_never_returns = true;
+				D3D11HwLog("context_destroy do core nao retornou em 5s - seguindo sem ele (contexto vazado ate fechar o app); nao sera chamado de novo nesta sessao");
 				// A thread fica onde esta. Nao se mata: ela esta dentro do
 				// core, provavelmente segurando algum lock, e TerminateThread
 				// aqui reproduziria exatamente o problema que isto evita.
