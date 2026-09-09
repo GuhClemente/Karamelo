@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <map>
+#include <set>
 #include <unordered_set>
 #include <fstream>
 
@@ -200,6 +201,26 @@ static volatile bool keyboard_bridge_active = false;
 // path. Only ever touched from the core thread, during load. See the comment
 // where it is consulted for why forgetting this was expensive.
 static std::map<std::string, std::string> s_arcade_core_for_rom;
+
+// Cores que exigem negociação de contexto Vulkan, que este frontend não
+// implementa. Casados por trecho do nome do arquivo da DLL.
+//
+// Existe porque a flag por carga chega tarde demais: o PPSSPP pede
+// SET_HW_RENDER (e escolhe Vulkan) **antes** de pedir a interface de
+// negociação. Quando descobrimos, ele já se comprometeu com Vulkan e já
+// começou a subir as threads dele. Recusar naquele ponto não desfaz nada -
+// medido: o core segue inicializando (`Entering __IoManagerThread`,
+// `PPGe drawing library initialized`) enquanto o frontend desmonta tudo por
+// baixo, e morre com 0xC0000005.
+//
+// A lista vem semeada com os dois casos já documentados nos comentários deste
+// arquivo, para que a primeira tentativa numa máquina nova também seja segura,
+// e cresce sozinha quando um core novo pedir negociação.
+static std::set<std::string> s_cores_needing_vk_negotiation = {
+	"psp",        // PPSSPP
+	"dreamcast",  // Flycast
+};
+
 
 // The bridge exists for machines whose games are driven by the keyboard and
 // have no joystick mapping worth speaking of - without it, a player holding
@@ -450,6 +471,17 @@ static volatile LONG g_baseline_wave_buffers = 12;
 static LONG s_clean_windows = 0;
 static bool          s_loaded_core_is_pcsx2 = false;
 static std::string   s_loaded_core_path = "";
+
+static bool CoreNeedsVkNegotiation()
+{
+	std::string lower = s_loaded_core_path;
+	for (char& c : lower) c = (char)tolower((unsigned char)c);
+	for (const auto& frag : s_cores_needing_vk_negotiation)
+	{
+		if (lower.find(frag) != std::string::npos) return true;
+	}
+	return false;
+}
 
 // Resampler rate-control state. This used to live as function-local statics
 // inside SendAudioSamples, which meant a lock from one game's audio survived
@@ -1212,6 +1244,7 @@ static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 }
 
 #include <map>
+#include <set>
 static std::map<std::string, std::string> g_core_options;
 
 // Defaults the core declared through SET_VARIABLES. A user choice in the OSD
@@ -1913,6 +1946,15 @@ static bool CB_Environment(unsigned cmd, void* data)
 		// of repeating that crash - the core then falls back to its next
 		// preferred context type (OpenGL, which we do support).
 		g_core_wants_vk_negotiation = true;
+		{
+			// Guarda para as proximas cargas: nesta ja e tarde se o core pediu
+			// SET_HW_RENDER antes.
+			std::string base = s_loaded_core_path;
+			size_t slash = base.find_last_of("/\\");
+			if (slash != std::string::npos) base = base.substr(slash + 1);
+			for (char& c : base) c = (char)tolower((unsigned char)c);
+			if (!base.empty()) s_cores_needing_vk_negotiation.insert(base);
+		}
 		CoreLogPrintf(RETRO_LOG_INFO,
 			"[HW] core pediu negociacao de contexto Vulkan - nao implementada, "
 			"Vulkan sera recusado para forcar fallback");
@@ -1936,7 +1978,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 				return D3D11HwSetRenderCallback(cb);
 			if (cb && cb->context_type == RETRO_HW_CONTEXT_VULKAN)
 			{
-				if (g_core_wants_vk_negotiation)
+				if (g_core_wants_vk_negotiation || CoreNeedsVkNegotiation())
 				{
 					CoreLogPrintf(RETRO_LOG_INFO,
 						"[HW] recusando Vulkan (negociacao de contexto nao suportada) - "
@@ -3874,7 +3916,19 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			loaded_core_name.c_str());
 		if (!suppress_toast)
 			CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
-		RetroUnloadGameGuarded();
+
+		// Sem retro_unload_game aqui, de proposito. O core ja subiu o que
+		// precisava durante o load e esta esperando um contexto que nao vai
+		// chegar; pedir para ele descarregar nesse estado e o que crashava.
+		// Medido com o PPSSPP: a mensagem acima saia no log e a linha seguinte
+		// era 0xC0000005 dentro de psp.dll - o app anunciava que estava
+		// recusando "para evitar crash" e crashava em seguida, o que e pior do
+		// que nao ter aviso nenhum.
+		//
+		// A falha nasce na thread interna do core, entao o __try/__except do
+		// Guarded nao alcanca. Nao chamar e o unico ponto de controle que
+		// sobra. O core fica carregado sem jogo ate o proximo CoreUnload, que
+		// nao libera esta DLL de qualquer forma.
 		CoreReleaseMemoryMap();
 		return false;
 	}
