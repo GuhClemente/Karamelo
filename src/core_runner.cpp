@@ -2871,11 +2871,18 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			candidate_cores.push_back(core_dll);
 		}
 
+		// Flycast is deliberately not in this list. It emulates Dreamcast and
+		// the Naomi/Atomiswave boards built on it, and nothing else - handing
+		// it a Sega System 16 romset like altbeast was never going to work.
+		// It was in the list as a last resort, which meant every arcade game
+		// that matched no MAME revision ended its search inside a core that
+		// cannot survive a second retro_init in one process: Flycast traps on
+		// its own assertion and kills the application. The block below adds it,
+		// at the front, for the titles it actually emulates.
 		const std::string default_arcade_cores[] = {
 			"cores/arcade_fbneo.dll",
 			"cores/mame2003.dll",
-			"cores/mame2010.dll",
-			"cores/dreamcast.dll"
+			"cores/mame2010.dll"
 		};
 
 		for (const auto& c : default_arcade_cores)
@@ -2886,19 +2893,23 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			}
 		}
 
-		// A known Naomi/Atomiswave title: none of the MAME/FBNeo candidates
-		// above emulate this hardware at all, so trying them first is a
-		// guaranteed, wasted round trip (and a wasted probation crash) before
-		// ever reaching the one core that can. Move Flycast to the front.
+		// A known Naomi/Atomiswave title: none of the MAME candidates above
+		// emulate this hardware at all, so Flycast goes to the front - and for
+		// anything else it does not go in at all.
 		{
 			std::string stem = fs::path(original_rom_path).stem().string();
 			std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
 			if (stem == "cvs2gd" || stem == "cvs2gd-chd" || stem == "cvs2mf" || NaomiAtomiswaveRomsets().count(stem))
 			{
-				auto it = std::find(candidate_cores.begin(), candidate_cores.end(), std::string("cores/dreamcast.dll"));
-				if (it != candidate_cores.end() && it != candidate_cores.begin())
+				const std::string fly = "cores/dreamcast.dll";
+				auto it = std::find(candidate_cores.begin(), candidate_cores.end(), fly);
+				if (it != candidate_cores.end())
 				{
-					std::rotate(candidate_cores.begin(), it, it + 1);
+					if (it != candidate_cores.begin()) std::rotate(candidate_cores.begin(), it, it + 1);
+				}
+				else if (fs::exists(fly))
+				{
+					candidate_cores.insert(candidate_cores.begin(), fly);
 				}
 			}
 		}

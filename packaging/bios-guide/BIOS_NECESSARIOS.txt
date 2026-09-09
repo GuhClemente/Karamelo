@@ -167,10 +167,15 @@ OPCIONAL - a maioria dos jogos funciona sem, so amplia compatibilidade
 --------------------------------------------------------------------------
 
 [Amiga] cores/amiga.dll (PUAE)
-  Status: PARCIAL - A500 e CD32 cobertos, falta AGA
-    kick34005.A500 (Kickstart 1.3)   - presente
-    kick40060.CD32 (Kickstart CD32)  - presente
-    Falta: Kickstart 3.1 para A1200/A4000 (jogos AGA) - o core tem um
+  Status: PARCIAL - A500 coberto; CD32 incompleto; falta AGA
+    kick34005.A500 (Kickstart 1.3)       - presente
+    kick40060.CD32 (Kickstart CD32)      - presente
+    kick40060.CD32.ext (ROM estendida)   - FALTA
+    Sem a ROM estendida o CD32 nao da boot em CD: o core carrega o
+    Kickstart, nao encontra a extensao e para na tela pedindo disquete,
+    como se o jogo nao existisse. O Kickstart sozinho nao basta, e os
+    dois arquivos andam juntos.
+    Falta tambem: Kickstart 3.1 para A1200/A4000 (jogos AGA) - o core tem um
     fallback AROS embutido, entao nunca trava, so pode rodar errado em
     jogos que exigem hardware AGA de verdade.
   Pasta: app/bios/
