@@ -108,6 +108,11 @@ del /s /q "%DIST_DIR%\cores\*.bin" "%DIST_DIR%\cores\*.iso" >nul 2>&1
 
 rem Create README with controls & user guides
 copy /Y "%~dp0packaging\release-guide\LEIAME.txt" "%DIST_DIR%\LEIAME.txt" >nul
+rem zlib (SDL3), BSD-3 (libchdr) e MIT (rcheevos, miniz) exigem que o aviso de
+rem copyright acompanhe a redistribuicao binaria - sem estes dois arquivos o
+rem pacote fica irregular.
+copy /Y "%~dp0LICENSE.md" "%DIST_DIR%\LICENSE.md" >nul
+copy /Y "%~dp0THIRD-PARTY-NOTICES.md" "%DIST_DIR%\THIRD-PARTY-NOTICES.md" >nul
 copy /Y "%~dp0packaging\ports-guide\LEIA-ME.txt" "%DIST_DIR%\ports\LEIA-ME.txt" >nul
 copy /Y "%~dp0packaging\bios-guide\BIOS_NECESSARIOS.txt" "%DIST_DIR%\bios\BIOS_NECESSARIOS.txt" >nul
 if exist "%~dp0docs\GUIA_COMPLETO_BIOS.md" (

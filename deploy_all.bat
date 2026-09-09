@@ -9,9 +9,18 @@ echo.
 
 cd /d "%~dp0"
 
-set SERVER_IP=187.127.59.127
-set SERVER_USER=root
-set REMOTE_DIR=/data/downloads/
+rem Endereco, usuario e diretorio remoto do servidor ficam em deploy_env.bat,
+rem que esta fora do controle de versao. Sem ele o deploy nao roda: copie o
+rem deploy_env.example.bat e preencha. Quem preferir pode so exportar
+rem SERVER_IP/SERVER_USER/REMOTE_DIR no ambiente - deploy_env.bat nao
+rem sobrescreve o que ja estiver definido.
+if not exist "%~dp0deploy_env.bat" (
+    echo [ERRO] deploy_env.bat nao encontrado.
+    echo Copie deploy_env.example.bat para deploy_env.bat e preencha o servidor.
+    pause
+    exit /b 1
+)
+call "%~dp0deploy_env.bat"
 set LOCAL_ZIP=dist\Karamelo_v1.0_Win64.zip
 set LOCAL_EXE=dist\Karamelo.exe
 set LOCAL_JSON=dist\version.json

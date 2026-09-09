@@ -117,28 +117,30 @@ arquivo** — ela não fica em disco depois disso.
 
 ---
 
-## ⚠️ Antes de publicar o repositório
+## ⚠️ Higiene do repositório
 
 **Não versione BIOS nem ROMs.** Redistribuí-las é violação de direito autoral. O
 `.gitignore` cobre `bios/`, `roms/`, `cores/`, `saves/` e `cache/` (em qualquer
 nível do repositório) — confira com `git check-ignore -v <arquivo>` antes de
 adicionar qualquer coisa nova.
 
-**Há um token de conta no histórico.** O commit `02c7fb4` inclui
-`Config/retroachievements.cfg` com o token do RetroAchievements preenchido, e
-esse commit já foi enviado para o remoto. O arquivo foi removido do rastreamento
-e o diretório `Config/` está ignorado, mas **isso não apaga o passado**: o token
-continua recuperável no histórico.
+**Não versione `Config/`.** O `retroachievements.cfg` guarda o token da conta
+depois do primeiro login. O diretório está ignorado e nenhum `.cfg` foi
+commitado neste repositório — conferido varrendo o histórico inteiro. Mantenha
+assim.
 
-Antes de tornar o repositório público:
+**Não versione credenciais de deploy.** O endereço e o usuário do servidor ficam
+em `deploy_env.bat`, que está no `.gitignore`; o que vai pro repositório é o
+`deploy_env.example.bat`, com valores de exemplo.
 
-1. **Invalide o token** — troque a senha da conta no RetroAchievements. Isso
-   revoga o token antigo e é o único passo que realmente resolve, porque o
-   histórico é imutável.
-2. **Reescreva o histórico** com `git filter-repo` (ou comece um repositório
-   novo) para remover o arquivo dos commits antigos.
-
-Fazer só o passo 2 sem o 1 não basta: quem já clonou continua com o token.
+> **Histórico anterior.** O repositório que antecedeu este (antes do commit
+> `troca de repositorio.`) tinha um `Config/retroachievements.cfg` com o token
+> do RetroAchievements preenchido. Esse commit **não existe aqui** e nenhum
+> `.cfg` aparece no histórico deste repositório, mas o token continua
+> recuperável em qualquer cópia do repositório antigo. Se ele ainda estiver
+> acessível em algum lugar, troque a senha da conta no RetroAchievements: isso
+> revoga o token antigo e é o único passo que resolve de verdade, porque
+> histórico já clonado é imutável.
 
 ---
 
@@ -174,8 +176,8 @@ Karamelo/
 │   ├── main_win32.cpp         Janela, loop de apresentação, entrada e HUD
 │   ├── core_runner.cpp        Thread do core libretro, áudio e escalonamento
 │   ├── menu.cpp                Navegação do OSD e seleção de core por sistema
-│   ├── osd.cpp                 Buffer do OSD portado do Main_MiSTer
-│   ├── charrom.cpp             Fonte 8x8 do MiSTer
+│   ├── osd.cpp                 Buffer raster do OSD (reescrita clean-room)
+│   ├── charrom.cpp             Fonte bitmap 8x8 do OSD (reescrita clean-room)
 │   ├── archive_helper.cpp      Extração de ZIP/7Z/RAR e escolha do arquivo do jogo
 │   ├── chd_reader.cpp          Leitura de imagens CHD (para RetroAchievements)
 │   ├── hw_render.cpp           Contexto OpenGL para cores com renderização por hardware
@@ -234,7 +236,8 @@ guias de BIOS/ROM e cores prontos), use `package_release.bat` em vez de
 * **Canal do YouTube:** [@GuhClemente](https://youtube.com/@GuhClemente)
 * **Desenvolvedor:** Guh Clemente
 * **Engine de Emulação:** Libretro API Architecture
-* **Licença do Frontend:** Software Gratuito / Freeware (Uso pessoal, não comercial). Código e frontend independentes.
+* **Licença:** [PolyForm Noncommercial 1.0.0](LICENSE.md). Qualquer pessoa pode ler, estudar, modificar, forkar e redistribuir o código; **uso comercial não é permitido**. Pela definição da OSI isso não conta como "open source" — é código aberto com uma restrição, e a restrição é essa.
+* **Bibliotecas de terceiros:** [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lista cada uma que entra no binário, com a licença original. O único copyleft é o `n64_gopher.dll` (GPL-3.0); o fonte modificado dele está versionado em `third_party/gopher64/`, que é justamente como a GPL é cumprida.
 * **Aviso Legal / Disclaimer:** O **Karamelo** é um projeto de software independente desenvolvido para o ecossistema Windows e **NÃO possui qualquer afiliação, vínculo ou endosso de Alexey Melnikov, do projeto oficial MiSTer FPGA ou de seus mantenedores**.
 * **Cores e Emuladores:** Todos os motores de emulação utilizados são plugins externos independentes compatíveis com a especificação Libretro, desenvolvidos por suas respectivas comunidades e regidos por suas licenças originais.
 
