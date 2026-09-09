@@ -50,7 +50,10 @@ if exist "%~dp0dist\Karamelo_Pack_BIOS.zip" (
     echo   - dist\Karamelo_Pack_BIOS.zip
 )
 
-scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" "%~dp0fix_server.sh" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+rem O script de deploy vai para /root/, nunca para %REMOTE_DIR%: aquela pasta e
+rem servida publicamente, e o fix_server.sh acabou exposto em /downloads/.
+scp -o StrictHostKeyChecking=no "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:/root/fix_server.sh
 
 if errorlevel 1 (
     echo.
@@ -63,7 +66,7 @@ rem com CRLF nao roda no Linux - o shebang vira "/bin/bash\r" e o erro e um
 rem enigmatico "cannot execute: required file not found", com os arquivos ja
 rem no servidor e os downloads em 404. O .gitattributes impede que volte, isto
 rem aqui garante que nem uma copia antiga do script derrube a publicacao.
-ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "sed -i 's/\x0d$//' %REMOTE_DIR%fix_server.sh && chmod +x %REMOTE_DIR%fix_server.sh && %REMOTE_DIR%fix_server.sh"
+ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "chmod +x /root/fix_server.sh && /root/fix_server.sh"
     echo.
     echo =======================================================
     echo   UPLOAD E PUBLICACAO CONCLUIDOS COM SUCESSO!
