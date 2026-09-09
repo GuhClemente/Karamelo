@@ -1,4 +1,4 @@
-# Briefing para quem mantém o site karamelo-emu.com
+﻿# Briefing para quem mantém o site karamelo-emu.com
 
 Este arquivo existe para manter o site e o aplicativo dizendo a mesma coisa.
 Ele é versionado junto com o código, então **a versão sempre atual está em**:
@@ -72,13 +72,18 @@ Leia de lá. Valores em 09/09/2026:
 | macro | valor | como publicar |
 |---|---|---|
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
-| `APP_CORE_ENGINES` | 41 | "41 motores de emulação" |
-| `APP_CORE_FILES` | 45 | **não publique** — é contagem de arquivos, não de emuladores |
+| `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
+| `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
 | `APP_VERSION` | 0.9.3 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
-porque quatro arquivos são o mesmo core sob um segundo nome. Anunciar 45 seria
-contar o mesmo emulador duas vezes.
+porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
+Anunciar 41 seria contar o mesmo emulador duas vezes.
+
+A lista motor a motor, pronta para publicar, está em
+[docs/MOTORES.md](MOTORES.md) — e ela avisa dos dois casos que nao se deve
+inventar: o core de ColecoVision nao se identifica, e `arcade_fbneo.dll` e MAME
+0.289, nao FinalBurn Neo.
 
 > Esses números já ficaram errados em quatro lugares ao mesmo tempo — o site
 > dizia 39, o README dizia 40, o `app_info.h` dizia 39 e o CREDITS dizia as
@@ -130,17 +135,20 @@ app instalado perde a atualização automática.
 |---|---|
 | `Karamelo_v<versão>_Win64.zip` | **sim** — é o download principal |
 | `Karamelo.exe` | **não** ofereça como download avulso |
-| `Karamelo_Pack_BIOS.zip` | ver abaixo |
+| `Karamelo_Pack_BIOS.zip` | **nao existe mais** |
 
 O `Karamelo.exe` sozinho **não funciona**: ele localiza `cores/`, `bios/`,
 `roms/` e `saves/` a partir da própria pasta. Quem baixar só ele fica com um
 app quebrado. Ele existe naquela URL porque é o que o auto-update baixa, não
 para consumo humano.
 
-O pack de BIOS contém material protegido por direito autoral. Ele **nunca**
-pode ser hospedado no GitHub. No site é decisão do dono do projeto — se for
-oferecido, deve estar claramente separado do download principal e nunca
-descrito como parte do produto.
+O pack de BIOS **deixou de ser publicado em 09/09/2026**. Ele contém firmware
+de console, material protegido por direito autoral, e publicá-lo é
+redistribuição — a mesma coisa que o README proíbe para o repositório, só que
+por outro canal. Foi retirado do servidor e dos scripts de upload.
+
+Se o site ainda tiver link para ele, remova: a URL responde 404 e o arquivo não
+volta.
 
 ### ROMs e BIOS
 

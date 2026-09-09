@@ -30,16 +30,20 @@
 // Two different figures, because they are different things:
 //   FILES   - .dll files in cores/, what the About page counts at runtime
 //   ENGINES - distinct emulators, which is what "41 cores" ought to mean
-// They differ by four, because four files are byte-for-byte copies of another
-// core under a second name: n64_parallel.dll = n64.dll, pcsx2.dll and
-// pcsx2_libretro.dll = ps2.dll, play_libretro.dll = ps2_play.dll. The
-// published number is the engine count, since shipping the same emulator
-// twice does not give the player another system.
+// They differ by one: n64_parallel.dll is a byte-for-byte copy of n64.dll
+// under a second name, and both are referenced - the menu loads
+// n64_parallel.dll by name and n64.dll is the generic last resort. The
+// published number is the engine count, since shipping the same emulator twice
+// does not give the player another system.
+//
+// Three other copies and one abandoned core used to sit here too - pcsx2.dll,
+// pcsx2_libretro.dll, play_libretro.dll and bluemsx.dll, 25 MB that nothing
+// could load, shipped in every release. Deleted.
 //
 // Measured, not estimated: hash every .dll in cores/ and count distinct
 // digests. Re-measure after adding or removing a core - these two numbers had
 // already drifted five files and two engines behind reality once.
-#define APP_CORE_FILES   45
-#define APP_CORE_ENGINES 41
+#define APP_CORE_FILES   41
+#define APP_CORE_ENGINES 40
 
 #endif

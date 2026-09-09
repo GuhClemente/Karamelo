@@ -8,7 +8,7 @@ emulação. Este arquivo diz qual projeto está por trás de cada DLL.
 
 Cada core foi verificado de duas formas, sem confiar no nome do arquivo:
 
-1. **Tabela de exports do PE** — os 45 arquivos exportam os seis símbolos que a
+1. **Tabela de exports do PE** — os 41 arquivos exportam os seis símbolos que a
    API libretro exige (`retro_api_version`, `retro_init`, `retro_run`,
    `retro_load_game`, `retro_get_system_info`, `retro_set_environment`).
 2. **Extensões declaradas pelo próprio core**, que são a assinatura do sistema.
@@ -64,30 +64,22 @@ o do log é sempre o real.
 | `spectrum.dll` | Fuse | ZX Spectrum |
 | `3do.dll` | Opera | Panasonic 3DO |
 | `dosbox_pure.dll` | DOSBox Pure | MS-DOS |
-| `arcade_fbneo.dll` | FinalBurn Neo | Arcade |
+| `arcade_fbneo.dll` | **MAME 0.289** (o nome do arquivo mente) | Arcade |
 | `mame2003.dll` | MAME 2003 | Arcade (romset 0.78) |
 | `mame2010.dll` | MAME 2010 | Arcade (romset 0.139) |
 
-**41 motores distintos em 45 arquivos.** Quatro arquivos são o mesmo core sob um
-segundo nome, conferido por hash e não pelo nome: `n64_parallel.dll` = `n64.dll`,
-`pcsx2.dll` e `pcsx2_libretro.dll` = `ps2.dll`, `play_libretro.dll` =
-`ps2_play.dll`.
+**40 motores distintos em 41 arquivos.** A diferença é uma só: `n64_parallel.dll`
+é cópia byte a byte de `n64.dll`, conferido por hash e não pelo nome. As duas
+são usadas — o menu carrega `n64_parallel.dll` pelo nome, e `n64.dll` é o
+último recurso genérico quando nenhum dos três cores de N64 existe em disco.
 
-Dessas cópias só o par do N64 está em uso — o menu carrega `n64_parallel.dll`
-pelo nome e `n64.dll` é o último recurso genérico. As outras três são peso
-morto, e `bluemsx.dll` também: sobrou de uma tentativa abandonada de rotear MSX
-para blueMSX em vez de fMSX, revertida por completo no código, o arquivo só
-nunca foi apagado do disco. Nenhum dos quatro é referenciado por
-`MenuResolveCoreForPath()` nem por qualquer outro caminho de carregamento:
-
-| arquivo morto | tamanho |
-|---|---|
-| `pcsx2.dll` | 10,5 MB |
-| `pcsx2_libretro.dll` | 10,5 MB |
-| `play_libretro.dll` | 2,8 MB |
-| `bluemsx.dll` | 1,5 MB |
-
-São 25 MB empacotados em todo release sem que nada possa carregá-los.
+Até 09/09/2026 havia mais quatro arquivos aqui, somando **25 MB embarcados em
+todo release sem que nada pudesse carregá-los**: `pcsx2.dll` e
+`pcsx2_libretro.dll` (cópias de `ps2.dll`), `play_libretro.dll` (cópia de
+`ps2_play.dll`) e `bluemsx.dll`, sobra de uma tentativa abandonada de rotear
+MSX para blueMSX em vez de fMSX. Nenhum era referenciado por
+`MenuResolveCoreForPath()` nem por qualquer outro caminho de carregamento.
+Foram apagados.
 
 Três observações:
 
