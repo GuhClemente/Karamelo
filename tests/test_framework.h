@@ -35,7 +35,7 @@ public:
 		int failed = 0;
 
 		std::cout << "\n==================================================\n";
-		std::cout << "  MiSTer 4 ALL - Unit Test Suite Runner\n";
+		std::cout << "  Karamelo - Unit Test Suite Runner\n";
 		std::cout << "==================================================\n\n";
 
 		auto total_start = std::chrono::high_resolution_clock::now();

@@ -34,7 +34,7 @@ namespace fs = std::filesystem;
 #include "hw_render_vulkan.h"
 #include "hw_render_d3d11.h"
 #include "resource.h"
-#include "mister_math.h"
+#include "karamelo_math.h"
 #include "gamepad_sdl.h"
 
 // dev-sdl3: first slice of the SDL3 migration. This only proves the vendored,
@@ -362,7 +362,7 @@ static void ToggleFullscreen(HWND hwnd)
 // Accurate Hardware Display Refresh Rate Detection
 // -------------------------------------------------------------
 // Accurate Hardware Display Refresh Rate Detection
-// SnapToStandardRate now lives in mister_math.cpp so the tests can reach it.
+// SnapToStandardRate now lives in karamelo_math.cpp so the tests can reach it.
 // -------------------------------------------------------------
 static double DetectDisplayRefreshRate(HWND hwnd, bool* out_dwm_ok = nullptr)
 {
@@ -453,7 +453,7 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 		}
 	}
 
-	FILE* f = fopen("mister4all.log", "a");
+	FILE* f = fopen("karamelo.log", "a");
 	if (f)
 	{
 		fprintf(f, "[ERROR] [CRASH] codigo=0x%08lX modulo=%s offset=0x%llX thread=%lu\n",
@@ -586,7 +586,7 @@ static void CheckWindowsCrashReportsOnStartup()
 
 	if (EvtNext(hResults, 10, events, 2000, 0, &returned))
 	{
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 
 		for (DWORD i = 0; i < returned; i++)
 		{
@@ -601,7 +601,7 @@ static void CheckWindowsCrashReportsOnStartup()
 					std::wstring xml(buf.data());
 
 					std::wstring app_path = ExtractWerField(xml, L"AppPath");
-					if (app_path.find(L"MiSTer_4_ALL.exe") == std::wstring::npos)
+					if (app_path.find(L"Karamelo.exe") == std::wstring::npos)
 					{
 						EvtClose(events[i]);
 						continue;
@@ -875,7 +875,7 @@ static void RenderFrame()
 			}
 		}
 
-		// 3. Floating Header Text (Left: MiSTer 4 ALL, Right: Date/Time)
+		// 3. Floating Header Text (Left: Karamelo, Right: Date/Time)
 		int txt_y = hdr_y + (hdr_h - 8) / 2;
 		DrawString(ox + 6, txt_y, APP_NAME, theme.header_txt);
 
@@ -1393,13 +1393,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// name other than the default here, before SDL_Init ever runs, means
 	// gopher64's later default "SDL_app" registration is the only one
 	// under that name and succeeds cleanly instead of colliding with ours.
-	SDL_RegisterApp("MiSTer4ALL_SDL", 0, NULL);
+	SDL_RegisterApp("KarameloSDL", 0, NULL);
 
 	// dev-sdl3 smoke test: confirms the statically-linked SDL3 build actually
 	// initializes inside this exe before any of the real Win32 windowing/
 	// input/audio code is touched. Nothing downstream depends on this yet.
 	{
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
 		{
 			if (lf) fprintf(lf, "[INFO] [SDL3] inicializado, versao=%d\n", SDL_GetVersion());
@@ -1411,7 +1411,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		if (lf) fclose(lf);
 	}
 
-	// Headless port install: "MiSTer_4_ALL.exe --install-port <id>" downloads
+	// Headless port install: "Karamelo.exe --install-port <id>" downloads
 	// and extracts a known port and exits, before any window is created, so
 	// ports/ can be pre-populated (packaging, CI, or just getting ahead of a
 	// slow download) without touching the menu UI at all.
@@ -1420,7 +1420,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		PortInit();
 		std::string install_error;
 		bool ok = PortInstallOnly(__argv[2], install_error);
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[INFO] [PORT-INSTALL] %s -> %s%s%s\n", __argv[2],
@@ -1430,7 +1430,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return ok ? 0 : 1;
 	}
 
-	// Headless end-to-end test: "MiSTer_4_ALL.exe --launch-port <id>" calls
+	// Headless end-to-end test: "Karamelo.exe --launch-port <id>" calls
 	// PortLaunch() exactly the way the "Ports & Recomp" menu entry does -
 	// download-if-needed, then launch - and pumps PortPumpPendingLaunch()
 	// itself since there is no window/message loop running yet to do it.
@@ -1442,7 +1442,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	{
 		PortInit();
 		bool started = PortLaunch(__argv[2]);
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 
 		DWORD waited_ms = 0;
 		while (started && !PortIsRunning() && waited_ms < 180000)
@@ -1468,7 +1468,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (__argc > 1 && _stricmp(__argv[1], "--list-ports") == 0)
 	{
 		PortInit();
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 		if (lf)
 		{
 			for (const auto& p : PortGetAvailableList())
@@ -1481,7 +1481,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return 0;
 	}
 
-	// Headless core lifecycle smoke test: "MiSTer_4_ALL.exe --core-selftest
+	// Headless core lifecycle smoke test: "Karamelo.exe --core-selftest
 	// <core.dll> <rom_path>" loads a core+ROM through the exact same
 	// CoreRequestLoad()/CoreShutdown() path the menu uses, with no window or
 	// message loop needed - the core thread's own run loop and timers are
@@ -1492,7 +1492,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// real core hang by hand.
 	if (__argc > 3 && _stricmp(__argv[1], "--core-selftest") == 0)
 	{
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 		auto log = [&](const char* fmt, ...) {
 			if (!lf) return;
 			va_list ap; va_start(ap, fmt);
@@ -1590,7 +1590,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// to jump to the restored size/position immediately after. Shown once
 	// that geometry has been applied.
 	g_sdl_window = SDL_CreateWindow(
-		APP_NAME " v" APP_VERSION " " APP_ARCH " [mister4all.com | @GuhClemente]",
+		APP_NAME_FULL " v" APP_VERSION " " APP_ARCH " [" APP_SITE " | @GuhClemente]",
 		WINDOW_WIDTH, WINDOW_HEIGHT,
 		SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
 	if (!g_sdl_window) return 1;
@@ -1705,7 +1705,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	{
 		// Written to the log so display cadence diagnosis is clear.
-		FILE* lf = fopen("mister4all.log", "a");
+		FILE* lf = fopen("karamelo.log", "a");
 		if (lf)
 		{
 			fprintf(lf, "[INFO] [DISPLAY] composicao DWM=%s taxa=%.3f Hz (fonte=%s)\n",

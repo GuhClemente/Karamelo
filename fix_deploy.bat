@@ -3,7 +3,7 @@ setlocal
 cls
 
 echo =======================================================
-echo   MiSTer 4 ALL - Correcao Definitiva de Download
+echo   Karamelo - Correcao Definitiva de Download
 echo =======================================================
 echo.
 echo [1/2] Enviando script de correcao para o servidor...

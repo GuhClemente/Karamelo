@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Gustavo Clemente (mister4all.com | @GuhClemente).
+// Copyright (c) 2026 Gustavo Clemente (karamelo-emu.com | @GuhClemente).
 // The arrangement/transposition below and the hand-drawn UI glyphs (0x10,
 // 0x11, 0x14, 0x15, 0x16) are original work, not GPL-derived - this file
 // used to be a near-literal port of Main_MiSTer's own charrom.cpp and was

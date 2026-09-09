@@ -1,12 +1,12 @@
 =====================================================================
-  MiSTer 4 ALL - Windows x64 (C++20 Nativo)
-  Site Oficial: https://mister4all.com | YouTube: @GuhClemente
+  Karamelo - Windows x64 (C++20 Nativo)
+  Site Oficial: https://karamelo-emu.com | YouTube: @GuhClemente
 =====================================================================
 
 1. COMO JOGAR:
    - Coloque suas ROMs/ISOs na pasta correspondente dentro de "roms\"
      (exemplo: roms\SNES, roms\Genesis, roms\PlayStation, roms\Arcade, etc.)
-   - Execute "MiSTer_4_ALL.exe"
+   - Execute "Karamelo.exe"
    - Use as setas do teclado ou o controle XInput para navegar e jogar
 
 2. CONTROLES PADRAO NO TECLADO:
@@ -42,11 +42,11 @@
 6. BIOS E ARQUIVOS DE SISTEMA:
    - Consoles de cartucho funcionam sem BIOS (Zero Configuracao).
    - Consoles de CD e arcade (PS1, PS2, Saturn, Sega CD, etc.) precisam de BIOS.
-   - Baixe o pacote oficial consolidado: MiSTer_4_ALL_Pack_BIOS.zip
+   - Baixe o pacote oficial consolidado: Karamelo_Pack_BIOS.zip
    - Consulte o guia completo e tabela MD5 em: bios\GUIA_COMPLETO_BIOS.md
 
 7. AVISO LEGAL / LEGAL DISCLAIMER:
-   - O MiSTer 4 ALL e um software independente e gratuito (Freeware) voltado a preservacao.
+   - O Karamelo e um software independente e gratuito (Freeware) voltado a preservacao.
    - Nao possui filiacao ou vinculo com o projeto de hardware MiSTer FPGA oficial.
    - Esta distribuicao NAO CONTEM nenhum arquivo de BIOS protegida ou ROM de jogo.
    - O usuario deve utilizar seus proprios backups de jogos e BIOS legalmente adquiridos.

@@ -25,7 +25,7 @@ bool PortIsInstalled(const std::string& port_id);
 // Searches roms/ and copies matching ROM to port directory if needed
 bool PortAutoSetupRom(const std::string& port_id);
 
-// Launches the port executable, minimizes/hides MiSTer, and restores on exit
+// Launches the port executable, minimizes/hides Karamelo, and restores on exit
 bool PortLaunch(const std::string& port_id);
 
 // Checks if an external port process is currently active

@@ -5,17 +5,22 @@
 // the website publishes.
 //
 // These used to be written out separately in the window title, the OSD title,
-// the About page and the site, and they had already drifted: the window said
-// "MiSTer 4 ALL", the About said "MiSTer Flavor v2.0" with "11 Consoles", and
-// the site said v1.1 with 24 cores. Nothing agreed with anything, and none of
-// it could be checked.
-#define APP_NAME        "MiSTer 4 ALL"
+// the About page and the site, and they had already drifted: three different
+// names, two different version numbers and three different core counts, with
+// nothing agreeing with anything and none of it checkable.
+
+// Short form. This is what the OSD draws: across the header and rotated
+// down the left sidebar, 8 px per character, so it has to stay short
+// enough to fit the panel. APP_NAME_FULL is for prose, the window title
+// bar, the About page and anything the packaging writes out.
+#define APP_NAME        "Karamelo"
+#define APP_NAME_FULL   "Karamelo Emulador"
 #define APP_VERSION     "0.9.2"
 #define APP_ARCH        "x64"
-#define APP_EXE_BASE    "MiSTer_4_ALL"
-#define APP_EXE_NAME    "MiSTer_4_ALL_v0.9.2.exe"
-#define APP_GITHUB_REPO "GuhClemente/MiSTer-4-All"
-#define APP_SITE        "mister4all.com"
+#define APP_EXE_BASE    "Karamelo"
+#define APP_EXE_NAME    "Karamelo_v0.9.2.exe"
+#define APP_GITHUB_REPO "GuhClemente/Karamelo"
+#define APP_SITE        "karamelo-emu.com"
 
 // One entry per system in the main menu, and every one of them now has a
 // core behind it in cores/. Rows whose DLL is absent are hidden at build

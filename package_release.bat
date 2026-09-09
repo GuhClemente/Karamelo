@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 cls
 echo =======================================================
-echo   MiSTer 4 ALL v1.0 - Packaging ^& Release Generator
+echo   Karamelo v1.0 - Packaging ^& Release Generator
 echo =======================================================
 echo.
 
@@ -16,13 +16,13 @@ if "%~1" neq "" (
 )
 
 for /f "tokens=3" %%v in ('findstr /c:"#define APP_VERSION " include\app_info.h') do set APP_VER=%%~v
-set APP_BASE=MiSTer_4_ALL
+set APP_BASE=Karamelo
 set APP_EXE=%APP_BASE%_v%APP_VER%.exe
 set DIST_NAME=%APP_BASE%_v%APP_VER%_Win64
 set DIST_DIR=%~dp0dist\%DIST_NAME%
 
 echo =======================================================
-echo   MiSTer 4 ALL v%APP_VER% - Packaging ^& Release Generator
+echo   Karamelo v%APP_VER% - Packaging ^& Release Generator
 echo =======================================================
 echo.
 
@@ -82,7 +82,7 @@ for %%S in (
 rem 3. Copy binaries and assets (Engines and wallpapers only - NO ROMs or BIOSes)
 echo.
 echo [3/4] Copiando executavel unico, motores e recursos...
-copy /Y "app\%APP_EXE%" "%DIST_DIR%\MiSTer_4_ALL.exe" >nul
+copy /Y "app\%APP_EXE%" "%DIST_DIR%\Karamelo.exe" >nul
 copy /Y "app\cores\*.dll" "%DIST_DIR%\cores\" >nul 2>&1
 copy /Y "app\Wallpapers\*.*" "%DIST_DIR%\Wallpapers\" >nul 2>&1
 
@@ -95,8 +95,8 @@ rem does shrink the download. Entirely optional: skips itself cleanly if
 rem upx.exe isn't on PATH, no install attempted here.
 where upx >nul 2>&1
 if not errorlevel 1 (
-    echo    Comprimindo MiSTer_4_ALL.exe com UPX...
-    upx --best --lzma "%DIST_DIR%\MiSTer_4_ALL.exe" >nul
+    echo    Comprimindo Karamelo.exe com UPX...
+    upx --best --lzma "%DIST_DIR%\Karamelo.exe" >nul
 ) else (
     echo    UPX nao encontrado no PATH - pulando compressao ^(opcional^).
     echo    Baixe em https://upx.github.io se quiser essa etapa ativa.
@@ -129,10 +129,10 @@ echo.
 powershell -NoProfile -Command "$f = Get-Item '%~dp0dist\%DIST_NAME%.zip'; Write-Host ('   Tamanho: ' + [math]::Round($f.Length / 1MB, 2) + ' MB (' + $f.Length + ' bytes)'); $hash = Get-FileHash $f.FullName -Algorithm SHA256; Write-Host ('   SHA-256: ' + $hash.Hash)"
 
 rem 5. Prepare Standalone Executable & version.json for Auto-Updater
-copy /Y "app\%APP_EXE%" "dist\MiSTer_4_ALL.exe" >nul
-powershell -NoProfile -Command "$exe = Get-Item 'dist\MiSTer_4_ALL.exe'; $exeHash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'MiSTer 4 ALL v%APP_VER%'; release_date = $date; notes = 'Lancamento oficial do MiSTer 4 ALL com 35 sistemas nativos e Auto-Update.'; exe_url = 'https://mister4all.com/downloads/MiSTer_4_ALL.exe'; exe_size = $exe.Length; exe_sha256 = $exeHash; zip_url = 'https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'dist\version.json' -Value $json -Encoding UTF8"
+copy /Y "app\%APP_EXE%" "dist\Karamelo.exe" >nul
+powershell -NoProfile -Command "$exe = Get-Item 'dist\Karamelo.exe'; $exeHash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'Karamelo v%APP_VER%'; release_date = $date; notes = 'Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.'; exe_url = 'https://karamelo-emu.com/downloads/Karamelo.exe'; exe_size = $exe.Length; exe_sha256 = $exeHash; zip_url = 'https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'dist\version.json' -Value $json -Encoding UTF8"
 
-echo   Updater: dist\MiSTer_4_ALL.exe
+echo   Updater: dist\Karamelo.exe
 echo   Manifest: dist\version.json
 echo =======================================================
 echo.

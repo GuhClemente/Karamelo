@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Gustavo Clemente (mister4all.com | @GuhClemente).
+// Copyright (c) 2026 Gustavo Clemente (karamelo-emu.com | @GuhClemente).
 // All rights reserved.
 //
 // Clean-room implementation of the OSD raster used to draw this app's menu.

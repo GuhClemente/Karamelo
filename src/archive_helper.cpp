@@ -253,7 +253,7 @@ static bool SanitizeCue(const fs::path& cue_path, std::string& out_cue_path)
 	if (!modified) return true; // cue was fine as shipped
 	if (keep == 0) return false;
 
-	fs::path fixed = dir / "mister_fixed.cue";
+	fs::path fixed = dir / "karamelo_fixed.cue";
 	std::ofstream out(fixed, std::ios::binary);
 	if (!out) return false;
 

@@ -1,5 +1,5 @@
-#ifndef MISTER_MATH_H_INCLUDED
-#define MISTER_MATH_H_INCLUDED
+#ifndef KARAMELO_MATH_H_INCLUDED
+#define KARAMELO_MATH_H_INCLUDED
 
 // Pure helpers, deliberately free of Windows and of any global state.
 //

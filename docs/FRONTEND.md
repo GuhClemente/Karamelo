@@ -130,7 +130,7 @@ nome ou do domínio, mas a comparação real não confirmou nenhuma relação:
   `gamecontrollerdb.txt` que aparecem em `app/ports/*/` pertencem aos jogos
   "Ports & Recomp" baixados de terceiros (cada um tem o seu próprio, vindo do
   respectivo projeto), não ao nosso código.
-- **`mister_math.cpp`** (`SnapToStandardRate`, `ComputeViewport`) — parecia
+- **`karamelo_math.cpp`** (`SnapToStandardRate`, `ComputeViewport`) — parecia
   candidato pela função de "encaixar taxa de atualização na mais próxima
   padrão", que é um problema que o `video.cpp`/`scaler.cpp` do MiSTer
   também resolve. Não achei nenhuma linha de código correspondente nos dois
@@ -159,7 +159,7 @@ nome ou do domínio, mas a comparação real não confirmou nenhuma relação:
 | `charrom.cpp` / `charrom.h` | `charrom.cpp` / `charrom.h` | Era porte direto; fonte trocada pela Unscii (CC0/domínio público) |
 | `menu.cpp` | `menu.cpp` | Inspirado (mesma convenção de teclas e visual via OSD), código próprio |
 | `input_map.cpp` | `input.cpp` / `joymapping.cpp` | Só o layout padrão de botões é herdado; código totalmente diferente |
-| `mister_math.cpp` | `video.cpp` / `scaler.cpp` | Mesmo domínio (taxas de vídeo), código independente |
+| `karamelo_math.cpp` | `video.cpp` / `scaler.cpp` | Mesmo domínio (taxas de vídeo), código independente |
 | `menu.cpp` (persistência) | `cfg.cpp` | Sem relação — desenhos de parsing diferentes |
 | `gamepad_sdl.cpp` | `gamecontroller_db.cpp` | Sem relação — usamos a API nativa do SDL3 em vez disso |
 | — | `fpga_io.cpp`, `spi.cpp`, `user_io.cpp`, etc. | Sem equivalente possível (não há FPGA) |
@@ -170,5 +170,5 @@ Análise feita clonando `https://github.com/MiSTer-devel/Main_MiSTer`
 (`git clone --depth 1`) para comparação lado a lado com `diff` real contra
 cada arquivo candidato do nosso `src/`/`include/`, não por memória ou
 suposição. Onde a semelhança de nome/domínio não se confirmou em código
-(`cfg.cpp`, `gamecontroller_db.cpp`, `mister_math.cpp`, `joymapping.cpp`),
+(`cfg.cpp`, `gamecontroller_db.cpp`, `karamelo_math.cpp`, `joymapping.cpp`),
 isso está registrado explicitamente acima como descartado, não omitido.

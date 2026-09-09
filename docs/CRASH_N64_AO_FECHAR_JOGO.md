@@ -11,7 +11,7 @@ aberto. Se ele voltar, ou se aparecer algo parecido em outro core, comece aqui.
 
 Abrir qualquer jogo de N64, jogar um pouco, e escolher **Close Game** no menu.
 O aplicativo inteiro morria na hora. Sem mensagem, sem erro na tela, e — o que
-mais confundia — **sem nada no log**. O `mister4all.log` simplesmente parava no
+mais confundia — **sem nada no log**. O `karamelo.log` simplesmente parava no
 meio, na linha `Chamando RetroUnloadGameGuarded...`, e acabava ali.
 
 Esse silêncio era ele próprio uma pista. O aplicativo tem um capturador de
@@ -117,20 +117,20 @@ O aplicativo tem um modo sem interface gráfica que carrega um core, roda alguns
 quadros e descarrega. Rode de dentro da pasta `app`:
 
 ```bash
-MiSTer_4_ALL.exe --core-selftest cores\n64_gopher.dll "roms\Nintendo64\SEU_JOGO.n64"
+Karamelo.exe --core-selftest cores\n64_gopher.dll "roms\Nintendo64\SEU_JOGO.n64"
 ```
 
 Também vale testar com outro core antes, que é quando o bug era mais violento:
 
 ```bash
-MiSTer_4_ALL.exe --core-selftest cores\gba.dll "roms\GBA\SEU_JOGO.gba" cores\n64_gopher.dll "roms\Nintendo64\SEU_JOGO.n64"
+Karamelo.exe --core-selftest cores\gba.dll "roms\GBA\SEU_JOGO.gba" cores\n64_gopher.dll "roms\Nintendo64\SEU_JOGO.n64"
 ```
 
 **Como ler o resultado:**
 
 - Código de saída `0` = passou.
 - Código `-1073740940` (`0xC0000374`) = o bug voltou.
-- No `mister4all.log`, todo `Chamando RetroUnloadGameGuarded...` tem que ser
+- No `karamelo.log`, todo `Chamando RetroUnloadGameGuarded...` tem que ser
   seguido de `RetroUnloadGameGuarded concluido.`
 
 Esse último ponto é o que realmente importa. Já aconteceu de um teste "passar"
@@ -169,7 +169,7 @@ core velho.
 
 ## Uma armadilha da máquina de desenvolvimento
 
-O **Application Verifier** pode estar ligado para o `MiSTer_4_ALL.exe` no
+O **Application Verifier** pode estar ligado para o `Karamelo.exe` no
 registro do Windows. Ele é uma ferramenta de caça-bugs que **mata o processo de
 propósito** em qualquer deslize, e deixa os códigos de erro diferentes
 (`0xC0000409` em vez de `0xC0000374`).
@@ -178,7 +178,7 @@ Se estiver investigando um crash e os números não baterem com este documento,
 confira:
 
 ```bash
-reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MiSTer_4_ALL.exe"
+reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Karamelo.exe"
 ```
 
 Se aparecer `GlobalFlag`, ele está ligado. Para testar como o usuário final vê,

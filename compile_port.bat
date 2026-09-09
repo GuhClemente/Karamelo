@@ -4,7 +4,7 @@ setlocal
 cls
 
 rem Build from wherever this file lives, so the project can be moved or cloned
-rem anywhere instead of being pinned to c:\SaborMister.
+rem anywhere instead of being pinned to c:\Karamelo.
 cd /d "%~dp0"
 
 call "%~dp0setup_msvc.bat"
@@ -13,7 +13,7 @@ if errorlevel 1 exit /b 1
 if not exist build mkdir build
 if not exist app mkdir app
 
-set APP_BASE=MiSTer_4_ALL
+set APP_BASE=Karamelo
 for /f "tokens=3" %%v in ('findstr /c:"#define APP_VERSION " include\app_info.h') do set APP_VER=%%~v
 set APP_EXE=%APP_BASE%_v%APP_VER%.exe
 
@@ -87,7 +87,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     /DRC_CLIENT_SUPPORTS_HASH ^
     /DZSTD_DISABLE_ASM ^
     /Fobuild\ ^
-    src\mister_math.cpp ^
+    src\karamelo_math.cpp ^
     src\input_map.cpp ^
     src\gamepad_sdl.cpp ^
     src\hw_render.cpp ^
@@ -131,7 +131,7 @@ if not exist app\cores mkdir app\cores
 if exist cores\*.dll copy /Y cores\*.dll app\cores\ >nul 2>&1
 
 rem Gerar version.json automatico
-powershell -NoProfile -Command "$size = (Get-Item 'app\%APP_EXE%').Length; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'MiSTer 4 ALL v%APP_VER%'; release_date = $date; notes = 'Versao de producao MiSTer 4 ALL'; exe_url = 'https://mister4all.com/downloads/MiSTer_4_ALL.exe'; exe_size = $size; exe_sha256 = ''; zip_url = 'https://mister4all.com/downloads/MiSTer_4_ALL_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'app\version.json' -Value $json -Encoding UTF8"
+powershell -NoProfile -Command "$size = (Get-Item 'app\%APP_EXE%').Length; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'Karamelo v%APP_VER%'; release_date = $date; notes = 'Versao de producao Karamelo'; exe_url = 'https://karamelo-emu.com/downloads/Karamelo.exe'; exe_size = $size; exe_sha256 = ''; zip_url = 'https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'app\version.json' -Value $json -Encoding UTF8"
 echo [VERSION.JSON] Gerado em app\version.json (v%APP_VER%)
 echo.
 echo ==================================================

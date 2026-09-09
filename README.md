@@ -1,4 +1,4 @@
-# MiSTer 4 ALL — Native Windows x64 Frontend & Retrogaming Emulation Suite
+# Karamelo Emulador — Native Windows x64 Frontend & Retrogaming Emulation Suite
 
 > **Software Gratuito e Independente (Freeware)**  
 > Canal do YouTube: **[@GuhClemente](https://youtube.com/@GuhClemente)**  
@@ -9,7 +9,7 @@
 
 ## 🌟 Visão Geral
 
-O **MiSTer 4 ALL** é um port nativo em C++20 (64-bit) de alto desempenho da interface de usuário e OSD do MiSTer para o ambiente Windows x86_64, integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **35 sistemas** através de **40 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, e dezenas de outros — ver CREDITS.md).
+O **Karamelo Emulador** é um port nativo em C++20 (64-bit) de alto desempenho da interface de usuário e OSD do MiSTer para o ambiente Windows x86_64, integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **35 sistemas** através de **40 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, e dezenas de outros — ver CREDITS.md).
 
 ---
 
@@ -68,7 +68,7 @@ Jogos de arcade passam por uma troca automática e silenciosa de core: o app ten
   * Gravação persistente no disco em `saves/<Sistema>/<NomeDoJogo>.state<Slot>`.
   * Notificações HUD em tempo real na tela do jogo (*Toast Notifications*).
 * **Atalhos Rápidos de Teclado:**
-  * `F12` ou `Tab`: Abrir / Fechar Menu OSD do MiSTer.
+  * `F12` ou `Tab`: Abrir / Fechar o Menu OSD do Karamelo.
   * `F5` ou `F2`: **Quick Save State** no slot ativo.
   * `F8` ou `F4`: **Quick Load State** do slot ativo.
   * `F6` / `F7`: Alternar Slot Anterior / Próximo (0 a 9).
@@ -77,7 +77,7 @@ Jogos de arcade passam por uma troca automática e silenciosa de core: o app ten
 * **Atalhos Rápidos no Controle (XInput / Xbox):**
   * `Select + R1 (RB)`: Salvar Estado Rápido.
   * `Select + L1 (LB)`: Carregar Estado Rápido.
-  * `Start + Select` ou `Guide`: Alternar Menu OSD do MiSTer.
+  * `Start + Select` ou `Guide`: Alternar o Menu OSD do Karamelo.
 * **Mouse como caneta/stylus:** em sistemas com tela de toque (DS, 3DS), o botão esquerdo do mouse funciona como caneta sobre a imagem do jogo. O cursor do Windows some sozinho enquanto o app está em foco.
 * **Pipeline de Áudio em Ring Buffer:** buffers circulares com reciclagem `WHDR_DONE`, detecção automática da taxa nativa da placa de som (WASAPI), recalibração a cada jogo carregado e fila de latência que cresce sozinha se detectar underruns recorrentes numa máquina mais lenta.
 * **Ports & Recomp:** categoria própria no menu principal com jogos "recompilados" nativamente (tecnologia N64Recomp e afins) - baixa, extrai e abre a versão mais recente de cada projeto direto do GitHub, sem sair do app. Ver [CREDITS.md](CREDITS.md) para a lista completa e os repositórios de origem.
@@ -169,7 +169,7 @@ nada.
 ## 📁 Estrutura do Projeto
 
 ```
-MiSTer 4 All/
+Karamelo/
 ├── src/                       Código-fonte (.cpp), 15 arquivos
 │   ├── main_win32.cpp         Janela, loop de apresentação, entrada e HUD
 │   ├── core_runner.cpp        Thread do core libretro, áudio e escalonamento
@@ -185,7 +185,7 @@ MiSTer 4 All/
 │   ├── port_runner.cpp         Download/execução dos "Ports & Recomp"
 │   ├── retroachievements.cpp   Integração com rcheevos
 │   ├── updater.cpp             Auto-atualização do próprio app
-│   └── mister_math.cpp         Funções matemáticas compartilhadas (viewport, clamp, etc.)
+│   └── karamelo_math.cpp       Funções matemáticas compartilhadas (viewport, clamp, etc.)
 ├── include/                    Cabeçalhos (.h), incluindo libretro.h
 ├── packaging/                  Templates versionados usados por package_release.bat
 │   ├── bios-guide/              Guia completo de BIOS (fonte única de verdade)
@@ -193,7 +193,7 @@ MiSTer 4 All/
 ├── build/                       Objetos intermediários (.obj) — gerado
 ├── docs/                        Capturas e material de referência
 └── app/                         Pasta de execução
-    ├── MiSTer_4_ALL_v<versão>.exe   Binário final (gerado pelo compile_port.bat)
+    ├── Karamelo_v<versão>.exe      Binário final (gerado pelo compile_port.bat)
     ├── cores/                   DLLs libretro
     ├── bios/                    BIOS por sistema (NeoGeo CD em bios/neocd/, Dreamcast em bios/dc/)
     ├── roms/                    Jogos, organizados por sistema
@@ -205,8 +205,8 @@ MiSTer 4 All/
 
 O executável precisa ficar dentro de `app/`: ele localiza `cores/`, `bios/`,
 `roms/` e `saves/` a partir da própria pasta. `package_release.bat` gera um
-pacote de distribuição equivalente em `dist/MiSTer_4_ALL_v<versão>_Win64/`,
-com o executável renomeado para `MiSTer_4_ALL.exe`.
+pacote de distribuição equivalente em `dist/Karamelo_v<versão>_Win64/`,
+com o executável renomeado para `Karamelo.exe`.
 
 ---
 
@@ -220,7 +220,7 @@ compile_port.bat
 
 O script se orienta pela própria localização, então o projeto pode ser clonado em
 qualquer diretório. Os `.obj` vão para `build/` e o executável final é gravado em
-`app\MiSTer_4_ALL_v<versão>.exe` (a versão vem de `include/app_info.h`). O script
+`app\Karamelo_v<versão>.exe` (a versão vem de `include/app_info.h`). O script
 também compila e roda a suíte de testes unitários automaticamente ao final.
 
 Para gerar um pacote de distribuição completo (com a estrutura de pastas,
@@ -235,7 +235,7 @@ guias de BIOS/ROM e cores prontos), use `package_release.bat` em vez de
 * **Desenvolvedor:** Guh Clemente
 * **Engine de Emulação:** Libretro API Architecture
 * **Licença do Frontend:** Software Gratuito / Freeware (Uso pessoal, não comercial). Código e frontend independentes.
-* **Aviso Legal / Disclaimer:** O **MiSTer 4 ALL** é um projeto de software independente desenvolvido para o ecossistema Windows e **NÃO possui qualquer afiliação, vínculo ou endosso de Alexey Melnikov, do projeto oficial MiSTer FPGA ou de seus mantenedores**.
+* **Aviso Legal / Disclaimer:** O **Karamelo** é um projeto de software independente desenvolvido para o ecossistema Windows e **NÃO possui qualquer afiliação, vínculo ou endosso de Alexey Melnikov, do projeto oficial MiSTer FPGA ou de seus mantenedores**.
 * **Cores e Emuladores:** Todos os motores de emulação utilizados são plugins externos independentes compatíveis com a especificação Libretro, desenvolvidos por suas respectivas comunidades e regidos por suas licenças originais.
 
 Lista completa e verificada de cada core/motor/port recompilado, com a

@@ -20,7 +20,7 @@
 #include "hw_render_d3d11.h"
 #include "input_map.h"
 #include "menu.h"
-#include "mister_math.h"
+#include "karamelo_math.h"
 #include "netplay.h"
 #include "osd.h"
 #include "retroachievements.h"
@@ -40,7 +40,8 @@ enum MenuState {
   STATE_ABOUT,
   STATE_UPDATE,
   STATE_CORE_OPTIONS,
-  STATE_RESET_CONFIRM
+  STATE_RESET_CONFIRM,
+  STATE_ABOUT_CORES
 };
 
 struct MenuItem {
@@ -78,9 +79,9 @@ static uint32_t TickCountMs()
 	return (uint32_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 }
 static int main_menu_saved_idx = 0;
-static std::string current_title = "MiSTer 4 ALL";
+static std::string current_title = "Karamelo";
 static std::string current_dir = "roms";
-static std::string status_msg = "MiSTer 4 ALL - mister4all.com - @GuhClemente";
+static std::string status_msg = "Karamelo - karamelo-emu.com - @GuhClemente";
 
 // Settings variables matching screenshots
 static int setting_aspect = 0; // 0=Original, 1=4:3, 2=16:9
@@ -375,10 +376,10 @@ static const char *WallpaperDisplayLabel(int mode) {
   if (!path) return "None";
   static char buf[32];
   std::string stem = fs::path(path).stem().string();
-  if (stem == "sabor_mister_chef") {
-    snprintf(buf, sizeof(buf), "Flavor Chef");
-  } else if (stem == "sabor_mister_arcade") {
-    snprintf(buf, sizeof(buf), "Flavor Arcade");
+  if (stem == "karamelo_chef") {
+    snprintf(buf, sizeof(buf), "Chef");
+  } else if (stem == "karamelo_arcade") {
+    snprintf(buf, sizeof(buf), "Arcade");
   } else {
     for (char &c : stem) {
       if (c == '_') c = ' ';
@@ -779,6 +780,7 @@ void PopulateCoreOptionsSettings();
 void PopulateAchievementList();
 void PopulateUpdate();
 void PopulateResetConfirm();
+void PopulateCoresList();
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
 static int neo_bios = 0;         // 0: Original, 1: UniBIOS
@@ -792,7 +794,7 @@ static int neo_dip_freeplay = 0; // 0: OFF, 1: ON
 // on change: without the load-time call a setting restored from the config
 // only took effect if the player toggled it again by hand - true of every
 // value below (found the hard way for NeoGeo's own dip switches, which
-// persisted correctly to mister4all.cfg and displayed correctly in this
+// persisted correctly to karamelo.cfg and displayed correctly in this
 // menu on the very next launch, but silently never reached Geolith unless
 // re-toggled in that session, since none of them were being re-applied here).
 static void ApplyPersistedCoreOptions() {
@@ -1577,7 +1579,7 @@ void PopulateAbout() {
     }
   }
   if (core_files > 0 && core_files != APP_CORE_FILES) {
-    FILE *lf = fopen("mister4all.log", "a");
+    FILE *lf = fopen("karamelo.log", "a");
     if (lf) {
       fprintf(lf,
               "[WARN] [ABOUT] cores/ tem %d DLLs, mas APP_CORE_FILES diz %d - "
@@ -1597,18 +1599,86 @@ void PopulateAbout() {
   items.push_back({APP_NAME, "v" APP_VERSION " " APP_ARCH, false, false, 0});
   items.push_back({"Author", "Guh Clemente", false, false, 0});
   items.push_back({"YouTube", "@GuhClemente", false, false, 0});
-  items.push_back({"Site", "mister4all", false, false, 0});
+  items.push_back({"Site", APP_SITE, false, false, 0});
   items.push_back({"Engine", "Libretro", false, false, 0});
   items.push_back({"Systems", sys_str, false, false, 0});
-  items.push_back({"Cores", core_str, false, false, 0});
-  items.push_back({"Ports & Recomp", ports_str, false, false, 0});
+  items.push_back({"Cores", std::string(core_str) + " >", false, true, 209});
+  items.push_back({"Ports & Recomp", std::string(ports_str) + " >", false, true, 140});
   items.push_back({"Netplay", "2P TCP/IP", false, false, 0});
   items.push_back({"Conquistas", RaIsEnabled() ? "Ativado" : "Desativado",
                    false, false, 0});
   items.push_back({"License", "Freeware", false, false, 0});
   items.push_back({"Back", "", false, true, 999});
 
-  selected_idx = 11;
+  selected_idx = 6;
+  scroll_top = 0;
+}
+
+void PopulateCoresList() {
+  items.clear();
+  current_title = "Cores";
+  OsdSetSize(15);
+
+  struct CoreEntry {
+    const char* system;
+    const char* engine;
+    const char* dll;
+  };
+
+  static const CoreEntry kAllCores[] = {
+    {"Nintendo 64", "ParaLLEl N64", "cores/n64_parallel.dll"},
+    {"Nintendo 64", "Gopher64", "cores/n64_gopher.dll"},
+    {"Nintendo 64", "Mupen64+ Next", "cores/n64_mupen.dll"},
+    {"PlayStation 2", "PCSX2", "cores/ps2.dll"},
+    {"PlayStation 2", "Play!", "cores/ps2_play.dll"},
+    {"PlayStation Port.", "PPSSPP", "cores/psp.dll"},
+    {"PlayStation 1", "Beetle PSX", "cores/psx.dll"},
+    {"Dreamcast", "Flycast", "cores/dreamcast.dll"},
+    {"GameCube", "Dolphin", "cores/gamecube.dll"},
+    {"Nintendo 3DS", "Citra", "cores/3ds.dll"},
+    {"Nintendo DS", "melonDS", "cores/nds.dll"},
+    {"SNES", "Snes9x", "cores/snes.dll"},
+    {"NES / Famicom", "Mesen / FCEU", "cores/nes.dll"},
+    {"Game Boy Advance", "mGBA", "cores/gba.dll"},
+    {"Game Boy / Color", "Gambatte", "cores/gb.dll"},
+    {"Arcade", "FinalBurn Neo", "cores/arcade_fbneo.dll"},
+    {"Arcade", "MAME 2003", "cores/mame2003.dll"},
+    {"Arcade", "MAME 2010", "cores/mame2010.dll"},
+    {"Genesis / MD", "Genesis Plus", "cores/genesis.dll"},
+    {"Sega Saturn", "Beetle Saturn", "cores/saturn.dll"},
+    {"Sega 32X", "PicoDrive", "cores/32x.dll"},
+    {"Mega CD", "Genesis Plus", "cores/genesis.dll"},
+    {"Master System", "Gearsystem", "cores/sms.dll"},
+    {"NeoGeo / CD", "Geolith", "cores/neogeo.dll"},
+    {"Neo Geo Pocket", "Beetle NeoPop", "cores/ngp.dll"},
+    {"TurboGrafx-16", "Beetle PCE", "cores/pce.dll"},
+    {"PC-FX", "Beetle PC-FX", "cores/pcfx.dll"},
+    {"Panasonic 3DO", "Opera", "cores/3do.dll"},
+    {"Atari 2600", "Stella", "cores/atari2600.dll"},
+    {"Atari 5200", "Atari800", "cores/atari5200.dll"},
+    {"Atari 7800", "ProSystem", "cores/atari7800.dll"},
+    {"Atari Jaguar", "Virt. Jaguar", "cores/jaguar.dll"},
+    {"Atari Lynx", "Handy", "cores/lynx.dll"},
+    {"ColecoVision", "Gearcoleco", "cores/coleco.dll"},
+    {"Commodore 64", "VICE x64", "cores/c64.dll"},
+    {"Commodore Amiga", "PUAE", "cores/amiga.dll"},
+    {"MS-DOS", "DOSBox-Pure", "cores/dosbox_pure.dll"},
+    {"MSX / MSX2", "fMSX/BlueMSX", "cores/msx.dll"},
+    {"ZX Spectrum", "Fuse", "cores/spectrum.dll"},
+    {"WonderSwan", "Beetle Cygne", "cores/wswan.dll"}
+  };
+
+  std::error_code ec;
+  for (const auto& c : kAllCores) {
+    bool present = fs::exists(c.dll, ec);
+    std::string status = present ? c.engine : "(Ausente)";
+    items.push_back({c.system, status, false, false, 0});
+  }
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({"Back", "", false, true, 997});
+
+  selected_idx = 0;
   scroll_top = 0;
 }
 
@@ -1932,14 +2002,17 @@ static void BrowseGoUp() {
 // volume reset on every launch. Written as plain key=value text next to the
 // executable, under Config/.
 // -------------------------------------------------------------
-static const char *SETTINGS_PATH = "Config/mister4all.cfg";
+static const char *SETTINGS_PATH = "Config/karamelo.cfg";
 // Older filenames this project shipped under, newest first. Read-only: the
 // first one that exists is loaded, and the very next MenuSaveSettings() writes
 // everything back out to SETTINGS_PATH above, so an upgrading player keeps
 // every binding, video/audio choice and Core Option instead of being silently
-// reset to defaults. "mister_flavor" was the name before this became
-// MiSTer 4 ALL; "sabor_mister" was the one before that.
+// reset to defaults. These are the names the project shipped under before the
+// rename to Karamelo, and they stay here verbatim: they are the on-disk files
+// an existing install actually has, so renaming them here would silently drop
+// everyone's settings on the first launch after upgrading.
 static const char *LEGACY_SETTINGS_PATHS[] = {
+    "Config/mister4all.cfg",
     "Config/mister_flavor.cfg",
     "Config/sabor_mister.cfg",
 };
@@ -2025,7 +2098,7 @@ static void MenuSaveSettings() {
   if (!f)
     return;
 
-  fprintf(f, "# MiSTer 4 ALL - Configuration\n");
+  fprintf(f, "# Karamelo - Configuration\n");
   std::string snap = SettingsSnapshot();
   fwrite(snap.data(), 1, snap.size(), f);
   fclose(f);
@@ -2790,6 +2863,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
     if (item.action_id == 99) // Exit
     {
       exit(0);
+    } else if (item.action_id == 997) // Back from Cores List -> About
+    {
+      current_state = STATE_ABOUT;
+      PopulateAbout();
+      selected_idx = 6;
     } else if (item.action_id == 999) // Back
     {
       current_state = STATE_SETTINGS;
@@ -3008,6 +3086,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_RESET_CONFIRM;
         PopulateResetConfirm();
       }
+    } else if (current_state == STATE_ABOUT) {
+      if (item.action_id == 209) {
+        current_state = STATE_ABOUT_CORES;
+        PopulateCoresList();
+      } else if (item.action_id == 140) {
+        current_state = STATE_BROWSE;
+        PopulateBrowse("ports");
+      }
     } else if (current_state == STATE_RESET_CONFIRM) {
       if (item.action_id == 211) {
         current_state = STATE_SETTINGS;
@@ -3132,6 +3218,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
   case KEY_CANCEL:
     if (current_state == STATE_BROWSE) {
       BrowseGoUp();
+    } else if (current_state == STATE_ABOUT_CORES) {
+      current_state = STATE_ABOUT;
+      PopulateAbout();
+      selected_idx = 6;
     } else if (current_state == STATE_RESET_CONFIRM) {
       current_state = STATE_SETTINGS;
       PopulateSettings();

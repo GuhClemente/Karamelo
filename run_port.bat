@@ -8,14 +8,14 @@ rem anywhere instead of being pinned to a static path.
 cd /d "%~dp0"
 
 set "EXE="
-if exist "app\MiSTer_4_ALL_v1.0.exe" set "EXE=app\MiSTer_4_ALL_v1.0.exe"
-if not defined EXE if exist "app\MiSTer_4_ALL.exe" set "EXE=app\MiSTer_4_ALL.exe"
+if exist "app\Karamelo_v1.0.exe" set "EXE=app\Karamelo_v1.0.exe"
+if not defined EXE if exist "app\Karamelo.exe" set "EXE=app\Karamelo.exe"
 if not defined EXE (
-    for %%F in (app\MiSTer_4_ALL*.exe) do (
+    for %%F in (app\Karamelo*.exe) do (
         set "EXE=%%F"
     )
 )
-if not defined EXE if exist "app\MiSTer_Win32.exe" set "EXE=app\MiSTer_Win32.exe"
+if not defined EXE if exist "app\Karamelo.exe" set "EXE=app\Karamelo.exe"
 
 if not defined EXE (
     echo [ERROR] Executable not found in app\ directory.
