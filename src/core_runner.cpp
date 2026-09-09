@@ -3998,19 +3998,36 @@ static void CoreUnload()
 	loaded_system_dir.clear();
 	LeaveCriticalSection(&name_lock);
 
+	// Which cores stay mapped after unloading.
+	//
+	// Leaving a DLL mapped is not free: the core's globals survive with it, and
+	// a core that checks "am I already initialised?" refuses the next
+	// retro_load_game. That is exactly what made loading the same arcade game a
+	// second time fail and a third time crash - MAME ran the game once, was
+	// unloaded but never freed, and every later attempt was handed a core that
+	// still thought it was running. The chain then walked every candidate,
+	// found none, and kept going.
+	//
+	// So the list is now only the cores that genuinely cannot be freed, which
+	// are the ones that leave threads of their own behind: PCSX2, PPSSPP and
+	// the Dreamcast/GameCube pair. The MAME builds and the generic "Arcade"
+	// name came off it - nothing recorded why they had been added, the commit
+	// that introduced this bundled it into an unrelated feature, and the
+	// justification written a few lines below in RecoverAfterKilledCore is
+	// about a thread that was killed mid-module, which is a different path
+	// that still keeps its mapping.
+	//
+	// If an arcade core starts faulting inside FreeLibrary, put "mame" back and
+	// the reload bug comes back with it - that is the trade being made here.
 	bool skip_free = false;
 	{
 		std::string lower_path = s_loaded_core_path;
 		for (char& c : lower_path) c = (char)tolower((unsigned char)c);
 
 		if (s_loaded_core_is_pcsx2 ||
-		    loaded_core_name == "Arcade" ||
 		    loaded_core_name == "PlayStation 2" ||
 		    loaded_core_name == "PSP" ||
 		    loaded_core_name == "GameCube" ||
-		    loaded_core_name == "Dreamcast" ||
-		    lower_path.find("fbneo") != std::string::npos ||
-		    lower_path.find("mame") != std::string::npos ||
 		    lower_path.find("pcsx2") != std::string::npos ||
 		    lower_path.find("ppsspp") != std::string::npos ||
 		    lower_path.find("psp") != std::string::npos)

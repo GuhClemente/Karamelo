@@ -1,4 +1,10 @@
-==========================================================================
+﻿==========================================================================
+
+CONFIRA ANTES DE INVESTIGAR: tools/check_bios.ps1 compara cada arquivo com o
+MD5 registrado aqui, reconhece ponteiro do Git LFS pelo cabecalho e mostra o
+que os cores reclamaram no log. Foi ele que descobriu que dois "downloads bem
+sucedidos" tinham 131 bytes de texto no lugar da ROM. Um arquivo com o nome
+certo e o conteudo errado carrega e falha depois, longe da causa.
  BIOS NECESSARIAS - Karamelo
  Lista completa, sistema por sistema, com nome exato de arquivo, MD5
  esperado (quando documentado pelo core) e onde colocar.
@@ -17,7 +23,8 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
 --------------------------------------------------------------------------
 
 [3DO] cores/3do.dll (Opera)
-  Status: FALTANDO
+  Status: FALTANDO - o arquivo baixado em 09/09 veio como ponteiro do
+  Git LFS (132 bytes de texto no lugar da ROM). Baixar de outra fonte.
   Precisa de UM destes (qualquer um serve, sao variantes regionais do
   mesmo boot ROM):
     panafz1.bin        MD5 f47264dd47fe30f73ab3c010015c155b
@@ -33,7 +40,9 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
   Pasta: app/bios/
 
 [Atari5200] cores/atari5200.dll (Atari800)
-  Status: FALTANDO (todos os 5)
+  Status: PRESENTE - 4 conferidos por MD5 em 09/09. O ATARIOSB.ROM tem o
+  tamanho certo (10240 bytes) mas MD5 de outra revisao do OS-B; o sistema
+  carrega assim mesmo.
     5200.rom           MD5 281f20ea4320404ec820fb7ec0693b38
     ATARIXL.ROM        MD5 06daac977823773a3eea3422fd26a703
     ATARIBAS.ROM       MD5 0bac0c6a50104045d902df4503a4c30b
@@ -42,12 +51,12 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
   Pasta: app/bios/
 
 [Lynx] cores/lynx.dll (Handy)
-  Status: FALTANDO
+  Status: PRESENTE E CONFERIDO (09/09)
     lynxboot.img       MD5 fcd403db69f54290b51035d82f835e7b
   Pasta: app/bios/
 
 [PC-FX] cores/pcfx.dll (Beetle PC-FX)
-  Status: FALTANDO
+  Status: PRESENTE E CONFERIDO (09/09)
     pcfx.rom           MD5 08e36edbea28a017f79f8d4f7ff9b6d7
   Pasta: app/bios/
 
@@ -135,7 +144,7 @@ JA COMPLETO - confira o MD5 se algum jogo especifico reclamar
   Necessario so para jogos em CD; cartucho roda sem.
 
 [PlayStation] cores/psx.dll (Beetle PSX)
-  Status: PRESENTE PARA NTSC-U E PAL, FALTA NTSC-J
+  Status: COMPLETO E CONFERIDO POR MD5 (09/09) - as tres regioes
     scph5501.bin (NTSC-U)   MD5 1e68c231d0896b7eadcad1d7d8e76129
     scph5502.bin (PAL)      MD5 32736f17079d0b2b7024407c39bd3050
     scph5500.bin (NTSC-J)   MD5 8dd7d5296a650fac7319bce665a6a53c
@@ -169,10 +178,10 @@ OPCIONAL - a maioria dos jogos funciona sem, so amplia compatibilidade
 --------------------------------------------------------------------------
 
 [Amiga] cores/amiga.dll (PUAE)
-  Status: PARCIAL - A500 coberto; CD32 incompleto; falta AGA
+  Status: A500 e CD32 completos (09/09); falta so o AGA
     kick34005.A500 (Kickstart 1.3)       - presente
     kick40060.CD32 (Kickstart CD32)      - presente
-    kick40060.CD32.ext (ROM estendida)   - FALTA
+    kick40060.CD32.ext (ROM estendida)   - presente
     Sem a ROM estendida o CD32 nao da boot em CD: o core carrega o
     Kickstart, nao encontra a extensao e para na tela pedindo disquete,
     como se o jogo nao existisse. O Kickstart sozinho nao basta, e os

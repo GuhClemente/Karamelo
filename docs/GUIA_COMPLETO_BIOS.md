@@ -1,4 +1,10 @@
-# 🕹️ Guia Oficial de BIOS e Arquivos de Sistema — Karamelo
+﻿# 🕹️ Guia Oficial de BIOS e Arquivos de Sistema — Karamelo
+
+> **Conferindo o que voce baixou:** `tools/check_bios.ps1` compara cada
+> arquivo com o MD5 esperado e reconhece ponteiro do Git LFS — o caso real em
+> que dois downloads "bem-sucedidos" tinham 131 bytes de texto no lugar da
+> ROM, e o sintoma foi um core que simplesmente nao abria nada.
+
 
 Este guia detalha **todos os arquivos de BIOS, firmwares, chaves criptográficas e assets de sistema** necessários ou recomendados para os **35 sistemas emulados nativamente** no **Karamelo**.
 

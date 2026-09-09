@@ -1,4 +1,4 @@
-# Pendências e diagnósticos em aberto
+﻿# Pendências e diagnósticos em aberto
 
 Escrito em 09/09/2026, no fim de uma sessão longa, para que o trabalho em curso
 não se perca. Cada item traz **a evidência que sustenta o diagnóstico**, não só
@@ -6,9 +6,21 @@ a conclusão — se alguém discordar, dá para refutar olhando a mesma coisa qu
 olhei. Os números de linha valem para o commit `95fc167`; confira o contexto ao
 redor antes de editar, porque eles andam.
 
+**Atualizado em 09/09/2026.** Três dos quatro itens foram corrigidos no mesmo
+dia. O diagnóstico de cada um fica registrado abaixo do respectivo cabeçalho —
+não porque ainda seja pendência, mas porque saber *por que* algo quebrou vale
+mais do que saber que foi consertado, e esses três voltam se alguém mexer na
+cadeia de cores ou no `CB_InputState` sem saber disto.
+
 ---
 
-## 1. Entrada duplicada: um botão faz duas coisas
+## 1. ~~Entrada duplicada: um botão faz duas coisas~~ — CORRIGIDO (`c665689`)
+
+> A ponte agora só vale para MSX, C64, ZX Spectrum, DOS e Amiga, decidida uma
+> vez no load. **Confirmado em jogo:** joystick no arcade voltou ao normal.
+> Falta confirmar o outro lado — que o controle ainda digita num jogo de MSX.
+
+### Diagnóstico original
 
 **Sintoma relatado, e reproduzido pelo dono do projeto no Altered Beast (MAME):**
 no gameplay, um botão do controle soca *e* pula ao mesmo tempo. No menu interno
@@ -55,7 +67,19 @@ porque a correção pode consertar um e quebrar o outro.
 
 ---
 
-## 2. O core de arcade corrompe o heap e mata o app sem deixar rastro
+## 2. Crash de arcade — CORRIGIDO EM PARTE (`7580e6d`, `02bee22`)
+
+> Dois consertos fecharam os dois caminhos que levavam ao crash: a cadeia agora
+> lembra qual core rodou cada romset (o reload virou uma tentativa em vez de
+> quinze), e o Flycast saiu da fila geral — ele só emula Naomi/Atomiswave, e era
+> nele que toda busca fracassada terminava.
+>
+> **Continua em aberto:** uma romset que não casa com nenhum core ainda percorre
+> a cadeia inteira. Nada valida a romset antes de entregá-la, e nada impede um
+> core de derrubar o processo. Resolver de verdade exige validação prévia ou
+> rodar cores fora do processo.
+
+### Diagnóstico original
 
 **Evidência.** No `app/karamelo.log`:
 
@@ -104,7 +128,7 @@ de arquitetura, não conserto pontual.
 
 ---
 
-## 3. `arcade_fbneo.dll` não é FinalBurn Neo
+## 3. `arcade_fbneo.dll` não é FinalBurn Neo — EM ABERTO
 
 **Evidência, três independentes:**
 
@@ -132,7 +156,15 @@ existentes e o `download_cores.ps1`. Decidir antes se vale.
 
 ---
 
-## 4. Crash ao recarregar o mesmo jogo
+## 4. ~~Crash ao recarregar o mesmo jogo~~ — CORRIGIDO (`7580e6d`)
+
+> Era o item 2. O log de uma sessão real mostrou: o jogo rodava no MAME 2010, o
+> reload recomeçava do fbneo, falhava nos quatro candidatos e repetia — quatro
+> rodadas, quinze cargas de core. Na quarta o Flycast bateu na própria asserção
+> (`state == Init`) e matou o processo com `0xC000001D`. Não era suposição minha
+> sobre o MAME; era outro core.
+
+### Diagnóstico original
 
 Relatado: abrir o jogo, sair, abrir de novo → trava. Não investigado. Suspeita
 de ser o mesmo item 2 (o core de 372 MB sendo descarregado e recarregado), mas
@@ -150,6 +182,22 @@ o jogo tenha aberto com sucesso na primeira vez.
   (commit `f219a54`): **45 arquivos, 41 motores**, medido por hash e não à mão.
 - Ícone do app refeito por código em `tools/make_icon.py` (commit `c116f7e`).
 - Briefing do site em `docs/SITE_SYNC.md`.
+
+## 5. BIOS: dois arquivos ainda inválidos
+
+`app/bios/panafz1.bin` tem 132 bytes — é um ponteiro do Git LFS, não a BIOS do
+3DO, então o 3DO continua sem abrir nada. `ATARIOSB.ROM` tem o tamanho certo mas
+MD5 de outra revisão do OS-B; o Atari 5200 tem as outras quatro ROMs corretas e
+provavelmente roda mesmo assim.
+
+Rode `tools/check_bios.ps1` antes de investigar qualquer "jogo não abre": ele
+compara MD5, reconhece ponteiro de LFS pelo cabeçalho e mostra o que os cores
+reclamaram no log. Foi ele que achou os dois stubs de 131 bytes que passavam
+como arquivos presentes.
+
+Resolvidos hoje por esse caminho: Amiga CD32 (faltava `kick40060.CD32.ext`, o
+sintoma era ficar na tela pedindo disquete para sempre), Atari 5200, Lynx, PC-FX
+e a BIOS japonesa de PlayStation.
 
 ## Decisões que dependem do dono
 

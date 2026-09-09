@@ -35,6 +35,15 @@ if (-not $exe) { throw "Executavel nao encontrado em $app - rode compile_port.ba
 
 $log = Join-Path $app "karamelo.log"
 
+# Duas baterias ao mesmo tempo disputam o mesmo executavel e o mesmo log, e o
+# resultado das duas fica sem valor. Aconteceu: uma rodada acusou dois sistemas
+# de derrubar o processo, e nenhum dos dois havia crashado.
+$outros = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like "*stress_cores*" })
+if ($outros.Count -gt 0) {
+    throw ("Ja existe uma bateria rodando (PID {0}). Espere ela terminar - duas ao mesmo tempo invalidam as duas." -f $outros[0].ProcessId)
+}
+
 # Pasta em roms/ -> core que a atende. Espelha o roteamento do menu nos casos
 # obvios; para Arcade entrega o primeiro da cadeia e deixa o proprio app
 # decidir, que e justamente o caminho que se quer exercitar.
@@ -105,15 +114,13 @@ foreach ($t in $targets) {
     $worst = "PASS"
 
     for ($i = 1; $i -le $Cycles; $i++) {
-        $before = if (Test-Path $log) { (Get-Item $log).Length } else { 0 }
-
-        # Os quatro argumentos exercitam carregar, desligar e carregar de novo
-        # dentro do mesmo processo - o cenario que quebrava.
-        # Cada argumento vai entre aspas: quase todo nome de ROM tem espaco, e
-        # sem isto o -ArgumentList junta tudo com espaco e o app recebe
-        # "roms/GBA/A", "Link", "to"... A primeira versao desta bateria
-        # reprovou 16 de 19 sistemas exatamente por isso, e os 3 que passaram
-        # eram os de nome sem espaco.
+        # O veredito vem do codigo de saida, nao do log. O autoteste devolve
+        # 0 quando passa e 1 quando o core recusa; qualquer outro valor e o
+        # codigo da excecao que matou o processo. Ler o log por posicao de byte
+        # parecia equivalente e nao e: com duas baterias rodando ao mesmo tempo
+        # os offsets se cruzaram e ciclos que passaram foram contados como
+        # processo morto - dois sistemas foram acusados de crash sem nunca
+        # terem crashado.
         $argLine = '--core-selftest "{0}" "{1}" "{0}" "{1}"' -f $t.Dll, $t.Rom
         $p = Start-Process -FilePath $exe.FullName -WorkingDirectory $app -PassThru -WindowStyle Hidden `
              -ArgumentList $argLine
@@ -122,25 +129,15 @@ foreach ($t in $targets) {
             $marks += "T"; $worst = "TIMEOUT"; continue
         }
 
-        $tail = ""
-        if (Test-Path $log) {
-            $fs = [System.IO.File]::Open($log, 'Open', 'Read', 'ReadWrite')
-            try {
-                $fs.Seek($before, 'Begin') | Out-Null
-                $sr = New-Object System.IO.StreamReader($fs)
-                $tail = $sr.ReadToEnd()
-            } finally { $fs.Close() }
-        }
-
-        if ($tail -match "RESULT=PASS") {
-            $marks += "."
-        } elseif ($tail -match "RESULT=FAIL") {
-            $marks += "F"
-            if ($worst -eq "PASS") { $worst = "FAIL" }
-        } else {
-            # Sem linha de RESULT: o processo morreu antes de escrever.
-            $marks += "X"
-            $worst = "CRASH"
+        switch ($p.ExitCode) {
+            0 { $marks += "." }
+            1 { $marks += "F"; if ($worst -eq "PASS") { $worst = "FAIL" } }
+            default {
+                $marks += "X"
+                $worst  = "CRASH"
+                $codes  = if ($codes) { $codes } else { @{} }
+                $codes[$t.Sys] = ("0x{0:X8}" -f $p.ExitCode)
+            }
         }
     }
 
