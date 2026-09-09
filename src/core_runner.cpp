@@ -3769,11 +3769,24 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			}
 			else if (strstr(sys, "Nintendo 3DS"))
 			{
-				// A retro_load_game failure on this core is overwhelmingly an
-				// encrypted eShop title Citra can't decrypt without the user's
-				// own console keys - "failed to load" alone left them with no
-				// idea a key file was even the missing piece.
-				CoreSetToast("3DS CIFRADO: falta saves/3DS/Citra/sysdata/aes_keys.txt", 360);
+				// An encrypted eShop title Citra cannot decrypt without the
+				// user's own console keys is the most common reason this core
+				// refuses, and "failed to load" alone left nobody any idea a
+				// key file was even involved. But it is not the only reason,
+				// and the message used to be shown for every failure: someone
+				// whose keys were already in place spent time hunting a file
+				// they had, while the real cause sat in the log one line away
+				// ("Failed to set HW renderer"). Only blame the keys when they
+				// are actually absent.
+				std::error_code kec;
+				if (!fs::exists("saves/3DS/Citra/sysdata/aes_keys.txt", kec))
+				{
+					CoreSetToast("3DS CIFRADO: falta saves/3DS/Citra/sysdata/aes_keys.txt", 360);
+				}
+				else
+				{
+					CoreSetToast("3DS: FALHA AO CARREGAR (chaves presentes) - VEJA karamelo.log", 300);
+				}
 			}
 			else if (needed)
 			{
