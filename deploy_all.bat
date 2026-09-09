@@ -61,8 +61,11 @@ echo.
 echo [2/2] Enviando pacote (v%APP_VER%), executavel e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
 echo.
 
+rem O pack de BIOS NAO sobe. Ele contem firmware de console, material
+rem protegido por direito autoral - publica-lo em karamelo-emu.com e
+rem redistribuicao, a mesma coisa que o README proibe para o repositorio.
+rem O create_packs.ps1 continua gerando o arquivo em dist/ para uso local.
 set EXTRA_FILES=
-if exist "%~dp0dist\Karamelo_Pack_BIOS.zip" set EXTRA_FILES="%~dp0dist\Karamelo_Pack_BIOS.zip"
 
 scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 rem O script de deploy vai para /root/, nunca para %REMOTE_DIR%: aquela pasta e
@@ -75,7 +78,6 @@ if errorlevel 1 (
     echo   - dist\version.json
     echo   - dist\Karamelo.exe
     echo   - %LOCAL_ZIP%
-    if exist "dist\Karamelo_Pack_BIOS.zip" echo   - dist\Karamelo_Pack_BIOS.zip
     echo.
 ) else (
     echo.
@@ -100,13 +102,11 @@ echo   Arquivos Gerados na pasta dist\:
 echo   - %LOCAL_JSON%
 echo   - %LOCAL_EXE%
 echo   - %LOCAL_ZIP%
-if exist "dist\Karamelo_Pack_BIOS.zip" echo   - dist\Karamelo_Pack_BIOS.zip
 echo.
 echo   Links Oficiais:
 echo   - https://karamelo-emu.com/downloads/version.json
 echo   - https://karamelo-emu.com/downloads/Karamelo.exe
 echo   - https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip
-if exist "dist\Karamelo_Pack_BIOS.zip" echo   - https://karamelo-emu.com/downloads/Karamelo_Pack_BIOS.zip
 echo.
 echo =====================================================================
 echo.

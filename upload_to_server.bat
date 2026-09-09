@@ -44,11 +44,11 @@ echo [2/2] Enviando arquivos para %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%...
 echo   - %LOCAL_ZIP%
 echo   - %LOCAL_EXE%
 echo   - %LOCAL_JSON%
+rem O pack de BIOS NAO sobe. Ele contem firmware de console, material
+rem protegido por direito autoral - publica-lo em karamelo-emu.com e
+rem redistribuicao, a mesma coisa que o README proibe para o repositorio.
+rem O create_packs.ps1 continua gerando o arquivo em dist/ para uso local.
 set EXTRA_FILES=
-if exist "%~dp0dist\Karamelo_Pack_BIOS.zip" (
-    set EXTRA_FILES="%~dp0dist\Karamelo_Pack_BIOS.zip"
-    echo   - dist\Karamelo_Pack_BIOS.zip
-)
 
 scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 rem O script de deploy vai para /root/, nunca para %REMOTE_DIR%: aquela pasta e
@@ -75,7 +75,6 @@ ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "chmod +x /root/fix_se
     echo   - https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip
     echo   - https://karamelo-emu.com/downloads/Karamelo.exe
     echo   - https://karamelo-emu.com/downloads/version.json
-    if exist "%~dp0dist\Karamelo_Pack_BIOS.zip" echo   - https://karamelo-emu.com/downloads/Karamelo_Pack_BIOS.zip
     echo =======================================================
 )
 
