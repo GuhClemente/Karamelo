@@ -188,6 +188,26 @@ static NameLockInit g_name_lock_init;
 
 static std::string loaded_game_name = "";
 static std::string loaded_system_dir = "";
+
+// Whether the gamepad-to-keyboard bridge down in CB_InputState applies to the
+// content currently loaded. Read on the core thread every input poll, so it is
+// a plain flag rather than a string comparison, and it is decided once when the
+// game loads.
+static volatile bool keyboard_bridge_active = false;
+
+// The bridge exists for machines whose games are driven by the keyboard and
+// have no joystick mapping worth speaking of - without it, a player holding
+// only a gamepad cannot type LOAD"" and start a C64 tape. It must NOT be on for
+// anything else: a core that polls both RETRO_DEVICE_JOYPAD and
+// RETRO_DEVICE_KEYBOARD (MAME does) then sees one physical button arrive twice,
+// once as the button and once as a keystroke, and performs both actions. That
+// is the punch-and-jump-at-once bug reported on Altered Beast.
+static bool SystemNeedsKeyboardBridge(const std::string& system_dir)
+{
+	std::string s = system_dir;
+	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+	return s == "msx" || s == "c64" || s == "zxspectrum" || s == "dos" || s == "amiga";
+}
 // The folder the loaded ROM came from, so the menu can reopen that same list.
 static std::string loaded_rom_dir = "";
 static std::string loaded_core_name = "";
@@ -2588,8 +2608,12 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 			}
 		}
 
-		// Also bridge Joypad buttons to common keyboard keys so gamepad players can
-		// drive keyboard-controlled computer games (MSX, C64, ZX Spectrum, etc.):
+		// Bridge gamepad buttons onto keyboard keys, but only for the machines
+		// that need it - see SystemNeedsKeyboardBridge. Leaving this on for every
+		// core made one button do two things at once on any core that reads both
+		// the joypad and the keyboard.
+		if (!keyboard_bridge_active) return 0;
+
 		if (id == 273 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_UP]) return 1;
 		if (id == 274 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_DOWN]) return 1;
 		if (id == 276 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_LEFT]) return 1;
@@ -2799,6 +2823,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		{
 			loaded_system_dir = init_p.stem().string();
 		}
+		keyboard_bridge_active = SystemNeedsKeyboardBridge(loaded_system_dir);
 		LeaveCriticalSection(&name_lock);
 	}
 
