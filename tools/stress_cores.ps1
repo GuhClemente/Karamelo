@@ -88,24 +88,40 @@ $map = [ordered]@{
     "NGP"           = "cores/ngp.dll"
     "PCFX"          = "cores/pcfx.dll"
     "3DO"           = "cores/3do.dll"
+    "PlayStation2"  = "cores/ps2.dll"
+    "PSP"           = "cores/psp.dll"
+    "GameCube"      = "cores/gamecube.dll"
+    "3DS"           = "cores/3ds.dll"
+    "DOS"           = "cores/dosbox_pure.dll"
+    "MegaDrive"     = "cores/genesis.dll"
 }
 
-$romExt = @(".zip",".7z",".chd",".cue",".iso",".adf",".rom",".bin",".nes",".sfc",".smc",
-            ".md",".gen",".gb",".gbc",".gba",".nds",".n64",".z64",".v64",".pce",".ws",
-            ".wsc",".ngp",".ngc",".lnx",".a26",".a52",".a78",".col",".tap",".d64",".dsk",".msx",".cas")
+# O que NAO e ROM. A versao anterior usava lista branca de extensoes, e todo
+# formato fora dela fazia o sistema ser pulado sem aviso - a bateria testava 19
+# de 35 pastas e o relatorio dizia "tudo verde".
+$naoRom = @(".txt",".md",".nfo",".jpg",".png",".sav",".srm",".state",".bak",".log",".ini",".cfg",".xml",".dat")
 
 $targets = @()
+$pulados = @()
 foreach ($sys in $map.Keys) {
     if ($System -and $sys -ne $System) { continue }
     $dll = Join-Path $app $map[$sys]
-    if (-not (Test-Path $dll)) { continue }
     $romDir = Join-Path $app "roms\$sys"
-    if (-not (Test-Path $romDir)) { continue }
+    if (-not (Test-Path $dll))    { $pulados += "$sys (core ausente: $($map[$sys]))"; continue }
+    if (-not (Test-Path $romDir)) { $pulados += "$sys (sem pasta roms/$sys)"; continue }
     $rom = Get-ChildItem $romDir -File -ErrorAction SilentlyContinue |
-           Where-Object { $romExt -contains $_.Extension.ToLower() } |
+           Where-Object { $naoRom -notcontains $_.Extension.ToLower() -and $_.Extension -ne "" } |
            Sort-Object Name | Select-Object -First 1
-    if (-not $rom) { continue }
+    if (-not $rom) { $pulados += "$sys (pasta vazia)"; continue }
     $targets += [pscustomobject]@{ Sys = $sys; Dll = $map[$sys]; Rom = "roms/$sys/$($rom.Name)" }
+}
+
+if (-not $System) {
+    foreach ($d in (Get-ChildItem (Join-Path $app "roms") -Directory -ErrorAction SilentlyContinue)) {
+        if (-not $map.Contains($d.Name) -and (Get-ChildItem $d.FullName -File -ErrorAction SilentlyContinue)) {
+            $pulados += "$($d.Name) (sistema fora do mapa deste script)"
+        }
+    }
 }
 
 if ($targets.Count -eq 0) { throw "Nenhum par (core, rom) encontrado. Confira app\roms\ e app\cores\." }
@@ -182,6 +198,12 @@ if ($fail.Count) {
 }
 
 Remove-Item $lock -Force -ErrorAction SilentlyContinue
+
+if ($pulados.Count) {
+    Write-Host ""
+    Write-Host ("  NAO testados ({0}) - o verde acima nao fala por eles:" -f $pulados.Count) -ForegroundColor DarkYellow
+    $pulados | ForEach-Object { Write-Host ("    " + $_) -ForegroundColor DarkGray }
+}
 
 Write-Host ""
 if ($crash.Count) { exit 2 } elseif ($fail.Count) { exit 1 } else { exit 0 }
