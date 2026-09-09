@@ -22,6 +22,11 @@ set -u
 SRC=/data/downloads
 DOMAIN=karamelo-emu.com
 
+# Todo docker exec que escreve usa -u 0: o container roda como usuario da
+# aplicacao, mas os arquivos entram por docker cp com dono root, e sem isso o
+# rm falha com "Permission denied" - silenciosamente, porque os erros iam para
+# /dev/null. Era por isso que o proprio script nao conseguia se despublicar.
+
 # Diretorios que o Next.js standalone serve como public/.
 TARGET_DIRS="/app/public/downloads /app/.next/standalone/public/downloads"
 
@@ -60,14 +65,14 @@ for c in $APPS; do
     echo "  container: $name"
 
     for dir in $TARGET_DIRS; do
-        docker exec "$c" mkdir -p "$dir" 2>/dev/null || continue
+        docker exec -u 0 "$c" mkdir -p "$dir" 2>/dev/null || continue
 
         # Poda: remove do destino o que nao existe mais na origem.
         docker exec "$c" sh -c "ls -1 $dir 2>/dev/null" | tr -d '\r' | while read -r f; do
             [ -n "$f" ] || continue
             if [ ! -e "$SRC/$f" ]; then
                 echo "    - removendo obsoleto: $dir/$f"
-                docker exec "$c" rm -f "$dir/$f" 2>/dev/null || true
+                docker exec -u 0 "$c" rm -f "$dir/$f" 2>/dev/null || true
             fi
         done
 
@@ -82,8 +87,8 @@ for c in $APPS; do
         done
 
         # O script nunca deve ficar publico no site.
-        docker exec "$c" rm -f "$dir/$SKIP" 2>/dev/null || true
-        docker exec "$c" chmod -R 755 "$dir" 2>/dev/null || true
+        docker exec -u 0 "$c" rm -f "$dir/$SKIP" 2>/dev/null || true
+        docker exec -u 0 "$c" chmod -R 755 "$dir" 2>/dev/null || true
     done
 done
 
