@@ -1,40 +1,32 @@
 #!/bin/bash
-# Publica /data/downloads no site karamelo-emu.com.
+# Publica no site karamelo-emu.com o que esta em /data/downloads.
 #
-# /data/downloads e a fonte da verdade: o que estiver la aparece no site, o que
-# for apagado de la some do site. Rode este script depois de qualquer upload.
+# Este arquivo mora em /root/ no servidor, de proposito: /data/downloads e
+# servido publicamente, entao um script de deploy la dentro fica exposto em
+# https://karamelo-emu.com/downloads/fix_server.sh - foi o que aconteceu.
 #
-# A versao anterior tinha tres defeitos que juntos derrubaram uma publicacao:
+# Como funciona de verdade:
 #
-#   1. Copiava para TODOS os containers em execucao. Os zips de release foram
-#      parar dentro do coolify-proxy, do coolify-sentinel e do buildkit.
-#   2. So copiava, nunca apagava. Arquivos de versoes antigas ficavam servidos
-#      para sempre, e apagar da origem nao adiantava nada.
-#   3. Nao reiniciava o app. O Next.js em modo standalone monta a lista de
-#      arquivos de public/ no boot, entao arquivo copiado com o servidor no ar
-#      nao era servido: dava 404 mesmo estando no disco do container.
+# A aplicacao no Coolify ja tem um bind mount de /data/downloads para
+# /app/public/downloads. O arquivo colocado em /data/downloads ja esta dentro
+# do container no mesmo instante - nao existe nada para copiar. Copiar,
+# alias, foi o que a primeira versao deste script fazia, para TODOS os
+# containers em execucao, enchendo o coolify-proxy e o buildkit com centenas
+# de MB de release.
 #
-# Aqui: acha so o container do site pelo dominio nos labels, espelha (copia e
-# poda), e reinicia o app no fim para o Next.js reconstruir a lista.
+# O que falta e so uma coisa: o Next.js em modo standalone monta a lista de
+# arquivos de public/ no boot. Arquivo que aparece com o servidor no ar nao e
+# servido (404) e arquivo que some passa a dar 500 - ambos mesmo com o disco
+# correto. Por isso publicar = reiniciar o app.
 
 set -u
 
 SRC=/data/downloads
 DOMAIN=karamelo-emu.com
 
-# Todo docker exec que escreve usa -u 0: o container roda como usuario da
-# aplicacao, mas os arquivos entram por docker cp com dono root, e sem isso o
-# rm falha com "Permission denied" - silenciosamente, porque os erros iam para
-# /dev/null. Era por isso que o proprio script nao conseguia se despublicar.
-
-# Diretorios que o Next.js standalone serve como public/.
-TARGET_DIRS="/app/public/downloads /app/.next/standalone/public/downloads"
-
-# Nao publicar o proprio script de deploy no site.
-SKIP="fix_server.sh"
-
-echo "=== 1. Permissoes em $SRC ==="
+echo "=== 1. Conteudo de $SRC ==="
 chmod -R 755 "$SRC" 2>/dev/null || true
+ls -1 "$SRC"
 
 echo ""
 echo "=== 2. Procurando o container do site ($DOMAIN) ==="
@@ -59,71 +51,45 @@ if [ -z "$APPS" ]; then
 fi
 
 echo ""
-echo "=== 3. Espelhando $SRC nos containers ==="
-for c in $APPS; do
-    name=$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')
-    echo "  container: $name"
-
-    for dir in $TARGET_DIRS; do
-        docker exec -u 0 "$c" mkdir -p "$dir" 2>/dev/null || continue
-
-        # Poda: remove do destino o que nao existe mais na origem.
-        docker exec "$c" sh -c "ls -1 $dir 2>/dev/null" | tr -d '\r' | while read -r f; do
-            [ -n "$f" ] || continue
-            if [ ! -e "$SRC/$f" ]; then
-                echo "    - removendo obsoleto: $dir/$f"
-                docker exec -u 0 "$c" rm -f "$dir/$f" 2>/dev/null || true
-            fi
-        done
-
-        # Copia tudo que esta na origem.
-        for f in "$SRC"/*; do
-            [ -f "$f" ] || continue
-            base=$(basename "$f")
-            [ "$base" = "$SKIP" ] && continue
-            if docker cp "$f" "$c:$dir/$base" >/dev/null 2>&1; then
-                echo "    + $dir/$base"
-            fi
-        done
-
-        # O script nunca deve ficar publico no site.
-        docker exec -u 0 "$c" rm -f "$dir/$SKIP" 2>/dev/null || true
-        docker exec -u 0 "$c" chmod -R 755 "$dir" 2>/dev/null || true
-    done
-done
-
-echo ""
-echo "=== 4. Reiniciando o app para o Next.js reler public/ ==="
-# Sem isto, arquivo novo continua dando 404 e arquivo apagado passa a dar 500,
-# porque a lista de arquivos estaticos so e montada no boot do servidor.
+echo "=== 3. Reiniciando o app para o Next.js reler public/ ==="
 for c in $APPS; do
     name=$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')
     if docker restart "$c" >/dev/null 2>&1; then
         echo "  reiniciado: $name"
     else
-        echo "  [AVISO] falha ao reiniciar $name - os downloads novos podem dar 404."
+        echo "  [ERRO] falha ao reiniciar $name."
+        exit 1
     fi
 done
 
 echo ""
-echo "=== 5. Aguardando o app voltar ==="
-for i in 1 2 3 4 5 6 7 8 9 10; do
+echo "=== 4. Aguardando o app voltar ==="
+up=0
+for i in $(seq 1 20); do
     if curl -sf -o /dev/null --max-time 5 "https://$DOMAIN/downloads/version.json"; then
         echo "  no ar."
+        up=1
         break
     fi
     sleep 3
 done
+[ "$up" = "1" ] || echo "  [AVISO] o app nao respondeu a tempo; conferindo mesmo assim."
 
 echo ""
-echo "=== 6. Conferindo o que o site esta servindo ==="
+echo "=== 5. Conferindo o que o site esta servindo ==="
+fail=0
 for f in "$SRC"/*; do
     [ -f "$f" ] || continue
     base=$(basename "$f")
-    [ "$base" = "$SKIP" ] && continue
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$DOMAIN/downloads/$base")
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "https://$DOMAIN/downloads/$base")
     printf '  %-4s %s\n' "$code" "$base"
+    [ "$code" = "200" ] || fail=1
 done
 
 echo ""
-echo "=== PRONTO ==="
+if [ "$fail" = "0" ]; then
+    echo "=== PUBLICADO ==="
+else
+    echo "=== [FALHA] algum arquivo nao esta sendo servido - veja os codigos acima ==="
+    exit 1
+fi
