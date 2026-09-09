@@ -12,6 +12,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <thread>
+#include <memory>
 #include <atomic>
 #include <string>
 #include <vector>
@@ -1531,16 +1532,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		// left stuck by the kill above, this deadlocks - on a worker thread
 		// with its own timeout, so a stuck lock is reported instead of
 		// hanging this whole self-test forever.
-		std::atomic<bool> toast_done{false};
-		std::thread([&toast_done]() {
+		// A flag vive no heap e a thread carrega uma referencia contada dela, em
+		// vez de apontar para a pilha desta funcao.
+		//
+		// Do jeito anterior a thread capturava &toast_done, uma variavel local,
+		// e era destacada. No caminho feliz nao dava em nada; no caminho que
+		// esta verificacao existe para detectar - o lock preso - a espera de 2s
+		// desistia, esta funcao seguia, a variavel saia de escopo e a thread
+		// escrevia nela depois. Escrita em pilha ja liberada, exatamente na
+		// falha que se queria diagnosticar.
+		auto toast_done = std::make_shared<std::atomic<bool>>(false);
+		std::thread([toast_done]() {
 			CoreSetToast("core-selftest", 1);
 			CoreGetToast();
 			CoreIsToastActive();
-			toast_done.store(true);
+			toast_done->store(true);
 		}).detach();
 		DWORD toast_wait = 0;
-		while (!toast_done.load() && toast_wait < 2000) { Sleep(20); toast_wait += 20; }
-		log("post-recovery lock check: toast_ok=%d (%lums)", toast_done.load() ? 1 : 0, toast_wait);
+		while (!toast_done->load() && toast_wait < 2000) { Sleep(20); toast_wait += 20; }
+		log("post-recovery lock check: toast_ok=%d (%lums)", toast_done->load() ? 1 : 0, toast_wait);
 
 		// The real proof a hung core didn't leave the engine wedged: load a
 		// second, different core+ROM right after, with its own timeout.
