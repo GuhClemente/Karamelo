@@ -58,7 +58,12 @@ if errorlevel 1 (
 ) else (
     echo.
     echo Sincronizando com containers do Coolify e ajustando permissoes...
-    ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "chmod +x %REMOTE_DIR%fix_server.sh && %REMOTE_DIR%fix_server.sh"
+    rem O sed remove CR do script antes de executar. Um .sh que sai do checkout
+rem com CRLF nao roda no Linux - o shebang vira "/bin/bash\r" e o erro e um
+rem enigmatico "cannot execute: required file not found", com os arquivos ja
+rem no servidor e os downloads em 404. O .gitattributes impede que volte, isto
+rem aqui garante que nem uma copia antiga do script derrube a publicacao.
+ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "sed -i 's/\x0d$//' %REMOTE_DIR%fix_server.sh && chmod +x %REMOTE_DIR%fix_server.sh && %REMOTE_DIR%fix_server.sh"
     echo.
     echo =======================================================
     echo   UPLOAD E PUBLICACAO CONCLUIDOS COM SUCESSO!
