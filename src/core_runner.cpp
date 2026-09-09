@@ -3303,6 +3303,8 @@ static void RecoverAfterKilledCore()
 				// call. Force it down first; it holds no C++ objects that
 				// need unwinding, just an audio buffer we are about to
 				// release anyway.
+				CoreLogPrintf(RETRO_LOG_WARN,
+					"[CoreShutdown] audio thread nao respondeu em 1s (driver travado?) - forcando encerramento");
 				TerminateThread(h_audio_thread, 1);
 			}
 			CloseHandle(h_audio_thread);
@@ -3511,7 +3513,13 @@ static void FreeLoadedRomData()
 static void RetroUnloadGameGuarded()
 {
 	__try { if (p_retro_unload_game) p_retro_unload_game(); }
-	__except (EXCEPTION_EXECUTE_HANDLER) {}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		// Engolir e proposital - um core que estoura ao descarregar nao deve
+		// levar o app junto. Em silencio nao era: toda a investigacao de hoje
+		// dependeu do log, e uma falha aqui nao deixava rastro nenhum.
+		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreUnload] excecao dentro de retro_unload_game do core - ignorada");
+	}
 
 	// Only now is the core guaranteed to be done with it. Every call site of
 	// this function is a point where the game is going away, so freeing here
@@ -3528,7 +3536,10 @@ static bool RetroGetSystemAvInfoGuarded(struct retro_system_av_info* av_info)
 static void RetroDeinitGuarded()
 {
 	__try { if (p_retro_deinit) p_retro_deinit(); }
-	__except (EXCEPTION_EXECUTE_HANDLER) {}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreUnload] excecao dentro de retro_deinit do core - ignorada");
+	}
 }
 
 static bool RetroResetGuarded()

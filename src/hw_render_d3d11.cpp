@@ -234,7 +234,10 @@ static DWORD WINAPI D3D11DestroyThreadProc(LPVOID param)
 {
 	retro_hw_context_reset_t fn = *(retro_hw_context_reset_t*)param;
 	__try { fn(); }
-	__except (EXCEPTION_EXECUTE_HANDLER) {}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		D3D11HwLog("excecao dentro do context_destroy do core (thread com prazo) - ignorada");
+	}
 	free(param);
 	return 0;
 }
@@ -283,7 +286,10 @@ void D3D11HwContextDestroy()
 		else
 		{
 			__try { g_hw_cb.context_destroy(); }
-			__except (EXCEPTION_EXECUTE_HANDLER) {}
+			__except (EXCEPTION_EXECUTE_HANDLER)
+			{
+				D3D11HwLog("excecao dentro do context_destroy do core - ignorada");
+			}
 		}
 	}
 

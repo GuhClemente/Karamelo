@@ -651,7 +651,10 @@ void VkHwContextDestroy()
 	if (g_context_live && g_hw_cb.context_destroy)
 	{
 		__try { g_hw_cb.context_destroy(); }
-		__except (EXCEPTION_EXECUTE_HANDLER) {}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			VkHwLog("excecao dentro do context_destroy do core - ignorada");
+		}
 	}
 
 	g_context_live = false;
