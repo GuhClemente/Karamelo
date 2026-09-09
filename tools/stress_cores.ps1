@@ -99,7 +99,10 @@ $map = [ordered]@{
 # O que NAO e ROM. A versao anterior usava lista branca de extensoes, e todo
 # formato fora dela fazia o sistema ser pulado sem aviso - a bateria testava 19
 # de 35 pastas e o relatorio dizia "tudo verde".
-$naoRom = @(".txt",".md",".nfo",".jpg",".png",".sav",".srm",".state",".bak",".log",".ini",".cfg",".xml",".dat")
+# Sem ".md" aqui: e a extensao do Mega Drive, nao so a do Markdown. Excluir
+# ".md" fez o Genesis ser reportado como "pasta vazia" tendo ROM dentro.
+# Os guias LEIA-ME.txt de cada pasta caem no ".txt".
+$naoRom = @(".txt",".nfo",".jpg",".png",".sav",".srm",".state",".bak",".log",".ini",".cfg",".xml",".dat")
 
 $targets = @()
 $pulados = @()
