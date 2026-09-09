@@ -24,8 +24,8 @@ abaixo para o porquê e o que exatamente mudou.
 `osd.cpp`/`osd.h` e `charrom.cpp`/`charrom.h` eram, até este documento ser
 atualizado, porte direto e quase byte-a-byte do Main_MiSTer original (a
 versão anterior desta mesma seção descrevia exatamente isso, com evidência
-de diff). Como o restante deste projeto não está com o código-fonte aberto
-no momento, manter código GPL-derivado incorporado no binário criava uma
+de diff). Como o restante deste projeto não tinha o código-fonte aberto
+à época, manter código GPL-derivado incorporado no binário criava uma
 obrigação de disponibilizar o código correspondente que não estava sendo
 cumprida. A solução adotada foi uma reescrita clean-room dos dois arquivos,
 numa branch separada, preservando o comportamento e o formato de dados que o
