@@ -15,7 +15,6 @@ if not defined EXE (
         set "EXE=%%F"
     )
 )
-if not defined EXE if exist "app\Karamelo.exe" set "EXE=app\Karamelo.exe"
 
 if not defined EXE (
     echo [ERROR] Executable not found in app\ directory.
