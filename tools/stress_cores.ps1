@@ -137,10 +137,14 @@ Write-Host ("-" * 78)
 $results = @()
 
 foreach ($t in $targets) {
-    $line = "  {0,-14}" -f $t.Sys
-    Write-Host -NoNewline $line
+    # Cada ciclo aparece assim que termina. Antes o nome do sistema era escrito
+    # e o resultado so saia depois de todos os ciclos: um core que estoura o
+    # timeout deixava a tela parada por minutos, sem sinal de vida, e parecia
+    # travado quando estava trabalhando.
+    Write-Host -NoNewline ("  {0,-14}[" -f $t.Sys)
     $marks = ""
     $worst = "PASS"
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
     for ($i = 1; $i -le $Cycles; $i++) {
         # O veredito vem do codigo de saida, nao do log. O autoteste devolve
@@ -155,14 +159,15 @@ foreach ($t in $targets) {
              -ArgumentList $argLine
         if (-not $p.WaitForExit($TimeoutSec * 1000)) {
             try { $p.Kill() } catch {}
-            $marks += "T"; $worst = "TIMEOUT"; continue
+            $marks += "T"; Write-Host -NoNewline "T" -ForegroundColor Red; $worst = "TIMEOUT"; continue
         }
 
         switch ($p.ExitCode) {
-            0 { $marks += "." }
-            1 { $marks += "F"; if ($worst -eq "PASS") { $worst = "FAIL" } }
+            0 { $marks += "."; Write-Host -NoNewline "." -ForegroundColor Green }
+            1 { $marks += "F"; Write-Host -NoNewline "F" -ForegroundColor Yellow; if ($worst -eq "PASS") { $worst = "FAIL" } }
             default {
                 $marks += "X"
+                Write-Host -NoNewline "X" -ForegroundColor Red
                 $worst  = "CRASH"
                 $codes  = if ($codes) { $codes } else { @{} }
                 $codes[$t.Sys] = ("0x{0:X8}" -f $p.ExitCode)
@@ -175,7 +180,7 @@ foreach ($t in $targets) {
         "FAIL"    { "Yellow" }
         default   { "Red" }
     }
-    Write-Host ("[{0}]  {1}" -f $marks, $worst) -ForegroundColor $color
+    Write-Host ("]  {0}  ({1:N0}s)" -f $worst, $sw.Elapsed.TotalSeconds) -ForegroundColor $color
     $results += [pscustomobject]@{ Sistema = $t.Sys; Marcas = $marks; Resultado = $worst; Rom = $t.Rom }
 }
 
