@@ -17,6 +17,7 @@
 #include <string>
 #include <filesystem>
 #include <algorithm>
+#include <map>
 #include <unordered_set>
 #include <fstream>
 
@@ -194,6 +195,11 @@ static std::string loaded_system_dir = "";
 // a plain flag rather than a string comparison, and it is decided once when the
 // game loads.
 static volatile bool keyboard_bridge_active = false;
+
+// Which arcade core actually ran a given romset, keyed by the original ROM
+// path. Only ever touched from the core thread, during load. See the comment
+// where it is consulted for why forgetting this was expensive.
+static std::map<std::string, std::string> s_arcade_core_for_rom;
 
 // The bridge exists for machines whose games are driven by the keyboard and
 // have no joystick mapping worth speaking of - without it, a player holding
@@ -2840,7 +2846,27 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	{
 		// Build candidate core priority list starting with the preferred core
 		std::vector<std::string> candidate_cores;
-		if (!core_dll.empty() && fs::exists(core_dll))
+
+		// An arcade romset is built for one specific core revision and nothing
+		// in the file says which, so the chain below finds out by trying. What
+		// it must not do is forget the answer. Reloading a game that had been
+		// running a minute earlier used to walk the whole chain again from the
+		// top - and walking it is not free, because several cores cannot be
+		// initialised twice in one process: after four such rounds Flycast
+		// trapped on its own assertion (state == Init, emulator.cpp:499) and
+		// took the application down with an illegal instruction. Remembering
+		// which core actually ran a given romset turns the reload into one
+		// correct attempt instead of fifteen wrong ones.
+		{
+			auto it = s_arcade_core_for_rom.find(original_rom_path);
+			if (it != s_arcade_core_for_rom.end() && fs::exists(it->second))
+			{
+				candidate_cores.push_back(it->second);
+			}
+		}
+
+		if (!core_dll.empty() && fs::exists(core_dll) &&
+			std::find(candidate_cores.begin(), candidate_cores.end(), core_dll) == candidate_cores.end())
 		{
 			candidate_cores.push_back(core_dll);
 		}
@@ -2948,6 +2974,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 						core_dll = cand_dll;
 						rom_path = load_path;
 						loaded = true;
+						s_arcade_core_for_rom[original_rom_path] = cand_dll;
 						CoreLogPrintf(RETRO_LOG_INFO, "[CoreRunner] Sucesso no carregamento de arcade com: %s", cand_dll.c_str());
 						break;
 					}
