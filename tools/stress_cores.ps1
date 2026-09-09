@@ -109,8 +109,14 @@ foreach ($t in $targets) {
 
         # Os quatro argumentos exercitam carregar, desligar e carregar de novo
         # dentro do mesmo processo - o cenario que quebrava.
+        # Cada argumento vai entre aspas: quase todo nome de ROM tem espaco, e
+        # sem isto o -ArgumentList junta tudo com espaco e o app recebe
+        # "roms/GBA/A", "Link", "to"... A primeira versao desta bateria
+        # reprovou 16 de 19 sistemas exatamente por isso, e os 3 que passaram
+        # eram os de nome sem espaco.
+        $argLine = '--core-selftest "{0}" "{1}" "{0}" "{1}"' -f $t.Dll, $t.Rom
         $p = Start-Process -FilePath $exe.FullName -WorkingDirectory $app -PassThru -WindowStyle Hidden `
-             -ArgumentList "--core-selftest", $t.Dll, $t.Rom, $t.Dll, $t.Rom
+             -ArgumentList $argLine
         if (-not $p.WaitForExit($TimeoutSec * 1000)) {
             try { $p.Kill() } catch {}
             $marks += "T"; $worst = "TIMEOUT"; continue
