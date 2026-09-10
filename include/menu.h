@@ -60,6 +60,12 @@ void MenuSetPersistedCoreOption(const char* key, const char* value);
 int  MenuGetDeadzone();
 int  MenuGetAudioLatencyMs();
 int  MenuGetVideoDriver();
+// So para o autoteste headless (--core-selftest --driver N). A bateria rodava
+// sempre com o driver no padrao "Auto", porque o autoteste nao carrega as
+// configuracoes - ou seja, testava uma combinacao que nenhum jogador usa, e
+// nunca exercitava Vulkan nem DirectX 11. Nao ha caminho de menu para isto:
+// quem muda o driver pela interface passa por MenuProcessKey, que persiste.
+void MenuSetVideoDriverForSelftest(int driver);
 int  MenuGetSyncMode();
 int  MenuGetVsync();
 int  MenuGetN64Core();

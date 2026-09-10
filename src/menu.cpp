@@ -443,6 +443,9 @@ void MenuSetWindowRect(int x, int y, int w, int h) {
 int MenuGetDeadzone() { return (setting_deadzone + 1) * 5; }
 int MenuGetAudioLatencyMs() { return kAudioLatencyMs[ClampInt(setting_latency, 0, 3)]; }
 int MenuGetVideoDriver() { return setting_driver; }
+void MenuSetVideoDriverForSelftest(int driver) {
+  setting_driver = ClampInt(driver, 0, 4);
+}
 int MenuGetSyncMode() { return setting_sync; }
 int MenuGetVsync() { return setting_vsync; }
 int MenuGetN64Core() { return setting_n64_core; }

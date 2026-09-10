@@ -1504,6 +1504,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			fflush(lf);
 		};
 
+		// --driver N em qualquer posicao: 0=Auto 1=OpenGL 2=Vulkan 3=DirectX 11
+		// 4=Software. Sem ele o autoteste roda no padrao Auto, que nao e o que
+		// o jogador tem configurado - e foi assim que a bateria passou meses
+		// sem nunca exercitar Vulkan nem DirectX 11 em core nenhum.
+		for (int i = 1; i + 1 < __argc; i++)
+		{
+			if (_stricmp(__argv[i], "--driver") == 0)
+			{
+				int drv = atoi(__argv[i + 1]);
+				MenuSetVideoDriverForSelftest(drv);
+				log("driver forcado para %d", drv);
+				break;
+			}
+		}
+
 		DWORD t0 = GetTickCount();
 		bool started = CoreRequestLoad(__argv[3], __argv[2]);
 

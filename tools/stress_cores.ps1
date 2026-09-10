@@ -18,12 +18,20 @@
 #   ...\stress_cores.ps1 -Cycles 5
 #   ...\stress_cores.ps1 -System Arcade          # so um sistema
 #   ...\stress_cores.ps1 -TimeoutSec 90          # cores pesados (PS2, GC)
+#   ...\stress_cores.ps1 -Driver 2               # tudo em Vulkan
+#   ...\stress_cores.ps1 -Driver 3               # tudo em DirectX 11
 
 [CmdletBinding()]
 param(
     [int]$Cycles = 3,
     [string]$System = "",
-    [int]$TimeoutSec = 60
+    [int]$TimeoutSec = 60,
+    # 0=Auto (padrao do app) 1=OpenGL 2=Vulkan 3=DirectX 11 4=Software.
+    # Vazio deixa o autoteste no padrao dele. Existe porque a bateria testava
+    # so o caminho Auto: nenhum core era exercitado em Vulkan ou DirectX 11,
+    # que sao justamente onde moram as diferencas entre um core e outro.
+    [ValidateRange(-1, 4)]
+    [int]$Driver = -1
 )
 
 $ErrorActionPreference = "Stop"
@@ -131,6 +139,10 @@ if ($targets.Count -eq 0) { throw "Nenhum par (core, rom) encontrado. Confira ap
 Write-Host ""
 Write-Host ("Bateria: {0} sistemas x {1} ciclos, cada ciclo = carrega, desliga, carrega de novo" -f $targets.Count, $Cycles) -ForegroundColor Cyan
 Write-Host ("Executavel: {0}" -f $exe.Name) -ForegroundColor DarkGray
+if ($Driver -ge 0) {
+    $nomes = @("Auto", "OpenGL", "Vulkan", "DirectX 11", "Software")
+    Write-Host ("Driver de video forcado: {0}" -f $nomes[$Driver]) -ForegroundColor DarkGray
+}
 Write-Host ("-" * 78)
 
 $results = @()
@@ -154,6 +166,7 @@ foreach ($t in $targets) {
         # processo morto - dois sistemas foram acusados de crash sem nunca
         # terem crashado.
         $argLine = '--core-selftest "{0}" "{1}" "{0}" "{1}"' -f $t.Dll, $t.Rom
+        if ($Driver -ge 0) { $argLine += ' --driver ' + $Driver }
         $p = Start-Process -FilePath $exe.FullName -WorkingDirectory $app -PassThru -WindowStyle Hidden `
              -ArgumentList $argLine
         if (-not $p.WaitForExit($TimeoutSec * 1000)) {
