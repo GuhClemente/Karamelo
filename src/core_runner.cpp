@@ -290,7 +290,21 @@ static void ClearInputDescriptors();
 static CRITICAL_SECTION toast_lock;
 static char  toast_message[128] = "";
 static char  toast_readback[128] = "";
-static volatile LONG toast_timer = 0;
+// Prazo em relogio de parede (GetTickCount64), nao em quadros. A contagem era
+// feita por CoreUpdateToast(), que so roda no laco de quadros do core - entao
+// sem jogo carregado nada descontava, e qualquer mensagem disparada pelo menu
+// ficava na tela para sempre. O caso que expos isso foi o "INICIANDO PORT
+// NATIVO...": o port fecha o core, o contador congela e a mensagem nao sai
+// mais. Com prazo absoluto a mensagem expira sozinha, rodando core ou nao.
+static volatile LONGLONG toast_expires_ms = 0;
+
+// Os chamadores continuam falando em quadros (sao 52 chamadas, com valores
+// escolhidos pensando em 60 fps); a conversao acontece so aqui.
+static LONGLONG ToastFramesToMs(int frames) { return (LONGLONG)frames * 1000 / 60; }
+static bool ToastExpired()
+{
+	return (LONGLONG)GetTickCount64() >= InterlockedCompareExchange64(&toast_expires_ms, 0, 0);
+}
 
 // Initialised before main() runs, so no thread can race the initialisation.
 struct ToastLockInit { ToastLockInit() { InitializeCriticalSection(&toast_lock); } };
@@ -367,7 +381,7 @@ void CoreSetToast(const char* message, int frames_duration)
 {
 	if (!message) return;
 
-	// toast_message and toast_timer must change together. Setting the timer
+	// toast_message and toast_expires_ms must change together. Setting the timer
 	// after releasing toast_lock left a window where two threads calling
 	// CoreSetToast() close together (e.g. a port's background monitor thread
 	// and the core thread loading a new game) could interleave: whichever
@@ -385,7 +399,8 @@ void CoreSetToast(const char* message, int frames_duration)
 	// nothing else able to run between the two, keeps the pairing correct
 	// for the actual race that mattered: two CoreSetToast() calls stepping
 	// on each other.
-	InterlockedExchange(&toast_timer, frames_duration);
+	InterlockedExchange64(&toast_expires_ms,
+		frames_duration > 0 ? (LONGLONG)GetTickCount64() + ToastFramesToMs(frames_duration) : 0);
 }
 
 const char* CoreGetToast()
@@ -393,6 +408,8 @@ const char* CoreGetToast()
 	// Copies into a UI-thread buffer so the caller never holds a pointer into
 	// storage the core thread may overwrite mid-draw.
 	EnterCriticalSection(&toast_lock);
+	if (ToastExpired())
+		toast_message[0] = '\0';
 	strncpy_s(toast_readback, sizeof(toast_readback), toast_message, _TRUNCATE);
 	LeaveCriticalSection(&toast_lock);
 	return toast_readback;
@@ -400,19 +417,27 @@ const char* CoreGetToast()
 
 bool CoreIsToastActive()
 {
-	return (InterlockedCompareExchange(&toast_timer, 0, 0) > 0 && toast_message[0] != '\0');
+	return !ToastExpired() && toast_message[0] != '\0';
 }
 
 void CoreUpdateToast()
 {
-	if (InterlockedCompareExchange(&toast_timer, 0, 0) > 0)
+	// Ja nao conta nada: o prazo e absoluto. So limpa o texto vencido, para que
+	// quem le toast_message direto nao encontre uma mensagem expirada.
+	//
+	// O teste do texto vem ANTES do lock, e isso importa. Esta funcao roda na
+	// thread do core a cada quadro, e ToastExpired() e verdadeiro quase o tempo
+	// todo - sem o teste, a thread do core pegaria toast_lock 60 vezes por
+	// segundo. E ela e justamente a thread que CoreShutdown mata a forca quando
+	// o core nao sai em 3 s: morta segurando o lock, deixaria toast_lock preso
+	// e travaria todo CoreSetToast/CoreGetToast dali em diante. Com o teste, o
+	// lock volta a ser tomado uma vez por mensagem, como na versao por quadros.
+	// A leitura de um char fora do lock e a mesma que CoreIsToastActive ja faz.
+	if (ToastExpired() && toast_message[0] != '\0')
 	{
-		if (InterlockedDecrement(&toast_timer) == 0)
-		{
-			EnterCriticalSection(&toast_lock);
-			toast_message[0] = '\0';
-			LeaveCriticalSection(&toast_lock);
-		}
+		EnterCriticalSection(&toast_lock);
+		toast_message[0] = '\0';
+		LeaveCriticalSection(&toast_lock);
 	}
 }
 

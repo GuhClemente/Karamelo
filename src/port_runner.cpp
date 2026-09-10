@@ -59,6 +59,9 @@ static std::atomic<int> s_active_bg_threads(0);
 static std::mutex       s_pending_lock;
 static std::string      s_pending_launch_id;
 static std::atomic<bool> s_has_pending_launch(false);
+// Nome do port que esta baixando, para o aviso de progresso (ver o topo de
+// PortPumpPendingLaunch). Protegido pelo mesmo s_pending_lock.
+static std::string      s_installing_name;
 
 static std::string ToLowerStr(const std::string& s) {
     std::string out = s;
@@ -998,7 +1001,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 #endif
 
     s_port_running.store(true);
-    CoreSetToast("INICIANDO PORT NATIVO...", 120);
+    CoreSetToast("INICIANDO PORT NATIVO...", 300); // 5 s
 
     // 5. Monitor in background thread
     try {
@@ -1095,11 +1098,6 @@ bool PortLaunch(const std::string& port_id) {
         return false;
     }
 
-    if (s_installing.load()) {
-        CoreSetToast("JA HA UM DOWNLOAD DE PORT EM ANDAMENTO", 150);
-        return false;
-    }
-
     const PortDefinition* def = FindPortDef(port_id);
     std::string dir = ResolvePortDir(port_id);
     std::string exe_path = dir.empty() ? "" : FindBestExecutable(dir);
@@ -1114,6 +1112,19 @@ bool PortLaunch(const std::string& port_id) {
             return false;
         }
 
+        // A trava de download mora aqui dentro, e nao no topo da funcao. No
+        // topo ela barrava QUALQUER port enquanto outro baixava - inclusive os
+        // ja instalados, que nao precisam baixar nada. So existe uma vaga de
+        // download; um port que ja esta no disco nao disputa essa vaga.
+        if (s_installing.load()) {
+            CoreSetToast("JA HA UM DOWNLOAD DE PORT EM ANDAMENTO", 150);
+            return false;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(s_pending_lock);
+            s_installing_name = def->display_name;
+        }
         s_installing.store(true);
         CoreSetToast(("BAIXANDO " + def->display_name + "...").c_str(), 600);
 
@@ -1151,6 +1162,22 @@ bool PortLaunch(const std::string& port_id) {
 }
 
 void PortPumpPendingLaunch() {
+    // Mantem o "BAIXANDO..." na tela enquanto o download durar. Os toasts
+    // passaram a expirar por relogio, e um download de centenas de MB dura
+    // bem mais que os 10 s da mensagem. Antes ela ficava por acidente - o
+    // contador so descia com core rodando, e no menu de ports nao ha core.
+    // So reexibe quando nenhuma outra mensagem esta na tela, para nao
+    // atropelar um aviso mais importante que tenha acabado de sair.
+    if (s_installing.load() && !CoreIsToastActive()) {
+        std::string name;
+        {
+            std::lock_guard<std::mutex> lock(s_pending_lock);
+            name = s_installing_name;
+        }
+        if (!name.empty())
+            CoreSetToast(("BAIXANDO " + name + "...").c_str(), 300);
+    }
+
     if (!s_has_pending_launch.exchange(false)) return;
 
     std::string id;
@@ -1166,6 +1193,16 @@ void PortPumpPendingLaunch() {
     std::string exe_path = dir.empty() ? "" : FindBestExecutable(dir);
     if (exe_path.empty()) {
         CoreSetToast("PORT BAIXADO MAS SEM EXECUTAVEL", 200);
+        return;
+    }
+
+    // Agora da para abrir um port instalado enquanto outro baixa, entao quando
+    // o download termina pode haver um port em execucao. LaunchResolvedExecutable
+    // nao confere isso - PortLaunch e que conferia -, e abriria o segundo por
+    // cima do primeiro. Nesse caso so avisa: o port ja esta no disco e abre
+    // pelo menu na hora que o jogador quiser.
+    if (s_port_running.load()) {
+        CoreSetToast("DOWNLOAD CONCLUIDO - ABRA O PORT PELO MENU", 300);
         return;
     }
 

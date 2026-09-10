@@ -63,6 +63,9 @@ void CoreSetMute(bool mute);
 bool CoreGetMute();
 
 // HUD Toast Notification Engine
+// frames_duration e convertido para tempo de relogio (quadros a 60 fps) e a
+// mensagem expira sozinha nesse prazo - com ou sem core rodando. Nao depende
+// mais de CoreUpdateToast() ser chamado a cada quadro.
 void CoreSetToast(const char* message, int frames_duration = 120);
 const char* CoreGetToast();
 bool CoreIsToastActive();
