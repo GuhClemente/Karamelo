@@ -62,6 +62,12 @@ static int scroll_top = 0;
 // item index changes - including back to one visited earlier - which is
 // exactly "the selection just landed here."
 static int s_scroll_item_idx = -1;
+// O indice sozinho nao identifica a linha. Entrar numa pasta e cair de novo
+// sobre o mesmo indice mantinha s_scroll_item_idx igual, o cronometro nao era
+// zerado e o nome ja aparecia rolando no instante em que a tela abria, sem
+// respeitar o tempo de Video > Rolagem Nome. Guardar tambem o texto resolve:
+// trocar de tela troca o texto.
+static std::string s_scroll_item_label;
 static uint32_t s_scroll_since = 0;
 
 // Same idea for the vertical title band on the left edge (OsdSetTitle) -
@@ -2463,11 +2469,21 @@ void MenuRun() {
         // silently clipped before, extension included, with no way to read
         // the rest. Marquee-scroll the SELECTED row once it has sat still for
         // setting_name_scroll seconds, instead of leaving it truncated.
+        //
+        // A largura vale para TODAS as linhas de nome, nao so para a que rola.
+        // Sem ela o " %s" escrevia o nome inteiro: a linha do OSD tem 256
+        // pixels e aceita cerca de 30 caracteres, entao um nome comprido ia
+        // ate a borda do painel e era cortado no meio de uma letra, sem
+        // margem - enquanto pasta e opcao, que usam %-22.22s, paravam bem
+        // antes. E o texto encolhia de 30 para 26 no instante em que a
+        // rolagem comecava. Agora e a mesma largura nos tres casos.
         const int kVisibleChars = 26;
         if (is_selected && kScrollDelays[setting_name_scroll] > 0 &&
             (int)item.label.size() > kVisibleChars) {
-          if (item_idx != s_scroll_item_idx) {
+          if (item_idx != s_scroll_item_idx ||
+              item.label != s_scroll_item_label) {
             s_scroll_item_idx = item_idx;
+            s_scroll_item_label = item.label;
             s_scroll_since = TickCountMs();
           }
           uint32_t delay_ms = (uint32_t)kScrollDelays[setting_name_scroll] * 1000;
@@ -2482,10 +2498,12 @@ void MenuRun() {
             snprintf(line_buf, sizeof(line_buf), " %s",
                      padded.substr(step, kVisibleChars).c_str());
           } else {
-            snprintf(line_buf, sizeof(line_buf), " %s", item.label.c_str());
+            snprintf(line_buf, sizeof(line_buf), " %-*.*s", kVisibleChars,
+                     kVisibleChars, item.label.c_str());
           }
         } else {
-          snprintf(line_buf, sizeof(line_buf), " %s", item.label.c_str());
+          snprintf(line_buf, sizeof(line_buf), " %-*.*s", kVisibleChars,
+                   kVisibleChars, item.label.c_str());
         }
       }
     }
