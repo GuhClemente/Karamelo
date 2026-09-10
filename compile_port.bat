@@ -128,7 +128,24 @@ echo.
 echo [BUILD SUCCESS] app\%APP_EXE%
 copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
 if not exist app\cores mkdir app\cores
-if exist cores\*.dll copy /Y cores\*.dll app\cores\ >nul 2>&1
+rem A pasta cores\ na raiz e um segundo deposito dos mesmos motores, e esta
+rem copia despeja ela por cima de app\cores\ a cada compilacao. Ela nunca
+rem apaga nada, so sobrescreve - entao core removido de app\cores\ reaparece
+rem no build seguinte. Foi assim que os 25 MB de cores mortos sobreviveram a
+rem uma release inteira: foram apagados de app\cores\, o commit registrou a
+rem remocao nos documentos, e a compilacao seguinte trouxe todos de volta sem
+rem dizer nada.
+rem
+rem O aviso abaixo nao impede a copia - quem depende dela para popular uma
+rem checkout novo continua sendo atendido. Ele so tira o silencio: se a raiz
+rem tem um .dll que app\cores\ nao tem, alguem precisa saber que ele acabou de
+rem voltar.
+if exist cores\*.dll (
+    for %%F in (cores\*.dll) do (
+        if not exist "app\cores\%%~nxF" echo   [AVISO] cores\%%~nxF nao estava em app\cores\ e foi copiado de volta.
+    )
+    copy /Y cores\*.dll app\cores\ >nul 2>&1
+)
 
 rem Gerar version.json automatico
 powershell -NoProfile -Command "$size = (Get-Item 'app\%APP_EXE%').Length; $date = (Get-Date -Format 'yyyy-MM-dd'); $json = @{ version = '%APP_VER%'; title = 'Karamelo v%APP_VER%'; release_date = $date; notes = 'Versao de producao Karamelo'; exe_url = 'https://karamelo-emu.com/downloads/Karamelo.exe'; exe_size = $size; exe_sha256 = ''; zip_url = 'https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip'; force_full_package = $false } | ConvertTo-Json -Depth 4; Set-Content -Path 'app\version.json' -Value $json -Encoding UTF8"

@@ -121,5 +121,7 @@ conseguia carregar: `pcsx2.dll` e `pcsx2_libretro.dll` (cópias de `ps2.dll`),
 `play_libretro.dll` (cópia de `ps2_play.dll`) e `bluemsx.dll`, sobra de uma
 tentativa abandonada de rotear MSX para blueMSX.
 
-Por isso o número correto passou de 41 para **40**. O site publica 39, que é
-uma contagem ainda mais antiga.
+Por isso o número correto passou de 41 para **40**. O site publica **41** —
+a contagem de arquivos de antes da limpeza, que conta o mesmo emulador duas
+vezes. A auditoria de 09/09/2026 achou esse número em oito lugares da página,
+listados em [SITE_SYNC.md](SITE_SYNC.md), seção 9.3.

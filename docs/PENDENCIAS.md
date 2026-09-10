@@ -34,11 +34,15 @@ Procurei no `D:\` por nome de pasta, por extensão (`.a52`, `.lnx`, `.ws`,
 `.ngp`) até quatro níveis, e dentro das coleções soltas: não estão nessa
 máquina. Basta uma ROM em cada pasta de `app/roms/` e a bateria cobre.
 
-### O site publica 39 motores
+### O site publica 41 motores
 
-O correto é **40**. A lista motor a motor, pronta para publicar, está em
-[MOTORES.md](MOTORES.md), e o briefing em [SITE_SYNC.md](SITE_SYNC.md) aponta
-para ela.
+O correto é **40**. O site anuncia 41, que é a contagem de arquivos — e conta
+`n64_parallel.dll` e `n64.dll`, que são o mesmo binário, como dois motores.
+
+O número aparece em **oito lugares** da página, metatags e JSON-LD incluídos.
+A lista motor a motor, pronta para publicar, está em [MOTORES.md](MOTORES.md);
+a auditoria completa do site, com todos os pontos a corrigir, está na seção 9
+de [SITE_SYNC.md](SITE_SYNC.md).
 
 ---
 

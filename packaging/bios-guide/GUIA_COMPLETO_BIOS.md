@@ -4,15 +4,27 @@ Este guia detalha **todos os arquivos de BIOS, firmwares, chaves criptográficas
 
 ---
 
-## 📦 O Pacote Oficial de BIOS (`Karamelo_Pack_BIOS.zip`)
+## 📦 Onde conseguir as BIOS
 
-Para simplificar a configuração, criamos o pacote consolidado **`Karamelo_Pack_BIOS.zip`** com **toda a hierarquia de pastas correta** e os arquivos já conferidos (MD5/SHA-256).
+**O projeto não distribui BIOS.** Elas são firmware de console, protegido por
+direito autoral, e publicá-las seria redistribuição. Um pacote consolidado
+chegou a existir e **foi retirado em 09/09/2026** — se você encontrar um link
+para `Karamelo_Pack_BIOS.zip` em algum lugar, ele está morto e não volta.
 
-### 🚀 Como Instalar o Pacote de BIOS:
-1. Baixe o arquivo `Karamelo_Pack_BIOS.zip`.
-2. Extraia o conteúdo diretamente na **pasta raiz da instalação do Karamelo** (onde fica o `Karamelo.exe`).
-3. As subpastas `bios/`, `bios/dc/`, `bios/neocd/`, `bios/pcsx2/`, `bios/PPSSPP/`, `bios/dolphin-emu/` e os arquivos de MSX na raiz serão posicionados automaticamente no local correto.
-4. Abra o emulador e jogue!
+O que este guia faz é dizer **exatamente qual arquivo cada sistema espera,
+com que nome, em qual pasta e com qual MD5**. Conseguir os arquivos, a partir
+dos aparelhos que você possui, é com você.
+
+### Como organizar depois de conseguir
+
+1. Coloque cada arquivo em `bios/`, respeitando as subpastas indicadas nas
+   tabelas abaixo (`bios/dc/`, `bios/neocd/`, `bios/pcsx2/`, `bios/PPSSPP/`,
+   `bios/dolphin-emu/`).
+2. Confira o nome: a maioria dos cores procura por um nome exato e falha em
+   silêncio se ele diferir, inclusive em maiúsculas e minúsculas.
+3. Rode `tools/check_bios.ps1` para conferir cada arquivo contra o MD5 desta
+   tabela. Ele também reconhece ponteiro do Git LFS, que já passou por BIOS
+   mais de uma vez.
 
 ---
 

@@ -8,7 +8,8 @@ rem anywhere instead of being pinned to a static path.
 cd /d "%~dp0"
 
 set "EXE="
-if exist "app\Karamelo_v1.0.exe" set "EXE=app\Karamelo_v1.0.exe"
+rem Nao existe nem nunca existiu uma v1.0; a busca abaixo ja acha qualquer
+rem Karamelo*.exe que o build tenha gerado.
 if not defined EXE if exist "app\Karamelo.exe" set "EXE=app\Karamelo.exe"
 if not defined EXE (
     for %%F in (app\Karamelo*.exe) do (

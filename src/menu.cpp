@@ -1308,6 +1308,11 @@ static void ResetAllSettingsToDefault() {
   MenuSaveSettings();
 }
 
+// Definida mais abaixo, junto do comentario que explica por que a selecao
+// e escolhida pela acao e nao pelo indice. Declarada aqui porque as telas
+// desta secao vem antes dela no arquivo.
+static void SelectByAction(int action_id, int fallback_idx);
+
 void PopulateSettings() {
   items.clear();
   current_title = "Settings";
@@ -1335,7 +1340,7 @@ void PopulateResetConfirm() {
   items.push_back({"Cancelar", ">", false, true, 211});
   items.push_back({"Confirmar Restauracao", "", false, true, 212});
 
-  selected_idx = 2; // "Cancelar" selected by default for safety
+  SelectByAction(211, 2); // "Cancelar" por seguranca: nunca o Confirmar
   scroll_top = 0;
 }
 
@@ -1496,7 +1501,7 @@ void PopulateNetplay() {
   items.push_back({"Netplay Port", "55435", false, false, 0});
   items.push_back({"Back", "", false, true, 999});
 
-  selected_idx = 2;
+  SelectByAction(601, 2); // "Host Game"
   scroll_top = 0;
 }
 
@@ -1584,8 +1589,17 @@ void PopulateRetroAchievements() {
 
   // The status line carries the real detail - why a login failed, or why a
   // game was not recognised. It used to exist only as an unread variable.
+  //
+  // Ela entra DEPOIS do aviso do arquivo e so ate encher a tela. A OSD tem
+  // 15 linhas fixas e nao rola sozinha - nenhum item desta tela e
+  // selecionavel, entao scroll_top nunca sai de zero. Sem esse limite, um
+  // status longo (o buffer aceita 192 caracteres, 8 linhas) empurraria a
+  // instrucao de onde fica o login para fora da tela, justo quando algo deu
+  // errado e ela e mais necessaria. O aviso e permanente; o status e que
+  // cede espaco.
   std::string st = RaGetStatus();
-  for (size_t i = 0; i < st.size(); i += 24)
+  int livres = OsdGetSize() - (int)items.size();
+  for (size_t i = 0; i < st.size() && livres > 0; i += 24, livres--)
     items.push_back({st.substr(i, 24), "", false, false, 0});
 
   selected_idx = 0;
@@ -1645,7 +1659,7 @@ void PopulateAbout() {
   items.push_back({"License", "GPL-3.0", false, false, 0});
   items.push_back({"Back", "", false, true, 999});
 
-  selected_idx = 6;
+  SelectByAction(209, 6); // linha "Cores"
   scroll_top = 0;
 }
 
@@ -1826,7 +1840,7 @@ void PopulateBrowse(const std::string &dirpath) {
       items.push_back({"[Nenhum Port Encontrado]", "", false, false, 0});
     }
     OsdSetSize((int)items.size());
-    selected_idx = 1;
+    SelectByAction(800, 1); // primeiro port, logo abaixo do "<..>"
     scroll_top = 0;
     return;
   }
@@ -2888,7 +2902,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
     {
       current_state = STATE_ABOUT;
       PopulateAbout();
-      selected_idx = 6;   // linha "Cores" na tela About, de onde se veio
+      SelectByAction(209, 6); // linha "Cores" na About, de onde se veio
     } else if (item.action_id == 999) // Back
     {
       current_state = STATE_SETTINGS;
@@ -3242,11 +3256,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (current_state == STATE_ABOUT_CORES) {
       current_state = STATE_ABOUT;
       PopulateAbout();
-      selected_idx = 6;   // linha "Cores" na tela About, de onde se veio
+      SelectByAction(209, 6); // linha "Cores" na About, de onde se veio
     } else if (current_state == STATE_RESET_CONFIRM) {
       current_state = STATE_SETTINGS;
       PopulateSettings();
-      selected_idx = 6;   // linha de onde a confirmacao foi aberta
+      SelectByAction(210, 6); // "Restaurar Padroes", de onde se veio
     } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
                current_state == STATE_CONTROLLER ||
                current_state == STATE_NETPLAY || current_state == STATE_ABOUT) {

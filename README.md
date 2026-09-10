@@ -68,7 +68,7 @@ Jogos de arcade passam por uma troca automática e silenciosa de core: o app ten
   * Gravação persistente no disco em `saves/<Sistema>/<NomeDoJogo>.state<Slot>`.
   * Notificações HUD em tempo real na tela do jogo (*Toast Notifications*).
 * **Atalhos Rápidos de Teclado:**
-  * `F12` ou `Tab`: Abrir / Fechar o Menu OSD do Karamelo.
+  * `F12`: Abrir o Menu OSD durante o jogo (`Esc` tambem fecha, mas nao abre - durante a partida `Esc` e `Tab` sao teclas do jogo).
   * `F5` ou `F2`: **Quick Save State** no slot ativo.
   * `F8` ou `F4`: **Quick Load State** do slot ativo.
   * `F6` / `F7`: Alternar Slot Anterior / Próximo (0 a 9).

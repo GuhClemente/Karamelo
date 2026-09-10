@@ -21,7 +21,11 @@ if not exist "%~dp0deploy_env.bat" (
     exit /b 1
 )
 call "%~dp0deploy_env.bat"
-set LOCAL_ZIP=dist\Karamelo_v1.0_Win64.zip
+rem O caminho real do pacote so pode ser montado depois que APP_VERSION for
+rem lido do app_info.h, o que acontece mais abaixo. Aqui havia um
+rem dist\Karamelo_v1.0_Win64.zip fixo, sobrescrito logo em seguida e nunca
+rem usado - inofensivo na execucao, mas fazia qualquer leitor acreditar que a
+rem release era a 1.0.
 set LOCAL_EXE=dist\Karamelo.exe
 set LOCAL_JSON=dist\version.json
 

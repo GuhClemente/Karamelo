@@ -10,7 +10,8 @@
    - Use as setas do teclado ou o controle XInput para navegar e jogar
 
 2. CONTROLES PADRAO NO TECLADO:
-   - Abrir / Fechar Menu OSD: F1 ou ESC
+   - Abrir Menu OSD durante o jogo: F12
+   - Fechar o Menu OSD: F12 ou ESC
    - Navegar: Setas Direcionais
    - Confirmar / Entrar: ENTER ou TECLA Z
    - Cancelar / Voltar: BACKSPACE ou TECLA X
@@ -22,11 +23,11 @@
    - Confirmar: BOTAO A
    - Voltar: BOTAO B
 
-4. SISTEMAS NATIVOS DISPONIVEIS (35 Sistemas / 39 Cores):
+4. SISTEMAS NATIVOS DISPONIVEIS (35 Sistemas / 40 Motores):
    - Nintendo: NES, SNES, N64, Game Boy, GBA, NDS, 3DS, GameCube
    - Sega: Master System, Genesis/Mega Drive, Mega CD, 32X, Saturn, Dreamcast
    - Sony: PlayStation 1, PlayStation 2, PSP
-   - SNK / Arcade: Neo Geo AES/MVS, Neo Geo CD, Neo Geo Pocket, FBNeo, MAME
+   - SNK / Arcade: Neo Geo AES/MVS, Neo Geo CD, Neo Geo Pocket, MAME
    - Atari: 2600, 5200, 7800, Jaguar, Lynx
    - Computadores / Outros: DOSBox Pure, Amiga, C64, MSX, ZX Spectrum,
      PC Engine / TG-16, PC-FX, 3DO, ColecoVision, WonderSwan.
@@ -42,11 +43,19 @@
 6. BIOS E ARQUIVOS DE SISTEMA:
    - Consoles de cartucho funcionam sem BIOS (Zero Configuracao).
    - Consoles de CD e arcade (PS1, PS2, Saturn, Sega CD, etc.) precisam de BIOS.
-   - Baixe o pacote oficial consolidado: Karamelo_Pack_BIOS.zip
+   - O projeto NAO distribui BIOS. Use suas proprias copias.
    - Consulte o guia completo e tabela MD5 em: bios\GUIA_COMPLETO_BIOS.md
 
-7. AVISO LEGAL / LEGAL DISCLAIMER:
-   - O Karamelo e um software independente e gratuito (Freeware) voltado a preservacao.
+7. LICENCA E CODIGO-FONTE:
+   - O Karamelo e software livre sob a GNU GPL-3.0. O texto completo esta
+     em LICENSE.md, nesta mesma pasta.
+   - Codigo-fonte completo: https://github.com/GuhClemente/Karamelo
+   - Bibliotecas de terceiros e suas licencas: THIRD-PARTY-NOTICES.md
+   - Os motores de emulacao em cores\ sao projetos de terceiros,
+     cada um sob a licenca do seu proprio projeto.
+
+8. AVISO LEGAL / LEGAL DISCLAIMER:
+   - O Karamelo e um software independente voltado a preservacao.
    - Nao possui filiacao ou vinculo com o projeto de hardware MiSTer FPGA oficial.
    - Esta distribuicao NAO CONTEM nenhum arquivo de BIOS protegida ou ROM de jogo.
    - O usuario deve utilizar seus proprios backups de jogos e BIOS legalmente adquiridos.
