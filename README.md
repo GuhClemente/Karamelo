@@ -54,7 +54,7 @@ A tabela abaixo é a mesma lógica usada pelo próprio app para decidir qual cor
 | ZX Spectrum | `spectrum.dll` | Fuse | `.tzx` `.tap` `.z80` `.sna`, `.zip` `.7z` `.rar` |
 | Panasonic 3DO | `3do.dll` | Opera | `.iso` `.cue` `.chd` `.m3u` `.toc`, `.zip` `.7z` `.rar` |
 | MS-DOS | `dosbox_pure.dll` | DOSBox Pure | `.zip` `.7z` `.rar` (pasta do jogo) |
-| Arcade | `arcade_fbneo.dll` / `mame2003.dll` / `mame2010.dll` / `dreamcast.dll` (Naomi) | FinalBurn Neo / MAME 2003 / MAME 2010 / Flycast | `.zip` `.7z` `.rar` (romset completo) |
+| Arcade | `arcade_fbneo.dll` / `mame2003.dll` / `mame2010.dll` / `dreamcast.dll` (Naomi) | MAME 0.289 (apesar do nome do arquivo) / MAME 2003 / MAME 2010 / Flycast | `.zip` `.7z` `.rar` (romset completo) |
 
 Jogos de arcade passam por uma troca automática e silenciosa de core: o app tenta cada candidato em sequência (e, desde a versão atual, também detecta um core que "carrega com sucesso" mas trava logo em seguida, descartando e tentando o próximo sozinho). Romsets Naomi/Atomiswave conhecidos (~210 títulos catalogados em `app/gamedb/naomi_atomiswave.json`, extraído do código-fonte real do MAME) vão direto para o Flycast, sem passar pela tentativa nos cores MAME primeiro.
 
