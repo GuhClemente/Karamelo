@@ -1,11 +1,11 @@
 ﻿{
     "exe_url":  "https://karamelo-emu.com/downloads/Karamelo.exe",
-    "exe_size":  4036608,
+    "exe_size":  4037632,
     "zip_url":  "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Win64.zip",
     "version":  "0.9.4",
     "release_date":  "2026-09-09",
     "notes":  "Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.",
-    "exe_sha256":  "6D8CE0619389B95964F0D759C4BB066EA8DEEA7DA5F6F4D681CD687A0F7D6488",
+    "exe_sha256":  "320BF9B1701944020D779741E6A93D54841E9C83DB5177B34D56D40200B2F5D9",
     "force_full_package":  false,
     "title":  "Karamelo v0.9.4"
 }
