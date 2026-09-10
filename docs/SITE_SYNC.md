@@ -341,9 +341,11 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Está certo e não deve mudar:** os **39** jogos de "Ports & Recomp". Esse
-número foi conferido contra o `CREDITS.md`. É coincidência infeliz que 39 já
-tenha sido, um dia, o número errado de motores — não confunda os dois.
+**Atualizado em 10/09/2026:** são **40** jogos de "Ports & Recomp", não mais
+39 — entrou Valkyrie Profile (ver seção 10). O número foi conferido contra o
+`CREDITS.md`, que é sempre a fonte — essa tabela só cresce, não copie 39 nem
+40 de outra página no futuro. É coincidência infeliz que 39 já tenha sido, um
+dia, o número errado de motores — não confunda os dois.
 
 ### 9.4 Motores creditados a quem não é
 
@@ -436,8 +438,14 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **39** jogos de Ports & Recomp, e o texto explicando que o app baixa só o
-  binário de código aberto de cada projeto.
+- Os **40** jogos de Ports & Recomp (atualizado em 10/09/2026 — ver seção 10),
+  e o texto explicando que o app baixa só o binário de cada projeto direto do
+  GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
+  "código aberto" no sentido estrito — a maioria é, mas ao menos um
+  (Valkyrie Profile) embute um motor sob licença não-comercial. Se o texto do
+  site afirmar "código aberto" para a lista inteira, isso deixou de ser
+  literalmente verdade; "de código aberto ou disponível gratuitamente" descreve
+  melhor, sem prometer o que a licença de um projeto de terceiro não garante.
 - A estrutura da seção de licença — **mas o conteúdo mudou**: o projeto agora
   é GPL-3.0, e toda menção a PolyForm ou a "uso comercial não permitido" tem
   que sair. Ver seção 4.
@@ -446,3 +454,35 @@ que é a página onde a marca de terceiro mais aparece.
 - A ausência de qualquer link para o pack de BIOS.
 - O texto "recriados do zero em C++20" — é verdade, e é exatamente a distinção
   que a seção 1 exige que o site preserve.
+
+---
+
+## 10. Adição de 10/09/2026 — Valkyrie Profile em Ports & Recomp
+
+Entrou uma linha nova em `CREDITS.md`: **Valkyrie Profile**, via
+[Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp). É um PS1 de
+dois discos, motor PSXRecomp — os outros 39 são quase todos N64Recomp.
+Mecanicamente ele se comporta como qualquer outro da lista (baixa do GitHub,
+sem nada empacotado no instalador do Karamelo), mas tem duas diferenças reais
+que valem nota se o site descrever essa entrada especificamente, não só a
+categoria como um todo:
+
+1. **Não é "baixe e jogue" na primeira vez.** O zip não traz o jogo pronto —
+   traz um assistente que exige Python 3 já instalado na máquina e baixa uma
+   toolchain de compilação (cmake/clang) no primeiro uso, para gerar o
+   executável do jogo a partir dos discos que o jogador fornecer. Todo o resto
+   da categoria é executável pronto após a extração.
+2. **Licença do motor:** o repositório do ValkyrieRecomp em si não declara
+   licença própria, mas o motor que ele embute (PSXRecomp, de Matthew Stan) é
+   **PolyForm Noncommercial 1.0.0** — a mesma família de licença que o
+   Karamelo usou por um único dia antes de virar GPL-3.0 (seção 4). Isso não
+   afeta a licença do Karamelo — é um binário de terceiro baixado sob demanda,
+   nunca embutido —, mas significa que esse port específico não é livre para
+   uso comercial, ao contrário do próprio Karamelo.
+
+Não é motivo para tirar a entrada da lista nem para dar destaque negativo a
+ela — é só para o texto do site não prometer, por causa desta uma linha, algo
+que não é verdade para ela: nem "baixa e já roda", nem "todo mundo aqui é
+código aberto sem ressalva". Se a página não descrever entradas individuais de
+Ports & Recomp (a maioria não descreve), não há nada a mudar além da contagem
+da seção 9.3/9.9.

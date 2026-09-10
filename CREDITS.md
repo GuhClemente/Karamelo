@@ -151,6 +151,16 @@ vezes vêm junto).
 | Viva Pinata: Trouble in Paradise | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
 | WipEout Phantom Edition | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
 | OutRun (CannonBall DX) | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
+| Valkyrie Profile | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
+
+Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
+tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que
+precisa de Python 3 instalado e baixa uma toolchain de compilação na primeira
+execução para gerar o binário a partir dos discos do jogador. E o motor por
+trás (PSXRecomp) é licenciado PolyForm Noncommercial, não a mesma licença dos
+demais projetos desta lista - isso não afeta a licença do Karamelo em si (o
+port é um binário externo, baixado sob demanda, nunca embutido), mas vale
+saber antes de indicar essa entrada para alguém.
 
 Assim como os cores, nenhum ROM/disco/ISO é baixado ou distribuído pelo app -
 só o executável de cada projeto, que é open source e distribuído livremente

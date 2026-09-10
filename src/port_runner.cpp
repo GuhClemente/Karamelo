@@ -232,6 +232,31 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           "SolarCookies/TiP-Recomp", "", true, {} },
         { "WipeoutPhantomEdition", "WipEout Phantom Edition",
           "wipeout-phantom-edition/wipeout-phantom-edition", "", true, {} },
+
+        // PS1 (Valkyrie Profile, 2 discs), built on PSXRecomp instead of
+        // N64Recomp. Verified against the real v1.0.1 release: the Windows
+        // zip is flat at the root (ValkyrieRecomp.exe alongside assets/,
+        // mods/, psxrecomp/ - no wrapper folder, so FlattenSingleSubfolder
+        // is a no-op here) and FindBestExecutable would pick the right exe
+        // on its own, but exe_hint is set anyway since it was confirmed.
+        // rom_keywords is empty on purpose, same reasoning as SymphonyRecomp/
+        // REDRIVER2 above: PortAutoSetupRom only searches roms/Nintendo64,
+        // so a PS1 disc image was never going to be auto-copied regardless -
+        // this port asks for its own disc pair on first run either way.
+        // Two things make this entry heavier than every other row here, and
+        // worth knowing before pointing someone at it: (1) first launch runs
+        // a "Generate & rebuild" wizard that needs Python 3 already on PATH
+        // and downloads a clang/cmake toolchain the first time - there's no
+        // prebuilt game binary inside the zip, only the tool that builds one
+        // locally from the discs; (2) the exe itself has no license file in
+        // its own repo, but the psxrecomp engine it embeds is PolyForm
+        // Noncommercial 1.0.0 (c) Matthew Stan - same license family Karamelo
+        // itself moved off of. That doesn't reach back into Karamelo's own
+        // GPL-3.0, since this is a separate binary downloaded on demand like
+        // every other port, never bundled - but it does mean the port itself
+        // isn't free for commercial use the way Karamelo now is.
+        { "ValkyrieRecomp", "Valkyrie Profile",
+          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {} },
     };
     return defs;
 }
