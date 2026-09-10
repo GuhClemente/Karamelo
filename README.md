@@ -1,6 +1,6 @@
 # Karamelo Emulador — Native Windows x64 Frontend & Retrogaming Emulation Suite
 
-> **Software Gratuito e Independente (Freeware)**  
+> **Software Livre e Independente — GNU GPL-3.0**  
 > Canal do YouTube: **[@GuhClemente](https://youtube.com/@GuhClemente)**  
 > Desenvolvido por: **Guh Clemente & Antigravity Pair Team**  
 > Core Engine: **Libretro API Architecture**
@@ -236,7 +236,7 @@ guias de BIOS/ROM e cores prontos), use `package_release.bat` em vez de
 * **Canal do YouTube:** [@GuhClemente](https://youtube.com/@GuhClemente)
 * **Desenvolvedor:** Guh Clemente
 * **Engine de Emulação:** Libretro API Architecture
-* **Licença:** [PolyForm Noncommercial 1.0.0](LICENSE.md). Qualquer pessoa pode ler, estudar, modificar, forkar e redistribuir o código; **uso comercial não é permitido**. Pela definição da OSI isso não conta como "open source" — é código aberto com uma restrição, e a restrição é essa.
+* **Licença:** [GNU GPL-3.0](LICENSE.md) — explicação em português em [docs/LICENCA.md](docs/LICENCA.md). Qualquer pessoa pode usar, estudar, modificar, forkar e redistribuir o código, inclusive comercialmente. **Em troca, quem distribuir uma versão modificada é obrigado a publicar o código-fonte dela sob a mesma licença** — não existe fork fechado. Os cores libretro em `cores/` são programas independentes carregados em tempo de execução e mantêm cada um a sua própria licença.
 * **Bibliotecas de terceiros:** [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lista cada uma que entra no binário, com a licença original. O único copyleft é o `n64_gopher.dll` (GPL-3.0); o fonte modificado dele está versionado em `third_party/gopher64/`, que é justamente como a GPL é cumprida.
 * **Aviso Legal / Disclaimer:** O **Karamelo** é um projeto de software independente desenvolvido para o ecossistema Windows e **NÃO possui qualquer afiliação, vínculo ou endosso de Alexey Melnikov, do projeto oficial MiSTer FPGA ou de seus mantenedores**.
 * **Cores e Emuladores:** Todos os motores de emulação utilizados são plugins externos independentes compatíveis com a especificação Libretro, desenvolvidos por suas respectivas comunidades e regidos por suas licenças originais.

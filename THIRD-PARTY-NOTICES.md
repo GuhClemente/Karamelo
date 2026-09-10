@@ -1,8 +1,13 @@
 # Avisos de terceiros
 
-O Karamelo Emulador é distribuído sob a [PolyForm Noncommercial 1.0.0](LICENSE.md),
-mas ele não é feito só de código próprio. Este arquivo lista tudo que entra no
-binário ou é distribuído junto, com a licença original de cada um.
+O Karamelo Emulador é distribuído sob a [GNU GPL-3.0](LICENSE.md) (explicação em [docs/LICENCA.md](docs/LICENCA.md)), mas ele não
+é feito só de código próprio. Este arquivo lista tudo que entra no binário ou é
+distribuído junto, com a licença original de cada um.
+
+Todas as bibliotecas abaixo são permissivas (zlib, MIT, BSD-3, CC0) e portanto
+compatíveis com a GPL-3: podem ser combinadas num programa GPL-3 desde que os
+avisos originais sigam junto — que é exatamente para isso que este arquivo
+existe.
 
 Isto aqui é **obrigação legal**, não cortesia: zlib, BSD-3 e MIT exigem que o
 aviso de copyright acompanhe qualquer redistribuição, inclusive em forma

@@ -160,34 +160,46 @@ são necessários e onde eles ficam na pasta — não fornece os arquivos.
 
 ## 4. Licença
 
-O código é aberto sob **PolyForm Noncommercial 1.0.0**:
+O código é livre sob a **GNU General Public License v3.0 (GPL-3.0)**:
 
 ```
 https://github.com/GuhClemente/Karamelo/blob/main/LICENSE.md
 ```
 
+⚠️ **A licença mudou em 09/09/2026.** O projeto passou um único dia sob a
+PolyForm Noncommercial 1.0.0. **Todo texto do site que mencione PolyForm,
+"não comercial", "uso comercial não é permitido" ou "código-fonte disponível"
+está desatualizado e precisa sair** — inclusive nas metatags, nas keywords, no
+`<title>` e no JSON-LD, onde a frase aparece várias vezes.
+
 Como descrever, corretamente:
 
-> Qualquer pessoa pode ler, estudar, modificar, forkar e redistribuir o código.
-> **Uso comercial não é permitido.**
+> Software livre sob GPL-3.0. Qualquer pessoa pode usar, estudar, modificar e
+> redistribuir o código. Quem distribuir uma versão modificada é obrigado a
+> publicar o código-fonte dela sob a mesma licença.
 
-**Não escreva "open source" sem qualificação.** Pela definição da OSI isto não
-é open source, justamente por causa da restrição comercial — o próprio GitHub
-não exibe selo de licença por isso. Formulações seguras: "código aberto",
-"código-fonte disponível", "aberto sob PolyForm Noncommercial". Formulação
-errada: "open source sob licença MIT/GPL", "software livre".
+Agora **pode** escrever "open source" e "software livre" sem ressalva: a
+GPL-3 é aprovada pela OSI e pela FSF, e o próprio GitHub passa a exibir o selo
+da licença. A restrição comercial que existia deixou de existir — **não escreva
+mais que o uso comercial é proibido**, porque virou falso.
 
-Também não descreva o app como "freeware" e ponto: é gratuito **e** tem o
-código publicado **e** o uso comercial é vedado. As três coisas juntas.
+O ponto que vale a pena explicar ao leitor, porque é o motivo da troca:
+
+> A licença anterior proibia vender, mas permitia pegar o código, fechar e não
+> devolver nada. A GPL-3 faz o contrário: vender é permitido, fechar não é.
+
+Não descreva o app como "freeware": ele é **software livre**, que é outra
+coisa. Freeware é grátis e fechado; isto é grátis, aberto, e obriga quem
+modificar a continuar aberto.
 
 ### Terceiros
 
 O app embute bibliotecas de terceiros com licenças próprias, listadas em
 `THIRD-PARTY-NOTICES.md` no repositório. Se o site tiver página de créditos,
 linke para lá em vez de reescrever a lista. Um ponto que costuma ser mal
-entendido: o core de N64 `n64_gopher.dll` é **GPL-3.0**, e essa licença vale
-para ele, **não** para o Karamelo — o core é um binário separado carregado
-pela API libretro.
+entendido: o core de N64 `n64_gopher.dll` é **GPL-3.0** por conta própria. Isso
+agora coincide com a licença do Karamelo, mas continua sendo decisão do projeto
+dele — o core é um binário separado, carregado pela API libretro.
 
 Os cores de emulação são projetos de terceiros, cada um com licença própria,
 catalogados em `CREDITS.md`. O site não deve dar a entender que foram feitos
@@ -415,8 +427,9 @@ que é a página onde a marca de terceiro mais aparece.
 
 - Os **39** jogos de Ports & Recomp, e o texto explicando que o app baixa só o
   binário de código aberto de cada projeto.
-- A descrição da licença PolyForm Noncommercial, incluindo a ressalva de uso
-  comercial.
+- A estrutura da seção de licença — **mas o conteúdo mudou**: o projeto agora
+  é GPL-3.0, e toda menção a PolyForm ou a "uso comercial não permitido" tem
+  que sair. Ver seção 4.
 - O FAQ sobre não distribuir ROM/BIOS, e o de "vocês reescreveram os cores?".
 - O botão de download lendo o `version.json`.
 - A ausência de qualquer link para o pack de BIOS.
