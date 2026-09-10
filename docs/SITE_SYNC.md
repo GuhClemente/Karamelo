@@ -211,10 +211,21 @@ por este projeto.
 
 Deve aparecer em qualquer página que mencione MiSTer FPGA, e no rodapé:
 
-> O **Karamelo Emulador** é um projeto de software independente desenvolvido
-> para o ecossistema Windows e **NÃO possui qualquer afiliação, vínculo ou
-> endosso de Alexey Melnikov, do projeto oficial MiSTer FPGA ou de seus
-> mantenedores**.
+> O **Karamelo Emulador** é um projeto de software independente e **NÃO possui
+> qualquer afiliação, vínculo ou endosso de Alexey Melnikov, do projeto oficial
+> MiSTer FPGA ou de seus mantenedores**.
+
+O aviso **não cita plataforma**, e isso é de propósito. A versão anterior dizia
+"desenvolvido para o ecossistema Windows", o que amarrava um texto jurídico a
+um detalhe de build: no dia em que sair um binário de Linux, o aviso passa a
+ser impreciso justo onde ele precisa ser exato. O que ele afirma é a não
+afiliação com o MiSTer FPGA, e isso independe de onde o app roda.
+
+Cuidado para não confundir esta mudança com a seção 9.6: tirar a plataforma do
+**aviso legal** é correto; anunciar o app como **multiplataforma** na chamada e
+nas metatags continua sendo promessa até existir um binário de Linux ou macOS
+para baixar. Uma coisa é não prometer nada; a outra é prometer o que ainda não
+está pronto.
 
 Complemento recomendado na mesma seção:
 
