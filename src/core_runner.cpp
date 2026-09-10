@@ -213,13 +213,11 @@ static std::map<std::string, std::string> s_arcade_core_for_rom;
 // `PPGe drawing library initialized`) enquanto o frontend desmonta tudo por
 // baixo, e morre com 0xC0000005.
 //
-// A lista vem semeada com os dois casos já documentados nos comentários deste
-// arquivo, para que a primeira tentativa numa máquina nova também seja segura,
-// e cresce sozinha quando um core novo pedir negociação.
-static std::set<std::string> s_cores_needing_vk_negotiation = {
-	"psp",        // PPSSPP
-	"dreamcast",  // Flycast
-};
+// Antes existia aqui uma lista de cores conhecidos por precisarem de
+// negociacao de contexto Vulkan, usada para recusar Vulkan a eles antes mesmo
+// de tentarem. Com a negociacao implementada em hw_render_vulkan.cpp, nao ha
+// mais o que recusar: o core pede, negocia e recebe o dispositivo que
+// descreveu.
 
 
 // The bridge exists for machines whose games are driven by the keyboard and
@@ -340,6 +338,8 @@ static bool g_render_diag_done = false;
 // by RETRO_ENVIRONMENT_SET_HW_RENDER (see both cases in CB_Environment) -
 // reset per load so a stale true from a previous core cannot wrongly refuse
 // Vulkan to the next one that never asked for negotiation at all.
+// Diagnostico: registra que o core entregou a interface de negociacao nesta
+// carga. Nao decide mais nada - antes era o gatilho da recusa.
 static bool g_core_wants_vk_negotiation = false;
 static std::string   g_pending_rom;
 static std::string   g_pending_core_hint;
@@ -502,16 +502,7 @@ static LONG s_clean_windows = 0;
 static bool          s_loaded_core_is_pcsx2 = false;
 static std::string   s_loaded_core_path = "";
 
-static bool CoreNeedsVkNegotiation()
-{
-	std::string lower = s_loaded_core_path;
-	for (char& c : lower) c = (char)tolower((unsigned char)c);
-	for (const auto& frag : s_cores_needing_vk_negotiation)
-	{
-		if (lower.find(frag) != std::string::npos) return true;
-	}
-	return false;
-}
+
 
 // Resampler rate-control state. This used to live as function-local statics
 // inside SendAudioSamples, which meant a lock from one game's audio survived
@@ -1964,32 +1955,43 @@ static bool CB_Environment(unsigned cmd, void* data)
 	}
 
 	case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE:
-		// A core provides this when it needs to dictate its own Vulkan device
-		// extensions/features rather than accept whatever "default" device we
-		// hand it - flycast confirmed needing this: given a vanilla device
-		// with no negotiation, it crashed with a null-pointer GPF deep in its
-		// own renderer setup (presumably relying on a feature/extension only
-		// negotiation would have enabled) rather than failing cleanly. We do
-		// not implement negotiation (a real create_device/create_device2
-		// wrapper letting the core choose), so remember that this core asked
-		// for it and have SET_HW_RENDER below refuse Vulkan outright instead
-		// of repeating that crash - the core then falls back to its next
-		// preferred context type (OpenGL, which we do support).
-		g_core_wants_vk_negotiation = true;
+	{
+		// Por esta interface o core escolhe o proprio dispositivo Vulkan: GPU,
+		// extensoes, features e filas. Ela era recusada, e o efeito era grande:
+		// sem poder negociar, PPSSPP, Flycast e PCSX2 recebiam um dispositivo
+		// generico e falhavam dentro do proprio renderizador - o Flycast com GPF
+		// de ponteiro nulo -, entao o frontend passou a recusar Vulkan para eles
+		// e os tres cairam para OpenGL. Implementada a negociacao, a recusa
+		// deixou de fazer sentido.
+		// O libretro.h vendorizado aqui nao traz a struct base, so o enum de
+		// tipo; a versao Vulkan dela mora em libretro_vulkan.h, que arrasta
+		// vulkan.h junto e nao tem por que entrar neste arquivo. Os dois
+		// primeiros campos sao o prefixo comum a toda interface de negociacao,
+		// entao le-los por este espelho e valido e mantem a dependencia de
+		// Vulkan confinada em hw_render_vulkan.cpp.
+		struct negotiation_header
 		{
-			// Guarda para as proximas cargas: nesta ja e tarde se o core pediu
-			// SET_HW_RENDER antes.
-			std::string base = s_loaded_core_path;
-			size_t slash = base.find_last_of("/\\");
-			if (slash != std::string::npos) base = base.substr(slash + 1);
-			for (char& c : base) c = (char)tolower((unsigned char)c);
-			if (!base.empty()) s_cores_needing_vk_negotiation.insert(base);
+			enum retro_hw_render_context_negotiation_interface_type interface_type;
+			unsigned interface_version;
+		};
+		const struct negotiation_header* iface = (const struct negotiation_header*)data;
+		if (!iface)
+			return false;
+		if (iface->interface_type != RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN)
+		{
+			CoreLogPrintf(RETRO_LOG_INFO,
+				"[HW] negociacao de contexto tipo %d nao suportada (so Vulkan)",
+				(int)iface->interface_type);
+			return false;
 		}
-		CoreLogPrintf(RETRO_LOG_INFO,
-			"[HW] core pediu negociacao de contexto Vulkan - nao implementada, "
-			"Vulkan sera recusado para forcar fallback");
-		return false;
 
+		VkHwSetNegotiationInterface(iface);
+		g_core_wants_vk_negotiation = true;
+		CoreLogPrintf(RETRO_LOG_INFO,
+			"[HW] negociacao de contexto Vulkan aceita (interface v%u)",
+			iface->interface_version);
+		return true;
+	}
 	case RETRO_ENVIRONMENT_SET_HW_RENDER:
 		// Accepting this is what lets mupen64plus-next, flycast and dolphin
 		// load at all - they refuse outright without OpenGL. But saying yes
@@ -2008,13 +2010,13 @@ static bool CB_Environment(unsigned cmd, void* data)
 				return D3D11HwSetRenderCallback(cb);
 			if (cb && cb->context_type == RETRO_HW_CONTEXT_VULKAN)
 			{
-				if (g_core_wants_vk_negotiation || CoreNeedsVkNegotiation())
-				{
-					CoreLogPrintf(RETRO_LOG_INFO,
-						"[HW] recusando Vulkan (negociacao de contexto nao suportada) - "
-						"core deve tentar o proximo tipo de contexto");
-					return false;
-				}
+				// A recusa que existia aqui era o contorno para a negociacao
+				// nao existir. Agora ela existe, e aceitar e o comportamento
+				// correto: o dispositivo so e criado quando o jogo carrega, ja
+				// com o que o core pediu. Se a negociacao falhar naquele ponto,
+				// VkHwEnsureDevice cai sozinho no dispositivo padrao, e se nem
+				// esse servir o carregamento falha de forma limpa em vez de
+				// crashar dentro do core.
 				return VkHwSetRenderCallback(cb);
 			}
 			return HwSetRenderCallback(cb);
@@ -3638,6 +3640,11 @@ static bool CoreLoad(const char* core_dll_path)
 	// names, so this is cleared on the way in rather than only on the way out.
 	ClearInputDescriptors();
 	g_core_wants_vk_negotiation = false;
+	// A interface de negociacao e um ponteiro para dentro da DLL do core. Ao
+	// trocar de core ele tem que ser esquecido aqui, antes do LoadLibrary do
+	// proximo: mante-lo apontaria para memoria de uma DLL que ja saiu, e a
+	// proxima criacao de dispositivo chamaria create_device do core anterior.
+	VkHwClearNegotiationInterface();
 
 	InterlockedExchange(&g_core_in_module_op, 1);
 	h_core_dll = LoadLibraryA(core_dll_path);
@@ -3970,43 +3977,6 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 
 
-	if (VkHwIsActive() && g_core_wants_vk_negotiation)
-	{
-		// The core already asked for the Vulkan context negotiation interface
-		// (create_device/create_device2) somewhere during retro_load_game -
-		// every RETRO_ENVIRONMENT_* call it was going to make has happened by
-		// now regardless of the order it made them in, so this check is safe
-		// even for cores (e.g. Flycast) that call SET_HW_RENDER before
-		// SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE. We don't implement that
-        // interface, so the core would be handed a generic device it doesn't
-		// know how to drive; letting it proceed into context_reset() crashes
-        // it (confirmed with Flycast/Dreamcast: the fault happens on the
-		// core's own internal threaded-renderer thread, asynchronously, which
-		// no SEH __try/__except on this thread can ever catch) - so bail out
-		// here, before ever calling context_reset(), instead of trying to
-		// recover from a crash we cannot actually contain.
-		CoreLogPrintf(RETRO_LOG_ERROR,
-			"[HW-VK] '%s' exige negociacao de contexto Vulkan (nao implementada) - recusando carregamento para evitar crash",
-			loaded_core_name.c_str());
-		if (!suppress_toast)
-			CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
-
-		// Sem retro_unload_game aqui, de proposito. O core ja subiu o que
-		// precisava durante o load e esta esperando um contexto que nao vai
-		// chegar; pedir para ele descarregar nesse estado e o que crashava.
-		// Medido com o PPSSPP: a mensagem acima saia no log e a linha seguinte
-		// era 0xC0000005 dentro de psp.dll - o app anunciava que estava
-		// recusando "para evitar crash" e crashava em seguida, o que e pior do
-		// que nao ter aviso nenhum.
-		//
-		// A falha nasce na thread interna do core, entao o __try/__except do
-		// Guarded nao alcanca. Nao chamar e o unico ponto de controle que
-		// sobra. O core fica carregado sem jogo ate o proximo CoreUnload, que
-		// nao libera esta DLL de qualquer forma.
-		CoreReleaseMemoryMap();
-		return false;
-	}
-
 	if (HwIsActive() || VkHwIsActive() || D3D11HwIsActive())
 	{
 		unsigned hw_w = av_info.geometry.max_width  ? av_info.geometry.max_width  : core_fb_width;
@@ -4036,11 +4006,12 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			                                    : (HwContextReset(), true);
 			if (using_hw_reset && !context_ok)
 			{
-				// Belt-and-suspenders: covers a core that crashes synchronously
-				// inside context_reset() itself (caught by the SEH guard in
-				// VkHwContextReset/D3D11HwContextReset) without having set
-				// g_core_wants_vk_negotiation - the check above only handles
-				// the known Vulkan-negotiation case.
+				// Rede de seguranca para o core que crasha dentro do proprio
+				// context_reset (capturado pelo SEH de VkHwContextReset e
+				// D3D11HwContextReset). Antes havia, acima, uma recusa que
+				// barrava o carregamento de qualquer core que pedisse
+				// negociacao Vulkan; ela existia so porque a negociacao nao
+				// era implementada, e saiu junto com essa limitacao.
 				CoreLogPrintf(RETRO_LOG_ERROR,
 					"[HW] context_reset falhou/crashou para '%s'",
 					loaded_core_name.c_str());

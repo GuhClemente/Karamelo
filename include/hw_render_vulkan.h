@@ -17,6 +17,19 @@ struct retro_hw_render_callback;
 // buffer every frame (VkHwReadPixels), and the existing GDI/CRT-filter/OSD
 // pipeline takes it from there, unchanged.
 
+// Interface de negociacao de contexto, entregue pelo core via
+// RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE. E por ela que
+// o core escolhe o dispositivo fisico, as extensoes, as features e a fila de
+// que o renderizador dele precisa. Sem isso o frontend so sabe entregar um
+// dispositivo generico, e cores como PPSSPP, Flycast e PCSX2 falham dentro do
+// proprio setup - motivo pelo qual o Vulkan vinha sendo recusado para eles.
+//
+// O ponteiro e const struct retro_hw_render_context_negotiation_interface_vulkan*
+// (void* aqui para o cabecalho nao arrastar vulkan.h). Vale ate o core ser
+// descarregado; VkHwClearNegotiationInterface() e chamada nesse momento.
+void VkHwSetNegotiationInterface(const void* iface);
+void VkHwClearNegotiationInterface();
+
 bool VkHwSetRenderCallback(struct retro_hw_render_callback* cb);
 bool VkHwIsActive();
 bool VkHwIsAvailable();

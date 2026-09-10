@@ -1,8 +1,30 @@
+// Este arquivo e o unico caminho de video do projeto que ja nasceu portavel:
+// tudo que ele usa do sistema vem do SDL3, e nenhuma funcao Vulkan e linkada
+// em tempo de build. As tres dependencias de Windows que restavam - windows.h,
+// CRITICAL_SECTION e o SEH __try/__except - foram trocadas por equivalentes de
+// biblioteca padrao ou isoladas atras de macro, para que Linux e macOS
+// precisem apenas de um toolchain, nao de uma reescrita.
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#endif
 #include <stdio.h>
 #include <string.h>
+#include <mutex>
 #include <vector>
+
+// O SEH e uma extensao da Microsoft. Fora dela, a tentativa vira execucao
+// direta: uma falha dentro do core derruba o processo em vez de ser contida.
+// Nao ha equivalente portavel - sinal de segmentacao nao e excecao de C++ e
+// nao pode ser capturado por catch de forma definida - entao o que se pode
+// fazer e deixar a diferenca explicita em vez de escondida.
+#if defined(_WIN32) && defined(_MSC_VER)
+#define VK_TRY        __try
+#define VK_EXCEPT_ALL __except (EXCEPTION_EXECUTE_HANDLER)
+#else
+#define VK_TRY        if (true)
+#define VK_EXCEPT_ALL else
+#endif
 
 // Dynamic loading, not link-time: there is no Vulkan SDK/import-lib vendored
 // here (matching the rest of this project's "no external SDK at build time"
@@ -103,8 +125,12 @@ static VkDeviceSize     g_staging_size = 0;
 static unsigned         g_surface_w = 0;
 static unsigned         g_surface_h = 0;
 
-static CRITICAL_SECTION g_queue_lock;
-static bool              g_queue_lock_init = false;
+// recursive_mutex, e nao mutex: o CRITICAL_SECTION que estava aqui e
+// recursivo por definicao, e o core pode chamar lock_queue enquanto o
+// frontend ja segura a fila para a leitura do quadro. Trocar por um mutex
+// simples transformaria isso em deadlock so em algumas maquinas.
+static std::recursive_mutex g_queue_lock;
+static bool                 g_queue_lock_init = false;
 
 static struct retro_hw_render_callback g_hw_cb;
 static bool g_hw_active = false;
@@ -123,6 +149,60 @@ static VkSemaphore g_pending_signal_semaphore = VK_NULL_HANDLE;
 static std::vector<VkCommandBuffer> g_pending_core_cmds;
 
 static struct retro_hw_render_interface_vulkan g_iface;
+
+// ---------------------------------------------------------------------------
+// Negociacao de contexto
+// ---------------------------------------------------------------------------
+// O core entrega esta interface para escolher ele mesmo o dispositivo fisico,
+// as extensoes, as features e a fila. Antes de existir, o frontend recusava
+// Vulkan para quem pedisse negociacao (PPSSPP, Flycast, PCSX2), e os tres
+// caiam para OpenGL.
+static const struct retro_hw_render_context_negotiation_interface_vulkan* g_negotiation = NULL;
+// Quem criou o VkDevice decide quem chama destroy_device no fim. O device em
+// si e sempre destruido pelo frontend - a especificacao e explicita: "Device
+// provided to frontend is owned by the frontend" -, o que o core libera em
+// destroy_device sao os recursos auxiliares dele, que vivem nesse device e
+// portanto precisam sair antes.
+static bool g_core_created_device = false;
+static bool g_core_created_instance = false;
+
+void VkHwSetNegotiationInterface(const void* iface)
+{
+	g_negotiation = (const struct retro_hw_render_context_negotiation_interface_vulkan*)iface;
+}
+
+void VkHwClearNegotiationInterface()
+{
+	g_negotiation = NULL;
+}
+
+// Envelopes exigidos pela v2: o core nao chama vkCreateInstance/vkCreateDevice
+// direto, chama estes, para que o frontend possa acrescentar o que precisa ao
+// create_info antes de repassar. Nao acrescentamos nada - este backend nunca
+// apresenta pela swapchain, so le o quadro de volta - mas o ponto de extensao
+// fica onde a especificacao manda.
+static VkInstance VkCreateInstanceWrapper(void* opaque, const VkInstanceCreateInfo* create_info)
+{
+	(void)opaque;
+	VkInstance inst = VK_NULL_HANDLE;
+	if (!create_info || !vkCreateInstance_) return VK_NULL_HANDLE;
+	if (vkCreateInstance_(create_info, NULL, &inst) != VK_SUCCESS) return VK_NULL_HANDLE;
+	return inst;
+}
+
+static VkDevice VkCreateDeviceWrapper(VkPhysicalDevice gpu, void* opaque, const VkDeviceCreateInfo* create_info)
+{
+	(void)opaque;
+	VkDevice dev = VK_NULL_HANDLE;
+	if (!create_info || !vkCreateDevice_) return VK_NULL_HANDLE;
+	if (vkCreateDevice_(gpu, create_info, NULL, &dev) != VK_SUCCESS) return VK_NULL_HANDLE;
+	return dev;
+}
+
+static unsigned NegotiationVersion()
+{
+	return g_negotiation ? g_negotiation->interface_version : 0;
+}
 
 // ---------------------------------------------------------------------------
 // retro_hw_render_interface_vulkan callbacks - see libretro_vulkan.h for the
@@ -173,13 +253,13 @@ static void VkCb_WaitSyncIndex(void* handle)
 static void VkCb_LockQueue(void* handle)
 {
 	(void)handle;
-	if (g_queue_lock_init) EnterCriticalSection(&g_queue_lock);
+	if (g_queue_lock_init) g_queue_lock.lock();
 }
 
 static void VkCb_UnlockQueue(void* handle)
 {
 	(void)handle;
-	if (g_queue_lock_init) LeaveCriticalSection(&g_queue_lock);
+	if (g_queue_lock_init) g_queue_lock.unlock();
 }
 
 static void VkCb_SetSignalSemaphore(void* handle, VkSemaphore semaphore)
@@ -254,9 +334,14 @@ static bool LoadDeviceFunctions()
 	       vkFreeMemory_ && vkBindBufferMemory_ && vkMapMemory_ && vkUnmapMemory_;
 }
 
-static bool VkHwInit()
+// So o loader: biblioteca, vkGetInstanceProcAddr e as duas funcoes de nivel
+// global. Separado da criacao do dispositivo porque a disponibilidade e
+// consultada muito cedo - no arranque do app e ao montar a lista de drivers no
+// menu - e criar o dispositivo definitivo ali seria criar antes de o core
+// existir, que e exatamente o que impedia a negociacao de funcionar.
+static bool VkLoadLoader()
 {
-	if (g_vk_ready) return true;
+	if (vkCreateInstance_) return true;
 
 	if (!SDL_Vulkan_LoadLibrary(NULL))
 	{
@@ -278,14 +363,41 @@ static bool VkHwInit()
 		VkHwLog("vkCreateInstance indisponivel");
 		return false;
 	}
+	return true;
+}
 
+// Versao de API a pedir, respeitando o que o loader instalado suporta e o que
+// o core pediu em get_application_info. A especificacao permite ao frontend
+// subir a versao se precisar, nunca descer abaixo do que o core exige.
+static uint32_t PickApiVersion(const VkApplicationInfo* from_core)
+{
 	uint32_t api_version = VK_API_VERSION_1_1;
+	if (from_core && from_core->apiVersion > api_version)
+		api_version = from_core->apiVersion;
+
 	if (vkEnumerateInstanceVersion_)
 	{
 		uint32_t supported = 0;
 		if (vkEnumerateInstanceVersion_(&supported) == VK_SUCCESS && supported < api_version)
 			api_version = supported;
 	}
+	return api_version;
+}
+
+// Cria instancia, dispositivo e fila de verdade, consultando a negociacao.
+// Idempotente: a primeira chamada monta tudo, as seguintes retornam.
+static bool VkHwEnsureDevice()
+{
+	if (g_vk_ready) return true;
+	if (!VkLoadLoader()) return false;
+
+	// O core fala primeiro: se tem negociacao e sabe dizer de que versao de
+	// Vulkan precisa, e essa que vale.
+	const VkApplicationInfo* core_app = NULL;
+	if (g_negotiation && g_negotiation->get_application_info)
+		core_app = g_negotiation->get_application_info();
+
+	uint32_t api_version = PickApiVersion(core_app);
 
 	VkApplicationInfo app_info = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
 	app_info.pApplicationName = "Karamelo";
@@ -293,6 +405,13 @@ static bool VkHwInit()
 	app_info.pEngineName = "Karamelo";
 	app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	app_info.apiVersion = api_version;
+	if (core_app)
+	{
+		// O nome e a versao do core valem mais que os nossos: alguns drivers
+		// aplicam correcoes por aplicativo a partir deles.
+		app_info = *core_app;
+		app_info.apiVersion = api_version;
+	}
 
 	VkInstanceCreateInfo inst_info = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 	inst_info.pApplicationInfo = &app_info;
@@ -300,7 +419,26 @@ static bool VkHwInit()
 	// swapchain), only render off-screen and copy back to CPU - the same
 	// division of labour hw_render.cpp's OpenGL path already uses.
 
-	if (vkCreateInstance_(&inst_info, NULL, &g_instance) != VK_SUCCESS)
+	// v2: o core pode querer criar a propria instancia, para habilitar
+	// extensoes de nivel de instancia que a v1 nao tinha como pedir.
+	g_core_created_instance = false;
+	if (NegotiationVersion() >= 2 && g_negotiation->create_instance)
+	{
+		g_instance = g_negotiation->create_instance(vkGetInstanceProcAddr_, &app_info,
+			VkCreateInstanceWrapper, NULL);
+		if (g_instance != VK_NULL_HANDLE)
+		{
+			g_core_created_instance = true;
+			VkHwLog("instancia criada pelo core (negociacao v2)");
+		}
+		else
+		{
+			VkHwLog("create_instance do core devolveu VK_NULL_HANDLE - criando a instancia padrao");
+		}
+	}
+
+	if (g_instance == VK_NULL_HANDLE &&
+	    vkCreateInstance_(&inst_info, NULL, &g_instance) != VK_SUCCESS)
 	{
 		VkHwLog("vkCreateInstance falhou");
 		return false;
@@ -334,6 +472,69 @@ static bool VkHwInit()
 		if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) { g_gpu = gpu; break; }
 	}
 
+	// --- Negociacao: o core escolhe o dispositivo ---------------------------
+	//
+	// E aqui que mora a diferenca. O core recebe a instancia e a GPU que
+	// preferimos e devolve dispositivo, fila e indice de familia ja criados
+	// com as extensoes e features de que o renderizador dele precisa. Entregar
+	// um dispositivo generico no lugar disso e o que fazia PPSSPP, Flycast e
+	// PCSX2 falharem dentro do proprio setup - e o que levou o frontend a
+	// recusar Vulkan para eles.
+	g_core_created_device = false;
+	if (g_negotiation)
+	{
+		struct retro_vulkan_context ctx;
+		memset(&ctx, 0, sizeof(ctx));
+
+		bool ok = false;
+		if (NegotiationVersion() >= 2 && g_negotiation->create_device2)
+		{
+			ok = g_negotiation->create_device2(&ctx, g_instance, g_gpu, VK_NULL_HANDLE,
+				vkGetInstanceProcAddr_, VkCreateDeviceWrapper, NULL);
+			if (!ok)
+			{
+				// A especificacao pede exatamente isto: se o core recusa a GPU
+				// que escolhemos, oferecer VK_NULL_HANDLE e deixar ele decidir.
+				VkHwLog("create_device2 recusou a GPU escolhida - repetindo sem indicar GPU");
+				memset(&ctx, 0, sizeof(ctx));
+				ok = g_negotiation->create_device2(&ctx, g_instance, VK_NULL_HANDLE, VK_NULL_HANDLE,
+					vkGetInstanceProcAddr_, VkCreateDeviceWrapper, NULL);
+			}
+		}
+		else if (g_negotiation->create_device)
+		{
+			// v1. Nao exigimos extensao, camada nem feature nenhuma: este
+			// backend nao apresenta pela swapchain, so le o quadro de volta.
+			// O ponteiro de features precisa existir mesmo assim - ha core que
+			// o desreferencia sem checar.
+			VkPhysicalDeviceFeatures required;
+			memset(&required, 0, sizeof(required));
+			ok = g_negotiation->create_device(&ctx, g_instance, g_gpu, VK_NULL_HANDLE,
+				vkGetInstanceProcAddr_, NULL, 0, NULL, 0, &required);
+		}
+
+		if (ok && ctx.device != VK_NULL_HANDLE && ctx.queue != VK_NULL_HANDLE)
+		{
+			g_gpu = ctx.gpu != VK_NULL_HANDLE ? ctx.gpu : g_gpu;
+			g_device = ctx.device;
+			g_queue = ctx.queue;
+			g_queue_family = ctx.queue_family_index;
+			g_core_created_device = true;
+			VkHwLog("dispositivo negociado pelo core (v%u, familia de fila %u)",
+				NegotiationVersion(), g_queue_family);
+		}
+		else if (ok)
+		{
+			VkHwLog("negociacao devolveu sucesso com contexto incompleto - usando o dispositivo padrao");
+		}
+		else
+		{
+			// Falhar aqui nao e fatal: a especificacao manda o frontend seguir
+			// como se create_device nunca tivesse sido chamada.
+			VkHwLog("negociacao falhou - usando o dispositivo padrao");
+		}
+	}
+
 	VkPhysicalDeviceProperties gpu_props;
 	vkGetPhysicalDeviceProperties_(g_gpu, &gpu_props);
 	vkGetPhysicalDeviceMemoryProperties_(g_gpu, &g_mem_props);
@@ -350,8 +551,16 @@ static bool VkHwInit()
 	// is not and crashes deep in its own pipeline setup instead of failing
 	// a validation check.
 	VkPhysicalDeviceFeatures gpu_features;
-	vkGetPhysicalDeviceFeatures_(g_gpu, &gpu_features);
+	if (!g_core_created_device)
+		vkGetPhysicalDeviceFeatures_(g_gpu, &gpu_features);
+	else
+		memset(&gpu_features, 0, sizeof(gpu_features));
 
+	// Tudo daqui ate o vkCreateDevice e o caminho padrao: so roda quando nao
+	// houve negociacao, ou quando ela falhou. Com o dispositivo vindo do core,
+	// a fila e a familia ja vieram junto no retro_vulkan_context.
+	if (!g_core_created_device)
+	{
 	// The interface requires a queue supporting both GRAPHICS and COMPUTE.
 	uint32_t qf_count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties_(g_gpu, &qf_count, NULL);
@@ -393,6 +602,7 @@ static bool VkHwInit()
 		VkHwShutdown();
 		return false;
 	}
+	}
 
 	if (!LoadDeviceFunctions())
 	{
@@ -401,9 +611,13 @@ static bool VkHwInit()
 		return false;
 	}
 
-	vkGetDeviceQueue_(g_device, g_queue_family, 0, &g_queue);
+	// Com dispositivo negociado a fila ja veio pronta do core; pedir outra por
+	// vkGetDeviceQueue devolveria uma fila que o core nao conhece e cujo acesso
+	// nao esta coberto pelos lock_queue/unlock_queue dele.
+	if (!g_core_created_device)
+		vkGetDeviceQueue_(g_device, g_queue_family, 0, &g_queue);
 
-	if (!g_queue_lock_init) { InitializeCriticalSection(&g_queue_lock); g_queue_lock_init = true; }
+	g_queue_lock_init = true;
 
 	VkCommandPoolCreateInfo pool_info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 	pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -471,14 +685,37 @@ void VkHwShutdown()
 		if (g_cmd_buf && vkFreeCommandBuffers_ && g_cmd_pool) { vkFreeCommandBuffers_(g_device, g_cmd_pool, 1, &g_cmd_buf); g_cmd_buf = VK_NULL_HANDLE; }
 		if (g_cmd_pool && vkDestroyCommandPool_) { vkDestroyCommandPool_(g_device, g_cmd_pool, NULL); g_cmd_pool = VK_NULL_HANDLE; }
 
+		// destroy_device antes de vkDestroyDevice, nessa ordem: o que o core
+		// libera ai sao recursos auxiliares dele, e todos vivem neste
+		// dispositivo. A especificacao tambem exige que isto aconteca antes de
+		// a VkInstance do frontend morrer, e que seja chamado mesmo quando
+		// context_reset nunca chegou a rodar - por isso o gatilho e ter havido
+		// create_device com sucesso, nao o contexto estar vivo.
+		//
+		// Envolto no mesmo SEH do resto: um core que estoura aqui nao pode
+		// levar junto o desligamento do dispositivo, senao vaza tudo.
+		if (g_core_created_device && g_negotiation && g_negotiation->destroy_device)
+		{
+			VK_TRY { g_negotiation->destroy_device(); }
+			VK_EXCEPT_ALL
+			{
+				VkHwLog("excecao dentro do destroy_device do core - ignorada");
+			}
+		}
+
 		if (vkDestroyDevice_) vkDestroyDevice_(g_device, NULL);
 		g_device = VK_NULL_HANDLE;
+		g_core_created_device = false;
 	}
 
 	if (g_instance)
 	{
+		// Vale tanto para a instancia que criamos quanto para a que veio do
+		// create_instance do core: a v2 diz que a VkInstance devolvida
+		// pertence ao frontend.
 		if (vkDestroyInstance_) vkDestroyInstance_(g_instance, NULL);
 		g_instance = VK_NULL_HANDLE;
+		g_core_created_instance = false;
 	}
 
 	g_gpu = VK_NULL_HANDLE;
@@ -493,17 +730,62 @@ void VkHwShutdown()
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 }
 
-bool VkHwIsActive() { return g_hw_active && g_vk_ready; }
+// "Ativo" passou a significar "o core pediu Vulkan", nao "o dispositivo ja
+// existe". A criacao foi adiada de proposito (ver VkHwSetRenderCallback), e
+// core_runner.cpp usa este predicado para decidir se chama VkHwEnsureSurface e
+// VkHwContextReset - se ele exigisse o dispositivo pronto, nenhum dos dois
+// seria chamado e o dispositivo nunca seria criado.
+bool VkHwIsActive() { return g_hw_active; }
 
 static int g_vk_probe_result = -1;
 
+// Sonda: existe Vulkan nesta maquina? Cria uma instancia descartavel so para
+// perguntar, e a destroi em seguida.
+//
+// Antes, esta pergunta era respondida criando o dispositivo definitivo - e ela
+// e feita cedo demais para isso: no arranque do app (main_win32.cpp) e ao
+// montar a lista de drivers do menu, ambos antes de qualquer core existir. O
+// dispositivo ficava pronto antes de o core ter chance de entregar a interface
+// de negociacao, e a negociacao chegava sempre tarde demais para valer.
 bool VkHwIsAvailable()
 {
-	if (g_vk_probe_result < 0)
+	if (g_vk_probe_result >= 0) return g_vk_probe_result != 0;
+	g_vk_probe_result = 0;
+
+	if (!VkLoadLoader()) return false;
+
+	VkApplicationInfo app_info = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
+	app_info.pApplicationName = "Karamelo";
+	app_info.pEngineName = "Karamelo";
+	app_info.apiVersion = PickApiVersion(NULL);
+
+	VkInstanceCreateInfo inst_info = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+	inst_info.pApplicationInfo = &app_info;
+
+	VkInstance probe = VK_NULL_HANDLE;
+	if (vkCreateInstance_(&inst_info, NULL, &probe) != VK_SUCCESS)
 	{
-		g_vk_probe_result = VkHwInit() ? 1 : 0;
+		VkHwLog("sonda: vkCreateInstance falhou - Vulkan indisponivel");
+		return false;
 	}
-	return g_vk_probe_result != 0;
+
+	PFN_vkEnumeratePhysicalDevices enum_gpus =
+		(PFN_vkEnumeratePhysicalDevices)vkGetInstanceProcAddr_(probe, "vkEnumeratePhysicalDevices");
+	PFN_vkDestroyInstance destroy_inst =
+		(PFN_vkDestroyInstance)vkGetInstanceProcAddr_(probe, "vkDestroyInstance");
+
+	uint32_t gpu_count = 0;
+	if (enum_gpus) enum_gpus(probe, &gpu_count, NULL);
+	if (destroy_inst) destroy_inst(probe, NULL);
+
+	if (gpu_count == 0)
+	{
+		VkHwLog("sonda: nenhuma GPU com suporte a Vulkan");
+		return false;
+	}
+
+	g_vk_probe_result = 1;
+	return true;
 }
 
 const void* VkHwGetRenderInterface()
@@ -515,7 +797,7 @@ const void* VkHwGetRenderInterface()
 	// with core_runner.cpp's GET_HW_RENDER_INTERFACE trying D3D11 first, a core
 	// could be handed the *other* backend's struct - which starts with an
 	// interface_type field saying so, and which the core would then misread.
-	if (!VkHwIsActive()) return NULL;
+	if (!VkHwIsActive() || !g_vk_ready) return NULL;
 	return &g_iface;
 }
 
@@ -528,11 +810,18 @@ bool VkHwSetRenderCallback(struct retro_hw_render_callback* cb)
 		return false;
 	}
 
-	if (!VkHwInit()) return false;
+	if (!VkHwIsAvailable()) return false;
 
+	// Repare que o dispositivo NAO e criado aqui, so aceito o pedido. Ha core -
+	// PPSSPP e o caso medido - que chama SET_HW_RENDER antes de entregar a
+	// interface de negociacao. Criando o dispositivo neste ponto, a negociacao
+	// chegaria com tudo ja decidido e seria inutil, que era exatamente o estado
+	// anterior. A criacao acontece em VkHwEnsureDevice(), no primeiro uso real,
+	// quando o core ja falou tudo o que tinha para falar.
 	g_hw_cb = *cb;
 	g_hw_active = true;
-	VkHwLog("hardware render Vulkan aceito (depth=%d, stencil=%d)", cb->depth ? 1 : 0, cb->stencil ? 1 : 0);
+	VkHwLog("hardware render Vulkan aceito (depth=%d, stencil=%d) - dispositivo sera criado ao carregar o jogo",
+		cb->depth ? 1 : 0, cb->stencil ? 1 : 0);
 	return true;
 }
 
@@ -549,6 +838,10 @@ static uint32_t FindMemoryType(uint32_t type_bits, VkMemoryPropertyFlags want)
 
 bool VkHwEnsureSurface(unsigned width, unsigned height)
 {
+	// Primeiro uso real do dispositivo no carregamento de um jogo: e aqui, ou
+	// em VkHwContextReset logo abaixo, que ele finalmente e criado.
+	if (!VkHwEnsureDevice()) return false;
+
 	if (!g_vk_ready || width == 0 || height == 0) return false;
 
 	VkDeviceSize needed = (VkDeviceSize)width * height * 4;
@@ -605,7 +898,13 @@ bool VkHwEnsureSurface(unsigned width, unsigned height)
 
 bool VkHwContextReset()
 {
-	if (!g_hw_active || !g_vk_ready) return false;
+	if (!g_hw_active) return false;
+	if (!VkHwEnsureDevice())
+	{
+		VkHwLog("nao foi possivel criar o dispositivo Vulkan - hw-render desativado nesta sessao");
+		g_hw_active = false;
+		return false;
+	}
 	if (g_hw_cb.context_reset)
 	{
 		// Some cores (e.g. Flycast) call context_reset() assuming a device
@@ -618,14 +917,14 @@ bool VkHwContextReset()
 		// The caller (CoreLoadGame) must treat a false return as a failed load -
 		// letting retro_run() keep pumping a core that half-crashed mid-init just
 		// moves the same fault a few frames later.
-		__try
+		VK_TRY
 		{
 			g_hw_cb.context_reset();
 			g_context_live = true;
 			VkHwLog("context_reset entregue ao core");
 			return true;
 		}
-		__except (EXCEPTION_EXECUTE_HANDLER)
+		VK_EXCEPT_ALL
 		{
 			VkHwLog("context_reset do core lancou excecao - core provavelmente precisa de negociacao de contexto Vulkan (nao implementada); desativando hw-render Vulkan para esta sessao");
 			// Full teardown, not just clearing the ready flags: leaving
@@ -650,8 +949,8 @@ void VkHwContextDestroy()
 
 	if (g_context_live && g_hw_cb.context_destroy)
 	{
-		__try { g_hw_cb.context_destroy(); }
-		__except (EXCEPTION_EXECUTE_HANDLER)
+		VK_TRY { g_hw_cb.context_destroy(); }
+		VK_EXCEPT_ALL
 		{
 			VkHwLog("excecao dentro do context_destroy do core - ignorada");
 		}
@@ -671,7 +970,7 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	if (!g_pending_image_valid) return false;
 	if (!VkHwEnsureSurface(width, height)) return false;
 
-	EnterCriticalSection(&g_queue_lock);
+	g_queue_lock.lock();
 
 	vkResetCommandBuffer_(g_cmd_buf, 0);
 	VkCommandBufferBeginInfo begin_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
@@ -764,7 +1063,7 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 
 	if (submit_result != VK_SUCCESS)
 	{
-		LeaveCriticalSection(&g_queue_lock);
+		g_queue_lock.unlock();
 		VkHwLog("vkQueueSubmit falhou (%d)", (int)submit_result);
 		return false;
 	}
@@ -775,7 +1074,7 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	// glReadPixels call already makes.
 	vkWaitForFences_(g_device, 1, &g_fence, VK_TRUE, UINT64_MAX);
 
-	LeaveCriticalSection(&g_queue_lock);
+	g_queue_lock.unlock();
 
 	void* mapped = NULL;
 	if (vkMapMemory_(g_device, g_staging_mem, 0, (VkDeviceSize)width * height * 4, 0, &mapped) != VK_SUCCESS || !mapped)
