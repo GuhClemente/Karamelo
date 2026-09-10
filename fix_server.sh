@@ -29,7 +29,47 @@ chmod -R 755 "$SRC" 2>/dev/null || true
 ls -1 "$SRC"
 
 echo ""
-echo "=== 2. Procurando o container do site ($DOMAIN) ==="
+echo "=== 2. Removendo pacotes de versoes anteriores ==="
+# Cada release deixava o zip da anterior para tras, e o disco acumulava 300 MB
+# por versao publicada. O que fica e so o pacote que o version.json anuncia -
+# ninguem baixa uma versao antiga de proposito, e o auto-update nunca pede.
+#
+# A versao corrente vem do proprio version.json que acabou de subir, e nao de
+# um parametro: se o manifesto e o zip discordarem, o site esta quebrado de
+# qualquer jeito e apagar seria a menor das preocupacoes.
+#
+# Isto roda ANTES do restart de proposito. O Next.js standalone monta a lista
+# de arquivos de public/ no boot, entao arquivo apagado com o app no ar passa a
+# responder 500 ate alguem reiniciar. Apagando antes, o mesmo restart que
+# publica o novo pacote ja esquece o antigo.
+ATUAL=""
+if [ -f "$SRC/version.json" ]; then
+    ATUAL=$(grep -o '"zip_url"[^,]*' "$SRC/version.json" | sed 's|.*/||; s|"||g')
+fi
+
+if [ -z "$ATUAL" ] || [ ! -f "$SRC/$ATUAL" ]; then
+    echo "  [AVISO] nao consegui identificar o pacote atual pelo version.json."
+    echo "  Nada foi apagado - conferir a mao e melhor que apagar por engano."
+else
+    echo "  mantendo: $ATUAL"
+    apagados=0
+    for z in "$SRC"/Karamelo_v*_Win64.zip; do
+        [ -f "$z" ] || continue
+        base=$(basename "$z")
+        [ "$base" = "$ATUAL" ] && continue
+        tam=$(du -h "$z" | cut -f1)
+        if rm -f "$z"; then
+            echo "  apagado:  $base ($tam)"
+            apagados=$((apagados + 1))
+        else
+            echo "  [ERRO] nao consegui apagar $base"
+        fi
+    done
+    [ "$apagados" = "0" ] && echo "  nenhuma versao antiga para apagar."
+fi
+
+echo ""
+echo "=== 3. Procurando o container do site ($DOMAIN) ==="
 APPS=""
 for c in $(docker ps -q); do
     name=$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')
@@ -51,7 +91,7 @@ if [ -z "$APPS" ]; then
 fi
 
 echo ""
-echo "=== 3. Reiniciando o app para o Next.js reler public/ ==="
+echo "=== 4. Reiniciando o app para o Next.js reler public/ ==="
 for c in $APPS; do
     name=$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')
     if docker restart "$c" >/dev/null 2>&1; then
@@ -63,7 +103,7 @@ for c in $APPS; do
 done
 
 echo ""
-echo "=== 4. Aguardando o app voltar ==="
+echo "=== 5. Aguardando o app voltar ==="
 up=0
 for i in $(seq 1 20); do
     if curl -sf -o /dev/null --max-time 5 "https://$DOMAIN/downloads/version.json"; then
@@ -76,7 +116,7 @@ done
 [ "$up" = "1" ] || echo "  [AVISO] o app nao respondeu a tempo; conferindo mesmo assim."
 
 echo ""
-echo "=== 5. Conferindo o que o site esta servindo ==="
+echo "=== 6. Conferindo o que o site esta servindo ==="
 fail=0
 for f in "$SRC"/*; do
     [ -f "$f" ] || continue
