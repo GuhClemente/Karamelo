@@ -235,6 +235,33 @@ static bool SystemNeedsKeyboardBridge(const std::string& system_dir)
 	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
 	return s == "msx" || s == "c64" || s == "zxspectrum" || s == "dos" || s == "amiga";
 }
+
+// Same family of bug as the keyboard bridge above, different pair of
+// controls: on a real N64/PSX/PS2/Saturn/Dreamcast/GameCube/PSP/3DS pad the
+// D-Pad and the analog stick are independent controls that many games bind
+// to different actions (PSP: D-Pad often cycles weapons/items while the
+// stick walks; N64: D-Pad is a separate item/camera control from the stick).
+// Below, both the physical-gamepad stick and the default keyboard layout
+// deliberately also drive the D-Pad so a stick-only 3D game stays playable
+// from a keyboard or a pad with a mushy D-Pad. Left unscoped, that mirroring
+// fires the D-Pad's OWN action every single step - confirmed against PSP:
+// walking with the analog stick also punched out whatever the game's D-Pad
+// is bound to, i.e. one push producing two unrelated actions. Systems whose
+// only real control IS the D-Pad (NES, SNES, Genesis, arcade, ...) still get
+// the full mirroring - there is nothing for it to collide with there.
+static bool SystemHasIndependentAnalogStick(const std::string& core_dll_path)
+{
+	std::string s = core_dll_path;
+	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+	return s.find("n64") != std::string::npos ||
+	       s.find("psx") != std::string::npos ||
+	       s.find("ps2") != std::string::npos ||
+	       s.find("saturn") != std::string::npos ||
+	       s.find("dreamcast") != std::string::npos ||
+	       s.find("gamecube") != std::string::npos ||
+	       s.find("psp") != std::string::npos ||
+	       s.find("3ds") != std::string::npos;
+}
 // The folder the loaded ROM came from, so the menu can reopen that same list.
 static std::string loaded_rom_dir = "";
 static std::string loaded_core_name = "";
@@ -2363,6 +2390,10 @@ static void CB_InputPoll(void)
 	// Analog deadzone, read once rather than per pad.
 	const int deadzone_thresh = (MenuGetDeadzone() * 32768) / 100;
 
+	// See SystemHasIndependentAnalogStick: on these systems the D-Pad and the
+	// stick are separate controls, so the stick must NOT also punch the D-Pad.
+	const bool indep_analog = SystemHasIndependentAnalogStick(s_loaded_core_path);
+
 	// 1. Direct JIT Hardware Polling via SDL_Gamepad (dev-sdl3: was XInput)
 	for (DWORD pad = 0; pad < 4; pad++)
 	{
@@ -2402,8 +2433,11 @@ static void CB_InputPoll(void)
 		if (abs(state.Gamepad.sThumbLX) > deadzone_thresh)
 		{
 			analog_sticks[pad][0][0] = state.Gamepad.sThumbLX;
-			if (state.Gamepad.sThumbLX > deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_RIGHT] = 1;
-			else if (state.Gamepad.sThumbLX < -deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_LEFT] = 1;
+			if (!indep_analog)
+			{
+				if (state.Gamepad.sThumbLX > deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_RIGHT] = 1;
+				else if (state.Gamepad.sThumbLX < -deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_LEFT] = 1;
+			}
 		}
 		if (abs(state.Gamepad.sThumbLY) > deadzone_thresh)
 		{
@@ -2411,8 +2445,11 @@ static void CB_InputPoll(void)
 			// stick held fully down would read as fully up for that sample.
 			analog_sticks[pad][0][1] = (state.Gamepad.sThumbLY == -32768)
 				? 32767 : (int16_t)(-state.Gamepad.sThumbLY);
-			if (state.Gamepad.sThumbLY > deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_UP] = 1;
-			else if (state.Gamepad.sThumbLY < -deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_DOWN] = 1;
+			if (!indep_analog)
+			{
+				if (state.Gamepad.sThumbLY > deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_UP] = 1;
+				else if (state.Gamepad.sThumbLY < -deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_DOWN] = 1;
+			}
 		}
 		if (abs(state.Gamepad.sThumbRX) > deadzone_thresh) analog_sticks[pad][1][0] = state.Gamepad.sThumbRX;
 		if (abs(state.Gamepad.sThumbRY) > deadzone_thresh)
@@ -2443,6 +2480,20 @@ static void CB_InputPoll(void)
 		}
 		else
 		{
+			// Same collision as the gamepad stick above (see
+			// SystemHasIndependentAnalogStick), reached from the keyboard side:
+			// the default layout puts BIND_UP/DOWN/LEFT/RIGHT on the same arrow
+			// keys as BIND_LSTICK_UP/DOWN/LEFT/RIGHT (input_map.cpp), on purpose,
+			// so a keyboard can still walk in a stick-only game. On a system
+			// where the D-Pad is its own control, firing it from that same key
+			// also does whatever the game binds the D-Pad to on every step.
+			// Only suppressed while the keys still actually coincide - rebinding
+			// either one apart (Settings > Controller) restores independent
+			// D-Pad control from the keyboard.
+			if (indep_analog && bind >= BIND_UP && bind <= BIND_RIGHT &&
+			    vk == InputBindGetKey(BIND_LSTICK_UP + (bind - BIND_UP)))
+				continue;
+
 			int rid = InputBindRetroId(bind);
 			if (rid >= 0 && rid < 16) joypad_buttons[0][rid] = 1;
 		}
