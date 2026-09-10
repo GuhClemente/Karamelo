@@ -1540,10 +1540,28 @@ void PopulateRetroAchievements() {
   current_title = "RetroAchievements";
   OsdSetSize(9);
 
+  // Esta tela e somente leitura, e o arquivo e o unico editor que existe. Ela
+  // dizia onde ele fica so quando a integracao estava DESATIVADA - quem ja
+  // tinha logado uma vez e depois quis trocar de conta nao tinha por onde
+  // comecar. O aviso passou a valer nos dois estados.
+  //
+  // A linha do token nao e detalhe: com token preenchido o login usa o token e
+  // ignora a senha (RaInit, em retroachievements.cpp). Trocar a senha no
+  // arquivo sem esvaziar o token nao muda absolutamente nada, e o sintoma e o
+  // app seguir entrando na conta antiga sem explicar por que.
+  //
+  // Os rotulos param em 22 caracteres porque e o que a linha do OSD comporta;
+  // o "Config/retroachievements" que estava aqui chegava cortado na tela.
+  auto PushLoginHint = [&]() {
+    items.push_back({"Editar em Config/", "", false, false, 0});
+    items.push_back({"retroachievements.cfg", "", false, false, 0});
+    items.push_back({"Trocar conta: apague", "", false, false, 0});
+    items.push_back({"a linha token=", "", false, false, 0});
+  };
+
   if (!RaIsEnabled()) {
     items.push_back({"Estado", "Desativado", false, false, 0});
-    items.push_back({"Config/retroachievements", ".cfg", false, false, 0});
-    items.push_back({"username e password", "", false, false, 0});
+    PushLoginHint();
   } else {
     items.push_back(
         {"Usuario", RaIsLoggedIn() ? RaGetUserName() : "-", false, false, 0});
@@ -1559,6 +1577,9 @@ void PopulateRetroAchievements() {
 
     if (RaHasPendingUnlocks())
       items.push_back({"Pendentes", "sem conexao", false, false, 0});
+
+    items.push_back({" ", "", false, false, 0});
+    PushLoginHint();
   }
 
   // The status line carries the real detail - why a login failed, or why a
