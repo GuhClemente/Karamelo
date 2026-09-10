@@ -87,13 +87,16 @@ Três observações:
   Contém `parallel-rdp` internamente, o que sugere relação com o Gopher64 (que
   também usa Parallel-RDP) ou com o ParaLLEl, mas isso é inferência. É também
   o único dos quatro cores de N64 que não exporta memória, e por isso não
-  rende conquistas no RetroAchievements. Na prática ele só é usado quando
-  `n64_gopher.dll` não existe em disco - `GetN64CoreDll()` sempre prefere o
-  Gopher64 primeiro (é o padrão do menu "N64 Core").
-- `n64_gopher.dll` (Gopher64) é o core de N64 padrão do app - único dos
-  quatro com suporte a RetroAchievements de verdade, integrado em `49cf96e`.
+  rende conquistas no RetroAchievements. Na prática ele só é usado como último
+  recurso, quando nenhum dos outros três existe em disco.
+- O core padrão de N64 é o `n64_parallel.dll` (ParaLLEl N64), tanto na opção 0
+  do menu "N64 Core" quanto no fallback de `GetN64CoreDll()`.
+- `n64_gopher.dll` (Gopher64) é o terceiro selecionável e o único dos quatro
+  com suporte real a RetroAchievements, integrado em `49cf96e`. Deixou de ser o
+  padrão por estabilidade: tem um bug conhecido de corrupção de memória ao
+  encerrar a sessão.
 - `coleco.dll` é um core libretro válido e aceita `col|cv|bin|rom`, mas não
-  declara um nome que eu conseguisse identificar com segurança.
+  declara um nome que permita identificar o motor com segurança.
 
 ## Ports & Recomp
 
@@ -102,9 +105,8 @@ estaticamente para rodar como executável nativo do Windows (tecnologia
 [N64Recomp](https://github.com/N64Recomp/N64Recomp) e variações da mesma
 técnica para outras plataformas), baixados sob demanda da API de Releases do
 GitHub direto do projeto de cada um - nada disso vem empacotado dentro do
-instalador do Karamelo. Cada linha foi baixada, extraída e aberta de
-verdade nesta sessão para confirmar que o link ainda é válido e que o
-executável certo é identificado (o app prefere o maior/mais raso `.exe` do
+instalador do Karamelo. Cada linha da tabela foi baixada, extraída e aberta
+para confirmar que o link é válido e que o executável certo é identificado (o app prefere o maior/mais raso `.exe` do
 pacote, evitando instaladores, ferramentas de build e outros arquivos que às
 vezes vêm junto).
 
@@ -180,21 +182,21 @@ Essas duas estão em `third_party/` com o fonte junto.
 
 ## ⚠ Licenças dos cores: pendência antes de distribuir
 
-**Esta lista identifica os cores, mas não resolve a questão de licenciamento** —
-e ela ficou maior, porque o projeto passou de 22 para 41 motores.
+**Esta lista identifica os cores, mas não resolve a questão de licenciamento.**
 
-As licenças diferem entre si. Vários são GPL, o que exige disponibilizar o
-código-fonte correspondente a quem recebe o binário. E alguns têm,
-historicamente, cláusulas restringindo uso comercial — Genesis Plus GX,
+As licenças diferem entre si. Vários cores são GPL, o que obriga quem
+distribui o binário a disponibilizar o código-fonte correspondente. E alguns
+têm, historicamente, cláusulas restringindo uso comercial — Genesis Plus GX,
 FinalBurn Neo e as builds antigas de MAME entre eles.
 
-Não confirmei licença nenhuma aqui, e não vou chutar: errar isso é pior do que
-não escrever nada. **Antes de publicar o projeto com as DLLs incluídas**, cada
-core precisa ser conferido no repositório de origem.
+Nenhuma dessas licenças foi conferida arquivo a arquivo. Enquanto essa
+verificação não for feita no repositório de origem de cada core, o pacote que
+inclui as DLLs carrega uma obrigação de origem desconhecida — e chutar aqui
+seria pior do que registrar a pendência.
 
-A saída mais simples, e a que boa parte dos frontends adota, é **não incluir as
-DLLs** no pacote e deixar o usuário baixá-las por conta própria. Isso remove a
-obrigação de redistribuição de uma vez.
+A saída que boa parte dos frontends adota é **não incluir as DLLs** no pacote,
+deixando o download por conta do usuário. Isso elimina a obrigação de
+redistribuição de uma vez, ao custo de um passo a mais na primeira execução.
 
-Isso é separado, e menos grave, do que a questão dos arquivos de BIOS — que já
-estão cobertos pelo `.gitignore` e não devem entrar em nenhum pacote.
+Questão separada, e mais simples: os arquivos de **BIOS** já estão cobertos
+pelo `.gitignore` e não entram em pacote nenhum.

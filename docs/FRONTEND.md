@@ -15,8 +15,8 @@ nosso projeto não tem FPGA nem Linux ARM — é um app Windows em C++ que roda
 núcleos libretro via SDL3. Ou seja: a base de hardware é completamente
 diferente, então "baseado em" aqui quase sempre quer dizer "a mesma ideia,
 reescrita pra outra arquitetura". Duas exceções (`osd.cpp`/`osd.h` e
-`charrom.cpp`/`charrom.h`) eram porte literal até este documento ser
-atualizado; hoje são reescritas clean-room - ver a seção correspondente
+`charrom.cpp`/`charrom.h`) eram porte literal até a revisão que originou este
+documento; passaram a ser reescritas clean-room - ver a seção correspondente
 abaixo para o porquê e o que exatamente mudou.
 
 ## Reescritos para remover porte literal (eram porte, não são mais)
@@ -112,7 +112,7 @@ comentário no próprio arquivo diz: *"Gamepad: Standard MiSTer / Nintendo
 RetroPad mapping on Xbox layout"* — ou seja, a escolha de qual botão físico
 faz o quê é uma decisão de design herdada, não o código que a implementa.
 
-## Investigado e descartado (achei parecido, não é)
+## Investigado e descartado (parecia relação, não é)
 
 Esses arquivos do MiSTer original pareciam candidatos óbvios por causa do
 nome ou do domínio, mas a comparação real não confirmou nenhuma relação:
@@ -133,7 +133,7 @@ nome ou do domínio, mas a comparação real não confirmou nenhuma relação:
 - **`karamelo_math.cpp`** (`SnapToStandardRate`, `ComputeViewport`) — parecia
   candidato pela função de "encaixar taxa de atualização na mais próxima
   padrão", que é um problema que o `video.cpp`/`scaler.cpp` do MiSTer
-  também resolve. Não achei nenhuma linha de código correspondente nos dois
+  também resolve. Não há nenhuma linha de código correspondente nos dois
   arquivos originais — é implementação nossa, com uma nota de depuração
   própria deste projeto (*"a virtual display adapter... made DWM report
   59.000Hz"*) que não existe no MiSTer. Mesma ideia de domínio (taxas de

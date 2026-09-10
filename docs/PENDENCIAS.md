@@ -1,8 +1,8 @@
 # Pendências
 
-Estado em 09/09/2026, fim de uma sessão longa. Cada item traz **a evidência que
-sustenta o diagnóstico**, não só a conclusão — quem discordar pode refutar
-olhando a mesma coisa que eu olhei.
+Estado em 09/09/2026. Cada item traz **a evidência que sustenta o
+diagnóstico**, não só a conclusão, para que possa ser refutado a partir da
+mesma medição.
 
 O que já foi corrigido está no fim, curto, para ninguém refazer.
 
@@ -17,7 +17,8 @@ A bateria (`tools/stress_cores.ps1`) roda sem janela e não substitui estes:
 - **PSP e PlayStation 2** — abrir um jogo, sair, abrir de novo. Foi assim que o
   crash original apareceu, e é assim que se confirma que sumiu.
 - **Nintendo 3DS** — o único que a bateria não consegue avaliar: o Citra não
-  cria renderizador sem janela. As chaves foram corrigidas hoje (ver no fim).
+  cria renderizador sem janela. As chaves foram corrigidas em 09/09/2026 (ver
+  no fim).
 - **MSX com controle** — a ponte controle→teclado foi restringida a MSX, C64,
   ZX Spectrum, DOS e Amiga. O arcade voltou ao normal; falta confirmar o outro
   lado, que o controle ainda digita no MSX.
@@ -26,8 +27,8 @@ A bateria (`tools/stress_cores.ps1`) roda sem janela e não substitui estes:
 ### ROMs de 6 sistemas
 
 Atari 5200, Atari Lynx, WonderSwan, Neo Geo Pocket, PC-FX e 3DO seguem sem
-cobertura da bateria. **Quatro deles ganharam BIOS válida hoje** e nunca foram
-exercitados.
+cobertura da bateria. **Quatro deles ganharam BIOS válida em 09/09/2026** e
+nunca foram exercitados.
 
 Procurei no `D:\` por nome de pasta, por extensão (`.a52`, `.lnx`, `.ws`,
 `.ngp`) até quatro níveis, e dentro das coleções soltas: não estão nessa
@@ -52,7 +53,7 @@ sempre. É comportamento documentado da API, não uso errado.
 
 As threads de áudio e do teardown do D3D11 passaram a ser **abandonadas** em vez
 de mortas, e o mesmo princípio provavelmente vale aqui. **Mas não é verificável
-hoje:** nenhum core chega mais nesse timeout, então a bateria não exercita o
+no estado atual:** nenhum core chega mais nesse timeout, então a bateria não exercita o
 caminho, e uma thread de core abandonada seguiria chamando os callbacks do
 frontend enquanto o próximo core carrega — pior que o congelamento. Trocar uma
 falha conhecida por uma não medida não é melhoria.
@@ -89,7 +90,7 @@ público. Decisão do dono, registrada aqui para não parecer resolvido.
 
 ---
 
-## Corrigido nesta sessão — não refazer
+## Corrigido em 09/09/2026 — não refazer
 
 Todos com bateria verde depois: 28 sistemas, 3 ciclos de carrega/desliga/
 recarrega, zero crash e zero trava.
@@ -120,10 +121,10 @@ Ferramentas que sobraram do caminho:
 
 ### Uma lição que vale mais que os consertos
 
-Em três dos quatro sistemas quebrados, **minha primeira hipótese estava
-errada** — culpei `TerminateThread` no que era spin, `retro_unload_game` no que
-era outra coisa, e DLL mapeada no que não explicava o PS2. O que resolveu foi
-medir: CPU por amostragem para separar trava de laço, log por etapa para achar
+Em três dos quatro sistemas quebrados, **a primeira hipótese estava errada** —
+`TerminateThread` foi culpado pelo que era spin, `retro_unload_game` pelo que
+era outra coisa, e a DLL mapeada pelo que não explicava o PS2. O que resolveu
+foi medir: CPU por amostragem para separar trava de laço, log por etapa para achar
 qual das quatro chamadas prendia, contagem de disparos para descobrir que o
 watchdog era 100% e não ocasional.
 

@@ -66,7 +66,7 @@ Três motivos, e vale registrar os três:
    devolver, mas o Windows só percebe isso depois, numa operação seguinte. Então
    o erro aparecia num lugar que não tinha nada a ver.
 2. **Parecia problema de placa de vídeo.** Como a RDRAM é entregue para a parte
-   gráfica, todo mundo (inclusive eu) olhou para lá primeiro.
+   gráfica, a investigação começou por lá.
 3. **O compilador estava apagando as pistas.** Uma otimização chamada LTO junta
    várias partes do código numa só e apaga as fronteiras entre as funções — o
    depurador não conseguia dizer onde a pancada estava. Desligar isso nas
@@ -105,9 +105,9 @@ aplicativo ser um `.exe` único, sem depender de DLLs do Windows instaladas — 
 certa e não precisa ser revista por causa disso.
 
 A primeira hipótese, mesmo não sendo a causa, apontou um **bug de verdade** que
-foi corrigido junto (commit `0f09904`): a gente liberava o buffer da ROM antes da
-hora, o que é proibido pela especificação do libretro. Nenhum core reclamava hoje,
-mas o próximo que guardasse o ponteiro em vez de copiar ia quebrar.
+foi corrigido junto (commit `0f09904`): o buffer da ROM era liberado antes da
+hora, o que a especificação do libretro proíbe. Nenhum core reclamava, mas o
+próximo que guardasse o ponteiro em vez de copiar iria quebrar.
 
 ---
 
