@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.3 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.4 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -110,13 +110,13 @@ Formato (exemplo real):
 {
     "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
     "exe_size": 4027392,
-    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.3_Win64.zip",
-    "version": "0.9.3",
+    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Win64.zip",
+    "version": "0.9.4",
     "release_date": "2026-09-09",
     "notes": "...",
     "exe_sha256": "268B286F...",
     "force_full_package": false,
-    "title": "Karamelo v0.9.3"
+    "title": "Karamelo v0.9.4"
 }
 ```
 
@@ -256,8 +256,169 @@ restart** — nunca escreva o nome fixo em script nenhum.
 
 - **Publicar número de versão escrito à mão na página.** Ficou desatualizado no
   primeiro release. Leia do `version.json`.
-- **Publicar 39 motores** porque foi copiado de outra página, quando a fonte
-  dizia outra coisa. Leia do `app_info.h`.
+- **Publicar 41 motores** porque foi copiado de outra página, quando a fonte
+  dizia outra coisa. Leia do `app_info.h`. Já esteve 39 e já esteve 41; nunca
+  esteve certo por cópia.
 - **Oferecer o `.exe` avulso** como download principal. Não funciona sozinho.
 - **Chamar de "port do MiSTer".** É falso e conflita com a licença.
 - **Chamar de "open source"** sem ressalva. A restrição comercial impede.
+
+---
+
+## 9. Auditoria do site em 09/09/2026 — o que está errado hoje
+
+Isto não é teoria: cada item abaixo foi lido na página publicada em
+`https://karamelo-emu.com` nesta data, incluindo o HTML gerado (metatags e
+JSON-LD), não só o texto visível. Ordem por gravidade.
+
+### 9.1 O domínio antigo ainda está no código da página
+
+`mister4all.com` aparece em, pelo menos:
+
+| onde | valor atual |
+|---|---|
+| `<link rel="canonical">` | `https://mister4all.com` |
+| `og:url` | `https://mister4all.com` |
+| `og:image` / `twitter:image` | `https://mister4all.com/og-banner.jpg` |
+| JSON-LD `WebSite.url` | `https://mister4all.com` |
+| JSON-LD `SoftwareApplication.url` | `https://mister4all.com` |
+
+Todos devem ser `https://karamelo-emu.com`.
+
+Este é o item mais grave da lista, e não é cosmético: um `canonical` apontando
+para outro domínio manda o Google indexar o domínio antigo e tratar o novo como
+cópia. Todo o SEO do site está sendo creditado a um endereço que o projeto não
+usa mais.
+
+### 9.2 A versão está escrita à mão no JSON-LD
+
+`SoftwareApplication.softwareVersion` diz `"0.9.3"`, e a metatag `keywords`
+traz `Karamelo Emu v0.9.3`. O botão de download já lê o `version.json` e mostra
+a versão certa — o JSON-LD não, e ficou uma versão atrás.
+
+Ou o JSON-LD passa a ser gerado a partir do mesmo `version.json`, ou tire o
+`softwareVersion` e o número das keywords. Versão escrita à mão sempre
+atrasa; foi o primeiro erro registrado na seção 8.
+
+### 9.3 O número de motores está errado em oito lugares
+
+O site publica **41**. O correto é **40** (ver seção 2 — `APP_CORE_ENGINES`).
+Lugares encontrados:
+
+1. Card do topo: "35 Sistemas — Consoles, arcades e portáteis (41 motores)"
+2. Comparativo: "35 sistemas nativos com 41 motores de emulação Libretro"
+3. `<meta name="description">`
+4. `og:description`
+5. `twitter:description`
+6. `keywords`: "41 motores Libretro" e "41 cores Libretro"
+7. JSON-LD `SoftwareApplication.description`
+8. FAQ "Todos os 35 sistemas funcionam?": "são 41 motores de emulação Libretro
+   distintos no total"
+
+Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
+emulador ausente" continua verdadeira e pode ficar.
+
+**Está certo e não deve mudar:** os **39** jogos de "Ports & Recomp". Esse
+número foi conferido contra o `CREDITS.md`. É coincidência infeliz que 39 já
+tenha sido, um dia, o número errado de motores — não confunda os dois.
+
+### 9.4 Motores creditados a quem não é
+
+| card / seção | está publicado | correto |
+|---|---|---|
+| Capcom CPS 1/2/3 Arcade | FinalBurn Neo | **MAME 0.289** |
+| Galeria, Arcade Classics | "MAME / FB Neo" | **MAME** |
+| Galeria, SNK Neo Geo | "Geolith / FinalBurn Neo" | **Geolith** (AES/MVS), **NeoCD** (CD) |
+| PlayStation 2 | Play! v0.77 | **LRPS2 (PCSX2)** é o padrão; Play! é o alternativo |
+| ColecoVision | Gearcoleco | **não publique nome de motor** — o core não se identifica |
+| Atari 5200 | a5200 | **Atari800** |
+| Game Boy & Color | "Gambatte / SameBoy" | **Gambatte** — SameBoy não é distribuído |
+| Galeria, NES | "Mesen / FCEUmm" | **Mesen** — FCEUmm não é distribuído |
+| Galeria, Master System | "Gearsystem / PicoDrive" | **Gearsystem** — PicoDrive é o core de 32X |
+| Nintendo 64 | ParaLLEl N64 / Mupen64Plus-Next / build genérico | falta o **Gopher64**, que é o terceiro selecionável |
+| Neo Geo Pocket | Mednafen NGP | **Beetle NeoPop** |
+| WonderSwan | Mednafen WonderSwan | **Beetle WonderSwan** |
+| PC-FX | Mednafen PC-FX | **Beetle PC-FX** |
+
+**O projeto não distribui FinalBurn Neo, em lugar nenhum.** O arquivo se chama
+`arcade_fbneo.dll` por herança, mas é uma build do MAME 0.289 — confirmado por
+três evidências independentes em [MOTORES.md](MOTORES.md). Toda menção a FBNeo
+no site precisa sair.
+
+### 9.5 Números de versão de core que ninguém verificou
+
+Os cards publicam coisas como "bsnes v115", "Mesen v0.9.9", "Stella v8.0",
+"Geolith v0.4.1", "melonDS v0.9.5", "PPSSPP v1.17", "Flycast v2.3",
+"Opera v1.0.0", "PUAE v5.3.0", "Play! v0.77".
+
+O [MOTORES.md](MOTORES.md) **não publica versão de core de propósito**: o único
+número que o projeto consegue provar é o que o próprio core declara ao carregar,
+e isso só foi levantado para o MAME. Publicar versão de core é assumir uma
+dívida de manutenção que ninguém vai pagar — na primeira atualização de core o
+site fica mentindo em vinte lugares.
+
+Recomendação: tire as versões, deixe só o nome do motor. Se quiser manter
+alguma, mantenha só as que puder conferir e assuma que vai ter que revisá-las
+a cada release.
+
+### 9.6 Promessas de plataforma
+
+O `<title>`, a `description`, as `keywords` e o JSON-LD descrevem o app como
+**multiplataforma**, com "Linux e macOS a caminho", e o `operatingSystem` do
+JSON-LD lista os três sistemas.
+
+Hoje existe **um** binário: Windows x64. A migração para SDL3 é real e torna
+Linux e macOS possíveis, mas possível não é disponível. O risco aqui não é
+técnico, é de confiança: quem chega pelo termo "emulador multiplataforma" e
+encontra só um .zip de Windows sente que foi enganado.
+
+Formulação segura, que diz a verdade sem perder o argumento:
+
+> Nativo para Windows x64. A base é SDL3, a mesma camada multiplataforma usada
+> por projetos como o RetroArch, o que abre caminho para Linux e macOS.
+
+O FAQ "Vai ter versão para Linux e macOS?" já está bem escrito e pode ficar
+como está — ele diz "hoje o build oficial é Windows", que é exatamente o tom
+certo. O problema é o título e as metatags venderem o que o FAQ desmente.
+
+### 9.7 GameCube — reverificar antes de publicar
+
+O card diz **"EM DESENVOLVIMENTO — ainda não roda"**, com a explicação do
+contexto OpenGL compartilhado entre threads.
+
+Na bateria automatizada de 09/09/2026 o GameCube **carrega, descarrega e
+recarrega três vezes sem falhar**. Isso não é o mesmo que jogar: a bateria não
+renderiza quadros nem abre janela, então ela não refuta o texto do card.
+
+**Não mude esse card com base neste parágrafo.** O que ele autoriza é uma
+reverificação com janela aberta. Enquanto ninguém abrir um jogo e confirmar, o
+texto pessimista é o correto — errar dizendo que não funciona é muito mais
+barato que errar dizendo que funciona.
+
+### 9.8 Menor
+
+**Os três cards de arcade** — "Capcom CPS 1/2/3", "MAME 2003", "MAME 2010" —
+são apresentados como sistemas separados. No aplicativo eles são **um** sistema
+("Arcade") com troca automática de core. Se alguém contar os cards para chegar
+ao número de sistemas, vai achar 37 e não 35. Conte pelo `app_info.h`.
+
+**O pack de wallpapers** (`/wallpapers/Karamelo_Wallpapers_4K_Pack.zip`) tem
+arte com **"SABOR MISTER" pintado na ilustração** — 16 wallpapers, mais duas
+imagens do app. A marca antiga não deve circular; a arte precisa ser refeita ou
+o pack repensado. É decisão do dono, registrada aqui para não parecer resolvido.
+
+**O aviso legal da seção 5 existe** no FAQ e no JSON-LD, e está correto. Garanta
+que ele também apareça **visível** na seção do comparativo com o MiSTer FPGA,
+que é a página onde a marca de terceiro mais aparece.
+
+### 9.9 O que está certo — não mexa
+
+- Os **39** jogos de Ports & Recomp, e o texto explicando que o app baixa só o
+  binário de código aberto de cada projeto.
+- A descrição da licença PolyForm Noncommercial, incluindo a ressalva de uso
+  comercial.
+- O FAQ sobre não distribuir ROM/BIOS, e o de "vocês reescreveram os cores?".
+- O botão de download lendo o `version.json`.
+- A ausência de qualquer link para o pack de BIOS.
+- O texto "recriados do zero em C++20" — é verdade, e é exatamente a distinção
+  que a seção 1 exige que o site preserve.
