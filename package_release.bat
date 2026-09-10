@@ -84,7 +84,12 @@ echo.
 echo [3/4] Copiando executavel unico, motores e recursos...
 copy /Y "app\%APP_EXE%" "%DIST_DIR%\Karamelo.exe" >nul
 copy /Y "app\cores\*.dll" "%DIST_DIR%\cores\" >nul 2>&1
-copy /Y "app\Wallpapers\*.*" "%DIST_DIR%\Wallpapers\" >nul 2>&1
+rem So o .raw entra no pacote. O app le exclusivamente .raw (ScanCustomWallpapers
+rem em src/menu.cpp aceita essa extensao e mais nenhuma), entao os .jpg de origem
+rem sao 86 MB que ninguem abre - tres vezes o peso dos cores mortos que sairam
+rem nesta mesma versao. Eles continuam versionados no repositorio, que e onde
+rem servem para alguma coisa: gerar o .raw de novo se a resolucao mudar.
+copy /Y "app\Wallpapers\*.raw" "%DIST_DIR%\Wallpapers\" >nul 2>&1
 
 rem Optional: compress the distributed exe with UPX (open source, MIT
 rem license - https://upx.github.io), only our own exe, never the third-
