@@ -961,6 +961,23 @@ void VkHwContextDestroy()
 	g_pending_image_valid = false;
 	g_pending_core_cmds.clear();
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
+
+	// Um dispositivo negociado (g_core_created_device) e da sessao deste core,
+	// nao do frontend - reaproveita-lo no proximo load (o que VkHwEnsureDevice
+	// faz por padrao, via g_vk_ready, para o caso comum do dispositivo generico
+	// que so o frontend possui) entrega ao PROXIMO context_reset um device/fila
+	// que ja passou pelo context_destroy deste core. Medido com PPSSPP e PCSX2
+	// sob Vulkan forcado (stress_cores.ps1 -Driver 2): a primeira carga do
+	// processo funciona (device negociado, renderiza, fecha limpo); a segunda
+	// carga do MESMO processo reusa o device velho - PPSSPP lanca excecao no
+	// context_reset seguinte (capturada, cai para o dispositivo padrao) e
+	// PCSX2 trava indefinidamente (sem excecao para capturar, provavelmente
+	// esperando um fence/semaphore de um device que ele mesmo ja considera
+	// morto). Forcar teardown completo aqui obriga a proxima carga a negociar
+	// de novo do zero - mesmo teardown que o branch de excecao do
+	// VkHwContextReset acima ja faz pelo mesmo motivo. O dispositivo generico
+	// (sem negociacao) continua sendo reaproveitado entre loads, sem mudanca.
+	if (g_core_created_device) VkHwShutdown();
 }
 
 bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)

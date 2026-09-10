@@ -4103,6 +4103,10 @@ static void CoreUnload()
 	HwContextDestroy();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] VkHwContextDestroy...");
 	VkHwContextDestroy();
+	// Belt and suspenders alongside the CoreLoad() clear before the next
+	// LoadLibrary: this DLL's negotiation interface has no business surviving
+	// its own unload, whether or not another game gets loaded afterward.
+	VkHwClearNegotiationInterface();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] D3D11HwContextDestroy...");
 	D3D11HwContextDestroy();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwReleaseCurrent...");
