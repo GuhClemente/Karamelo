@@ -515,3 +515,86 @@ Duas coisas que valem nota, se o site descrever essa entrada especificamente:
 
 Se a página não descrever entradas individuais (o caso comum), a única
 mudança necessária é a contagem da seção 9.3/9.9.
+
+---
+
+## 12. Filtro e ícone de SO em Ports & Recomp (11/09/2026)
+
+Pedido direto do dono do projeto: a lista de "Ports & Recomp" no site deve
+**filtrar por sistema operacional e mostrar um ícone de qual SO cada jogo
+suporta** — 🪟 para Windows, 🐧 para Linux. A fonte de verdade agora é a
+própria tabela em [CREDITS.md](../CREDITS.md), que ganhou uma coluna **SO**
+com exatamente esses dois ícones, verificada em 11/09/2026 contra a release
+mais recente de cada um dos 41 repositórios. Leia de lá — não estime, não
+copie a lista abaixo sem checá-la primeiro (ela existe aqui só pra você não
+se perder revisando, ver a ressalva no fim desta seção).
+
+### O que "SO" significa aqui
+
+**Não é sobre o motor recompilado em si — é sobre o que o Karamelo consegue
+baixar e abrir automaticamente.** Alguns desses projetos publicam mais
+plataformas do que as que contam aqui (ex.: o Valkyrie Profile também tem
+build de macOS, o Wave Race 64 também) — isso não vira ícone, porque **o
+Karamelo não roda em macOS**, então não existe um app Karamelo-para-Mac que
+pudesse baixar aquele arquivo. 🐧 só aparece quando existe um `.zip` com
+marcador explícito de Linux no nome da release (o app não arrisca baixar um
+zip sem marcação, para não entregar um binário Windows que não abre) **e**
+esse zip realmente contém um executável, não um pacote Flatpak (que não é
+algo que o app consiga abrir sozinho — `Banjo 64` e `Sonic Unleashed
+Recompiled` caem nesse caso: têm "linux" no nome do arquivo mas não contam).
+
+### ⚠️ Antes de publicar o ícone 🐧 em qualquer lugar do site
+
+A build Linux do Karamelo **ainda não é a versão publicada** em
+`karamelo-emu.com` — confira isso primeiro, direto na fonte, não assuma:
+
+```
+https://karamelo-emu.com/downloads/version.json
+```
+
+Se esse arquivo **não tiver** os campos `linux_bin_url`/`linux_tar_url`
+(formato descrito na seção 3), o Linux ainda não foi lançado publicamente e
+a coluna 🐧 não deve aparecer em lugar nenhum do site ainda — nem no ícone
+por jogo, nem prometendo "também disponível pra Linux". Assim que esse
+arquivo passar a ter os campos de Linux, a filtragem abaixo já pode entrar.
+
+### O que implementar, quando o Linux já estiver publicado
+
+1. **Filtro por SO.** Se a página tiver alguma forma de o visitante escolher
+   a plataforma (aba, toggle, ou detecção automática do SO de quem visita),
+   a lista de Ports & Recomp exibida deve mostrar só as entradas com o ícone
+   daquele SO — hoje isso é 41 no filtro Windows e 16 no filtro Linux.
+2. **Ícone por jogo.** Onde quer que a lista apareça (card, tabela, grid),
+   cada entrada mostra 🪟 e/ou 🐧 conforme a coluna SO do `CREDITS.md`. Se só
+   tiver 🪟, não precisa dizer nada extra — é o padrão da categoria.
+3. **Contagem.** Se o site publicar "N jogos suportam Linux" ou algo parecido,
+   o número vem de contar as linhas com 🐧 em `CREDITS.md` no momento da
+   publicação, nunca do número fixo "16" — essa tabela muda toda vez que um
+   projeto de terceiro adiciona ou remove uma plataforma.
+
+### Lista completa de 11/09/2026, para não se perder revisando
+
+Confira sempre contra o `CREDITS.md` antes de publicar — isto aqui é uma
+cópia de leitura rápida, não a fonte:
+
+**🪟🐧 (16, funcionam nos dois SOs):** Zelda 64: Recompiled (OoT/MM), Goemon
+64, Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT
+(Ship of Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox 64 (Starship),
+Star Fox (SNES, Enhanced), Mario Kart 64 (SpaghettiKart), Super Mario 64
+(Ghostship), Super Mario 64 Coop Deluxe, Infinite Mario 64, Super Mario Bros.
+Remastered, Valkyrie Profile.
+
+**🪟 apenas (25, só Windows):** Dr. Mario 64, Dinosaur Planet, Snowboard
+Kids 2, Pokemon Stadium, Banjo 64, Chameleon Twist, Quest 64, Perfect Dark,
+Animal Crossing (GameCube), Banjo-Kazooie: Nuts & Bolts, Dragon Ball Z
+Budokai, Jak & Daxter (OpenGOAL), LoD: Severed Chains, REDRIVER 2,
+Castlevania: Symphony of the Night, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
+Unleashed Recompiled, Space Station Silicon Valley, Super Mario World, Super
+Metroid, Viva Pinata: Trouble in Paradise, WipEout Phantom Edition, OutRun
+(CannonBall DX), Wave Race 64.
+
+Essa divisão 16/25 vai ficar desatualizada com o tempo — cada projeto de
+terceiro pode adicionar ou tirar uma plataforma a qualquer release deles, sem
+avisar o Karamelo. Reverifique contra `CREDITS.md` (que por sua vez precisa
+ser reverificado contra a API do GitHub periodicamente - não é uma tarefa
+única).

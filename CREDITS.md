@@ -101,7 +101,7 @@ Três observações:
 ## Ports & Recomp
 
 Diferente dos cores acima, esses não são emulados: são jogos "recompilados"
-estaticamente para rodar como executável nativo do Windows (tecnologia
+estaticamente para rodar como executável nativo (tecnologia
 [N64Recomp](https://github.com/N64Recomp/N64Recomp) e variações da mesma
 técnica para outras plataformas), baixados sob demanda da API de Releases do
 GitHub direto do projeto de cada um - nada disso vem empacotado dentro do
@@ -110,49 +110,68 @@ para confirmar que o link é válido e que o executável certo é identificado (
 pacote, evitando instaladores, ferramentas de build e outros arquivos que às
 vezes vêm junto).
 
-| Jogo | Repositório |
-|---|---|
-| Dr. Mario 64 | [theboy181/drmario64_recomp_plus](https://github.com/theboy181/drmario64_recomp_plus) |
-| Zelda 64: Recompiled (OoT/MM) | [Zelda64Recomp/Zelda64Recomp](https://github.com/Zelda64Recomp/Zelda64Recomp) |
-| Goemon 64 | [klorfmorf/Goemon64Recomp](https://github.com/klorfmorf/Goemon64Recomp) |
-| Dinosaur Planet | [DinosaurPlanetRecomp/dino-recomp](https://github.com/DinosaurPlanetRecomp/dino-recomp) |
-| Harvest Moon 64 | [HarvestMoon64Recomp/HarvestMoon64Recomp](https://github.com/HarvestMoon64Recomp/HarvestMoon64Recomp) |
-| Snowboard Kids 2 | [cdlewis/snowboardkids2-recomp](https://github.com/cdlewis/snowboardkids2-recomp) |
-| Pokemon Stadium | [mstan/PokemonStadiumRecomp](https://github.com/mstan/PokemonStadiumRecomp) |
-| Banjo 64 | [BanjoRecomp/BanjoRecomp](https://github.com/BanjoRecomp/BanjoRecomp) |
-| Bomberman 64 | [RevoSucks/BM64Recomp](https://github.com/RevoSucks/BM64Recomp) |
-| Chameleon Twist | [Rainchus/ChameleonTwist1-JP-Recomp](https://github.com/Rainchus/ChameleonTwist1-JP-Recomp) |
-| Mega Man 64 | [MegaMan64Recomp/MegaMan64Recompiled](https://github.com/MegaMan64Recomp/MegaMan64Recompiled) |
-| Quest 64 | [Rainchus/Quest64-Recomp](https://github.com/Rainchus/Quest64-Recomp) |
-| Bomberman Hero | [RevoSucks/BMHeroRecomp](https://github.com/RevoSucks/BMHeroRecomp) |
-| Zelda OoT (Ship of Harkinian) | [harbourmasters/shipwright](https://github.com/harbourmasters/shipwright) |
-| Zelda MM (2 Ship 2 Harkinian) | [harbourmasters/2ship2harkinian](https://github.com/harbourmasters/2ship2harkinian) |
-| Star Fox 64 (Starship) | [harbourmasters/starship](https://github.com/harbourmasters/starship) |
-| Star Fox (SNES, Enhanced) | [kandowontu/starfox-enhanced](https://github.com/kandowontu/starfox-enhanced) |
-| Mario Kart 64 (SpaghettiKart) | [harbourmasters/spaghettikart](https://github.com/harbourmasters/spaghettikart) |
-| Super Mario 64 (Ghostship) | [harbourmasters/ghostship](https://github.com/harbourmasters/ghostship) |
-| Perfect Dark | [perfect-dark-pc-port/perfect_dark](https://github.com/perfect-dark-pc-port/perfect_dark) |
-| Super Mario 64 Coop Deluxe | [coop-deluxe/sm64coopdx](https://github.com/coop-deluxe/sm64coopdx) |
-| Animal Crossing (GameCube) | [flyngmt/ACGC-PC-Port](https://github.com/flyngmt/ACGC-PC-Port) |
-| Banjo-Kazooie: Nuts & Bolts | [masterspike52/reNut](https://github.com/masterspike52/reNut) |
-| Dragon Ball Z Budokai | [WistfulHopes/DBZ1](https://github.com/WistfulHopes/DBZ1) |
-| Infinite Mario 64 | [Brawmario/infinite-mario-64-ever](https://github.com/Brawmario/infinite-mario-64-ever) |
-| Jak & Daxter (OpenGOAL) | [open-goal/jak-project](https://github.com/open-goal/jak-project) |
-| LoD: Severed Chains | [Legend-of-Dragoon-Modding/Severed-Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) |
-| REDRIVER 2 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
-| Castlevania: Symphony of the Night | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
-| Sonic 1 Forever | [ElspethThePict/S1Forever](https://github.com/ElspethThePict/S1Forever) |
-| Sonic 3 A.I.R. | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
-| Sonic Unleashed Recompiled | [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) |
-| Space Station Silicon Valley | [Cellenseres/SSSV_Recomp](https://github.com/Cellenseres/SSSV_Recomp) |
-| Super Mario Bros. Remastered | [JHDev2006/Super-Mario-Bros.-Remastered-Public](https://github.com/JHDev2006/Super-Mario-Bros.-Remastered-Public) |
-| Super Mario World | [mstan/SuperMarioWorldRecomp](https://github.com/mstan/SuperMarioWorldRecomp) |
-| Super Metroid | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
-| Viva Pinata: Trouble in Paradise | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
-| WipEout Phantom Edition | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
-| OutRun (CannonBall DX) | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
-| Valkyrie Profile | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
-| Wave Race 64 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
+A coluna **SO** diz em qual build do Karamelo (Windows ou Linux) aquele
+jogo pode ser baixado - **todos** têm 🪟, só alguns também têm 🐧. Verificado
+em 11/09/2026 contra a release mais recente de cada repositório: 🐧 exige um
+`.zip` com um marcador explícito de Linux no nome (o app não arrisca um zip
+sem marcação - ver `IsLinuxAssetName` em `port_runner.cpp`); Flatpak
+empacotado dentro de um `.zip` não conta, porque não é um executável que o
+app consiga abrir sozinho. Isso é sobre o **jogo**, não sobre o Karamelo em
+si - a build Linux do Karamelo ainda não é a versão publicada no site (ver
+seção 12 do `SITE_SYNC.md`).
+
+| Jogo | SO | Repositório |
+|---|---|---|
+| Dr. Mario 64 | 🪟 | [theboy181/drmario64_recomp_plus](https://github.com/theboy181/drmario64_recomp_plus) |
+| Zelda 64: Recompiled (OoT/MM) | 🪟🐧 | [Zelda64Recomp/Zelda64Recomp](https://github.com/Zelda64Recomp/Zelda64Recomp) |
+| Goemon 64 | 🪟🐧 | [klorfmorf/Goemon64Recomp](https://github.com/klorfmorf/Goemon64Recomp) |
+| Dinosaur Planet | 🪟 | [DinosaurPlanetRecomp/dino-recomp](https://github.com/DinosaurPlanetRecomp/dino-recomp) |
+| Harvest Moon 64 | 🪟🐧 | [HarvestMoon64Recomp/HarvestMoon64Recomp](https://github.com/HarvestMoon64Recomp/HarvestMoon64Recomp) |
+| Snowboard Kids 2 | 🪟 | [cdlewis/snowboardkids2-recomp](https://github.com/cdlewis/snowboardkids2-recomp) |
+| Pokemon Stadium | 🪟 | [mstan/PokemonStadiumRecomp](https://github.com/mstan/PokemonStadiumRecomp) |
+| Banjo 64 | 🪟 | [BanjoRecomp/BanjoRecomp](https://github.com/BanjoRecomp/BanjoRecomp) |
+| Bomberman 64 | 🪟🐧 | [RevoSucks/BM64Recomp](https://github.com/RevoSucks/BM64Recomp) |
+| Chameleon Twist | 🪟 | [Rainchus/ChameleonTwist1-JP-Recomp](https://github.com/Rainchus/ChameleonTwist1-JP-Recomp) |
+| Mega Man 64 | 🪟🐧 | [MegaMan64Recomp/MegaMan64Recompiled](https://github.com/MegaMan64Recomp/MegaMan64Recompiled) |
+| Quest 64 | 🪟 | [Rainchus/Quest64-Recomp](https://github.com/Rainchus/Quest64-Recomp) |
+| Bomberman Hero | 🪟🐧 | [RevoSucks/BMHeroRecomp](https://github.com/RevoSucks/BMHeroRecomp) |
+| Zelda OoT (Ship of Harkinian) | 🪟🐧 | [harbourmasters/shipwright](https://github.com/harbourmasters/shipwright) |
+| Zelda MM (2 Ship 2 Harkinian) | 🪟🐧 | [harbourmasters/2ship2harkinian](https://github.com/harbourmasters/2ship2harkinian) |
+| Star Fox 64 (Starship) | 🪟🐧 | [harbourmasters/starship](https://github.com/harbourmasters/starship) |
+| Star Fox (SNES, Enhanced) | 🪟🐧 | [kandowontu/starfox-enhanced](https://github.com/kandowontu/starfox-enhanced) |
+| Mario Kart 64 (SpaghettiKart) | 🪟🐧 | [harbourmasters/spaghettikart](https://github.com/harbourmasters/spaghettikart) |
+| Super Mario 64 (Ghostship) | 🪟🐧 | [harbourmasters/ghostship](https://github.com/harbourmasters/ghostship) |
+| Perfect Dark | 🪟 | [perfect-dark-pc-port/perfect_dark](https://github.com/perfect-dark-pc-port/perfect_dark) |
+| Super Mario 64 Coop Deluxe | 🪟🐧 | [coop-deluxe/sm64coopdx](https://github.com/coop-deluxe/sm64coopdx) |
+| Animal Crossing (GameCube) | 🪟 | [flyngmt/ACGC-PC-Port](https://github.com/flyngmt/ACGC-PC-Port) |
+| Banjo-Kazooie: Nuts & Bolts | 🪟 | [masterspike52/reNut](https://github.com/masterspike52/reNut) |
+| Dragon Ball Z Budokai | 🪟 | [WistfulHopes/DBZ1](https://github.com/WistfulHopes/DBZ1) |
+| Infinite Mario 64 | 🪟🐧 | [Brawmario/infinite-mario-64-ever](https://github.com/Brawmario/infinite-mario-64-ever) |
+| Jak & Daxter (OpenGOAL) | 🪟 | [open-goal/jak-project](https://github.com/open-goal/jak-project) |
+| LoD: Severed Chains | 🪟 | [Legend-of-Dragoon-Modding/Severed-Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) |
+| REDRIVER 2 | 🪟 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
+| Castlevania: Symphony of the Night | 🪟 | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
+| Sonic 1 Forever | 🪟 | [ElspethThePict/S1Forever](https://github.com/ElspethThePict/S1Forever) |
+| Sonic 3 A.I.R. | 🪟 | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
+| Sonic Unleashed Recompiled | 🪟 | [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) |
+| Space Station Silicon Valley | 🪟 | [Cellenseres/SSSV_Recomp](https://github.com/Cellenseres/SSSV_Recomp) |
+| Super Mario Bros. Remastered | 🪟🐧 | [JHDev2006/Super-Mario-Bros.-Remastered-Public](https://github.com/JHDev2006/Super-Mario-Bros.-Remastered-Public) |
+| Super Mario World | 🪟 | [mstan/SuperMarioWorldRecomp](https://github.com/mstan/SuperMarioWorldRecomp) |
+| Super Metroid | 🪟 | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
+| Viva Pinata: Trouble in Paradise | 🪟 | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
+| WipEout Phantom Edition | 🪟 | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
+| OutRun (CannonBall DX) | 🪟 | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
+| Valkyrie Profile | 🪟🐧 | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
+| Wave Race 64 | 🪟 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
+
+**16 de 41 também têm build Linux** hoje: Zelda 64 Recompiled, Goemon 64,
+Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Ship of
+Harkinian, 2 Ship 2 Harkinian, Starship, Star Fox Enhanced, SpaghettiKart,
+Ghostship, Super Mario 64 Coop Deluxe, Infinite Mario 64, Super Mario Bros.
+Remastered e Valkyrie Profile. Os outros 25 só publicam build Windows -
+`Banjo 64` e `Sonic Unleashed Recompiled` merecem nota: cada um tem um
+arquivo com "linux" no nome, mas é um Flatpak dentro de um zip, não um
+executável direto, então contam como Windows-only pra esse app.
 
 Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
 tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que
