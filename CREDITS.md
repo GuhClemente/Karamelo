@@ -111,7 +111,7 @@ pacote, evitando instaladores, ferramentas de build e outros arquivos que às
 vezes vêm junto).
 
 A coluna **SO** diz em qual build do Karamelo (Windows, Linux ou macOS) aquele
-jogo pode ser baixado - **todos** têm 🪟, alguns têm 🐧 e 18 têm 🍎 (macOS
+jogo pode ser baixado - **todos** têm 🪟, alguns têm 🐧 e 19 têm 🍎 (macOS
 Apple Silicon / Universal). Verificado em 11/09/2026 contra a release mais
 recente de cada repositório.
 
@@ -136,7 +136,7 @@ recente de cada repositório.
 | Star Fox (SNES, Enhanced) | 🪟🐧🍎 | [kandowontu/starfox-enhanced](https://github.com/kandowontu/starfox-enhanced) |
 | Mario Kart 64 (SpaghettiKart) | 🪟🐧🍎 | [harbourmasters/spaghettikart](https://github.com/harbourmasters/spaghettikart) |
 | Super Mario 64 (Ghostship) | 🪟🐧🍎 | [harbourmasters/ghostship](https://github.com/harbourmasters/ghostship) |
-| Perfect Dark | 🪟 | [perfect-dark-pc-port/perfect_dark](https://github.com/perfect-dark-pc-port/perfect_dark) |
+| Perfect Dark | 🪟🍎 | [perfect-dark-pc-port/perfect_dark](https://github.com/perfect-dark-pc-port/perfect_dark) |
 | Super Mario 64 Coop Deluxe | 🪟🐧🍎 | [coop-deluxe/sm64coopdx](https://github.com/coop-deluxe/sm64coopdx) |
 | Animal Crossing (GameCube) | 🪟 | [flyngmt/ACGC-PC-Port](https://github.com/flyngmt/ACGC-PC-Port) |
 | Banjo-Kazooie: Nuts & Bolts | 🪟 | [masterspike52/reNut](https://github.com/masterspike52/reNut) |
@@ -160,10 +160,10 @@ recente de cada repositório.
 | Wave Race 64 | 🪟🍎 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
 | Pokemon Snap | 🪟 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
 
-**16 de 42 têm build Linux** e **18 de 42 têm build macOS** (Apple Silicon /
+**16 de 42 têm build Linux** e **19 de 42 têm build macOS** (Apple Silicon /
 Universal). Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app` descompactados, arquivos
-`.zip` com binários Mach-O nativos e prioriza compilações ARM64. No Linux,
+`.zip` e `.tar.xz` com binários Mach-O nativos e prioriza compilações ARM64. No Linux,
 pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
 e `.tar.gz` (`Pokemon Snap`) não são executáveis diretos compatíveis com o
 extrator padrão.

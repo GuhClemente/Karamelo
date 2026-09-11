@@ -1,4 +1,4 @@
-# Karamelo Emulador — Native Windows x64 Frontend & Retrogaming Emulation Suite
+# Karamelo Emulador — Native Multiplatform Retrogaming Suite (Windows, Linux, macOS)
 
 > **Software Livre e Independente — GNU GPL-3.0**  
 > Canal do YouTube: **[@GuhClemente](https://youtube.com/@GuhClemente)**  
@@ -9,7 +9,7 @@
 
 ## 🌟 Visão Geral
 
-O **Karamelo Emulador** é um frontend nativo em C++20 (64-bit) de alto desempenho para Windows x86_64. A interface e o OSD são inspirados no visual do MiSTer, mas são **implementação própria, escrita do zero** — nada aqui é porte de código do Main_MiSTer; o que foi preservado é a aparência e o contrato de dados, detalhado arquivo a arquivo em [docs/FRONTEND.md](docs/FRONTEND.md). O frontend é integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **35 sistemas** através de **40 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, e dezenas de outros — ver CREDITS.md).
+O **Karamelo Emulador** é um frontend nativo em C++20 (64-bit) de alto desempenho para **Windows x86_64**, **Linux x64** e **macOS ARM64 (Apple Silicon)**. A interface e o OSD são inspirados no visual do MiSTer, mas são **implementação própria, escrita do zero** — nada aqui é porte de código do Main_MiSTer; o que foi preservado é a aparência e o contrato de dados, detalhado arquivo a arquivo em [docs/FRONTEND.md](docs/FRONTEND.md). O frontend é integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **35 sistemas** através de **40 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, Valkyrie Profile, Perfect Dark e dezenas de outros — total de 42 ports, sendo 19 com suporte nativo a macOS e 16 a Linux — ver [CREDITS.md](CREDITS.md)).
 
 ---
 
@@ -172,8 +172,9 @@ nada.
 
 ```
 Karamelo/
-├── src/                       Código-fonte (.cpp), 15 arquivos
-│   ├── main_win32.cpp         Janela, loop de apresentação, entrada e HUD
+├── src/                       Código-fonte (.cpp)
+│   ├── main_win32.cpp         Janela, Direct3D 11, entrada e HUD (Windows)
+│   ├── main_linux.cpp         Janela SDL3, renderizador e entrada (Linux e macOS)
 │   ├── core_runner.cpp        Thread do core libretro, áudio e escalonamento
 │   ├── menu.cpp                Navegação do OSD e seleção de core por sistema
 │   ├── osd.cpp                 Buffer raster do OSD (reescrita clean-room)
@@ -184,50 +185,74 @@ Karamelo/
 │   ├── input_map.cpp           Mapeamento de teclado/controle
 │   ├── netplay.cpp             Netplay via UDP
 │   ├── netplay_protocol.cpp    Framing do protocolo de rede do netplay
-│   ├── port_runner.cpp         Download/execução dos "Ports & Recomp"
+│   ├── port_runner.cpp         Download e execução de PC Ports (.exe, Linux e Mach-O macOS)
 │   ├── retroachievements.cpp   Integração com rcheevos
-│   ├── updater.cpp             Auto-atualização do próprio app
+│   ├── updater.cpp             Auto-atualização do próprio app (multiplataforma)
 │   └── karamelo_math.cpp       Funções matemáticas compartilhadas (viewport, clamp, etc.)
-├── include/                    Cabeçalhos (.h), incluindo libretro.h
-├── packaging/                  Templates versionados usados por package_release.bat
+├── include/                    Cabeçalhos (.h), incluindo libretro.h e app_info.h
+├── packaging/                  Templates versionados de distribuição
 │   ├── bios-guide/              Guia completo de BIOS (fonte única de verdade)
 │   └── rom-folder-guides/       Um LEIA-ME.txt por sistema de ROM
-├── build/                       Objetos intermediários (.obj) — gerado
-├── docs/                        Capturas e material de referência
+├── build/                       Objetos intermediários (.obj / .o) — gerado
+├── docs/                        Documentação técnica e briefing do site (SITE_SYNC.md)
 └── app/                         Pasta de execução
-    ├── Karamelo_v<versão>.exe      Binário final (gerado pelo compile_port.bat)
-    ├── cores/                   DLLs libretro
-    ├── bios/                    BIOS por sistema (NeoGeo CD em bios/neocd/, Dreamcast em bios/dc/)
-    ├── roms/                    Jogos, organizados por sistema
-    ├── saves/                   Savestates e memória de cartão
-    ├── cache/                   Arquivos extraídos de pacotes compactados
+    ├── Karamelo.exe / Karamelo  Binário final
+    ├── cores/                   Motores libretro (.dll / .so / .dylib)
+    ├── bios/                    BIOS por sistema
+    ├── roms/                    Jogos organizados por sistema
+    ├── saves/                   Savestates e cartões de memória
+    ├── cache/                   Arquivos temporários descompactados
     ├── ports/                   Jogos recompilados baixados sob demanda
     └── Wallpapers/               Papéis de parede do menu
 ```
 
-O executável precisa ficar dentro de `app/`: ele localiza `cores/`, `bios/`,
-`roms/` e `saves/` a partir da própria pasta. `package_release.bat` gera um
-pacote de distribuição equivalente em `dist/Karamelo_v<versão>_Win64/`,
-com o executável renomeado para `Karamelo.exe`.
+O executável localiza `cores/`, `bios/`, `roms/` e `saves/` a partir da própria pasta do executável (ou bundle `.app` no macOS). Os scripts de empacotamento geram os pacotes prontos para distribuição em `dist/`.
 
 ---
 
 ## 🛠️ Como Compilar
 
+### Windows (x64)
 Requisitos: **MSVC BuildTools (C++20 x64)**
 
 ```cmd
 compile_port.bat
 ```
+* Gera o executável em `app\Karamelo_v<versão>.exe` e executa os testes unitários.
+* Para gerar o pacote de distribuição (`dist/Karamelo_v<versão>_Win64.zip`): `package_release.bat`
+* Para fazer deploy para o servidor: `deploy_all.bat` (ou `upload_to_server.bat`)
 
-O script se orienta pela própria localização, então o projeto pode ser clonado em
-qualquer diretório. Os `.obj` vão para `build/` e o executável final é gravado em
-`app\Karamelo_v<versão>.exe` (a versão vem de `include/app_info.h`). O script
-também compila e roda a suíte de testes unitários automaticamente ao final.
+### macOS (Apple Silicon ARM64)
+Requisitos: **Xcode Command Line Tools** (Clang C++20) e **SDL3** (`brew install sdl3`)
 
-Para gerar um pacote de distribuição completo (com a estrutura de pastas,
-guias de BIOS/ROM e cores prontos), use `package_release.bat` em vez de
-`compile_port.bat` diretamente.
+```bash
+./compile_macos.sh
+```
+* Gera o executável em `app/Karamelo` e executa a suíte de testes.
+* Para gerar o pacote de distribuição (`dist/Karamelo_v<versão>_macOS_arm64.tar.gz`):
+```bash
+./package_macos.sh
+```
+* Para enviar para o servidor de downloads:
+```bash
+./deploy_macos.sh
+```
+
+### Linux (x86_64)
+Requisitos: **GCC ou Clang (C++20)** e **SDL3** (`libsdl3-dev`)
+
+```bash
+./compile_linux.sh
+```
+* Gera o executável em `app/Karamelo` e executa os testes.
+* Para gerar o pacote de distribuição (`dist/Karamelo_v<versão>_Linux64.tar.gz`):
+```bash
+./package_linux.sh
+```
+* Para enviar para o servidor de downloads:
+```bash
+./deploy_linux.sh
+```
 
 ---
 

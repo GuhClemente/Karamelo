@@ -573,7 +573,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
   arquivos `.tar.gz` (`Pokemon Snap`) não contam hoje (total: 16 ports).
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados e zips aninhados.
-  Hoje 18 ports possuem releases comprovadas para macOS.
+  Hoje 19 ports possuem releases comprovadas para macOS.
 
 ### O que implementar no site
 
@@ -582,7 +582,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
    Recomp exibida deve filtrar conforme o SO selecionado:
    - **Filtro Windows (🪟)**: 42 jogos.
    - **Filtro Linux (🐧)**: 16 jogos.
-   - **Filtro macOS (🍎)**: 18 jogos.
+   - **Filtro macOS (🍎)**: 19 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
@@ -592,17 +592,17 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (13 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (14 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
   Infinite Mario 64, Valkyrie Profile.
-- **🪟🍎 (5 jogos, Windows e macOS):** Snowboard Kids 2, Banjo 64, Space Station
-  Silicon Valley, Wave Race 64.
-- **🪟🐧 (3 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
+- **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
+  Space Station Silicon Valley, Wave Race 64.
+- **🪟🐧 (2 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
   Remastered.
 - **🪟 apenas (21 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
-  Pokemon Stadium, Chameleon Twist, Quest 64, Perfect Dark, Animal Crossing (GC),
+  Pokemon Stadium, Chameleon Twist, Quest 64, Animal Crossing (GC),
   Banjo-Kazooie: Nuts & Bolts, DBZ Budokai, Jak & Daxter, LoD: Severed Chains,
   REDRIVER 2, Castlevania: SotN, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
   Unleashed, Super Mario World, Super Metroid, Viva Pinata, WipEout Phantom
@@ -648,6 +648,6 @@ O Karamelo agora possui compilação e suporte nativo completo para **macOS (App
 5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
    - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
    - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
-   - 18 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
+   - 19 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
 6. **Detecção no Site**:
    - Recomenda-se detectar o SO do usuário (`MacIntel` com `navigator.maxTouchPoints > 0` ou `navigator.userAgent` contendo `Macintosh`) para destacar o botão **Baixar para macOS (Apple Silicon)** por padrão para usuários Apple.
