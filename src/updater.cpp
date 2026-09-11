@@ -1,8 +1,16 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winhttp.h>
 #include <shellapi.h>
 #include <bcrypt.h>
+#pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "bcrypt.lib")
+#else
+#include "compat_win32.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,10 +29,6 @@
 #include "updater.h"
 #include "app_info.h"
 #include "osd.h"
-
-#pragma comment(lib, "winhttp.lib")
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "bcrypt.lib")
 
 namespace fs = std::filesystem;
 
@@ -182,6 +186,7 @@ static std::string GetCurrentExecutablePath()
 	return std::string(path);
 }
 
+#ifdef _WIN32
 // SHA-256 of a file on disk, lowercase hex - via BCrypt (CNG), built into
 // Windows since Vista, no third-party crypto dependency needed. Returns
 // empty on any failure (missing file, API error) so the caller treats that
@@ -395,6 +400,52 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 	WinHttpCloseHandle(session);
 	return success;
 }
+#else
+static std::string Sha256File(const std::string& path)
+{
+	std::string cmd = "sha256sum \"" + path + "\" 2>/dev/null";
+	FILE* pipe = popen(cmd.c_str(), "r");
+	if (!pipe) return "";
+	char buf[128] = { 0 };
+	std::string res;
+	if (fgets(buf, sizeof(buf), pipe))
+	{
+		char hex[65] = { 0 };
+		if (sscanf(buf, "%64s", hex) == 1) res = hex;
+	}
+	pclose(pipe);
+	return res;
+}
+
+static bool HttpFetchData(const std::string& url, std::string* out_str, std::vector<uint8_t>* out_bin,
+                          size_t* total_size_out, size_t known_total_size, bool track_progress)
+{
+	(void)known_total_size;
+	(void)track_progress;
+	std::string cmd = "curl -sL \"" + url + "\"";
+	FILE* pipe = popen(cmd.c_str(), "r");
+	if (!pipe) return false;
+	std::vector<uint8_t> data;
+	uint8_t chunk[4096];
+	size_t n;
+	while ((n = fread(chunk, 1, sizeof(chunk), pipe)) > 0)
+	{
+		data.insert(data.end(), chunk, chunk + n);
+	}
+	pclose(pipe);
+	if (data.empty()) return false;
+	if (total_size_out) *total_size_out = data.size();
+	if (out_str)
+	{
+		out_str->assign((const char*)data.data(), data.size());
+	}
+	if (out_bin)
+	{
+		*out_bin = std::move(data);
+	}
+	return true;
+}
+#endif
 
 bool UpdaterHttpGetString(const std::string& url, std::string& out_body)
 {
@@ -593,6 +644,13 @@ void UpdaterShutdown()
 				g_updater_thread.detach();
 		}
 	}
+	else if (g_updater_thread.joinable())
+	{
+		if (g_updater_thread_done.load())
+			g_updater_thread.join();
+		else
+			g_updater_thread.detach();
+	}
 }
 
 void UpdaterCheckAsync(bool manual_trigger)
@@ -616,6 +674,7 @@ void UpdaterStartDownload()
 
 bool UpdaterApplyAndRestart()
 {
+#ifdef _WIN32
 	std::string app_dir = GetExecutableDirectory();
 	std::string target_exe = GetCurrentExecutablePath();
 	std::string new_exe = app_dir + "\\Karamelo.new";
@@ -674,9 +733,8 @@ bool UpdaterApplyAndRestart()
 	// spinning unnoticed for good.
 	fprintf(f, "set RETRY_COPY_COUNT=0\r\n");
 	fprintf(f, ":retry_copy\r\n");
-	fprintf(f, "if not exist \"%s\" goto copy_failed\r\n", new_exe.c_str());
 	fprintf(f, "copy /y \"%s\" \"%s\" >nul 2>&1\r\n", new_exe.c_str(), target_exe.c_str());
-	fprintf(f, "if errorlevel 1 (\r\n");
+	fprintf(f, "if not exist \"%s\" (\r\n", target_exe.c_str());
 	fprintf(f, "    set /a RETRY_COPY_COUNT+=1\r\n");
 	fprintf(f, "    if %%RETRY_COPY_COUNT%% geq 15 goto copy_failed\r\n");
 	fprintf(f, "    timeout /t 1 /nobreak >nul\r\n");
@@ -706,6 +764,9 @@ bool UpdaterApplyAndRestart()
 		return true;
 	}
 	return false;
+#else
+	return false;
+#endif
 }
 
 UpdaterState UpdaterGetState()

@@ -1347,6 +1347,11 @@ static void PresentFrame(HWND hwnd)
 	was_busy = busy;
 
 	MenuRun();
+	if (MenuIsQuitRequested())
+	{
+		PostMessage(hwnd, WM_CLOSE, 0, 0);
+		return;
+	}
 	RenderFrame();
 
 	PaintNow(hwnd);
@@ -1876,6 +1881,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			MenuSetWindowRect(wx, wy, ww, wh);
 	}
 
+	GamepadShutdown();
 	SDL_Quit();
 
 	if (h_mem_dc) DeleteDC(h_mem_dc);

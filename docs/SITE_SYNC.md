@@ -1,4 +1,4 @@
-﻿# Briefing para quem mantém o site karamelo-emu.com
+# Briefing para quem mantém o site karamelo-emu.com
 
 Este arquivo existe para manter o site e o aplicativo dizendo a mesma coisa.
 Ele é versionado junto com o código, então **a versão sempre atual está em**:
@@ -24,7 +24,7 @@ não estimá-la.
 | Domínio | **karamelo-emu.com** |
 | Repositório | **https://github.com/GuhClemente/Karamelo** |
 | Autor | Guh Clemente — YouTube [@GuhClemente](https://youtube.com/@GuhClemente) |
-| Plataforma | Windows x64, nativo |
+| Plataforma | **Windows x64 e Linux x64 (nativos)** |
 
 Use "Karamelo Emulador" na primeira menção de uma página, em títulos e no
 `<title>`. Depois disso, "Karamelo" sozinho está correto e lê melhor.
@@ -108,39 +108,57 @@ Formato (exemplo real):
 
 ```json
 {
-    "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
-    "exe_size": 4027392,
-    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Win64.zip",
     "version": "0.9.4",
-    "release_date": "2026-09-09",
-    "notes": "...",
-    "exe_sha256": "268B286F...",
+    "title": "Karamelo v0.9.4",
+    "release_date": "2026-09-11",
+    "notes": "Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.",
     "force_full_package": false,
-    "title": "Karamelo v0.9.4"
+    "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
+    "exe_size": 4038144,
+    "exe_sha256": "4AA64512...",
+    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Win64.zip",
+    "linux_bin_url": "https://karamelo-emu.com/downloads/Karamelo_linux",
+    "linux_bin_size": 5380024,
+    "linux_bin_sha256": "331E1BE1...",
+    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Linux64.tar.gz"
 }
 ```
 
-O site deve montar o botão de download **lendo esse arquivo**, nunca com o
+O site deve montar os botões de download **lendo esse arquivo**, nunca com o
 número da versão escrito à mão no código da página. Assim uma release nova não
 exige tocar no site.
 
-⚠️ **Esse arquivo é lido pelo auto-update do aplicativo.** Não altere, não
-mova, não renomeie, não sirva com outro `Content-Type` e não coloque nada na
-frente que responda HTML em vez do JSON. Se ele quebrar, todo mundo que tem o
-app instalado perde a atualização automática.
+⚠️ **Esse arquivo é lido pelo auto-update do aplicativo (Windows e Linux).**
+Não altere nomes de campos nem quebre o JSON. Se ele quebrar, os usuários perdem
+a atualização automática.
 
 ### O que oferecer para download
 
 | arquivo | oferecer? |
 |---|---|
-| `Karamelo_v<versão>_Win64.zip` | **sim** — é o download principal |
-| `Karamelo.exe` | **não** ofereça como download avulso |
-| `Karamelo_Pack_BIOS.zip` | **nao existe mais** |
+| `Karamelo_v<versão>_Win64.zip` | **sim** — download principal para Windows (x64) |
+| `Karamelo_v<versão>_Linux64.tar.gz` | **sim** — download principal para Linux (x64) |
+| `Karamelo.exe` | **não** ofereça avulso (usado pelo auto-update do Windows) |
+| `Karamelo_linux` | **não** ofereça avulso (usado pelo auto-update do Linux) |
+| `Karamelo_Pack_BIOS.zip` | **não existe mais** |
 
-O `Karamelo.exe` sozinho **não funciona**: ele localiza `cores/`, `bios/`,
-`roms/` e `saves/` a partir da própria pasta. Quem baixar só ele fica com um
-app quebrado. Ele existe naquela URL porque é o que o auto-update baixa, não
-para consumo humano.
+O `Karamelo.exe` e o `Karamelo_linux` avulsos **não funcionam sozinhos**: eles
+localizam `cores/`, `bios/`, `roms/` e `saves/` a partir da própria pasta. Quem
+baixar só o executável fica sem os motores de emulação. Eles existem nas URLs
+acima porque é onde o auto-update do próprio app busca atualizações.
+
+### Como apresentar no site
+
+Recomenda-se oferecer dois botões ou abas claras:
+- **Baixar para Windows (x64)** (apontando para `zip_url`)
+- **Baixar para Linux (x64)** (apontando para `linux_tar_url`)
+
+Para Linux, instrua o usuário a descompactar e executar:
+```bash
+tar -xzf Karamelo_v*_Linux64.tar.gz
+cd Karamelo_v*_Linux64
+./Karamelo
+```
 
 O pack de BIOS **deixou de ser publicado em 09/09/2026**. Ele contém firmware
 de console, material protegido por direito autoral, e publicá-lo é

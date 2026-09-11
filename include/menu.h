@@ -28,6 +28,8 @@ void MenuProcessKey(MenuKey key);
 void MenuSetStatus(const char* status);
 const char* MenuGetStatus();
 const char* MenuGetTitle();
+bool MenuIsQuitRequested();
+void MenuRequestQuit();
 
 int  MenuGetAspectMode();
 int  MenuGetFilterMode();

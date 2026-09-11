@@ -8,8 +8,14 @@
 #include <string.h>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include "compat_win32.h"
+#endif
 
 #include "app_info.h"
 #include "archive_helper.h"
@@ -518,17 +524,33 @@ static const char *GetArcadeCoreDll(const std::string &file_path = "") {
   return "cores/arcade_fbneo.dll";
 }
 
-static const char *GetN64CoreDll() {
+static bool CoreBinaryExists(const char* dll_or_so_path) {
+  if (!dll_or_so_path) return false;
   std::error_code ec;
-  if (setting_n64_core == 0 && fs::exists("cores/n64_parallel.dll", ec))
+  std::string p = dll_or_so_path;
+#ifndef _WIN32
+  if (p.size() >= 4 && p.substr(p.size() - 4) == ".dll") {
+    std::string so = p.substr(0, p.size() - 4) + ".so";
+    if (fs::exists(so, ec) || fs::exists("app/" + so, ec)) return true;
+  }
+  return fs::exists(p, ec) || fs::exists("app/" + p, ec);
+#else
+  return fs::exists(p, ec) || fs::exists("app/" + p, ec);
+#endif
+}
+
+static const char *GetN64CoreDll() {
+  if (setting_n64_core == 0 && CoreBinaryExists("cores/n64_parallel.dll"))
     return "cores/n64_parallel.dll";
-  if (setting_n64_core == 1 && fs::exists("cores/n64_mupen.dll", ec))
+  if (setting_n64_core == 1 && CoreBinaryExists("cores/n64_mupen.dll"))
     return "cores/n64_mupen.dll";
-  if (setting_n64_core == 2 && fs::exists("cores/n64_gopher.dll", ec))
+  if (setting_n64_core == 2 && CoreBinaryExists("cores/n64_gopher.dll"))
     return "cores/n64_gopher.dll";
-  if (fs::exists("cores/n64_parallel.dll", ec))
+  if (CoreBinaryExists("cores/n64_parallel.dll"))
     return "cores/n64_parallel.dll";
-  if (fs::exists("cores/n64.dll", ec))
+  if (CoreBinaryExists("cores/n64_mupen.dll"))
+    return "cores/n64_mupen.dll";
+  if (CoreBinaryExists("cores/n64.dll"))
     return "cores/n64.dll";
   return "cores/n64_parallel.dll";
 }
@@ -536,6 +558,9 @@ int MenuGetHwRender() { return (setting_driver != VIDEO_DRIVER_SOFTWARE) ? 1 : 0
 int MenuGetLanguage() { return setting_language; }
 const char *MenuGetStatus() { return status_msg.c_str(); }
 const char *MenuGetTitle() { return current_title.c_str(); }
+static bool s_menu_quit_requested = false;
+bool MenuIsQuitRequested() { return s_menu_quit_requested; }
+void MenuRequestQuit() { s_menu_quit_requested = true; }
 
 void PopulateMainMenu();
 // Picks the core DLL for a ROM, from its extension and from whatever the path
@@ -921,36 +946,42 @@ static const SystemCore kSystemCores[] = {
 
 // NULL above means the system has its own core selector; ask that instead.
 static bool SystemHasCore(int action_id) {
+  static std::unordered_map<int, bool> s_cache;
+  auto it = s_cache.find(action_id);
+  if (it != s_cache.end()) return it->second;
+
+  if (action_id == 140) {
+    s_cache[action_id] = true;
+    return true;
+  }
+
+  if (action_id == 107) {
+    bool has_n64 = CoreBinaryExists("cores/n64_gopher.dll") ||
+                   CoreBinaryExists("cores/n64_parallel.dll") ||
+                   CoreBinaryExists("cores/n64_mupen.dll") ||
+                   CoreBinaryExists("cores/n64.dll");
+    s_cache[action_id] = has_n64;
+    return has_n64;
+  }
+
   const char *dll = NULL;
-  bool known = false;
   for (const auto &e : kSystemCores)
     if (e.action_id == action_id) {
       dll = e.dll;
-      known = true;
       break;
     }
 
-  if (action_id == 107) {
-    std::error_code ec;
-    return fs::exists("cores/n64_gopher.dll", ec) ||
-           fs::exists("cores/n64.dll", ec) ||
-           fs::exists("cores/n64_parallel.dll", ec) ||
-           fs::exists("cores/n64_mupen.dll", ec);
-  }
   if (action_id == 117)
     dll = GetArcadeCoreDll();
-  if (action_id == 140) {
-    // Same list PopulateBrowse() and the About screen's count use, rather
-    // than a second, looser check (the old fs::exists("ports") was always
-    // true anyway - PortInit() creates the folder unconditionally on
-    // startup, whether or not anything has been downloaded into it yet).
-    return !PortGetAvailableList().empty();
-  }
-  if (!dll)
-    return true;
 
-  std::error_code ec;
-  return fs::exists(dll, ec);
+  if (!dll) {
+    s_cache[action_id] = true;
+    return true;
+  }
+
+  bool exists = CoreBinaryExists(dll);
+  s_cache[action_id] = exists;
+  return exists;
 }
 
 void PopulateMainMenu() {
@@ -2918,7 +2949,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
 
     if (item.action_id == 99) // Exit
     {
-      exit(0);
+      MenuRequestQuit();
     } else if (item.action_id == 997) // Back from Cores List -> About
     {
       current_state = STATE_ABOUT;

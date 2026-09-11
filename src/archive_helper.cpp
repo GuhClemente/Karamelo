@@ -572,10 +572,37 @@ static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
 #ifdef _WIN32
 	int exit_code = RunHiddenCommandCaptureOutput({ "tar.exe", "-tf", archive_path }, 30000, output);
 #else
-	// "-Z1" is zipinfo mode built into unzip: bare filenames, one per line,
-	// no header/footer/column formatting - the same plain shape "tar -tf"
-	// produces, so the parsing loop below needs no changes either way.
-	int exit_code = RunHiddenCommandCaptureOutput({ "unzip", "-Z1", archive_path }, 30000, output);
+	int exit_code = -1;
+	std::string ext = fs::path(archive_path).extension().string();
+	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+	if (ext == ".7z" || ext == ".rar")
+	{
+		std::string raw_output;
+		exit_code = RunHiddenCommandCaptureOutput({ "7z", "l", "-slt", archive_path }, 30000, raw_output);
+		if (exit_code == 0)
+		{
+			std::stringstream ss(raw_output);
+			std::string line;
+			bool first_path = true;
+			while (std::getline(ss, line))
+			{
+				if (!line.empty() && line.back() == '\r') line.pop_back();
+				if (line.rfind("Path = ", 0) == 0)
+				{
+					if (first_path) { first_path = false; continue; }
+					output += line.substr(7) + "\n";
+				}
+			}
+		}
+	}
+	else if (ext == ".zip")
+	{
+		exit_code = RunHiddenCommandCaptureOutput({ "unzip", "-Z1", archive_path }, 30000, output);
+	}
+	else
+	{
+		exit_code = RunHiddenCommandCaptureOutput({ "tar", "-tf", archive_path }, 30000, output);
+	}
 #endif
 
 	// The extractor couldn't even list this archive's contents (a format it
@@ -628,20 +655,29 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 		RunHiddenCommand({ "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps_script }, EXTRACT_TIMEOUT_MS);
 	}
 #else
-	// Every archive that reaches this function is a .zip - "tar.exe" above is
-	// really just being used as a zip extractor (bsdtar auto-detects the
-	// format), same reason ArchiveHasUnsafeEntry below uses "unzip -Z1"
-	// instead of a real tar listing. unzip is the direct equivalent, present
-	// on essentially every Linux desktop distro. No PowerShell-style fallback
-	// exists here without a new dependency - if unzip fails, extraction fails.
-	bool ok = RunHiddenCommand({ "unzip", "-o", archive_path, "-d", dest_dir }, EXTRACT_TIMEOUT_MS);
-	// dest_dir is a stable, identity-keyed directory (e.g. ports/<id>), never
-	// cleared before extraction - a retry that lands here after a prior
-	// partial install would find it non-empty regardless of whether *this*
-	// unzip run actually did anything. Ignoring `ok` and falling through to
-	// the exists-and-non-empty check below let a failed unzip (missing
-	// binary, corrupt archive, disk full) get reported as a successful
-	// (re)install just because leftover files were already there.
+	bool ok = false;
+	std::string ext = fs::path(archive_path).extension().string();
+	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+	if (ext == ".7z" || ext == ".rar")
+	{
+		ok = RunHiddenCommand({ "7z", "x", "-y", "-o" + dest_dir, archive_path }, EXTRACT_TIMEOUT_MS);
+	}
+	else if (ext == ".zip")
+	{
+		ok = RunHiddenCommand({ "unzip", "-o", archive_path, "-d", dest_dir }, EXTRACT_TIMEOUT_MS);
+		if (!ok)
+		{
+			ok = RunHiddenCommand({ "7z", "x", "-y", "-o" + dest_dir, archive_path }, EXTRACT_TIMEOUT_MS);
+		}
+	}
+	else
+	{
+		ok = RunHiddenCommand({ "tar", "-xf", archive_path, "-C", dest_dir }, EXTRACT_TIMEOUT_MS);
+		if (!ok)
+		{
+			ok = RunHiddenCommand({ "7z", "x", "-y", "-o" + dest_dir, archive_path }, EXTRACT_TIMEOUT_MS);
+		}
+	}
 	if (!ok) return false;
 #endif
 

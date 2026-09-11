@@ -30,18 +30,15 @@ set LOCAL_EXE=dist\Karamelo.exe
 set LOCAL_JSON=dist\version.json
 
 rem -------------------------------------------------------------
-rem PASSO 1: Compilacao, Testes e Empacotamento
+rem PASSO 1: Compilacao, Testes e Empacotamento Windows
 rem -------------------------------------------------------------
 rem package_release.bat's own step [1/4] already calls compile_port.bat
-rem (compile + run the unit tests) before packaging - calling it again here
-rem first just recompiled and re-ran the whole test suite a second time,
-rem invisibly, since compile_port.bat's own "cls" wiped the first run off
-rem the screen before anyone could see it had already happened.
-echo [1/2] Compilando, testando e empacotando a release...
+rem (compile + run the unit tests) before packaging.
+echo [1/3] Compilando, testando e empacotando release Windows...
 call "%~dp0package_release.bat" %*
 if errorlevel 1 (
     echo.
-    echo [FALHA] Erro na compilacao, testes ou empacotamento. Deploy cancelado.
+    echo [FALHA] Erro na compilacao, testes ou empacotamento Windows. Deploy cancelado.
     pause
     exit /b 1
 )
@@ -59,10 +56,35 @@ if not exist "%LOCAL_ZIP%" (
 )
 
 rem -------------------------------------------------------------
-rem PASSO 2: Upload via SCP para o Servidor VPS / Coolify
+rem PASSO 2: Compilacao, Testes e Empacotamento Linux (WSL)
+rem -------------------------------------------------------------
+set LOCAL_LINUX_TAR=dist\Karamelo_v%APP_VER%_Linux64.tar.gz
+set LOCAL_LINUX_BIN=dist\Karamelo_linux
+set LINUX_DEPLOY_FILES=
+
+where wsl >nul 2>&1
+if not errorlevel 1 (
+    echo.
+    echo [2/3] Compilando, testando e empacotando release Linux via WSL...
+    wsl bash -c "cd '$(wslpath '%~dp0')' && sed -i 's/\r$//' package_linux.sh && chmod +x package_linux.sh && ./package_linux.sh"
+    if errorlevel 1 (
+        echo.
+        echo [AVISO] Falha ao gerar release Linux no WSL. Continuando deploy somente com Windows...
+    ) else (
+        if exist "%LOCAL_LINUX_TAR%" (
+            set LINUX_DEPLOY_FILES="%LOCAL_LINUX_TAR%" "%LOCAL_LINUX_BIN%"
+        )
+    )
+) else (
+    echo.
+    echo [AVISO] WSL nao encontrado no sistema. Pulando empacotamento Linux...
+)
+
+rem -------------------------------------------------------------
+rem PASSO 3: Upload via SCP para o Servidor VPS / Coolify
 rem -------------------------------------------------------------
 echo.
-echo [2/2] Enviando pacote (v%APP_VER%), executavel e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
+echo [3/3] Enviando pacotes (v%APP_VER%), executaveis e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
 echo.
 
 rem O pack de BIOS NAO sobe. Ele contem firmware de console, material
@@ -71,7 +93,7 @@ rem redistribuicao, a mesma coisa que o README proibe para o repositorio.
 rem O create_packs.ps1 continua gerando o arquivo em dist/ para uso local.
 set EXTRA_FILES=
 
-scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" "%LOCAL_JSON%" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" %LINUX_DEPLOY_FILES% "%LOCAL_JSON%" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 rem O script de deploy vai para /root/, nunca para %REMOTE_DIR%: aquela pasta e
 rem servida publicamente, e o fix_server.sh acabou exposto em /downloads/.
 scp -o StrictHostKeyChecking=no "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:/root/fix_server.sh
@@ -82,16 +104,20 @@ if errorlevel 1 (
     echo   - dist\version.json
     echo   - dist\Karamelo.exe
     echo   - %LOCAL_ZIP%
+    if exist "%LOCAL_LINUX_TAR%" (
+    echo   - dist\Karamelo_linux
+    echo   - %LOCAL_LINUX_TAR%
+    )
     echo.
 ) else (
     echo.
     echo Sincronizando com containers do Coolify e ajustando permissoes...
     rem O sed remove CR do script antes de executar. Um .sh que sai do checkout
-rem com CRLF nao roda no Linux - o shebang vira "/bin/bash\r" e o erro e um
-rem enigmatico "cannot execute: required file not found", com os arquivos ja
-rem no servidor e os downloads em 404. O .gitattributes impede que volte, isto
-rem aqui garante que nem uma copia antiga do script derrube a publicacao.
-ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "chmod +x /root/fix_server.sh && /root/fix_server.sh"
+    rem com CRLF nao roda no Linux - o shebang vira "/bin/bash\r" e o erro e um
+    rem enigmatico "cannot execute: required file not found", com os arquivos ja
+    rem no servidor e os downloads em 404. O .gitattributes impede que volte, isto
+    rem aqui garante que nem uma copia antiga do script derrube a publicacao.
+    ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "sed -i 's/\r$//' /root/fix_server.sh && chmod +x /root/fix_server.sh && /root/fix_server.sh"
 )
 
 rem -------------------------------------------------------------
@@ -106,11 +132,19 @@ echo   Arquivos Gerados na pasta dist\:
 echo   - %LOCAL_JSON%
 echo   - %LOCAL_EXE%
 echo   - %LOCAL_ZIP%
+if exist "%LOCAL_LINUX_TAR%" (
+echo   - %LOCAL_LINUX_BIN%
+echo   - %LOCAL_LINUX_TAR%
+)
 echo.
 echo   Links Oficiais:
 echo   - https://karamelo-emu.com/downloads/version.json
 echo   - https://karamelo-emu.com/downloads/Karamelo.exe
 echo   - https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip
+if exist "%LOCAL_LINUX_TAR%" (
+echo   - https://karamelo-emu.com/downloads/Karamelo_linux
+echo   - https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Linux64.tar.gz
+)
 echo.
 echo =====================================================================
 echo.

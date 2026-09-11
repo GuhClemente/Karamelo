@@ -4,6 +4,7 @@
 #else
 #include <spawn.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 extern char **environ;
 #endif
@@ -17,6 +18,7 @@ extern char **environ;
 #include <mutex>
 #include <vector>
 #include <string>
+#include <fstream>
 #include <stdio.h>
 
 #include "port_runner.h"
@@ -92,6 +94,24 @@ struct PortDefinition {
     std::string exe_hint;    // expected exe filename, best-effort only
     bool needs_rom;
     std::vector<std::string> rom_keywords; // all must appear (lowercased) in a ROM filename
+    // Verified 11/09/2026 by actually checking each repo's latest release for
+    // a .zip PickLinuxAsset would pick (an explicit linux/.deb/.rpm/appimage/
+    // flatpak marker, matching IsLinuxAssetName - see that function's own
+    // comment for why an unmarked zip is never assumed to be a Linux build).
+    // Most of this table has never shipped anything but a Windows zip; only
+    // the entries below with true actually have one. Defaults to false via
+    // this trailing member initializer (valid since C++14 for an aggregate,
+    // which this still is) so every existing entry above didn't need
+    // touching - only the ones being marked true got a 7th element added.
+    // Two releases that DO publish a Linux-tagged .zip were deliberately
+    // left false anyway: BanjoRecomp and SonicUnleashedRecomp's only Linux
+    // asset is a Flatpak bundle wrapped in a .zip, which is not something
+    // FindBestExecutable can launch (no plain executable inside, just the
+    // .flatpak bundle file) - it would pass this matcher, download, then
+    // fail with "pacote instalado sem executavel" the moment it's selected.
+    // This needs re-checking periodically, same as exe_hint/rom_keywords -
+    // a project can add or drop platforms between verifications.
+    bool has_linux_build = false;
 };
 
 static const std::vector<PortDefinition>& KnownPortDefs() {
@@ -112,13 +132,13 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // 64's own ROM); those ports show their own ROM picker on first run
         // instead, which is the normal flow for most of them anyway.
         { "Zelda64Recomp", "Zelda64Recomp",
-          "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" } },
+          "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" }, true },
         { "Goemon64Recomp", "Goemon 64",
-          "klorfmorf/Goemon64Recomp", "", true, { "goemon" } },
+          "klorfmorf/Goemon64Recomp", "", true, { "goemon" }, true },
         { "DinosaurPlanet", "Dinosaur Planet",
           "DinosaurPlanetRecomp/dino-recomp", "", true, { "dinosaur" } },
         { "HarvestMoon64Recomp", "Harvest Moon 64",
-          "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" } },
+          "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" }, true },
         { "SnowboardKids2Recomp", "Snowboard Kids 2",
           "cdlewis/snowboardkids2-recomp", "", true, { "snowboard", "kids", "2" } },
         // No rom_keywords: "pokemon"+"stadium" alone would also match a
@@ -126,7 +146,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // description) targets Stadium 1 (US v1.0) specifically. Wrong game
         // copied in silently is worse than just letting the port ask.
         { "PokemonStadiumRecomp", "Pokemon Stadium",
-          "mstan/PokemonStadiumRecomp", "", true, {} },
+          "mstan/PokemonStadiumRecomp", "", true, { "pokemon", "stadium" } },
         // "Duke Nukem: Zero Hour" (sonicdcer/DNZHRecomp) was here but the
         // GitHub account that hosted it (sonicdcer) has been deleted -
         // confirmed via the API, a 404 on the user itself, not just the
@@ -139,21 +159,21 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "Banjo64Recomp", "Banjo 64",
           "BanjoRecomp/BanjoRecomp", "", true, { "banjo" } },
         { "BM64Recomp", "Bomberman 64",
-          "RevoSucks/BM64Recomp", "", true, { "bomberman" } },
+          "RevoSucks/BM64Recomp", "", true, { "bomberman" }, true },
         { "ChameleonTwistRecomp", "Chameleon Twist",
           "Rainchus/ChameleonTwist1-JP-Recomp", "", true, { "chameleon" } },
         { "MegaMan64Recomp", "Mega Man 64",
-          "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" } },
+          "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" }, true },
         { "Quest64Recomp", "Quest 64",
           "Rainchus/Quest64-Recomp", "", true, { "quest" } },
         { "BMHeroRecomp", "Bomberman Hero",
-          "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" } },
+          "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" }, true },
         { "ShipOfHarkinian", "Ship of Harkinian",
-          "harbourmasters/shipwright", "", true, { "zelda", "ocarina" } },
+          "harbourmasters/shipwright", "", true, { "zelda", "ocarina" }, true },
         { "2Ship2Harkinian", "2 Ship 2 Harkinian",
-          "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" } },
+          "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" }, true },
         { "Starship", "Starship",
-          "harbourmasters/starship", "", true, { "star", "fox" } },
+          "harbourmasters/starship", "", true, { "star", "fox" }, true },
         // Not the same game as the two Star Fox 64 (N64) entries above -
         // "built from the UltraStarFox codebase" per the repo's own
         // description, i.e. a source port of the original 1993 SNES Star
@@ -165,18 +185,18 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // at all (it only looks under roms/Nintendo64 and roms/N64) - the
         // scan would find nothing here regardless of keywords.
         { "StarFoxEnhanced", "Star Fox Enhanced",
-          "kandowontu/starfox-enhanced", "", true, {} },
+          "kandowontu/starfox-enhanced", "", true, {}, true },
         { "SpaghettiKart", "SpaghettiKart",
-          "harbourmasters/spaghettikart", "", true, { "mario", "kart" } },
+          "harbourmasters/spaghettikart", "", true, { "mario", "kart" }, true },
         { "Ghostship", "Ghostship",
-          "harbourmasters/ghostship", "", true, {} },
+          "harbourmasters/ghostship", "", true, {}, true },
         // fgsfdsfgs/perfect_dark was the original repo; it has since moved to
         // this org. GitHub's API currently still resolves the old name via
         // redirect, but that isn't guaranteed to keep working.
         { "PerfectDark", "Perfect Dark",
           "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" } },
         { "SM64CoopDX", "Super Mario 64 CoopDX",
-          "coop-deluxe/sm64coopdx", "", true, {} },
+          "coop-deluxe/sm64coopdx", "", true, {}, true },
         { "CannonballDX", "OutRun (CannonBall DX)",
           "Endprodukt/cannonball-dx", "cannonball-dx.exe",
           true, { "outrun" } },
@@ -208,7 +228,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "DBZBudokai", "Dragon Ball Z Budokai",
           "WistfulHopes/DBZ1", "", true, {} },
         { "InfiniteMario64", "Infinite Mario 64",
-          "Brawmario/infinite-mario-64-ever", "", true, {} },
+          "Brawmario/infinite-mario-64-ever", "", true, {}, true },
         { "JakAndDaxter", "Jak & Daxter",
           "open-goal/jak-project", "", true, {} },
         { "SeveredChains", "Severed Chains",
@@ -226,7 +246,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "SpaceStationSiliconValley", "Space Station Silicon Valley",
           "Cellenseres/SSSV_Recomp", "", true, { "silicon", "valley" } },
         { "SMBRemastered", "Super Mario Bros. Remastered",
-          "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {} },
+          "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {}, true },
         { "SuperMarioWorldRecomp", "Super Mario World",
           "mstan/SuperMarioWorldRecomp", "", true, {} },
         { "SuperMetroidRecomp", "Super Metroid",
@@ -259,7 +279,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // every other port, never bundled - but it does mean the port itself
         // isn't free for commercial use the way Karamelo now is.
         { "ValkyrieRecomp", "Valkyrie Profile",
-          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {} },
+          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {}, true },
 
         // N64Recomp-family, MIT-licensed (GitHub misreports it as "Other" -
         // the LICENSE file is standard MIT text with one extra disclaimer
@@ -357,20 +377,27 @@ static std::string FindBestExecutable(const std::string& dir) {
     std::error_code ec;
     if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec)) return "";
 
-    std::vector<fs::path> top_level, nested;
-    for (const auto& e : fs::recursive_directory_iterator(dir, ec)) {
-        if (ec || !e.is_regular_file(ec)) continue;
+    std::vector<fs::path> top_level;
+    std::vector<fs::path> subdirs;
+
+    // Fast Pass 1: Check top level only
+    for (const auto& e : fs::directory_iterator(dir, ec)) {
+        if (ec) continue;
+        if (e.is_directory(ec)) {
+            subdirs.push_back(e.path());
+            continue;
+        }
+        if (!e.is_regular_file(ec)) continue;
+
 #ifdef _WIN32
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
-        // Linux binaries conventionally ship with no extension at all - a
-        // release zip built for Linux is not going to contain a ".exe", so
-        // "no extension" is the closest equivalent signal available from the
-        // filename alone. Files that do have an extension here are data,
-        // scripts, or libraries (.so, .txt, .json, ...), never the binary to
-        // launch, so they are excluded the same way ".exe"-only excludes
-        // everything else on Windows.
-        if (!e.path().extension().empty()) continue;
+        std::string ext = ToLowerStr(e.path().extension().string());
+        bool is_exe = (ext == ".exe");
+        if (!ext.empty() && !is_exe) continue;
+        auto perms = e.status(ec).permissions();
+        if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+            continue;
 #endif
 
         std::string fname = ToLowerStr(e.path().filename().string());
@@ -379,24 +406,49 @@ static std::string FindBestExecutable(const std::string& dir) {
             if (fname.find(b) != std::string::npos) { skip = true; break; }
         if (skip) continue;
 
-        std::error_code rel_ec;
-        fs::path rel = fs::relative(e.path(), dir, rel_ec);
-        auto rel_it = rel.begin();
-        bool is_top = !rel_ec && rel_it != rel.end() && (++rel_it == rel.end()); // just a filename, no subdirectory components
-        (is_top ? top_level : nested).push_back(e.path());
+        top_level.push_back(e.path());
     }
 
     if (!top_level.empty()) return BestExeAmong(top_level);
 
-    // A root-level "launch.bat" outranks any *nested* .exe, checked before
-    // falling into the recursive fallback below. This is what Severed Chains
-    // needs in practice: its launch.bat downloads a JDK into .\jdk25\bin\ on
-    // first run, which is a folder full of nested .exe (java.exe among
-    // dozens of other JDK CLI tools) that would otherwise win by depth over
-    // the one file that is actually meant to be launched.
+    // Root-level "launch.bat" (or "launch.sh" on Linux)
     std::error_code lb_ec;
     fs::path launch_bat = fs::path(dir) / "launch.bat";
     if (fs::exists(launch_bat, lb_ec)) return launch_bat.string();
+#ifndef _WIN32
+    fs::path launch_sh = fs::path(dir) / "launch.sh";
+    if (fs::exists(launch_sh, lb_ec)) return launch_sh.string();
+#endif
+
+    // Fallback: Check only 1 level deep in immediate subdirs (skip assets/data)
+    std::vector<fs::path> nested;
+    for (const auto& sdir : subdirs) {
+        std::string sname = ToLowerStr(sdir.filename().string());
+        if (sname == "assets" || sname == "sound" || sname == "audio" || sname == "roms" ||
+            sname == "textures" || sname == "music" || sname == "data")
+            continue;
+
+        for (const auto& e : fs::directory_iterator(sdir, ec)) {
+            if (ec || !e.is_regular_file(ec)) continue;
+#ifdef _WIN32
+            if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
+#else
+            std::string ext = ToLowerStr(e.path().extension().string());
+            bool is_exe = (ext == ".exe");
+            if (!ext.empty() && !is_exe) continue;
+            auto perms = e.status(ec).permissions();
+            if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+                continue;
+#endif
+            std::string fname = ToLowerStr(e.path().filename().string());
+            bool skip = false;
+            for (const auto& b : blacklist)
+                if (fname.find(b) != std::string::npos) { skip = true; break; }
+            if (skip) continue;
+
+            nested.push_back(e.path());
+        }
+    }
 
     if (!nested.empty()) return BestExeAmong(nested);
 
@@ -772,6 +824,19 @@ std::vector<PortGameInfo> PortGetAvailableList() {
             if (fs::exists(hinted)) exe = hinted;
         }
 
+#ifndef _WIN32
+        // Every entry in this table is offered on Windows regardless of
+        // whether it was ever verified there (the launcher default list this
+        // was copied from targets Windows first) - but on Linux, silently
+        // offering a title whose only release is a Windows .zip means
+        // selecting it always fails with "nenhum build Linux na release
+        // deste port" after a download attempt. Hide those instead, unless
+        // the user already has a working executable sitting in ports/<id>/
+        // regardless of what has_linux_build says (a stale verification
+        // should never hide something that demonstrably already runs).
+        if (!def.has_linux_build && exe.empty()) continue;
+#endif
+
         // Games are never bundled with the app itself (no ROMs, no ports/
         // shipped in the project or the release zip - see .gitignore) - the
         // whole point of this list is that PortLaunch() downloads whatever
@@ -915,7 +980,16 @@ bool PortAutoSetupRom(const std::string& port_id) {
     // 4. Default: Nintendo 64 ports (.z64, .n64, .v64)
     for (const auto& f : fs::directory_iterator(target_dir, ec)) {
         std::string ext = ToLowerStr(f.path().extension().string());
-        if (ext == ".z64" || ext == ".n64" || ext == ".v64") return true;
+        if (ext == ".z64" || ext == ".n64" || ext == ".v64") {
+            if (port_id == "PokemonStadiumRecomp") {
+                fs::path cfg_path = fs::path(target_dir) / "rom.cfg";
+                if (!fs::exists(cfg_path, ec)) {
+                    std::ofstream cfg(cfg_path);
+                    if (cfg) cfg << f.path().filename().string() << "\n";
+                }
+            }
+            return true;
+        }
     }
 
     static const std::vector<std::string> search_dirs = {
@@ -931,6 +1005,8 @@ bool PortAutoSetupRom(const std::string& port_id) {
             std::string ext = ToLowerStr(entry.path().extension().string());
             if (ext != ".z64" && ext != ".n64" && ext != ".v64") continue;
 
+            if (port_id == "PokemonStadiumRecomp" && fname.find("2") != std::string::npos) continue;
+
             bool all_match = true;
             for (const auto& kw : def->rom_keywords)
                 if (fname.find(kw) == std::string::npos) { all_match = false; break; }
@@ -938,6 +1014,11 @@ bool PortAutoSetupRom(const std::string& port_id) {
 
             fs::path dest = fs::path(target_dir) / entry.path().filename();
             fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
+
+            if (port_id == "PokemonStadiumRecomp") {
+                std::ofstream cfg(fs::path(target_dir) / "rom.cfg");
+                if (cfg) cfg << entry.path().filename().string() << "\n";
+            }
             return !ec;
         }
     }
@@ -1024,9 +1105,23 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     std::string sexe = abs_exe.string();
     std::string sdir = abs_dir.string();
 
-    // A freshly-extracted zip does not preserve the Unix execute bit, so the
-    // binary would otherwise refuse to run at all.
     chmod(sexe.c_str(), 0755);
+    std::error_code ec;
+    std::string rom_arg;
+    for (const auto& f : fs::directory_iterator(abs_dir, ec)) {
+        std::string ext = ToLowerStr(f.path().extension().string());
+        if (ext == ".z64" || ext == ".n64" || ext == ".v64") {
+            rom_arg = f.path().string();
+            break;
+        }
+    }
+
+    std::vector<char*> argv;
+    argv.push_back(const_cast<char*>(sexe.c_str()));
+    if (!rom_arg.empty()) {
+        argv.push_back(const_cast<char*>(rom_arg.c_str()));
+    }
+    argv.push_back(nullptr);
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -1036,10 +1131,10 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     }
     if (pid == 0) {
         // Child: only async-signal-safe calls until exec, per fork()'s
-        // contract in a multithreaded process.
-        chdir(sdir.c_str());
-        char* argv[] = { const_cast<char*>(sexe.c_str()), nullptr };
-        execv(sexe.c_str(), argv);
+        // contract in a multithreaded process. chdir, execv, and _exit
+        // are strictly async-signal-safe and perform no heap allocations.
+        (void)chdir(sdir.c_str());
+        execv(sexe.c_str(), argv.data());
         _exit(127); // exec itself failed (not found / not executable)
     }
 #endif

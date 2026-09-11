@@ -1,7 +1,12 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#include <stdarg.h>
 #include <windows.h>
 #include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
+#else
+#include "compat_win32.h"
+#endif
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <string>
@@ -24,8 +29,6 @@ extern "C" {
 #include "rc_libretro.h"
 #include "rc_consoles.h"
 }
-
-#pragma comment(lib, "winhttp.lib")
 
 namespace fs = std::filesystem;
 
@@ -170,6 +173,7 @@ static std::atomic<bool>       g_http_running{ false };
 static std::deque<HttpJob*> g_http_pending;
 static std::deque<HttpJob*> g_http_done;
 
+#ifdef _WIN32
 static void HttpPerform(HttpJob* job)
 {
 	job->status = 0;
@@ -248,6 +252,101 @@ static void HttpPerform(HttpJob* job)
 	}
 	WinHttpCloseHandle(session);
 }
+#else
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+extern char** environ;
+
+static void HttpPerform(HttpJob* job)
+{
+	job->status = 0;
+	if (!job || job->url.empty()) return;
+
+	int in_pipe[2];
+	int out_pipe[2];
+	if (pipe(in_pipe) != 0) return;
+	if (pipe(out_pipe) != 0) { close(in_pipe[0]); close(in_pipe[1]); return; }
+
+	posix_spawn_file_actions_t actions;
+	posix_spawn_file_actions_init(&actions);
+	posix_spawn_file_actions_adddup2(&actions, in_pipe[0], STDIN_FILENO);
+	posix_spawn_file_actions_adddup2(&actions, out_pipe[1], STDOUT_FILENO);
+	posix_spawn_file_actions_addclose(&actions, in_pipe[1]);
+	posix_spawn_file_actions_addclose(&actions, out_pipe[0]);
+
+	std::vector<std::string> args = { "curl", "-s", "-w", "\n%{http_code}" };
+	if (!job->post_data.empty())
+	{
+		args.push_back("-X");
+		args.push_back("POST");
+		args.push_back("--data-binary");
+		args.push_back("@-");
+		if (!job->content_type.empty())
+		{
+			args.push_back("-H");
+			args.push_back("Content-Type: " + job->content_type);
+		}
+	}
+	args.push_back(job->url);
+
+	std::vector<char*> argv;
+	for (auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+	argv.push_back(nullptr);
+
+	pid_t pid;
+	int rc = posix_spawnp(&pid, "curl", &actions, NULL, argv.data(), environ);
+	posix_spawn_file_actions_destroy(&actions);
+	close(in_pipe[0]);
+	close(out_pipe[1]);
+
+	if (rc != 0)
+	{
+		close(in_pipe[1]);
+		close(out_pipe[0]);
+		return;
+	}
+
+	if (!job->post_data.empty())
+	{
+		const char* p = job->post_data.data();
+		size_t to_write = job->post_data.size();
+		while (to_write > 0)
+		{
+			ssize_t w = write(in_pipe[1], p, to_write);
+			if (w <= 0) break;
+			p += w;
+			to_write -= (size_t)w;
+		}
+	}
+	close(in_pipe[1]);
+
+	std::string output;
+	char buf[4096];
+	ssize_t n;
+	while ((n = read(out_pipe[0], buf, sizeof(buf))) > 0)
+	{
+		output.append(buf, (size_t)n);
+	}
+	close(out_pipe[0]);
+
+	int status = 0;
+	waitpid(pid, &status, 0);
+
+	size_t last_nl = output.find_last_of('\n');
+	if (last_nl != std::string::npos && last_nl + 1 < output.size())
+	{
+		std::string code_str = output.substr(last_nl + 1);
+		job->status = atoi(code_str.c_str());
+		job->body = output.substr(0, last_nl);
+	}
+	else
+	{
+		job->body = output;
+		job->status = 200;
+	}
+}
+#endif
 
 static std::atomic<bool> g_http_thread_done{ false };
 
@@ -752,6 +851,13 @@ void RaShutdown()
 			else
 				g_http_thread.detach();
 		}
+	}
+	else if (g_http_thread.joinable())
+	{
+		if (g_http_thread_done.load())
+			g_http_thread.join();
+		else
+			g_http_thread.detach();
 	}
 
 	// The worker thread has fully stopped by this point (waited above), so

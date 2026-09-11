@@ -44,6 +44,10 @@ static inline void strncpy_s(char* dst, size_t dst_size, const char* src, size_t
 	dst[dst_size - 1] = '\0';
 }
 #endif
+
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -464,11 +468,11 @@ void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][
 
 	while (remaining > 0)
 	{
-		int sent = send(peer_sock, out, remaining, 0);
+		int sent = send(peer_sock, out, remaining, MSG_NOSIGNAL);
 		if (sent > 0) { out += sent; remaining -= sent; continue; }
 
 		int err = WSAGetLastError();
-		if (sent == SOCKET_ERROR && err == WSAEWOULDBLOCK)
+		if (sent == SOCKET_ERROR && (err == WSAEWOULDBLOCK || err == EAGAIN))
 		{
 			// Socket buffer full: the peer is not keeping up. Dropping this
 			// frame's input is better than blocking the emulator, but the

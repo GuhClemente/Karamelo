@@ -7,6 +7,8 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include "compat_win32.h"
 #endif
 #include <stdio.h>
 #include <string.h>
@@ -18,12 +20,14 @@
 // Nao ha equivalente portavel - sinal de segmentacao nao e excecao de C++ e
 // nao pode ser capturado por catch de forma definida - entao o que se pode
 // fazer e deixar a diferenca explicita em vez de escondida.
+#ifndef VK_TRY
 #if defined(_WIN32) && defined(_MSC_VER)
 #define VK_TRY        __try
 #define VK_EXCEPT_ALL __except (EXCEPTION_EXECUTE_HANDLER)
 #else
-#define VK_TRY        if (true)
-#define VK_EXCEPT_ALL else
+#define VK_TRY        try
+#define VK_EXCEPT_ALL catch (...)
+#endif
 #endif
 
 // Dynamic loading, not link-time: there is no Vulkan SDK/import-lib vendored
@@ -975,6 +979,7 @@ void VkHwContextDestroy()
 {
 	if (!g_hw_active) return;
 
+	bool destroy_timed_out = false;
 	if ((g_skip_context_destroy || g_destroy_never_returns) && g_context_live && g_hw_cb.context_destroy)
 	{
 		VkHwLog("pulando context_destroy - este core nao retorna ou foi marcado para pular");
@@ -994,6 +999,7 @@ void VkHwContextDestroy()
 		{
 			if (WaitForSingleObject(h, 3000) == WAIT_TIMEOUT)
 			{
+				destroy_timed_out = true;
 				g_destroy_never_returns = true;
 				VkHwLog("context_destroy do core nao retornou em 3s - seguindo sem ele; nao sera chamado de novo nesta sessao");
 			}
@@ -1015,7 +1021,19 @@ void VkHwContextDestroy()
 	g_pending_core_cmds.clear();
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 
-	if (g_core_created_device) VkHwShutdown();
+	if (!destroy_timed_out)
+	{
+		VkHwShutdown();
+	}
+	else
+	{
+		// Orfão para evitar use-after-free na thread que ainda pode estar executando
+		g_device = VK_NULL_HANDLE;
+		g_instance = VK_NULL_HANDLE;
+		g_gpu = VK_NULL_HANDLE;
+		g_queue = VK_NULL_HANDLE;
+		g_vk_ready = false;
+	}
 	g_skip_context_destroy = false;
 }
 
@@ -1117,9 +1135,12 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	g_pending_core_cmds.clear();
 	g_pending_num_semaphores = 0;
 
+	// Destrava o mutex da fila logo apos a submissao para liberar outras threads
+	// do core em vez de bloquear o lock durante a espera da fence.
+	g_queue_lock.unlock();
+
 	if (submit_result != VK_SUCCESS)
 	{
-		g_queue_lock.unlock();
 		VkHwLog("vkQueueSubmit falhou (%d)", (int)submit_result);
 		return false;
 	}
@@ -1129,8 +1150,6 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	// for the GPU every frame - the same trade-off HwReadPixels's single GL
 	// glReadPixels call already makes.
 	vkWaitForFences_(g_device, 1, &g_fence, VK_TRUE, UINT64_MAX);
-
-	g_queue_lock.unlock();
 
 	void* mapped = NULL;
 	if (vkMapMemory_(g_device, g_staging_mem, 0, (VkDeviceSize)width * height * 4, 0, &mapped) != VK_SUCCESS || !mapped)

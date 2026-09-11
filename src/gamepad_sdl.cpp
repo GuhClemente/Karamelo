@@ -1,8 +1,12 @@
 // windows.h has to come first: xinput.h (pulled in by gamepad_sdl.h) needs
 // the architecture macros windows.h's own preamble sets up before it
 // includes winnt.h, or MSVC fails with "No Target Architecture" (C1189).
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include "compat_win32.h"
+#endif
 #include <SDL3/SDL.h>
 #include <string.h>
 #include <stdio.h>
@@ -183,3 +187,18 @@ bool GamepadGetState(int slot, XINPUT_STATE* out_state)
 	ReleaseSRWLockShared(&s_pads_lock);
 	return true;
 }
+
+void GamepadShutdown()
+{
+	AcquireSRWLockExclusive(&s_pads_lock);
+	for (int i = 0; i < 4; i++)
+	{
+		if (s_pads[i])
+		{
+			SDL_CloseGamepad(s_pads[i]);
+			s_pads[i] = nullptr;
+		}
+	}
+	ReleaseSRWLockExclusive(&s_pads_lock);
+}
+

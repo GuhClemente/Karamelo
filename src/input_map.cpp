@@ -1,6 +1,109 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <xinput.h>
+#else
+#include "compat_win32.h"
+#include <SDL3/SDL.h>
+
+static SDL_Scancode VkToScancode(int vk)
+{
+	switch (vk)
+	{
+	case VK_BACK: return SDL_SCANCODE_BACKSPACE;
+	case VK_TAB: return SDL_SCANCODE_TAB;
+	case VK_RETURN: return SDL_SCANCODE_RETURN;
+	case VK_ESCAPE: return SDL_SCANCODE_ESCAPE;
+	case VK_SPACE: return SDL_SCANCODE_SPACE;
+	case VK_LEFT: return SDL_SCANCODE_LEFT;
+	case VK_UP: return SDL_SCANCODE_UP;
+	case VK_RIGHT: return SDL_SCANCODE_RIGHT;
+	case VK_DOWN: return SDL_SCANCODE_DOWN;
+	case VK_LSHIFT: return SDL_SCANCODE_LSHIFT;
+	case VK_RSHIFT: return SDL_SCANCODE_RSHIFT;
+	case VK_LCONTROL: return SDL_SCANCODE_LCTRL;
+	case VK_RCONTROL: return SDL_SCANCODE_RCTRL;
+	case VK_MENU: return SDL_SCANCODE_LALT;
+	case VK_CAPITAL: return SDL_SCANCODE_CAPSLOCK;
+	case VK_NUMPAD0: return SDL_SCANCODE_KP_0;
+	case VK_NUMPAD1: return SDL_SCANCODE_KP_1;
+	case VK_NUMPAD2: return SDL_SCANCODE_KP_2;
+	case VK_NUMPAD3: return SDL_SCANCODE_KP_3;
+	case VK_NUMPAD4: return SDL_SCANCODE_KP_4;
+	case VK_NUMPAD5: return SDL_SCANCODE_KP_5;
+	case VK_NUMPAD6: return SDL_SCANCODE_KP_6;
+	case VK_NUMPAD7: return SDL_SCANCODE_KP_7;
+	case VK_NUMPAD8: return SDL_SCANCODE_KP_8;
+	case VK_NUMPAD9: return SDL_SCANCODE_KP_9;
+	case VK_F1: return SDL_SCANCODE_F1;
+	case VK_F2: return SDL_SCANCODE_F2;
+	case VK_F3: return SDL_SCANCODE_F3;
+	case VK_F4: return SDL_SCANCODE_F4;
+	case VK_F5: return SDL_SCANCODE_F5;
+	case VK_F6: return SDL_SCANCODE_F6;
+	case VK_F7: return SDL_SCANCODE_F7;
+	case VK_F8: return SDL_SCANCODE_F8;
+	case VK_F9: return SDL_SCANCODE_F9;
+	case VK_F10: return SDL_SCANCODE_F10;
+	case VK_F11: return SDL_SCANCODE_F11;
+	case VK_F12: return SDL_SCANCODE_F12;
+	default: break;
+	}
+	if (vk >= 'A' && vk <= 'Z')
+		return (SDL_Scancode)(SDL_SCANCODE_A + (vk - 'A'));
+	if (vk >= '0' && vk <= '9')
+		return (vk == '0') ? SDL_SCANCODE_0 : (SDL_Scancode)(SDL_SCANCODE_1 + (vk - '1'));
+	return SDL_SCANCODE_UNKNOWN;
+}
+
+extern "C" SHORT GetAsyncKeyState(int vk)
+{
+	if (vk == VK_LBUTTON)
+	{
+		SDL_MouseButtonFlags btn = SDL_GetMouseState(NULL, NULL);
+		return (btn & SDL_BUTTON_LMASK) ? (SHORT)0x8000 : 0;
+	}
+	if (vk == VK_RBUTTON)
+	{
+		SDL_MouseButtonFlags btn = SDL_GetMouseState(NULL, NULL);
+		return (btn & SDL_BUTTON_RMASK) ? (SHORT)0x8000 : 0;
+	}
+	if (vk == VK_MBUTTON)
+	{
+		SDL_MouseButtonFlags btn = SDL_GetMouseState(NULL, NULL);
+		return (btn & SDL_BUTTON_MMASK) ? (SHORT)0x8000 : 0;
+	}
+
+	int numkeys = 0;
+	const bool* state = SDL_GetKeyboardState(&numkeys);
+	if (!state) return 0;
+	if (vk == VK_SHIFT)
+	{
+		if ((SDL_SCANCODE_LSHIFT < numkeys && state[SDL_SCANCODE_LSHIFT]) ||
+		    (SDL_SCANCODE_RSHIFT < numkeys && state[SDL_SCANCODE_RSHIFT]))
+			return (SHORT)0x8000;
+		return 0;
+	}
+	if (vk == VK_CONTROL)
+	{
+		if ((SDL_SCANCODE_LCTRL < numkeys && state[SDL_SCANCODE_LCTRL]) ||
+		    (SDL_SCANCODE_RCTRL < numkeys && state[SDL_SCANCODE_RCTRL]))
+			return (SHORT)0x8000;
+		return 0;
+	}
+	if (vk == VK_MENU)
+	{
+		if ((SDL_SCANCODE_LALT < numkeys && state[SDL_SCANCODE_LALT]) ||
+		    (SDL_SCANCODE_RALT < numkeys && state[SDL_SCANCODE_RALT]))
+			return (SHORT)0x8000;
+		return 0;
+	}
+	SDL_Scancode sc = VkToScancode(vk);
+	if (sc != SDL_SCANCODE_UNKNOWN && sc < numkeys && state[sc])
+		return (SHORT)0x8000;
+	return 0;
+}
+#endif
 #include <stdio.h>
 #include <string.h>
 

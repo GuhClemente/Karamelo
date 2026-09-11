@@ -1,7 +1,11 @@
 #ifndef GAMEPAD_SDL_H_INCLUDED
 #define GAMEPAD_SDL_H_INCLUDED
 
+#ifdef _WIN32
 #include <xinput.h>
+#else
+#include "compat_win32.h"
+#endif
 
 union SDL_Event;
 
@@ -25,5 +29,8 @@ bool GamepadGetState(int slot, XINPUT_STATE* out_state);
 // SDL_EVENT_GAMEPAD_ADDED/SDL_EVENT_GAMEPAD_REMOVED, ignoring the rest, so
 // slot assignment stays in sync with what is actually plugged in.
 void GamepadHandleDeviceEvent(const SDL_Event* event);
+
+// Closes all open gamepad handles on shutdown.
+void GamepadShutdown();
 
 #endif
