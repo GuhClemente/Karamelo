@@ -286,6 +286,24 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "WaveRace64Recomp", "Wave Race 64",
           "elliotttate/wave-race-64-recomp", "WaveRace64Recomp.exe",
           true, { "wave", "race" } },
+
+        // GPL-3.0, same license as Karamelo itself - no caveat needed here,
+        // unlike ValkyrieRecomp/WaveRace64Recomp above. Verified against the
+        // real v1.0.3 release: Windows zip wraps everything in one top-level
+        // "Snap64Recomp-1.0.3-win64/" folder (Snap64Recomp.exe alongside
+        // SDL2.dll, dxcompiler.dll, dxil.dll, etc.) - a normal case for
+        // FlattenSingleSubfolder, exe_hint confirmed by actually opening it.
+        // Windows needs a GPU driver with Direct3D 12, same bar WaveRace64
+        // already set. A real Linux build exists too (the release notes call
+        // it "experimental... played on a Steam Deck in Desktop Mode and
+        // nowhere else yet"), but it only ships as a .tar.gz - this app's
+        // Linux extractor is unzip-only (see PickLinuxAsset's own comment),
+        // so it is never selected regardless of platform; not worth adding a
+        // has_linux_build flag for on main, which hasn't merged the Linux
+        // port yet anyway.
+        { "Snap64Recomp", "Pokemon Snap",
+          "JackandBeans/Snap64Recomp", "Snap64Recomp.exe",
+          true, { "pokemon", "snap" } },
     };
     return defs;
 }

@@ -163,15 +163,20 @@ seção 12 do `SITE_SYNC.md`).
 | OutRun (CannonBall DX) | 🪟 | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
 | Valkyrie Profile | 🪟🐧 | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
 | Wave Race 64 | 🪟 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
+| Pokemon Snap | 🪟 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
 
-**16 de 41 também têm build Linux** hoje: Zelda 64 Recompiled, Goemon 64,
+**16 de 42 também têm build Linux** hoje: Zelda 64 Recompiled, Goemon 64,
 Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Ship of
 Harkinian, 2 Ship 2 Harkinian, Starship, Star Fox Enhanced, SpaghettiKart,
 Ghostship, Super Mario 64 Coop Deluxe, Infinite Mario 64, Super Mario Bros.
-Remastered e Valkyrie Profile. Os outros 25 só publicam build Windows -
-`Banjo 64` e `Sonic Unleashed Recompiled` merecem nota: cada um tem um
-arquivo com "linux" no nome, mas é um Flatpak dentro de um zip, não um
-executável direto, então contam como Windows-only pra esse app.
+Remastered e Valkyrie Profile. Os outros 26 só publicam build utilizável no
+Windows por este app - `Banjo 64` e `Sonic Unleashed Recompiled` merecem
+nota: cada um tem um arquivo com "linux" no nome, mas é um Flatpak dentro
+de um zip, não um executável direto. `Pokemon Snap` merece outra: a release
+tem um build Linux de verdade, mas só em `.tar.gz` - o extrator deste app é
+`unzip`-only, então esse arquivo nunca é escolhido. Todos esses três contam
+como Windows-only pra esse app hoje, mesmo sem ser culpa do projeto de
+origem.
 
 Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
 tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que

@@ -341,12 +341,13 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 11/09/2026:** são **41** jogos de "Ports & Recomp" — 39 até
-09/09, +1 (Valkyrie Profile) em 10/09, +1 (Wave Race 64) em 11/09 (ver seções
-10 e 11). O número foi conferido contra o `CREDITS.md`, que é sempre a fonte —
-essa tabela só cresce, não copie 39, 40 nem 41 de outra página no futuro. É
-coincidência infeliz que 39 já tenha sido, um dia, o número errado de
-motores — não confunda os dois.
+**Atualizado em 11/09/2026:** são **42** jogos de "Ports & Recomp" — 39 até
+09/09, +1 (Valkyrie Profile) e +1 (Wave Race 64) em 10-11/09, +1 (Pokemon
+Snap) ainda em 11/09 (ver seções 10, 11 e 13). O número foi conferido contra
+o `CREDITS.md`, que é sempre a fonte — essa tabela só cresce, não copie
+nenhum número antigo (39, 40, 41) de outra página no futuro. É coincidência
+infeliz que 39 já tenha sido, um dia, o número errado de motores — não
+confunda os dois.
 
 ### 9.4 Motores creditados a quem não é
 
@@ -439,8 +440,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **41** jogos de Ports & Recomp (atualizado em 11/09/2026 — ver seções
-  10 e 11),
+- Os **42** jogos de Ports & Recomp (atualizado em 11/09/2026 — ver seções
+  10, 11 e 13),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -525,7 +526,7 @@ Pedido direto do dono do projeto: a lista de "Ports & Recomp" no site deve
 suporta** — 🪟 para Windows, 🐧 para Linux. A fonte de verdade agora é a
 própria tabela em [CREDITS.md](../CREDITS.md), que ganhou uma coluna **SO**
 com exatamente esses dois ícones, verificada em 11/09/2026 contra a release
-mais recente de cada um dos 41 repositórios. Leia de lá — não estime, não
+mais recente de cada um dos 42 repositórios. Leia de lá — não estime, não
 copie a lista abaixo sem checá-la primeiro (ela existe aqui só pra você não
 se perder revisando, ver a ressalva no fim desta seção).
 
@@ -541,7 +542,10 @@ marcador explícito de Linux no nome da release (o app não arrisca baixar um
 zip sem marcação, para não entregar um binário Windows que não abre) **e**
 esse zip realmente contém um executável, não um pacote Flatpak (que não é
 algo que o app consiga abrir sozinho — `Banjo 64` e `Sonic Unleashed
-Recompiled` caem nesse caso: têm "linux" no nome do arquivo mas não contam).
+Recompiled` caem nesse caso: têm "linux" no nome do arquivo mas não contam),
+**e** precisa ser especificamente um `.zip` - o extrator deste app não abre
+`.tar.gz`/`.tar.xz`/AppImage, então `Pokemon Snap` também fica sem 🐧 apesar
+de ter um build Linux de verdade, só que empacotado como `.tar.gz`.
 
 ### ⚠️ Antes de publicar o ícone 🐧 em qualquer lugar do site
 
@@ -563,7 +567,7 @@ arquivo passar a ter os campos de Linux, a filtragem abaixo já pode entrar.
 1. **Filtro por SO.** Se a página tiver alguma forma de o visitante escolher
    a plataforma (aba, toggle, ou detecção automática do SO de quem visita),
    a lista de Ports & Recomp exibida deve mostrar só as entradas com o ícone
-   daquele SO — hoje isso é 41 no filtro Windows e 16 no filtro Linux.
+   daquele SO — hoje isso é 42 no filtro Windows e 16 no filtro Linux.
 2. **Ícone por jogo.** Onde quer que a lista apareça (card, tabela, grid),
    cada entrada mostra 🪟 e/ou 🐧 conforme a coluna SO do `CREDITS.md`. Se só
    tiver 🪟, não precisa dizer nada extra — é o padrão da categoria.
@@ -584,17 +588,42 @@ Star Fox (SNES, Enhanced), Mario Kart 64 (SpaghettiKart), Super Mario 64
 (Ghostship), Super Mario 64 Coop Deluxe, Infinite Mario 64, Super Mario Bros.
 Remastered, Valkyrie Profile.
 
-**🪟 apenas (25, só Windows):** Dr. Mario 64, Dinosaur Planet, Snowboard
+**🪟 apenas (26, só Windows):** Dr. Mario 64, Dinosaur Planet, Snowboard
 Kids 2, Pokemon Stadium, Banjo 64, Chameleon Twist, Quest 64, Perfect Dark,
 Animal Crossing (GameCube), Banjo-Kazooie: Nuts & Bolts, Dragon Ball Z
 Budokai, Jak & Daxter (OpenGOAL), LoD: Severed Chains, REDRIVER 2,
 Castlevania: Symphony of the Night, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
 Unleashed Recompiled, Space Station Silicon Valley, Super Mario World, Super
 Metroid, Viva Pinata: Trouble in Paradise, WipEout Phantom Edition, OutRun
-(CannonBall DX), Wave Race 64.
+(CannonBall DX), Wave Race 64, Pokemon Snap.
 
-Essa divisão 16/25 vai ficar desatualizada com o tempo — cada projeto de
+Essa divisão 16/26 vai ficar desatualizada com o tempo — cada projeto de
 terceiro pode adicionar ou tirar uma plataforma a qualquer release deles, sem
 avisar o Karamelo. Reverifique contra `CREDITS.md` (que por sua vez precisa
 ser reverificado contra a API do GitHub periodicamente - não é uma tarefa
 única).
+
+---
+
+## 13. Adição de 11/09/2026 — Pokemon Snap em Ports & Recomp
+
+Mais uma linha em `CREDITS.md`: **Pokemon Snap**, via
+[JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp).
+N64Recomp normal, sem ressalva de licença (GPL-3.0, a mesma do Karamelo) e
+sem exigir nada além do `.z64` do jogador.
+
+Duas coisas que valem nota, se o site descrever essa entrada
+especificamente:
+
+1. **Precisa de Direct3D 12 no Windows** - mesmo requisito que o Wave Race
+   64 (seção 11) já tem. Qualquer PC com Windows 10/11 e GPU dedicada dos
+   últimos anos atende, mas não é universal como um core libretro em OpenGL.
+2. **Tem build Linux de verdade, mas não conta pra este app** (ver a
+   ressalva da seção 12) - o release publica `.tar.gz`, não `.zip`, e o
+   próprio projeto chama esse build de "experimental... rodado num Steam
+   Deck em modo Desktop e em lugar nenhum mais até agora". Não é motivo pra
+   tratar a entrada como incompleta no Windows, só não prometa Linux pra
+   ela.
+
+Se a página não descrever entradas individuais (o caso comum), a única
+mudança necessária é a contagem da seção 9.3/9.9 e a lista da seção 12.
