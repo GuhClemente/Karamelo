@@ -1755,7 +1755,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// cuts off the final directory component (".../app/bios" -> ".../app"),
 			// causing StartMSX() to search for MSX.ROM, MSX2.ROM, MSX2EXT.ROM in "app"
 			// instead of "app/bios", failing to load any BIOS and causing a black screen.
-			if (s_loaded_core_path.find("msx.dll") != std::string::npos)
+			if (s_loaded_core_path.find("msx") != std::string::npos)
 			{
 				static std::string msx_sys_dir;
 				if (msx_sys_dir.empty())
@@ -2530,7 +2530,7 @@ static void CB_InputPoll(void)
 
 	// For MSX computer cores: also route Space to Joypad A/B so games reading
 	// either the MSX joystick or MSX keyboard respond naturally to Space and Enter.
-	if (s_loaded_core_path.find("msx.dll") != std::string::npos)
+	if (s_loaded_core_path.find("msx") != std::string::npos)
 	{
 		if (GetAsyncKeyState(VK_SPACE) & 0x8000)
 		{
@@ -2935,7 +2935,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			// which is required for MSX2 titles (such as Aleste, Metal Gear 2, Rastan Saga,
 			// Outrun) while remaining backwards compatible with MSX1 games.
 			// Only explicit .mx1 files are constrained to "MSX1".
-			if (core_dll.find("msx.dll") != std::string::npos)
+			if (core_dll.find("msx") != std::string::npos)
 			{
 				std::string extracted_ext = fs::path(rom_path).extension().string();
 				std::transform(extracted_ext.begin(), extracted_ext.end(), extracted_ext.begin(), ::tolower);
@@ -3152,13 +3152,13 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			// core's default meant every click on the touch screen was
 			// silently ignored. citra_render_touchscreen defaults off the
 			// same way, hiding the touch-screen cursor entirely.
-			if (core_dll.find("3ds.dll") != std::string::npos)
+			if (core_dll.find("3ds") != std::string::npos)
 			{
 				CoreSetOption("citra_touch_touchscreen", "enabled");
 				CoreSetOption("citra_render_touchscreen", "enabled");
 			}
 
-			if (core_dll.find("msx.dll") != std::string::npos)
+			if (core_dll.find("msx") != std::string::npos)
 			{
 				std::string ext = fs::path(rom_path).extension().string();
 				std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
@@ -3571,7 +3571,7 @@ static void SetPortDevicesGuarded()
 	__try
 	{
 		unsigned port0_device = RETRO_DEVICE_JOYPAD;
-		if (s_loaded_core_path.find("msx.dll") != std::string::npos)
+		if (s_loaded_core_path.find("msx") != std::string::npos)
 		{
 			// fMSX requires port 0 device to be RETRO_DEVICE_KEYBOARD (3) so that
 			// it polls the emulated MSX keyboard matrix via RETRO_DEVICE_KEYBOARD while
