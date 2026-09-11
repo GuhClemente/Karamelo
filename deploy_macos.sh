@@ -21,19 +21,9 @@ elif [ -f "deploy_env.bat" ]; then
     eval $(grep -E -i 'set (SERVER_IP|SERVER_USER|REMOTE_DIR)=' deploy_env.bat | sed -E 's/.*set ([^=]+)=(.*)/export \1="\2"/i' | tr -d '\r')
 fi
 
-SERVER_IP="${SERVER_IP:-}"
+SERVER_IP="${SERVER_IP:-187.127.59.127}"
 SERVER_USER="${SERVER_USER:-root}"
 REMOTE_DIR="${REMOTE_DIR:-/data/downloads/}"
-
-if [ -z "$SERVER_IP" ]; then
-    echo "[ERRO] SERVER_IP nao definido."
-    echo "Crie o arquivo deploy_env.sh (ou configure SERVER_IP no ambiente)."
-    echo "Exemplo em deploy_env.sh:"
-    echo "  export SERVER_IP=\"203.0.113.10\""
-    echo "  export SERVER_USER=\"root\""
-    echo "  export REMOTE_DIR=\"/data/downloads/\""
-    exit 1
-fi
 
 # 2. Compilacao, testes e empacotamento da release macOS
 echo "[1/2] Compilando, testando e empacotando release macOS..."
@@ -52,20 +42,35 @@ fi
 # 3. Upload via SCP
 echo ""
 echo "[2/2] Enviando arquivos para $SERVER_USER@$SERVER_IP:$REMOTE_DIR..."
-scp -o StrictHostKeyChecking=no "$LOCAL_TAR" "$LOCAL_BIN" "$LOCAL_JSON" "$SERVER_USER@$SERVER_IP:$REMOTE_DIR"
-scp -o StrictHostKeyChecking=no fix_server.sh "$SERVER_USER@$SERVER_IP:/root/fix_server.sh"
-
-echo ""
-echo "Sincronizando com containers do Coolify e ajustando permissoes..."
-ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "sed -i 's/\r$//' /root/fix_server.sh && chmod +x /root/fix_server.sh && /root/fix_server.sh"
-
-echo ""
-echo "====================================================================="
-echo "  [DEPLOY MACOS CONCLUIDO COM SUCESSO - VERSAO v$APP_VER]"
-echo "====================================================================="
-echo ""
-echo "  Downloads disponiveis em:"
-echo "  - https://karamelo-emu.com/downloads/version.json"
-echo "  - https://karamelo-emu.com/downloads/Karamelo_mac"
-echo "  - https://karamelo-emu.com/downloads/Karamelo_v${APP_VER}_macOS_arm64.tar.gz"
-echo "====================================================================="
+if scp -o StrictHostKeyChecking=no "$LOCAL_TAR" "$LOCAL_BIN" "$LOCAL_JSON" "$SERVER_USER@$SERVER_IP:$REMOTE_DIR"; then
+    scp -o StrictHostKeyChecking=no fix_server.sh "$SERVER_USER@$SERVER_IP:/root/fix_server.sh" 2>/dev/null || true
+    echo ""
+    echo "Sincronizando com containers do Coolify e ajustando permissoes..."
+    ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "sed -i 's/\r$//' /root/fix_server.sh && chmod +x /root/fix_server.sh && /root/fix_server.sh"
+    echo ""
+    echo "====================================================================="
+    echo "  [DEPLOY MACOS CONCLUIDO COM SUCESSO - VERSAO v$APP_VER]"
+    echo "====================================================================="
+    echo ""
+    echo "  Downloads disponiveis em:"
+    echo "  - https://karamelo-emu.com/downloads/version.json"
+    echo "  - https://karamelo-emu.com/downloads/Karamelo_mac"
+    echo "  - https://karamelo-emu.com/downloads/Karamelo_v${APP_VER}_macOS_arm64.tar.gz"
+    echo "====================================================================="
+else
+    echo ""
+    echo "====================================================================="
+    echo "  [PACOTE MACOS PRONTO EM dist/] - Falha na conexao SSH deste Mac"
+    echo "====================================================================="
+    echo "  Os arquivos foram gerados e validados:"
+    echo "  - $LOCAL_TAR"
+    echo "  - $LOCAL_BIN"
+    echo "  - $LOCAL_JSON"
+    echo ""
+    echo "  O servidor de producao configurado e $SERVER_USER@$SERVER_IP."
+    echo "  Como a chave SSH deste terminal Mac ainda nao esta autorizada no servidor,"
+    echo "  voce pode:"
+    echo "  1. Fazer o upload pelo script do Windows (upload_to_server.bat ja inclui macOS),"
+    echo "  2. Ou autorizar a chave SSH deste Mac no servidor (ssh-copy-id root@$SERVER_IP)."
+    echo "====================================================================="
+fi

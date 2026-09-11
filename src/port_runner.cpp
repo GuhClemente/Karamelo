@@ -112,6 +112,7 @@ struct PortDefinition {
     // This needs re-checking periodically, same as exe_hint/rom_keywords -
     // a project can add or drop platforms between verifications.
     bool has_linux_build = false;
+    bool has_macos_build = false;
 };
 
 static const std::vector<PortDefinition>& KnownPortDefs() {
@@ -121,209 +122,92 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // auto-copy, launch) rather than only checked against the API.
         { "DrMario64", "Dr. Mario 64",
           "theboy181/drmario64_recomp_plus", "drmario64_recomp.exe",
-          true, { "dr", "mario" } },
-
-        // Everything below is copied from the shipping N64Recomp Launcher's
-        // own default game list (github.com/SirDiabo/N64RecompLauncher,
-        // Services/N64RecompLauncherProfile.cs) - real repos its own users
-        // download from today, not guessed. rom_keywords is left empty
-        // wherever the title is too generic to safely auto-pick a ROM out of
-        // roms/Nintendo64/ (e.g. "mario"+"64" would also match Mario Kart
-        // 64's own ROM); those ports show their own ROM picker on first run
-        // instead, which is the normal flow for most of them anyway.
+          true, { "dr", "mario" }, false, false },
         { "Zelda64Recomp", "Zelda64Recomp",
-          "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" }, true },
+          "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" }, true, true },
         { "Goemon64Recomp", "Goemon 64",
-          "klorfmorf/Goemon64Recomp", "", true, { "goemon" }, true },
+          "klorfmorf/Goemon64Recomp", "", true, { "goemon" }, true, true },
         { "DinosaurPlanet", "Dinosaur Planet",
-          "DinosaurPlanetRecomp/dino-recomp", "", true, { "dinosaur" } },
+          "DinosaurPlanetRecomp/dino-recomp", "", true, { "dinosaur" }, false, false },
         { "HarvestMoon64Recomp", "Harvest Moon 64",
-          "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" }, true },
+          "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" }, true, true },
         { "SnowboardKids2Recomp", "Snowboard Kids 2",
-          "cdlewis/snowboardkids2-recomp", "", true, { "snowboard", "kids", "2" } },
-        // No rom_keywords: "pokemon"+"stadium" alone would also match a
-        // Pokemon Stadium *2* ROM, and this recomp (per the repo's own
-        // description) targets Stadium 1 (US v1.0) specifically. Wrong game
-        // copied in silently is worse than just letting the port ask.
+          "cdlewis/snowboardkids2-recomp", "", true, { "snowboard", "kids", "2" }, false, true },
         { "PokemonStadiumRecomp", "Pokemon Stadium",
-          "mstan/PokemonStadiumRecomp", "", true, { "pokemon", "stadium" } },
-        // "Duke Nukem: Zero Hour" (sonicdcer/DNZHRecomp) was here but the
-        // GitHub account that hosted it (sonicdcer) has been deleted -
-        // confirmed via the API, a 404 on the user itself, not just the
-        // repo. It always failed on install with no path to fix from our
-        // side, so removed outright at the user's request on 2026-09-01
-        // rather than kept as a permanently-broken menu entry.
-        // sonicdcer/MarioKart64Recomp and sonicdcer/Starfox64Recomp hit the
-        // same dead account; harbourmasters/spaghettikart and harbourmasters/
-        // starship below already cover Mario Kart 64 and Star Fox 64 instead.
+          "mstan/PokemonStadiumRecomp", "", true, { "pokemon", "stadium" }, false, false },
         { "Banjo64Recomp", "Banjo 64",
-          "BanjoRecomp/BanjoRecomp", "", true, { "banjo" } },
+          "BanjoRecomp/BanjoRecomp", "", true, { "banjo" }, false, true },
         { "BM64Recomp", "Bomberman 64",
-          "RevoSucks/BM64Recomp", "", true, { "bomberman" }, true },
+          "RevoSucks/BM64Recomp", "", true, { "bomberman" }, true, true },
         { "ChameleonTwistRecomp", "Chameleon Twist",
-          "Rainchus/ChameleonTwist1-JP-Recomp", "", true, { "chameleon" } },
+          "Rainchus/ChameleonTwist1-JP-Recomp", "", true, { "chameleon" }, false, false },
         { "MegaMan64Recomp", "Mega Man 64",
-          "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" }, true },
+          "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" }, true, true },
         { "Quest64Recomp", "Quest 64",
-          "Rainchus/Quest64-Recomp", "", true, { "quest" } },
+          "Rainchus/Quest64-Recomp", "", true, { "quest" }, false, false },
         { "BMHeroRecomp", "Bomberman Hero",
-          "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" }, true },
+          "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" }, true, true },
         { "ShipOfHarkinian", "Ship of Harkinian",
-          "harbourmasters/shipwright", "", true, { "zelda", "ocarina" }, true },
+          "harbourmasters/shipwright", "", true, { "zelda", "ocarina" }, true, true },
         { "2Ship2Harkinian", "2 Ship 2 Harkinian",
-          "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" }, true },
+          "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" }, true, true },
         { "Starship", "Starship",
-          "harbourmasters/starship", "", true, { "star", "fox" }, true },
-        // Not the same game as the two Star Fox 64 (N64) entries above -
-        // "built from the UltraStarFox codebase" per the repo's own
-        // description, i.e. a source port of the original 1993 SNES Star
-        // Fox, not the N64 sequel. Confirmed by its release also offering an
-        // optional MSU1 pack (an SNES-emulation audio format, meaningless
-        // for anything N64). rom_keywords is empty for two reasons, not one:
-        // the usual "name too generic" risk, and because any real SNES ROM
-        // would live in roms/SNES/, a folder PortAutoSetupRom does not search
-        // at all (it only looks under roms/Nintendo64 and roms/N64) - the
-        // scan would find nothing here regardless of keywords.
+          "harbourmasters/starship", "", true, { "star", "fox" }, true, false },
         { "StarFoxEnhanced", "Star Fox Enhanced",
-          "kandowontu/starfox-enhanced", "", true, {}, true },
+          "kandowontu/starfox-enhanced", "", true, {}, true, true },
         { "SpaghettiKart", "SpaghettiKart",
-          "harbourmasters/spaghettikart", "", true, { "mario", "kart" }, true },
+          "harbourmasters/spaghettikart", "", true, { "mario", "kart" }, true, true },
         { "Ghostship", "Ghostship",
-          "harbourmasters/ghostship", "", true, {}, true },
-        // fgsfdsfgs/perfect_dark was the original repo; it has since moved to
-        // this org. GitHub's API currently still resolves the old name via
-        // redirect, but that isn't guaranteed to keep working.
+          "harbourmasters/ghostship", "", true, {}, true, true },
         { "PerfectDark", "Perfect Dark",
-          "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" } },
+          "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" }, false, false },
         { "SM64CoopDX", "Super Mario 64 CoopDX",
-          "coop-deluxe/sm64coopdx", "", true, {}, true },
+          "coop-deluxe/sm64coopdx", "", true, {}, true, true },
         { "CannonballDX", "OutRun (CannonBall DX)",
           "Endprodukt/cannonball-dx", "cannonball-dx.exe",
-          true, { "outrun" } },
-
-        // -----------------------------------------------------------------
-        // Not part of the launcher's own default list - these are the rest of
-        // the titles from the user's library screenshot, each individually
-        // verified against a live GitHub Releases API response (repo exists,
-        // has a downloadable Windows-runnable asset) rather than guessed.
-        // Most need a ROM/disc image this app has no way to source (PS1/PS2/
-        // Xbox 360 dumps, SNES ROMs) - rom_keywords is only set where the
-        // dump would plausibly live in roms/Nintendo64/ next to everything
-        // else this app already manages; everywhere else the port's own
-        // first-run picker is the real flow, same as several N64 ones above.
-        //
-        // Two titles from the screenshot are deliberately absent:
-        //   - "Link's Awakening DX HD" (Phantop/LADXHD) ships a .7z, and this
-        //     file's extractor only handles tar.exe/Expand-Archive formats
-        //     (zip). Its GitHub mirror is also unofficial and last released
-        //     in Dec 2023, after Nintendo DMCA'd the original itch.io page.
-        //   - "Super Metroid Launcher" (RadzPrower/Super-Metroid-Launcher) is
-        //     not a game - it is a small tool that downloads/compiles a
-        //     Super Metroid port from source and needs a build toolchain.
-        //     mstan/SuperMetroidRecomp below is an actual playable port.
+          true, { "outrun" }, false, false },
         { "AnimalCrossingGC", "Animal Crossing",
-          "flyngmt/ACGC-PC-Port", "", true, {} },
+          "flyngmt/ACGC-PC-Port", "", true, {}, false, false },
         { "NutsAndBolts", "Banjo-Kazooie: Nuts & Bolts",
-          "masterspike52/reNut", "", true, {} },
+          "masterspike52/reNut", "", true, {}, false, false },
         { "DBZBudokai", "Dragon Ball Z Budokai",
-          "WistfulHopes/DBZ1", "", true, {} },
+          "WistfulHopes/DBZ1", "", true, {}, false, false },
         { "InfiniteMario64", "Infinite Mario 64",
-          "Brawmario/infinite-mario-64-ever", "", true, {}, true },
+          "Brawmario/infinite-mario-64-ever", "", true, {}, true, true },
         { "JakAndDaxter", "Jak & Daxter",
-          "open-goal/jak-project", "", true, {} },
+          "open-goal/jak-project", "", true, {}, false, false },
         { "SeveredChains", "Severed Chains",
-          "Legend-of-Dragoon-Modding/Severed-Chains", "", true, {} },
+          "Legend-of-Dragoon-Modding/Severed-Chains", "", true, {}, false, false },
         { "REDRIVER2", "REDRIVER 2",
-          "OpenDriver2/REDRIVER2", "", true, {} },
+          "OpenDriver2/REDRIVER2", "", true, {}, false, false },
         { "SymphonyRecomp", "Castlevania: Symphony of the Night",
-          "GuhClemente/SymphonyRecomp", "", true, {} },
+          "GuhClemente/SymphonyRecomp", "", true, {}, false, false },
         { "Sonic1Forever", "Sonic 1 Forever",
-          "ElspethThePict/S1Forever", "", true, {} },
+          "ElspethThePict/S1Forever", "", true, {}, false, false },
         { "Sonic3AIR", "Sonic 3 A.I.R.",
-          "Eukaryot/sonic3air", "", true, {} },
+          "Eukaryot/sonic3air", "", true, {}, false, false },
         { "SonicUnleashedRecomp", "Sonic Unleashed",
-          "hedge-dev/UnleashedRecomp", "", true, {} },
+          "hedge-dev/UnleashedRecomp", "", true, {}, false, false },
         { "SpaceStationSiliconValley", "Space Station Silicon Valley",
-          "Cellenseres/SSSV_Recomp", "", true, { "silicon", "valley" } },
+          "Cellenseres/SSSV_Recomp", "", true, { "silicon", "valley" }, false, true },
         { "SMBRemastered", "Super Mario Bros. Remastered",
-          "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {}, true },
+          "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {}, true, false },
         { "SuperMarioWorldRecomp", "Super Mario World",
-          "mstan/SuperMarioWorldRecomp", "", true, {} },
+          "mstan/SuperMarioWorldRecomp", "", true, {}, false, false },
         { "SuperMetroidRecomp", "Super Metroid",
-          "mstan/SuperMetroidRecomp", "", true, { "metroid" } },
+          "mstan/SuperMetroidRecomp", "", true, { "metroid" }, false, false },
         { "VivaPinataTiP", "Viva Pinata: Trouble in Paradise",
-          "SolarCookies/TiP-Recomp", "", true, {} },
+          "SolarCookies/TiP-Recomp", "", true, {}, false, false },
         { "WipeoutPhantomEdition", "WipEout Phantom Edition",
-          "wipeout-phantom-edition/wipeout-phantom-edition", "", true, {} },
-
-        // PS1 (Valkyrie Profile, 2 discs), built on PSXRecomp instead of
-        // N64Recomp. Verified against the real v1.0.1 release: the Windows
-        // zip is flat at the root (ValkyrieRecomp.exe alongside assets/,
-        // mods/, psxrecomp/ - no wrapper folder, so FlattenSingleSubfolder
-        // is a no-op here) and FindBestExecutable would pick the right exe
-        // on its own, but exe_hint is set anyway since it was confirmed.
-        // rom_keywords is empty on purpose, same reasoning as SymphonyRecomp/
-        // REDRIVER2 above: PortAutoSetupRom only searches roms/Nintendo64,
-        // so a PS1 disc image was never going to be auto-copied regardless -
-        // this port asks for its own disc pair on first run either way.
-        // Two things make this entry heavier than every other row here, and
-        // worth knowing before pointing someone at it: (1) first launch runs
-        // a "Generate & rebuild" wizard that needs Python 3 already on PATH
-        // and downloads a clang/cmake toolchain the first time - there's no
-        // prebuilt game binary inside the zip, only the tool that builds one
-        // locally from the discs; (2) the exe itself has no license file in
-        // its own repo, but the psxrecomp engine it embeds is PolyForm
-        // Noncommercial 1.0.0 (c) Matthew Stan - same license family Karamelo
-        // itself moved off of. That doesn't reach back into Karamelo's own
-        // GPL-3.0, since this is a separate binary downloaded on demand like
-        // every other port, never bundled - but it does mean the port itself
-        // isn't free for commercial use the way Karamelo now is.
+          "wipeout-phantom-edition/wipeout-phantom-edition", "", true, {}, false, false },
         { "ValkyrieRecomp", "Valkyrie Profile",
-          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {}, true },
-
-        // N64Recomp-family, MIT-licensed (GitHub misreports it as "Other" -
-        // the LICENSE file is standard MIT text with one extra disclaimer
-        // paragraph up top about not covering the game itself, which trips
-        // GitHub's detector; read it directly to confirm). Windows-only for
-        // us - the release also ships an Apple Silicon build, irrelevant
-        // here. exe_hint and the flat top-level layout ("run
-        // WaveRace64Recomp.exe", "keep the three DLLs and assets folder
-        // beside the executable") both come straight from the v0.4.0
-        // release notes rather than a re-download - that release body is
-        // unusually detailed (exact ROM SHA-1, per-platform automated test
-        // counts, checksums), a stronger source than usual for a repo this
-        // size. rom_keywords is safe here: no other N64 title shares "wave"
-        // and "race" together.
-        //
-        // Two things worth knowing before pointing someone at this one:
-        // (1) it is explicitly "currently in beta" per the repo's own
-        // description, with real caveats in its own release notes (e.g.
-        // "other GPU families... remain untested" on Windows); (2) the
-        // download is far bigger than anything else in this table (~390 MB
-        // vs a typical few tens of MB) because it bundles a full HD texture
-        // and replacement-soundtrack pack alongside the recompiled game -
-        // fine for PortLaunch's own download/extract path, just slower.
+          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {}, true, true },
         { "WaveRace64Recomp", "Wave Race 64",
           "elliotttate/wave-race-64-recomp", "WaveRace64Recomp.exe",
-          true, { "wave", "race" } },
-
-        // GPL-3.0, same license as Karamelo itself - no caveat needed here,
-        // unlike ValkyrieRecomp/WaveRace64Recomp above. Verified against the
-        // real v1.0.3 release: Windows zip wraps everything in one top-level
-        // "Snap64Recomp-1.0.3-win64/" folder (Snap64Recomp.exe alongside
-        // SDL2.dll, dxcompiler.dll, dxil.dll, etc.) - a normal case for
-        // FlattenSingleSubfolder, exe_hint confirmed by actually opening it.
-        // Windows needs a GPU driver with Direct3D 12, same bar WaveRace64
-        // already set. A real Linux build exists too (the release notes call
-        // it "experimental... played on a Steam Deck in Desktop Mode and
-        // nowhere else yet"), but it only ships as a .tar.gz - this app's
-        // Linux extractor is unzip-only (see PickLinuxAsset's own comment),
-        // so it is never selected regardless of platform; not worth adding a
-        // has_linux_build flag for on main, which hasn't merged the Linux
-        // port yet anyway.
+          true, { "wave", "race" }, false, true },
         { "Snap64Recomp", "Pokemon Snap",
           "JackandBeans/Snap64Recomp", "Snap64Recomp.exe",
-          true, { "pokemon", "snap" } },
+          true, { "pokemon", "snap" }, false, false },
     };
     return defs;
 }
@@ -450,7 +334,36 @@ static std::string FindBestExecutable(const std::string& dir) {
         }
     }
 
-    if (!nested.empty()) return BestExeAmong(nested);
+#ifdef __APPLE__
+    fs::path direct_macos = fs::path(dir) / "Contents" / "MacOS";
+    if (fs::exists(direct_macos, ec)) {
+        for (const auto& e : fs::directory_iterator(direct_macos, ec)) {
+            if (ec || !e.is_regular_file(ec)) continue;
+            std::string fname = e.path().filename().string();
+            if (fname.rfind("._", 0) == 0) continue;
+            auto perms = e.status(ec).permissions();
+            if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) != fs::perms::none) {
+                return e.path().string();
+            }
+        }
+    }
+    for (const auto& sdir : subdirs) {
+        if (ToLowerStr(sdir.extension().string()) == ".app") {
+            fs::path macos_dir = sdir / "Contents" / "MacOS";
+            if (fs::exists(macos_dir, ec)) {
+                for (const auto& e : fs::directory_iterator(macos_dir, ec)) {
+                    if (ec || !e.is_regular_file(ec)) continue;
+                    std::string fname = e.path().filename().string();
+                    if (fname.rfind("._", 0) == 0) continue;
+                    auto perms = e.status(ec).permissions();
+                    if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) != fs::perms::none) {
+                        return e.path().string();
+                    }
+                }
+            }
+        }
+    }
+#endif
 
     // No .exe anywhere and no launch.bat at root: a JVM-based port might
     // still use a differently-named batch launcher. Root-level only - a
@@ -713,6 +626,54 @@ static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
 }
 #endif
 
+#ifdef __APPLE__
+static bool IsMacOsAssetName(const std::string& lower_name) {
+    if (ContainsAny(lower_name, { "windows", "win64", "win32", "win-x64", "win-x86",
+                                   "-win.", "_win.", ".exe", ".msi", "msvc", "mingw",
+                                   "linux", ".deb", ".rpm", "appimage", "flatpak",
+                                   "switch", "android", "source" }))
+        return false;
+    return ContainsAny(lower_name, { "macos", "osx", "darwin", "apple", "-mac", "_mac" });
+}
+
+static int MacOsArchPreferenceRank(const std::string& lower_name) {
+#if defined(__arm64__) || defined(__aarch64__)
+    if (ContainsAny(lower_name, { "arm64", "apple-silicon", "arm", "_m1", "-m1", "aarch64" })) return 0;
+    if (ContainsAny(lower_name, { "universal" })) return 1;
+    if (ContainsAny(lower_name, { "x64", "x86_64", "intel" })) return 2;
+#else
+    if (ContainsAny(lower_name, { "x64", "x86_64", "intel" })) return 0;
+    if (ContainsAny(lower_name, { "universal" })) return 1;
+    if (ContainsAny(lower_name, { "arm64", "apple-silicon" })) return 2;
+#endif
+    return 3;
+}
+
+static GhAsset PickMacOsAsset(const std::vector<GhAsset>& assets) {
+    auto is_archive = [](const std::string& n) {
+        return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||
+               (n.size() >= 7 && n.substr(n.size() - 7) == ".tar.gz");
+    };
+
+    std::vector<GhAsset> matches;
+    for (const auto& a : assets) {
+        std::string n = ToLowerStr(a.name);
+        if (is_archive(n) && IsMacOsAssetName(n) && !LooksLikeCompanionTool(n)) matches.push_back(a);
+    }
+    if (!matches.empty()) {
+        const GhAsset* best = &matches.front();
+        int best_rank = MacOsArchPreferenceRank(ToLowerStr(best->name));
+        for (const auto& a : matches) {
+            int rank = MacOsArchPreferenceRank(ToLowerStr(a.name));
+            if (rank < best_rank) { best = &a; best_rank = rank; }
+            if (best_rank == 0) break;
+        }
+        return *best;
+    }
+    return GhAsset{};
+}
+#endif
+
 // Downloads the latest release of def, extracts it into ports/<id>/ and
 // flattens it. Runs on a worker thread - network + disk I/O, seconds to
 // minutes depending on the release size and the user's connection.
@@ -740,6 +701,9 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
 #ifdef _WIN32
     GhAsset asset = PickWindowsAsset(assets);
     if (asset.url.empty()) { out_error = "nenhum build Windows na release"; return false; }
+#elif defined(__APPLE__)
+    GhAsset asset = PickMacOsAsset(assets);
+    if (asset.url.empty()) { out_error = "nenhum build macOS na release deste port"; return false; }
 #else
     GhAsset asset = PickLinuxAsset(assets);
     if (asset.url.empty()) { out_error = "nenhum build Linux na release deste port"; return false; }
@@ -790,6 +754,21 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         if (!extracted) { out_error = "falha ao extrair o pacote"; return false; }
 
         FlattenSingleSubfolder(dest_dir);
+
+        // If the extracted folder contains no executable but contains a nested archive
+        // (common in macOS releases where Game.app is inside a nested .zip), extract it.
+        if (FindBestExecutable(dest_dir).empty()) {
+            for (const auto& e : fs::directory_iterator(dest_dir, ec)) {
+                if (ec || !e.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(e.path().filename().string());
+                if (fname.size() >= 4 && fname.substr(fname.size() - 4) == ".zip" && fname.rfind("._", 0) != 0) {
+                    ArchiveExtractAll(e.path().string(), dest_dir);
+                    fs::remove(e.path(), ec);
+                    FlattenSingleSubfolder(dest_dir);
+                    break;
+                }
+            }
+        }
     }
 
     if (FindBestExecutable(dest_dir).empty()) { out_error = "pacote instalado sem executavel"; return false; }
@@ -824,16 +803,13 @@ std::vector<PortGameInfo> PortGetAvailableList() {
             if (fs::exists(hinted)) exe = hinted;
         }
 
-#ifndef _WIN32
-        // Every entry in this table is offered on Windows regardless of
-        // whether it was ever verified there (the launcher default list this
-        // was copied from targets Windows first) - but on Linux, silently
-        // offering a title whose only release is a Windows .zip means
-        // selecting it always fails with "nenhum build Linux na release
-        // deste port" after a download attempt. Hide those instead, unless
-        // the user already has a working executable sitting in ports/<id>/
-        // regardless of what has_linux_build says (a stale verification
-        // should never hide something that demonstrably already runs).
+#ifdef _WIN32
+        // Every entry in this table is offered on Windows
+#elif defined(__APPLE__)
+        // On macOS, hide titles with no macOS build unless already present on disk.
+        if (!def.has_macos_build && exe.empty()) continue;
+#else
+        // On Linux, hide titles with no Linux build unless already present on disk.
         if (!def.has_linux_build && exe.empty()) continue;
 #endif
 

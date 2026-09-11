@@ -153,8 +153,9 @@
 *.lock*
 .gradle/
 **/.gradle/
-# Credenciais de deploy (o .example.bat vai para o repositorio, este nao)
+# Credenciais de deploy (o .example.bat vai para o repositorio, estes nao)
 /deploy_env.bat
+/deploy_env.sh
 /tools/download_bios.ps1
 /tools/download_bios.ps1
 

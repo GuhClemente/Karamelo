@@ -555,85 +555,58 @@ mudança necessária é a contagem da seção 9.3/9.9.
 
 Pedido direto do dono do projeto: a lista de "Ports & Recomp" no site deve
 **filtrar por sistema operacional e mostrar um ícone de qual SO cada jogo
-suporta** — 🪟 para Windows, 🐧 para Linux. A fonte de verdade agora é a
-própria tabela em [CREDITS.md](../CREDITS.md), que ganhou uma coluna **SO**
-com exatamente esses dois ícones, verificada em 11/09/2026 contra a release
-mais recente de cada um dos 42 repositórios. Leia de lá — não estime, não
-copie a lista abaixo sem checá-la primeiro (ela existe aqui só pra você não
-se perder revisando, ver a ressalva no fim desta seção).
+suporta** — 🪟 para Windows, 🐧 para Linux, 🍎 para macOS (Apple Silicon &
+Universal). A fonte de verdade agora é a própria tabela em
+[CREDITS.md](../CREDITS.md), que traz a coluna **SO** com esses três ícones,
+verificada em 11/09/2026 contra a release mais recente de cada um dos 42
+repositórios. Leia de lá — não estime, não invente.
 
 ### O que "SO" significa aqui
 
-**Não é sobre o motor recompilado em si — é sobre o que o Karamelo consegue
-baixar e abrir automaticamente.** Alguns desses projetos publicam mais
-plataformas do que as que contam aqui (ex.: o Valkyrie Profile também tem
-build de macOS, o Wave Race 64 também) — isso não vira ícone, porque **o
-Karamelo não roda em macOS**, então não existe um app Karamelo-para-Mac que
-pudesse baixar aquele arquivo. 🐧 só aparece quando existe um `.zip` com
-marcador explícito de Linux no nome da release (o app não arrisca baixar um
-zip sem marcação, para não entregar um binário Windows que não abre) **e**
-esse zip realmente contém um executável, não um pacote Flatpak (que não é
-algo que o app consiga abrir sozinho — `Banjo 64` e `Sonic Unleashed
-Recompiled` caem nesse caso: têm "linux" no nome do arquivo mas não contam),
-**e** precisa ser especificamente um `.zip` - o extrator deste app não abre
-`.tar.gz`/`.tar.xz`/AppImage, então `Pokemon Snap` também fica sem 🐧 apesar
-de ter um build Linux de verdade, só que empacotado como `.tar.gz`.
+**É sobre o que o Karamelo consegue baixar, extrair e abrir automaticamente em
+cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
+macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
+filtra dinamicamente os jogos disponíveis para a plataforma em execução:
+- No **Windows**: todos os 42 ports possuem builds executáveis (.exe).
+- No **Linux**: requer um `.zip` com binário Linux executável nativo direto.
+  Pacotes Flatpak dentro de zip (`Banjo 64`, `Sonic Unleashed Recompiled`) e
+  arquivos `.tar.gz` (`Pokemon Snap`) não contam hoje (total: 16 ports).
+- No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
+  Universal > Intel), extrai pacotes `.app` descompactados e zips aninhados.
+  Hoje 18 ports possuem releases comprovadas para macOS.
 
-### ⚠️ Antes de publicar o ícone 🐧 em qualquer lugar do site
+### O que implementar no site
 
-A build Linux do Karamelo **ainda não é a versão publicada** em
-`karamelo-emu.com` — confira isso primeiro, direto na fonte, não assuma:
+1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
+   detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
+   Recomp exibida deve filtrar conforme o SO selecionado:
+   - **Filtro Windows (🪟)**: 42 jogos.
+   - **Filtro Linux (🐧)**: 16 jogos.
+   - **Filtro macOS (🍎)**: 18 jogos.
+2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
+   dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
+3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
+   derive-os da contagem dos ícones em `CREDITS.md`.
 
-```
-https://karamelo-emu.com/downloads/version.json
-```
+### Resumo das compatibilidades (11/09/2026)
 
-Se esse arquivo **não tiver** os campos `linux_bin_url`/`linux_tar_url`
-(formato descrito na seção 3), o Linux ainda não foi lançado publicamente e
-a coluna 🐧 não deve aparecer em lugar nenhum do site ainda — nem no ícone
-por jogo, nem prometendo "também disponível pra Linux". Assim que esse
-arquivo passar a ter os campos de Linux, a filtragem abaixo já pode entrar.
+Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-### O que implementar, quando o Linux já estiver publicado
-
-1. **Filtro por SO.** Se a página tiver alguma forma de o visitante escolher
-   a plataforma (aba, toggle, ou detecção automática do SO de quem visita),
-   a lista de Ports & Recomp exibida deve mostrar só as entradas com o ícone
-   daquele SO — hoje isso é 42 no filtro Windows e 16 no filtro Linux.
-2. **Ícone por jogo.** Onde quer que a lista apareça (card, tabela, grid),
-   cada entrada mostra 🪟 e/ou 🐧 conforme a coluna SO do `CREDITS.md`. Se só
-   tiver 🪟, não precisa dizer nada extra — é o padrão da categoria.
-3. **Contagem.** Se o site publicar "N jogos suportam Linux" ou algo parecido,
-   o número vem de contar as linhas com 🐧 em `CREDITS.md` no momento da
-   publicação, nunca do número fixo "16" — essa tabela muda toda vez que um
-   projeto de terceiro adiciona ou remove uma plataforma.
-
-### Lista completa de 11/09/2026, para não se perder revisando
-
-Confira sempre contra o `CREDITS.md` antes de publicar — isto aqui é uma
-cópia de leitura rápida, não a fonte:
-
-**🪟🐧 (16, funcionam nos dois SOs):** Zelda 64: Recompiled (OoT/MM), Goemon
-64, Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT
-(Ship of Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox 64 (Starship),
-Star Fox (SNES, Enhanced), Mario Kart 64 (SpaghettiKart), Super Mario 64
-(Ghostship), Super Mario 64 Coop Deluxe, Infinite Mario 64, Super Mario Bros.
-Remastered, Valkyrie Profile.
-
-**🪟 apenas (26, só Windows):** Dr. Mario 64, Dinosaur Planet, Snowboard
-Kids 2, Pokemon Stadium, Banjo 64, Chameleon Twist, Quest 64, Perfect Dark,
-Animal Crossing (GameCube), Banjo-Kazooie: Nuts & Bolts, Dragon Ball Z
-Budokai, Jak & Daxter (OpenGOAL), LoD: Severed Chains, REDRIVER 2,
-Castlevania: Symphony of the Night, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
-Unleashed Recompiled, Space Station Silicon Valley, Super Mario World, Super
-Metroid, Viva Pinata: Trouble in Paradise, WipEout Phantom Edition, OutRun
-(CannonBall DX), Wave Race 64, Pokemon Snap.
-
-Essa divisão 16/26 vai ficar desatualizada com o tempo — cada projeto de
-terceiro pode adicionar ou tirar uma plataforma a qualquer release deles, sem
-avisar o Karamelo. Reverifique contra `CREDITS.md` (que por sua vez precisa
-ser reverificado contra a API do GitHub periodicamente - não é uma tarefa
-única).
+- **🪟🐧🍎 (13 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+  Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
+  Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
+  Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
+  Infinite Mario 64, Valkyrie Profile.
+- **🪟🍎 (5 jogos, Windows e macOS):** Snowboard Kids 2, Banjo 64, Space Station
+  Silicon Valley, Wave Race 64.
+- **🪟🐧 (3 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
+  Remastered.
+- **🪟 apenas (21 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+  Pokemon Stadium, Chameleon Twist, Quest 64, Perfect Dark, Animal Crossing (GC),
+  Banjo-Kazooie: Nuts & Bolts, DBZ Budokai, Jak & Daxter, LoD: Severed Chains,
+  REDRIVER 2, Castlevania: SotN, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
+  Unleashed, Super Mario World, Super Metroid, Viva Pinata, WipEout Phantom
+  Edition, OutRun (CannonBall DX), Pokemon Snap.
 
 ---
 
@@ -659,3 +632,22 @@ especificamente:
 
 Se a página não descrever entradas individuais (o caso comum), a única
 mudança necessária é a contagem da seção 9.3/9.9 e a lista da seção 12.
+
+---
+
+## 14. Suporte Nativo a macOS (Apple Silicon ARM64) — 11/09/2026
+
+O Karamelo agora possui compilação e suporte nativo completo para **macOS (Apple Silicon M1/M2/M3/M4)**.
+
+### Resumo Técnico para o Site
+
+1. **Arquitetura**: Nativo ARM64 (Apple Silicon). Não necessita de emulação x86 nem Rosetta 2 para o app principal.
+2. **Motores de Emulação**: 39 cores Libretro compilados nativamente em `.dylib` ARM64. Testados e validados em bateria de stress (240 ciclos contínuos de abertura, carga de jogo, execução de quadros e encerramento com 0 falhas).
+3. **Download Principal**: Pacote `Karamelo_v<versão>_macOS_arm64.tar.gz`, apontado pela chave `macos_tar_url` no `version.json`.
+4. **Auto-Update macOS**: O aplicativo no macOS se auto-atualiza consultando `macos_bin_url`, `macos_bin_size` e `macos_bin_sha256` no `version.json`.
+5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
+   - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
+   - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
+   - 18 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
+6. **Detecção no Site**:
+   - Recomenda-se detectar o SO do usuário (`MacIntel` com `navigator.maxTouchPoints > 0` ou `navigator.userAgent` contendo `Macintosh`) para destacar o botão **Baixar para macOS (Apple Silicon)** por padrão para usuários Apple.

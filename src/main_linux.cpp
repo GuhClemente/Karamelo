@@ -708,6 +708,7 @@ int main(int argc, char* argv[])
 		printf("  --version, -v                 Exibe a versao\n");
 		printf("  --help, -h                    Exibe esta mensagem de ajuda\n");
 		printf("  --core-selftest <core> <rom>  Executa teste de carregamento e encerramento de core\n");
+		printf("  --core-stress <c> <r> [n]     Executa stress test de N ciclos (abrir/carregar/fechar)\n");
 		printf("  --install-port <id>           Instala um port sem abrir a interface grafica\n");
 		return 0;
 	}
@@ -809,6 +810,60 @@ int main(int argc, char* argv[])
 		log("RESULT=%s", pass ? "PASS" : "FAIL");
 		if (lf) fclose(lf);
 		return pass ? 0 : 1;
+	}
+
+	// -------------------------------------------------------------
+	// 2. Headless Core Stress Mode (--core-stress)
+	// -------------------------------------------------------------
+	if (argc > 3 && strcmp(argv[1], "--core-stress") == 0)
+	{
+		const char* core_path = argv[2];
+		const char* rom_path = argv[3];
+		int iterations = (argc > 4) ? atoi(argv[4]) : 20;
+		if (iterations <= 0) iterations = 20;
+
+		printf("[STRESS] Iniciando stress test de %d ciclos para o core: %s (ROM: %s)\n",
+			iterations, core_path, rom_path);
+		int passed = 0;
+		DWORD t_total = GetTickCount();
+
+		for (int i = 1; i <= iterations; i++)
+		{
+			DWORD t0 = GetTickCount();
+			bool started = CoreRequestLoad(rom_path, core_path);
+			DWORD waited_ms = 0;
+			while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 5000)
+			{
+				Sleep(10);
+				waited_ms += 10;
+			}
+			bool running = CoreIsRunning();
+			if (running)
+			{
+				Sleep(40);
+			}
+			DWORD shutdown_t0 = GetTickCount();
+			CoreShutdown();
+			DWORD shutdown_ms = GetTickCount() - shutdown_t0;
+			DWORD cycle_ms = GetTickCount() - t0;
+
+			if (started && running)
+			{
+				passed++;
+				printf("  [Ciclo %2d/%d] OK: load=%ums shutdown=%ums total=%ums\n",
+					i, iterations, waited_ms, shutdown_ms, cycle_ms);
+			}
+			else
+			{
+				printf("  [Ciclo %2d/%d] FALHA: started=%d running=%d waited=%ums\n",
+					i, iterations, started ? 1 : 0, running ? 1 : 0, waited_ms);
+				break;
+			}
+		}
+		DWORD elapsed = GetTickCount() - t_total;
+		printf("[STRESS] Concluido: %d/%d ciclos com sucesso em %.2fs (media: %.1fms/ciclo)\n",
+			passed, iterations, elapsed / 1000.0, elapsed / (double)iterations);
+		return (passed == iterations) ? 0 : 1;
 	}
 
 	// -------------------------------------------------------------
