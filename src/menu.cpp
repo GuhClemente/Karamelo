@@ -530,8 +530,11 @@ static bool CoreBinaryExists(const char* dll_or_so_path) {
   std::string p = dll_or_so_path;
 #ifndef _WIN32
   if (p.size() >= 4 && p.substr(p.size() - 4) == ".dll") {
-    std::string so = p.substr(0, p.size() - 4) + ".so";
-    if (fs::exists(so, ec) || fs::exists("app/" + so, ec)) return true;
+    std::string base = p.substr(0, p.size() - 4);
+    std::string dylib = base + ".dylib";
+    std::string so = base + ".so";
+    if (fs::exists(dylib, ec) || fs::exists("app/" + dylib, ec) ||
+        fs::exists(so, ec) || fs::exists("app/" + so, ec)) return true;
   }
   return fs::exists(p, ec) || fs::exists("app/" + p, ec);
 #else

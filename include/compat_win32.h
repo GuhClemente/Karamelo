@@ -155,6 +155,9 @@ struct WinHandle
 		struct {
 			pthread_t th;
 			bool joined;
+			pthread_mutex_t mtx;
+			pthread_cond_t cond;
+			bool finished;
 		} thread;
 		struct {
 			pthread_mutex_t mtx;
@@ -169,7 +172,20 @@ struct ThreadShimData
 {
 	LPTHREAD_START_ROUTINE fn;
 	LPVOID param;
+	WinHandle* handle;
 };
+
+static inline void ThreadCleanupHandler(void* arg)
+{
+	WinHandle* h = (WinHandle*)arg;
+	if (h)
+	{
+		pthread_mutex_lock(&h->thread.mtx);
+		h->thread.finished = true;
+		pthread_cond_broadcast(&h->thread.cond);
+		pthread_mutex_unlock(&h->thread.mtx);
+	}
+}
 
 static inline void* ThreadShimProc(void* p)
 {
@@ -188,8 +204,12 @@ static inline void* ThreadShimProc(void* p)
 	ThreadShimData* s = (ThreadShimData*)p;
 	LPTHREAD_START_ROUTINE fn = s->fn;
 	LPVOID param = s->param;
+	WinHandle* h = s->handle;
 	delete s;
+
+	pthread_cleanup_push(ThreadCleanupHandler, h);
 	fn(param);
+	pthread_cleanup_pop(1);
 	return NULL;
 }
 
@@ -199,9 +219,14 @@ static inline HANDLE CreateThread(void* sec, size_t stack, LPTHREAD_START_ROUTIN
 	WinHandle* h = new WinHandle();
 	h->type = HANDLE_TYPE_THREAD;
 	h->thread.joined = false;
-	ThreadShimData* s = new ThreadShimData{ fn, param };
+	h->thread.finished = false;
+	pthread_mutex_init(&h->thread.mtx, NULL);
+	pthread_cond_init(&h->thread.cond, NULL);
+	ThreadShimData* s = new ThreadShimData{ fn, param, h };
 	if (pthread_create(&h->thread.th, NULL, ThreadShimProc, s) != 0)
 	{
+		pthread_mutex_destroy(&h->thread.mtx);
+		pthread_cond_destroy(&h->thread.cond);
 		delete s;
 		delete h;
 		return NULL;
@@ -303,40 +328,57 @@ static inline DWORD WaitForSingleObject(HANDLE handle, DWORD ms)
 	else if (h->type == HANDLE_TYPE_THREAD)
 	{
 		if (h->thread.joined) return WAIT_OBJECT_0;
+
+		pthread_mutex_lock(&h->thread.mtx);
+		if (h->thread.finished)
+		{
+			pthread_mutex_unlock(&h->thread.mtx);
+			pthread_join(h->thread.th, NULL);
+			h->thread.joined = true;
+			return WAIT_OBJECT_0;
+		}
+
+		if (ms == 0)
+		{
+			pthread_mutex_unlock(&h->thread.mtx);
+			return WAIT_TIMEOUT;
+		}
+
+		int ret = 0;
 		if (ms == INFINITE)
+		{
+			while (!h->thread.finished)
+			{
+				pthread_cond_wait(&h->thread.cond, &h->thread.mtx);
+			}
+		}
+		else
+		{
+			struct timespec ts;
+			clock_gettime(CLOCK_REALTIME, &ts);
+			ts.tv_sec += ms / 1000;
+			ts.tv_nsec += (ms % 1000) * 1000000;
+			if (ts.tv_nsec >= 1000000000)
+			{
+				ts.tv_sec += 1;
+				ts.tv_nsec -= 1000000000;
+			}
+			while (!h->thread.finished && ret == 0)
+			{
+				ret = pthread_cond_timedwait(&h->thread.cond, &h->thread.mtx, &ts);
+			}
+		}
+
+		bool is_finished = h->thread.finished;
+		pthread_mutex_unlock(&h->thread.mtx);
+
+		if (is_finished)
 		{
 			pthread_join(h->thread.th, NULL);
 			h->thread.joined = true;
 			return WAIT_OBJECT_0;
 		}
-		if (ms == 0)
-		{
-			int tj = pthread_tryjoin_np(h->thread.th, NULL);
-			if (tj == 0)
-			{
-				h->thread.joined = true;
-				return WAIT_OBJECT_0;
-			}
-			return WAIT_TIMEOUT;
-		}
-
-		struct timespec ts;
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += ms / 1000;
-		ts.tv_nsec += (ms % 1000) * 1000000;
-		if (ts.tv_nsec >= 1000000000)
-		{
-			ts.tv_sec += 1;
-			ts.tv_nsec -= 1000000000;
-		}
-		int ret = pthread_timedjoin_np(h->thread.th, NULL, &ts);
-		if (ret == 0)
-		{
-			h->thread.joined = true;
-			return WAIT_OBJECT_0;
-		}
-		if (ret == ETIMEDOUT) return WAIT_TIMEOUT;
-		return WAIT_FAILED;
+		return (ret == ETIMEDOUT) ? WAIT_TIMEOUT : WAIT_FAILED;
 	}
 	return WAIT_FAILED;
 }
@@ -356,6 +398,8 @@ static inline BOOL CloseHandle(HANDLE handle)
 		{
 			pthread_detach(h->thread.th);
 		}
+		pthread_mutex_destroy(&h->thread.mtx);
+		pthread_cond_destroy(&h->thread.cond);
 	}
 	delete h;
 	return TRUE;
@@ -389,8 +433,13 @@ static inline DWORD GetWindowThreadProcessId(HWND hWnd, DWORD* lpdwProcessId)
 	return (DWORD)getpid();
 }
 
+#if defined(__APPLE__)
+#define _fseeki64 fseeko
+#define _ftelli64 ftello
+#else
 #define _fseeki64 fseeko64
 #define _ftelli64 ftello64
+#endif
 
 // ---------------------------------------------------------------------------
 // Clocks & Timing
@@ -618,6 +667,22 @@ SHORT GetAsyncKeyState(int vk);
 }
 #endif
 
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+static inline DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize)
+{
+	(void)hModule;
+	uint32_t size = (uint32_t)nSize;
+	if (_NSGetExecutablePath(lpFilename, &size) == 0) {
+		char real[PATH_MAX];
+		if (realpath(lpFilename, real)) {
+			strncpy_s(lpFilename, nSize, real, _TRUNCATE);
+		}
+		return (DWORD)strlen(lpFilename);
+	}
+	return 0;
+}
+#else
 static inline DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize)
 {
 	(void)hModule;
@@ -628,6 +693,7 @@ static inline DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD 
 	}
 	return 0;
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Exception Handling Macros

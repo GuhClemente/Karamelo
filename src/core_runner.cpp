@@ -3691,15 +3691,30 @@ static bool CoreLoad(const char* core_dll_path)
 	InterlockedExchange(&g_core_in_module_op, 1);
 #ifndef _WIN32
 	std::string path_str = core_dll_path ? core_dll_path : "";
+	std::string dylib_path = "";
+	std::string so_path = "";
 	if (path_str.size() > 4 && path_str.substr(path_str.size() - 4) == ".dll")
 	{
-		path_str = path_str.substr(0, path_str.size() - 4) + ".so";
+		std::string base = path_str.substr(0, path_str.size() - 4);
+		dylib_path = base + ".dylib";
+		so_path = base + ".so";
 	}
+	if (!dylib_path.empty() && dylib_path[0] != '/' && dylib_path.rfind("./", 0) != 0)
+		dylib_path = "./" + dylib_path;
+	if (!so_path.empty() && so_path[0] != '/' && so_path.rfind("./", 0) != 0)
+		so_path = "./" + so_path;
 	if (!path_str.empty() && path_str[0] != '/' && path_str.rfind("./", 0) != 0)
-	{
 		path_str = "./" + path_str;
-	}
-	h_core_dll = LoadLibraryA(path_str.c_str());
+
+#if defined(__APPLE__)
+	if (!dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
+	if (!h_core_dll && !so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
+#else
+	if (!so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
+	if (!h_core_dll && !dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
+#endif
+	if (!h_core_dll && !path_str.empty())
+		h_core_dll = LoadLibraryA(path_str.c_str());
 	if (!h_core_dll && core_dll_path)
 		h_core_dll = LoadLibraryA(core_dll_path);
 #else

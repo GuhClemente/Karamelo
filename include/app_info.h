@@ -1,4 +1,4 @@
-﻿#ifndef APP_INFO_H_INCLUDED
+#ifndef APP_INFO_H_INCLUDED
 #define APP_INFO_H_INCLUDED
 
 // Single source of truth for the application's identity, and the same figures
@@ -16,7 +16,17 @@
 #define APP_NAME        "Karamelo"
 #define APP_NAME_FULL   "Karamelo Emulador"
 #define APP_VERSION     "0.9.4"
+#if defined(__APPLE__) && defined(__arm64__)
+#define APP_ARCH        "arm64"
+#elif defined(__APPLE__)
+#define APP_ARCH        "macOS"
+#elif defined(__aarch64__)
+#define APP_ARCH        "arm64"
+#elif defined(__x86_64__) || defined(_M_X64)
 #define APP_ARCH        "x64"
+#else
+#define APP_ARCH        "x86"
+#endif
 #define APP_EXE_BASE    "Karamelo"
 #define APP_EXE_NAME    "Karamelo_v0.9.4.exe"
 #define APP_GITHUB_REPO "GuhClemente/Karamelo"

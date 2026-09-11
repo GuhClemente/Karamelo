@@ -3,6 +3,12 @@
 #include <windows.h>
 #include <gl/GL.h>
 #pragma comment(lib, "opengl32.lib")
+#elif defined(__APPLE__)
+#include "compat_win32.h"
+#include <OpenGL/gl.h>
+#ifndef APIENTRY
+#define APIENTRY
+#endif
 #else
 #include "compat_win32.h"
 #include <GL/gl.h>
