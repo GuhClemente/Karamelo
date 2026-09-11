@@ -1004,7 +1004,7 @@ int main(int argc, char* argv[])
 				{
 					MenuProcessKey(KEY_MENU_TOGGLE);
 				}
-				else if (sc == SDL_SCANCODE_F11)
+				else if (sc == SDL_SCANCODE_F11 || (sc == SDL_SCANCODE_RETURN && (event.key.mod & SDL_KMOD_ALT)))
 				{
 					bool is_full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN) != 0;
 					SDL_SetWindowFullscreen(g_window, !is_full);
@@ -1061,6 +1061,7 @@ int main(int argc, char* argv[])
 
 		PollGamepad();
 		PollMouseStylus();
+		PortPumpPendingLaunch();
 
 		if (MenuGetSyncMode() != last_sync_mode)
 		{
@@ -1118,7 +1119,11 @@ int main(int argc, char* argv[])
 			SDL_RenderPresent(g_renderer);
 		}
 
-		if (!last_vsync)
+		if (PortIsRunning())
+		{
+			SDL_Delay(30);
+		}
+		else if (!last_vsync)
 		{
 			SDL_Delay(1);
 		}

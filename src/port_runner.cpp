@@ -61,6 +61,7 @@ static std::atomic<int> s_active_bg_threads(0);
 static std::mutex       s_pending_lock;
 static std::string      s_pending_launch_id;
 static std::atomic<bool> s_has_pending_launch(false);
+static std::atomic<bool> s_port_needs_restore(false);
 // Nome do port que esta baixando, para o aviso de progresso (ver o topo de
 // PortPumpPendingLaunch). Protegido pelo mesmo s_pending_lock.
 static std::string      s_installing_name;
@@ -1200,12 +1201,10 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
         s_port_running.store(false);
 
-        // Restore the Karamelo window with full focus
-        if (window) {
-            SDL_RestoreWindow(window);
-            SDL_RaiseWindow(window);
-        }
-        OsdEnable();
+        // Window restoration must happen on the main UI thread (via PortPumpPendingLaunch).
+        // On macOS (Cocoa / AppKit), calling SDL_RestoreWindow or SDL_RaiseWindow
+        // from a secondary thread causes an AppKit thread safety violation (SIGTRAP / trace trap 133).
+        s_port_needs_restore.store(true);
         s_active_bg_threads.fetch_sub(1);
     }).detach();
     } catch (const std::system_error&) {
@@ -1331,6 +1330,16 @@ bool PortLaunch(const std::string& port_id) {
 }
 
 void PortPumpPendingLaunch() {
+    // Process window restoration from the main thread if a port just exited
+    if (s_port_needs_restore.exchange(false)) {
+        SDL_Window* window = MainGetSdlWindow();
+        if (window) {
+            SDL_RestoreWindow(window);
+            SDL_RaiseWindow(window);
+        }
+        OsdEnable();
+    }
+
     // Mantem o "BAIXANDO..." na tela enquanto o download durar. Os toasts
     // passaram a expirar por relogio, e um download de centenas de MB dura
     // bem mais que os 10 s da mensagem. Antes ela ficava por acidente - o
