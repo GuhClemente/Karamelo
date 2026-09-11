@@ -94,6 +94,24 @@ struct PortDefinition {
     std::string exe_hint;    // expected exe filename, best-effort only
     bool needs_rom;
     std::vector<std::string> rom_keywords; // all must appear (lowercased) in a ROM filename
+    // Verified 11/09/2026 by actually checking each repo's latest release for
+    // a .zip PickLinuxAsset would pick (an explicit linux/.deb/.rpm/appimage/
+    // flatpak marker, matching IsLinuxAssetName - see that function's own
+    // comment for why an unmarked zip is never assumed to be a Linux build).
+    // Most of this table has never shipped anything but a Windows zip; only
+    // the entries below with true actually have one. Defaults to false via
+    // this trailing member initializer (valid since C++14 for an aggregate,
+    // which this still is) so every existing entry above didn't need
+    // touching - only the ones being marked true got a 7th element added.
+    // Two releases that DO publish a Linux-tagged .zip were deliberately
+    // left false anyway: BanjoRecomp and SonicUnleashedRecomp's only Linux
+    // asset is a Flatpak bundle wrapped in a .zip, which is not something
+    // FindBestExecutable can launch (no plain executable inside, just the
+    // .flatpak bundle file) - it would pass this matcher, download, then
+    // fail with "pacote instalado sem executavel" the moment it's selected.
+    // This needs re-checking periodically, same as exe_hint/rom_keywords -
+    // a project can add or drop platforms between verifications.
+    bool has_linux_build = false;
 };
 
 static const std::vector<PortDefinition>& KnownPortDefs() {
@@ -114,13 +132,13 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // 64's own ROM); those ports show their own ROM picker on first run
         // instead, which is the normal flow for most of them anyway.
         { "Zelda64Recomp", "Zelda64Recomp",
-          "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" } },
+          "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" }, true },
         { "Goemon64Recomp", "Goemon 64",
-          "klorfmorf/Goemon64Recomp", "", true, { "goemon" } },
+          "klorfmorf/Goemon64Recomp", "", true, { "goemon" }, true },
         { "DinosaurPlanet", "Dinosaur Planet",
           "DinosaurPlanetRecomp/dino-recomp", "", true, { "dinosaur" } },
         { "HarvestMoon64Recomp", "Harvest Moon 64",
-          "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" } },
+          "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" }, true },
         { "SnowboardKids2Recomp", "Snowboard Kids 2",
           "cdlewis/snowboardkids2-recomp", "", true, { "snowboard", "kids", "2" } },
         // No rom_keywords: "pokemon"+"stadium" alone would also match a
@@ -141,21 +159,21 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "Banjo64Recomp", "Banjo 64",
           "BanjoRecomp/BanjoRecomp", "", true, { "banjo" } },
         { "BM64Recomp", "Bomberman 64",
-          "RevoSucks/BM64Recomp", "", true, { "bomberman" } },
+          "RevoSucks/BM64Recomp", "", true, { "bomberman" }, true },
         { "ChameleonTwistRecomp", "Chameleon Twist",
           "Rainchus/ChameleonTwist1-JP-Recomp", "", true, { "chameleon" } },
         { "MegaMan64Recomp", "Mega Man 64",
-          "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" } },
+          "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" }, true },
         { "Quest64Recomp", "Quest 64",
           "Rainchus/Quest64-Recomp", "", true, { "quest" } },
         { "BMHeroRecomp", "Bomberman Hero",
-          "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" } },
+          "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" }, true },
         { "ShipOfHarkinian", "Ship of Harkinian",
-          "harbourmasters/shipwright", "", true, { "zelda", "ocarina" } },
+          "harbourmasters/shipwright", "", true, { "zelda", "ocarina" }, true },
         { "2Ship2Harkinian", "2 Ship 2 Harkinian",
-          "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" } },
+          "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" }, true },
         { "Starship", "Starship",
-          "harbourmasters/starship", "", true, { "star", "fox" } },
+          "harbourmasters/starship", "", true, { "star", "fox" }, true },
         // Not the same game as the two Star Fox 64 (N64) entries above -
         // "built from the UltraStarFox codebase" per the repo's own
         // description, i.e. a source port of the original 1993 SNES Star
@@ -167,18 +185,18 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // at all (it only looks under roms/Nintendo64 and roms/N64) - the
         // scan would find nothing here regardless of keywords.
         { "StarFoxEnhanced", "Star Fox Enhanced",
-          "kandowontu/starfox-enhanced", "", true, {} },
+          "kandowontu/starfox-enhanced", "", true, {}, true },
         { "SpaghettiKart", "SpaghettiKart",
-          "harbourmasters/spaghettikart", "", true, { "mario", "kart" } },
+          "harbourmasters/spaghettikart", "", true, { "mario", "kart" }, true },
         { "Ghostship", "Ghostship",
-          "harbourmasters/ghostship", "", true, {} },
+          "harbourmasters/ghostship", "", true, {}, true },
         // fgsfdsfgs/perfect_dark was the original repo; it has since moved to
         // this org. GitHub's API currently still resolves the old name via
         // redirect, but that isn't guaranteed to keep working.
         { "PerfectDark", "Perfect Dark",
           "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" } },
         { "SM64CoopDX", "Super Mario 64 CoopDX",
-          "coop-deluxe/sm64coopdx", "", true, {} },
+          "coop-deluxe/sm64coopdx", "", true, {}, true },
         { "CannonballDX", "OutRun (CannonBall DX)",
           "Endprodukt/cannonball-dx", "cannonball-dx.exe",
           true, { "outrun" } },
@@ -210,7 +228,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "DBZBudokai", "Dragon Ball Z Budokai",
           "WistfulHopes/DBZ1", "", true, {} },
         { "InfiniteMario64", "Infinite Mario 64",
-          "Brawmario/infinite-mario-64-ever", "", true, {} },
+          "Brawmario/infinite-mario-64-ever", "", true, {}, true },
         { "JakAndDaxter", "Jak & Daxter",
           "open-goal/jak-project", "", true, {} },
         { "SeveredChains", "Severed Chains",
@@ -228,7 +246,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "SpaceStationSiliconValley", "Space Station Silicon Valley",
           "Cellenseres/SSSV_Recomp", "", true, { "silicon", "valley" } },
         { "SMBRemastered", "Super Mario Bros. Remastered",
-          "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {} },
+          "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {}, true },
         { "SuperMarioWorldRecomp", "Super Mario World",
           "mstan/SuperMarioWorldRecomp", "", true, {} },
         { "SuperMetroidRecomp", "Super Metroid",
@@ -261,7 +279,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // every other port, never bundled - but it does mean the port itself
         // isn't free for commercial use the way Karamelo now is.
         { "ValkyrieRecomp", "Valkyrie Profile",
-          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {} },
+          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {}, true },
     };
     return defs;
 }
@@ -761,6 +779,19 @@ std::vector<PortGameInfo> PortGetAvailableList() {
             std::string hinted = dir + "/" + def.exe_hint;
             if (fs::exists(hinted)) exe = hinted;
         }
+
+#ifndef _WIN32
+        // Every entry in this table is offered on Windows regardless of
+        // whether it was ever verified there (the launcher default list this
+        // was copied from targets Windows first) - but on Linux, silently
+        // offering a title whose only release is a Windows .zip means
+        // selecting it always fails with "nenhum build Linux na release
+        // deste port" after a download attempt. Hide those instead, unless
+        // the user already has a working executable sitting in ports/<id>/
+        // regardless of what has_linux_build says (a stale verification
+        // should never hide something that demonstrably already runs).
+        if (!def.has_linux_build && exe.empty()) continue;
+#endif
 
         // Games are never bundled with the app itself (no ROMs, no ports/
         // shipped in the project or the release zip - see .gitignore) - the
