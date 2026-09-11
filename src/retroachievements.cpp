@@ -253,31 +253,85 @@ static void HttpPerform(HttpJob* job)
 	WinHttpCloseHandle(session);
 }
 #else
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+extern char** environ;
+
 static void HttpPerform(HttpJob* job)
 {
 	job->status = 0;
 	if (!job || job->url.empty()) return;
 
-	std::string cmd = "curl -s -w \"\\n%{http_code}\"";
+	int in_pipe[2];
+	int out_pipe[2];
+	if (pipe(in_pipe) != 0) return;
+	if (pipe(out_pipe) != 0) { close(in_pipe[0]); close(in_pipe[1]); return; }
+
+	posix_spawn_file_actions_t actions;
+	posix_spawn_file_actions_init(&actions);
+	posix_spawn_file_actions_adddup2(&actions, in_pipe[0], STDIN_FILENO);
+	posix_spawn_file_actions_adddup2(&actions, out_pipe[1], STDOUT_FILENO);
+	posix_spawn_file_actions_addclose(&actions, in_pipe[1]);
+	posix_spawn_file_actions_addclose(&actions, out_pipe[0]);
+
+	std::vector<std::string> args = { "curl", "-s", "-w", "\n%{http_code}" };
 	if (!job->post_data.empty())
 	{
-		cmd += " -X POST -d '" + job->post_data + "'";
+		args.push_back("-X");
+		args.push_back("POST");
+		args.push_back("--data-binary");
+		args.push_back("@-");
 		if (!job->content_type.empty())
-			cmd += " -H 'Content-Type: " + job->content_type + "'";
+		{
+			args.push_back("-H");
+			args.push_back("Content-Type: " + job->content_type);
+		}
 	}
-	cmd += " \"" + job->url + "\"";
+	args.push_back(job->url);
 
-	FILE* pipe = popen(cmd.c_str(), "r");
-	if (!pipe) return;
+	std::vector<char*> argv;
+	for (auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+	argv.push_back(nullptr);
+
+	pid_t pid;
+	int rc = posix_spawnp(&pid, "curl", &actions, NULL, argv.data(), environ);
+	posix_spawn_file_actions_destroy(&actions);
+	close(in_pipe[0]);
+	close(out_pipe[1]);
+
+	if (rc != 0)
+	{
+		close(in_pipe[1]);
+		close(out_pipe[0]);
+		return;
+	}
+
+	if (!job->post_data.empty())
+	{
+		const char* p = job->post_data.data();
+		size_t to_write = job->post_data.size();
+		while (to_write > 0)
+		{
+			ssize_t w = write(in_pipe[1], p, to_write);
+			if (w <= 0) break;
+			p += w;
+			to_write -= (size_t)w;
+		}
+	}
+	close(in_pipe[1]);
 
 	std::string output;
 	char buf[4096];
-	size_t n;
-	while ((n = fread(buf, 1, sizeof(buf), pipe)) > 0)
+	ssize_t n;
+	while ((n = read(out_pipe[0], buf, sizeof(buf))) > 0)
 	{
-		output.append(buf, n);
+		output.append(buf, (size_t)n);
 	}
-	pclose(pipe);
+	close(out_pipe[0]);
+
+	int status = 0;
+	waitpid(pid, &status, 0);
 
 	size_t last_nl = output.find_last_of('\n');
 	if (last_nl != std::string::npos && last_nl + 1 < output.size())

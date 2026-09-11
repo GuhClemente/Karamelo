@@ -911,6 +911,11 @@ static void InitAudio(int sample_rate)
 	}
 	else
 	{
+		if (h_audio_event)
+		{
+			CloseHandle(h_audio_event);
+			h_audio_event = NULL;
+		}
 		// Both attempts failed - every game from here on plays completely
 		// silent with nothing else in the log to explain why (audio_initialized
 		// stays false, so SendAudioSamples() no-ops every call with no error of

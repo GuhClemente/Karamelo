@@ -1881,6 +1881,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			MenuSetWindowRect(wx, wy, ww, wh);
 	}
 
+	GamepadShutdown();
 	SDL_Quit();
 
 	if (h_mem_dc) DeleteDC(h_mem_dc);

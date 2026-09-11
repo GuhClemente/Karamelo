@@ -6,6 +6,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <signal.h>
 #include <string>
 #include <vector>
 #include <memory>
@@ -37,6 +38,44 @@ const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
 const int CANVAS_WIDTH = 640;
 const int CANVAS_HEIGHT = 360;
+
+#define PRESENT_MAX_W 1920
+#define PRESENT_MAX_H 1200
+
+static uint32_t* present_buffer = nullptr;
+static SDL_Texture* g_present_texture = nullptr;
+static int present_w = 0;
+static int present_h = 0;
+static bool g_use_present = false;
+
+static bool EnsurePresentBuffer(int w, int h)
+{
+	if (w < 16 || h < 16) return false;
+	if (w > PRESENT_MAX_W) w = PRESENT_MAX_W;
+	if (h > PRESENT_MAX_H) h = PRESENT_MAX_H;
+
+	if (present_buffer && g_present_texture && w == present_w && h == present_h) return true;
+
+	if (g_present_texture) { SDL_DestroyTexture(g_present_texture); g_present_texture = nullptr; }
+	delete[] present_buffer;
+	present_buffer = nullptr;
+
+	present_buffer = new (std::nothrow) uint32_t[w * h];
+	if (!present_buffer) return false;
+
+	g_present_texture = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+	if (!g_present_texture)
+	{
+		delete[] present_buffer;
+		present_buffer = nullptr;
+		return false;
+	}
+	SDL_SetTextureBlendMode(g_present_texture, SDL_BLENDMODE_NONE);
+	SDL_SetTextureScaleMode(g_present_texture, SDL_SCALEMODE_LINEAR);
+	present_w = w;
+	present_h = h;
+	return true;
+}
 
 struct ThemeColor
 {
@@ -216,6 +255,43 @@ static void RenderFrame()
 		noise_seed ^= noise_seed << 5;
 		return noise_seed;
 	};
+
+	g_use_present = false;
+	if (CoreIsRunning() && !CoreIsLoading() && !OsdIsEnabled())
+	{
+		int win_w = 0, win_h = 0;
+		SDL_GetWindowSizeInPixels(g_window, &win_w, &win_h);
+		if (EnsurePresentBuffer(win_w, win_h))
+		{
+			CoreRender(present_buffer, present_w, present_h, MenuGetAspectMode(), MenuGetFilterMode());
+			for (int i = 0; i < present_w * present_h; i++)
+			{
+				present_buffer[i] |= 0xFF000000;
+			}
+			g_use_present = true;
+			if (CoreIsToastActive())
+			{
+				DrawToast(present_buffer, present_w, present_h, theme);
+			}
+			return;
+		}
+	}
+
+	if (CoreIsLoading())
+	{
+		for (int y = 0; y < CANVAS_HEIGHT; y++)
+			for (int x = 0; x < CANVAS_WIDTH; x++)
+				pixel_buffer[y * CANVAS_WIDTH + x] = 0xFF020308;
+
+		static int spin = 0;
+		spin++;
+		const char* dots = (spin / 20) % 3 == 0 ? "." : ((spin / 20) % 3 == 1 ? ".." : "...");
+
+		char line[64];
+		snprintf(line, sizeof(line), "LOADING%s", dots);
+		DrawString((CANVAS_WIDTH - (int)strlen(line) * 8) / 2, CANVAS_HEIGHT / 2 - 4, line, theme.text_white);
+		return;
+	}
 
 	if (CoreIsRunning())
 	{
@@ -462,6 +538,28 @@ static void RenderFrame()
 	}
 }
 
+static void PollMouseStylus()
+{
+	if (!CoreIsRunning() || OsdIsEnabled())
+	{
+		CoreSetPointer(0.0, 0.0, false);
+		SDL_ShowCursor();
+		return;
+	}
+
+	SDL_HideCursor();
+
+	float mx = 0.0f, my = 0.0f;
+	SDL_MouseButtonFlags btn = SDL_GetMouseState(&mx, &my);
+
+	int win_w = 0, win_h = 0;
+	SDL_GetWindowSizeInPixels(g_window, &win_w, &win_h);
+	if (win_w <= 0 || win_h <= 0) return;
+
+	bool down = (btn & SDL_BUTTON_LMASK) != 0;
+	CoreSetPointer((double)mx / (double)win_w, (double)my / (double)win_h, down);
+}
+
 static WORD s_prev_pad_buttons = 0;
 static int s_prev_dpad_dir = 0;
 static DWORD s_dpad_first_press_tick = 0;
@@ -567,6 +665,10 @@ static void PollGamepad()
 
 int main(int argc, char* argv[])
 {
+#ifndef _WIN32
+	signal(SIGPIPE, SIG_IGN);
+#endif
+
 	// bios/, cores/, saves/, Wallpapers/, Config/, roms/ and the log are all opened
 	// by relative path, so the working directory has to be the executable's own folder
 	// (matching Win32 main_win32.cpp lines 1362-1377).
@@ -890,6 +992,7 @@ int main(int argc, char* argv[])
 		}
 
 		PollGamepad();
+		PollMouseStylus();
 
 		if (MenuGetSyncMode() != last_sync_mode)
 		{
@@ -915,12 +1018,26 @@ int main(int argc, char* argv[])
 		}
 		RenderFrame();
 
-		SDL_UpdateTexture(g_texture, NULL, pixel_buffer, CANVAS_WIDTH * sizeof(uint32_t));
-		SDL_SetRenderDrawColor(g_renderer, 0, 0, 0, 255);
-		SDL_RenderClear(g_renderer);
-		SDL_FRect dst = { 0.0f, 0.0f, (float)CANVAS_WIDTH, (float)CANVAS_HEIGHT };
-		SDL_RenderTexture(g_renderer, g_texture, NULL, &dst);
-		SDL_RenderPresent(g_renderer);
+		if (g_use_present && g_present_texture && present_buffer)
+		{
+			SDL_SetRenderLogicalPresentation(g_renderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
+			SDL_UpdateTexture(g_present_texture, NULL, present_buffer, present_w * sizeof(uint32_t));
+			SDL_SetRenderDrawColor(g_renderer, 0, 0, 0, 255);
+			SDL_RenderClear(g_renderer);
+			SDL_FRect dst = { 0.0f, 0.0f, (float)present_w, (float)present_h };
+			SDL_RenderTexture(g_renderer, g_present_texture, NULL, &dst);
+			SDL_RenderPresent(g_renderer);
+		}
+		else
+		{
+			SDL_SetRenderLogicalPresentation(g_renderer, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+			SDL_UpdateTexture(g_texture, NULL, pixel_buffer, CANVAS_WIDTH * sizeof(uint32_t));
+			SDL_SetRenderDrawColor(g_renderer, 0, 0, 0, 255);
+			SDL_RenderClear(g_renderer);
+			SDL_FRect dst = { 0.0f, 0.0f, (float)CANVAS_WIDTH, (float)CANVAS_HEIGHT };
+			SDL_RenderTexture(g_renderer, g_texture, NULL, &dst);
+			SDL_RenderPresent(g_renderer);
+		}
 
 		if (!last_vsync)
 		{
@@ -931,6 +1048,7 @@ int main(int argc, char* argv[])
 	// -------------------------------------------------------------
 	// 5. Clean Teardown
 	// -------------------------------------------------------------
+	GamepadShutdown();
 	PortShutdown();
 	CoreShutdown();
 	RaShutdown();
@@ -938,6 +1056,8 @@ int main(int argc, char* argv[])
 	HwShutdown();
 	VkHwShutdown();
 
+	if (present_buffer) { delete[] present_buffer; present_buffer = nullptr; }
+	if (g_present_texture) { SDL_DestroyTexture(g_present_texture); g_present_texture = nullptr; }
 	if (pixel_buffer) { delete[] pixel_buffer; pixel_buffer = nullptr; }
 	if (g_texture) { SDL_DestroyTexture(g_texture); g_texture = nullptr; }
 	if (g_renderer) { SDL_DestroyRenderer(g_renderer); g_renderer = nullptr; }

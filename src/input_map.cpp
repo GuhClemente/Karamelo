@@ -58,6 +58,22 @@ static SDL_Scancode VkToScancode(int vk)
 
 extern "C" SHORT GetAsyncKeyState(int vk)
 {
+	if (vk == VK_LBUTTON)
+	{
+		SDL_MouseButtonFlags btn = SDL_GetMouseState(NULL, NULL);
+		return (btn & SDL_BUTTON_LMASK) ? (SHORT)0x8000 : 0;
+	}
+	if (vk == VK_RBUTTON)
+	{
+		SDL_MouseButtonFlags btn = SDL_GetMouseState(NULL, NULL);
+		return (btn & SDL_BUTTON_RMASK) ? (SHORT)0x8000 : 0;
+	}
+	if (vk == VK_MBUTTON)
+	{
+		SDL_MouseButtonFlags btn = SDL_GetMouseState(NULL, NULL);
+		return (btn & SDL_BUTTON_MMASK) ? (SHORT)0x8000 : 0;
+	}
+
 	int numkeys = 0;
 	const bool* state = SDL_GetKeyboardState(&numkeys);
 	if (!state) return 0;

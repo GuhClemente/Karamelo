@@ -30,4 +30,7 @@ bool GamepadGetState(int slot, XINPUT_STATE* out_state);
 // slot assignment stays in sync with what is actually plugged in.
 void GamepadHandleDeviceEvent(const SDL_Event* event);
 
+// Closes all open gamepad handles on shutdown.
+void GamepadShutdown();
+
 #endif

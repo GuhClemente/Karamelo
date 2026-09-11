@@ -187,3 +187,18 @@ bool GamepadGetState(int slot, XINPUT_STATE* out_state)
 	ReleaseSRWLockShared(&s_pads_lock);
 	return true;
 }
+
+void GamepadShutdown()
+{
+	AcquireSRWLockExclusive(&s_pads_lock);
+	for (int i = 0; i < 4; i++)
+	{
+		if (s_pads[i])
+		{
+			SDL_CloseGamepad(s_pads[i]);
+			s_pads[i] = nullptr;
+		}
+	}
+	ReleaseSRWLockExclusive(&s_pads_lock);
+}
+

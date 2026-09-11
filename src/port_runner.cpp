@@ -1041,6 +1041,13 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         }
     }
 
+    std::vector<char*> argv;
+    argv.push_back(const_cast<char*>(sexe.c_str()));
+    if (!rom_arg.empty()) {
+        argv.push_back(const_cast<char*>(rom_arg.c_str()));
+    }
+    argv.push_back(nullptr);
+
     pid_t pid = fork();
     if (pid < 0) {
         if (window) SDL_RestoreWindow(window);
@@ -1049,14 +1056,9 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     }
     if (pid == 0) {
         // Child: only async-signal-safe calls until exec, per fork()'s
-        // contract in a multithreaded process.
+        // contract in a multithreaded process. chdir, execv, and _exit
+        // are strictly async-signal-safe and perform no heap allocations.
         (void)chdir(sdir.c_str());
-        std::vector<char*> argv;
-        argv.push_back(const_cast<char*>(sexe.c_str()));
-        if (!rom_arg.empty()) {
-            argv.push_back(const_cast<char*>(rom_arg.c_str()));
-        }
-        argv.push_back(nullptr);
         execv(sexe.c_str(), argv.data());
         _exit(127); // exec itself failed (not found / not executable)
     }
