@@ -173,6 +173,18 @@ struct ThreadShimData
 
 static inline void* ThreadShimProc(void* p)
 {
+	// Async, not the pthread default of deferred: TerminateThread() below is
+	// pthread_cancel() under the hood, and deferred cancellation only takes
+	// effect at a cancellation point (a blocking syscall). A core thread stuck
+	// in a CPU-bound loop with no such call never hits one, so the "graceful
+	// stop timed out, force it" recovery path silently did nothing - the
+	// thread kept running and consuming CPU while CoreShutdown() went on to
+	// free the memory and unload the DLL out from under it. TerminateThread
+	// is already the last-resort, already-known-to-be-risky escape hatch
+	// (same as real Windows TerminateThread); this just makes it actually
+	// terminate the thread instead of quietly failing to.
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
 	ThreadShimData* s = (ThreadShimData*)p;
 	LPTHREAD_START_ROUTINE fn = s->fn;
 	LPVOID param = s->param;
