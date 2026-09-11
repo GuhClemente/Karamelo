@@ -244,6 +244,34 @@ static std::string BestExeAmong(const std::vector<fs::path>& candidates) {
 // redistributables, uninstallers, crash handlers - is not. "Largest file
 // anywhere" was the guess this replaced; it happened to work for Dr. Mario
 // 64 but had no real basis once other projects' folder layouts differ.
+#ifndef _WIN32
+// Verified 11/09/2026 against 16 real Linux releases downloaded and
+// extracted from the ports this app actually offers: every single one
+// failed against a "no extension at all" rule, for reasons discovered by
+// that pass, not assumed in advance - Godot exports keep the target triple
+// on the binary name ("SMB1R.x86_64"), several projects ship a single-file
+// AppImage (".appimage" is not empty either, and it's the one extension
+// that genuinely is a runnable binary), and the same applies to whatever
+// macOS command-line binaries or naming conventions turn up next - trying
+// to keep an allowlist of every extension a real release might use is a
+// losing game. A Linux or macOS binary having *some* extension is normal,
+// so the executable permission bit is what actually decides here;
+// extension is used only to reject file kinds no port ever launches even
+// when marked executable (shared libraries, data packs, build/setup
+// scripts, docs).
+static bool IsUnixNeverExecutable(const std::string& lower_ext) {
+    static const std::vector<std::string> never = {
+        ".so", ".dll", ".dylib", ".pck", ".pak", ".dat",
+        ".py", ".sh", ".pl", ".rb",
+        ".txt", ".md", ".yml", ".yaml", ".json", ".cfg", ".ini", ".toml",
+        ".zip", ".tar", ".gz", ".xz", ".7z",
+        ".log", ".pdb", ".map", ".a", ".o"
+    };
+    for (const auto& e : never) if (lower_ext == e) return true;
+    return false;
+}
+#endif
+
 static std::string FindBestExecutable(const std::string& dir) {
     static const std::vector<std::string> blacklist = {
         "unins000.exe", "uninstall.exe", "vc_redist", "dxwebsetup", "dxsetup",
@@ -256,7 +284,14 @@ static std::string FindBestExecutable(const std::string& dir) {
         // just as a separate release asset) - never the thing to launch by
         // default, even though each is a perfectly normal top-level .exe
         // that would otherwise win the alphabetical tie-break.
-        "extractor.exe", "asset_builder.exe", "assetbuilder.exe"
+        "extractor.exe", "asset_builder.exe", "assetbuilder.exe",
+        // Bare (no ".exe") duplicates of the same intent, for Linux/macOS -
+        // a release that ships "starfox_asset_builder" or "coopdx_updater"
+        // with no extension at all sorts before the real game alphabetically
+        // (SM64 Coop Deluxe's own Linux build does exactly this: the update
+        // helper "coopdx_updater" would otherwise win over "sm64coopdx"),
+        // and neither matches any of the ".exe"-suffixed entries above.
+        "updater", "asset_builder", "assetbuilder", "extractor"
     };
     std::error_code ec;
     if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec)) return "";
@@ -277,8 +312,7 @@ static std::string FindBestExecutable(const std::string& dir) {
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
         std::string ext = ToLowerStr(e.path().extension().string());
-        bool is_exe = (ext == ".exe" || ext.empty() || ext == ".arm64" || ext == ".x86_64" || ext == ".bin");
-        if (!is_exe) continue;
+        if (IsUnixNeverExecutable(ext)) continue;
         auto perms = e.status(ec).permissions();
         if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
             continue;
@@ -318,8 +352,7 @@ static std::string FindBestExecutable(const std::string& dir) {
             if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
             std::string ext = ToLowerStr(e.path().extension().string());
-            bool is_exe = (ext == ".exe" || ext.empty() || ext == ".arm64" || ext == ".x86_64" || ext == ".bin");
-            if (!is_exe) continue;
+            if (IsUnixNeverExecutable(ext)) continue;
             auto perms = e.status(ec).permissions();
             if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
                 continue;
@@ -747,7 +780,17 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         std::string exe_path = dest_dir + "/" + exe_name;
         if (!UpdaterHttpDownloadToFile(asset.url, exe_path)) { out_error = "falha no download"; return false; }
     } else {
-        std::string zip_path = "cache/" + def.id + "_download.zip";
+        // Match the local cache file's extension to what was actually picked
+        // instead of assuming .zip: PickMacOsAsset (unlike PickWindowsAsset/
+        // PickLinuxAsset) also matches .tar.gz/.tar.xz, and ArchiveExtractAll
+        // decides how to open a file by looking at *this* path's own
+        // extension - a real .tar.gz saved as "..._download.zip" made it
+        // call unzip on a tar.gz, which unzip cannot read, then fall back to
+        // 7z (not installed on a stock Mac), failing extraction outright.
+        std::string cache_ext = ".zip";
+        if (lower_name.size() >= 7 && lower_name.substr(lower_name.size() - 7) == ".tar.gz") cache_ext = ".tar.gz";
+        else if (lower_name.size() >= 7 && lower_name.substr(lower_name.size() - 7) == ".tar.xz") cache_ext = ".tar.xz";
+        std::string zip_path = "cache/" + def.id + "_download" + cache_ext;
         if (!UpdaterHttpDownloadToFile(asset.url, zip_path)) { out_error = "falha no download"; return false; }
 
         bool extracted = ArchiveExtractAll(zip_path, dest_dir);
@@ -756,13 +799,23 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
 
         FlattenSingleSubfolder(dest_dir);
 
-        // If the extracted folder contains no executable but contains a nested archive
-        // (common in macOS releases where Game.app is inside a nested .zip), extract it.
+        // If the extracted folder contains no executable but contains a nested
+        // archive, extract that too - common in macOS releases where Game.app
+        // sits inside a nested .zip, and in several real Linux releases (Zelda
+        // 64: Recompiled among them) that wrap their actual payload as a
+        // single .tar.gz *inside* the outer .zip instead of shipping the game
+        // directly. ArchiveExtractAll already knows how to open any of these
+        // three by extension - this just has to notice one was left behind.
         if (FindBestExecutable(dest_dir).empty()) {
             for (const auto& e : fs::directory_iterator(dest_dir, ec)) {
                 if (ec || !e.is_regular_file(ec)) continue;
                 std::string fname = ToLowerStr(e.path().filename().string());
-                if (fname.size() >= 4 && fname.substr(fname.size() - 4) == ".zip" && fname.rfind("._", 0) != 0) {
+                if (fname.rfind("._", 0) == 0) continue;
+                bool is_nested_archive =
+                    (fname.size() >= 4 && fname.substr(fname.size() - 4) == ".zip") ||
+                    (fname.size() >= 7 && (fname.substr(fname.size() - 7) == ".tar.gz" ||
+                                            fname.substr(fname.size() - 7) == ".tar.xz"));
+                if (is_nested_archive) {
                     ArchiveExtractAll(e.path().string(), dest_dir);
                     fs::remove(e.path(), ec);
                     FlattenSingleSubfolder(dest_dir);
