@@ -644,6 +644,13 @@ void UpdaterShutdown()
 				g_updater_thread.detach();
 		}
 	}
+	else if (g_updater_thread.joinable())
+	{
+		if (g_updater_thread_done.load())
+			g_updater_thread.join();
+		else
+			g_updater_thread.detach();
+	}
 }
 
 void UpdaterCheckAsync(bool manual_trigger)

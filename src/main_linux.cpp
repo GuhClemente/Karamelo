@@ -931,10 +931,12 @@ int main(int argc, char* argv[])
 	// -------------------------------------------------------------
 	// 5. Clean Teardown
 	// -------------------------------------------------------------
+	PortShutdown();
 	CoreShutdown();
 	RaShutdown();
 	UpdaterShutdown();
-	PortShutdown();
+	HwShutdown();
+	VkHwShutdown();
 
 	if (pixel_buffer) { delete[] pixel_buffer; pixel_buffer = nullptr; }
 	if (g_texture) { SDL_DestroyTexture(g_texture); g_texture = nullptr; }

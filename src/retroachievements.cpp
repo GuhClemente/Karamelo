@@ -798,6 +798,13 @@ void RaShutdown()
 				g_http_thread.detach();
 		}
 	}
+	else if (g_http_thread.joinable())
+	{
+		if (g_http_thread_done.load())
+			g_http_thread.join();
+		else
+			g_http_thread.detach();
+	}
 
 	// The worker thread has fully stopped by this point (waited above), so
 	// nothing else can still be pushing into these deques - safe to drain
