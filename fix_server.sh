@@ -43,15 +43,17 @@ echo "=== 2. Removendo pacotes de versoes anteriores ==="
 # responder 500 ate alguem reiniciar. Apagando antes, o mesmo restart que
 # publica o novo pacote ja esquece o antigo.
 ATUAL=""
+ATUAL_LINUX=""
 if [ -f "$SRC/version.json" ]; then
     ATUAL=$(grep -o '"zip_url"[^,]*' "$SRC/version.json" | sed 's|.*/||; s|"||g')
+    ATUAL_LINUX=$(grep -o '"linux_tar_url"[^,]*' "$SRC/version.json" | sed 's|.*/||; s|"||g')
 fi
 
 if [ -z "$ATUAL" ] || [ ! -f "$SRC/$ATUAL" ]; then
-    echo "  [AVISO] nao consegui identificar o pacote atual pelo version.json."
-    echo "  Nada foi apagado - conferir a mao e melhor que apagar por engano."
+    echo "  [AVISO] nao consegui identificar o pacote Win64 atual pelo version.json."
+    echo "  Nada foi apagado do Windows - conferir a mao e melhor que apagar por engano."
 else
-    echo "  mantendo: $ATUAL"
+    echo "  mantendo Win64: $ATUAL"
     apagados=0
     for z in "$SRC"/Karamelo_v*_Win64.zip; do
         [ -f "$z" ] || continue
@@ -65,7 +67,25 @@ else
             echo "  [ERRO] nao consegui apagar $base"
         fi
     done
-    [ "$apagados" = "0" ] && echo "  nenhuma versao antiga para apagar."
+    [ "$apagados" = "0" ] && echo "  nenhuma versao Win64 antiga para apagar."
+fi
+
+if [ -n "$ATUAL_LINUX" ] && [ -f "$SRC/$ATUAL_LINUX" ]; then
+    echo "  mantendo Linux64: $ATUAL_LINUX"
+    apagados_linux=0
+    for z in "$SRC"/Karamelo_v*_Linux64.tar.gz "$SRC"/Karamelo_v*_Linux64.zip; do
+        [ -f "$z" ] || continue
+        base=$(basename "$z")
+        [ "$base" = "$ATUAL_LINUX" ] && continue
+        tam=$(du -h "$z" | cut -f1)
+        if rm -f "$z"; then
+            echo "  apagado Linux:  $base ($tam)"
+            apagados_linux=$((apagados_linux + 1))
+        else
+            echo "  [ERRO] nao consegui apagar $base"
+        fi
+    done
+    [ "$apagados_linux" = "0" ] && echo "  nenhuma versao Linux64 antiga para apagar."
 fi
 
 echo ""
