@@ -674,7 +674,7 @@ int main(int argc, char* argv[])
 	// (matching Win32 main_win32.cpp lines 1362-1377).
 	{
 		char exe_path[PATH_MAX] = { 0 };
-		ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+		DWORD len = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path) - 1);
 		if (len > 0)
 		{
 			exe_path[len] = '\0';
