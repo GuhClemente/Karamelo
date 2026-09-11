@@ -458,6 +458,24 @@ static bool HwMakeCurrentForTeardown()
 	return SDL_GL_MakeCurrent(g_gl_window, g_gl_ctx);
 }
 
+#ifndef _WIN32
+#include <signal.h>
+#include <setjmp.h>
+static thread_local sigjmp_buf s_hw_sig_env;
+static thread_local bool s_hw_sig_active = false;
+typedef void (*hw_sig_fn_t)(int);
+static void HwSigHandler(int sig)
+{
+	if (s_hw_sig_active)
+	{
+		s_hw_sig_active = false;
+		siglongjmp(s_hw_sig_env, 1);
+	}
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+#endif
+
 void HwContextDestroy()
 {
 	if (!g_hw_active) return;
@@ -466,11 +484,28 @@ void HwContextDestroy()
 	{
 		if (g_hw_cb.context_destroy)
 		{
+#ifndef _WIN32
+			s_hw_sig_active = true;
+			hw_sig_fn_t old_segv = signal(SIGSEGV, HwSigHandler);
+			hw_sig_fn_t old_bus = signal(SIGBUS, HwSigHandler);
+			if (sigsetjmp(s_hw_sig_env, 1) == 0)
+			{
+				g_hw_cb.context_destroy();
+			}
+			else
+			{
+				HwLog("excecao dentro do context_destroy do core - ignorada");
+			}
+			s_hw_sig_active = false;
+			signal(SIGSEGV, old_segv);
+			signal(SIGBUS, old_bus);
+#else
 			__try { g_hw_cb.context_destroy(); }
 			__except (EXCEPTION_EXECUTE_HANDLER)
 			{
 				HwLog("excecao dentro do context_destroy do core - ignorada");
 			}
+#endif
 		}
 	}
 	if (HwMakeCurrentForTeardown())

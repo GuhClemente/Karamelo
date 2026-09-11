@@ -18,6 +18,7 @@ extern char **environ;
 #include <mutex>
 #include <vector>
 #include <string>
+#include <fstream>
 #include <stdio.h>
 
 #include "port_runner.h"
@@ -127,7 +128,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // description) targets Stadium 1 (US v1.0) specifically. Wrong game
         // copied in silently is worse than just letting the port ask.
         { "PokemonStadiumRecomp", "Pokemon Stadium",
-          "mstan/PokemonStadiumRecomp", "", true, {} },
+          "mstan/PokemonStadiumRecomp", "", true, { "pokemon", "stadium" } },
         // "Duke Nukem: Zero Hour" (sonicdcer/DNZHRecomp) was here but the
         // GitHub account that hosted it (sonicdcer) has been deleted -
         // confirmed via the API, a 404 on the user itself, not just the
@@ -329,9 +330,11 @@ static std::string FindBestExecutable(const std::string& dir) {
 #ifdef _WIN32
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
-        if (!e.path().extension().empty()) continue;
+        std::string ext = ToLowerStr(e.path().extension().string());
+        bool is_exe = (ext == ".exe");
+        if (!ext.empty() && !is_exe) continue;
         auto perms = e.status(ec).permissions();
-        if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+        if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
             continue;
 #endif
 
@@ -368,9 +371,11 @@ static std::string FindBestExecutable(const std::string& dir) {
 #ifdef _WIN32
             if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
-            if (!e.path().extension().empty()) continue;
+            std::string ext = ToLowerStr(e.path().extension().string());
+            bool is_exe = (ext == ".exe");
+            if (!ext.empty() && !is_exe) continue;
             auto perms = e.status(ec).permissions();
-            if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+            if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
                 continue;
 #endif
             std::string fname = ToLowerStr(e.path().filename().string());
@@ -900,7 +905,16 @@ bool PortAutoSetupRom(const std::string& port_id) {
     // 4. Default: Nintendo 64 ports (.z64, .n64, .v64)
     for (const auto& f : fs::directory_iterator(target_dir, ec)) {
         std::string ext = ToLowerStr(f.path().extension().string());
-        if (ext == ".z64" || ext == ".n64" || ext == ".v64") return true;
+        if (ext == ".z64" || ext == ".n64" || ext == ".v64") {
+            if (port_id == "PokemonStadiumRecomp") {
+                fs::path cfg_path = fs::path(target_dir) / "rom.cfg";
+                if (!fs::exists(cfg_path, ec)) {
+                    std::ofstream cfg(cfg_path);
+                    if (cfg) cfg << f.path().filename().string() << "\n";
+                }
+            }
+            return true;
+        }
     }
 
     static const std::vector<std::string> search_dirs = {
@@ -916,6 +930,8 @@ bool PortAutoSetupRom(const std::string& port_id) {
             std::string ext = ToLowerStr(entry.path().extension().string());
             if (ext != ".z64" && ext != ".n64" && ext != ".v64") continue;
 
+            if (port_id == "PokemonStadiumRecomp" && fname.find("2") != std::string::npos) continue;
+
             bool all_match = true;
             for (const auto& kw : def->rom_keywords)
                 if (fname.find(kw) == std::string::npos) { all_match = false; break; }
@@ -923,6 +939,11 @@ bool PortAutoSetupRom(const std::string& port_id) {
 
             fs::path dest = fs::path(target_dir) / entry.path().filename();
             fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
+
+            if (port_id == "PokemonStadiumRecomp") {
+                std::ofstream cfg(fs::path(target_dir) / "rom.cfg");
+                if (cfg) cfg << entry.path().filename().string() << "\n";
+            }
             return !ec;
         }
     }
@@ -1009,9 +1030,16 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     std::string sexe = abs_exe.string();
     std::string sdir = abs_dir.string();
 
-    // A freshly-extracted zip does not preserve the Unix execute bit, so the
-    // binary would otherwise refuse to run at all.
     chmod(sexe.c_str(), 0755);
+    std::error_code ec;
+    std::string rom_arg;
+    for (const auto& f : fs::directory_iterator(abs_dir, ec)) {
+        std::string ext = ToLowerStr(f.path().extension().string());
+        if (ext == ".z64" || ext == ".n64" || ext == ".v64") {
+            rom_arg = f.path().string();
+            break;
+        }
+    }
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -1022,9 +1050,14 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     if (pid == 0) {
         // Child: only async-signal-safe calls until exec, per fork()'s
         // contract in a multithreaded process.
-        chdir(sdir.c_str());
-        char* argv[] = { const_cast<char*>(sexe.c_str()), nullptr };
-        execv(sexe.c_str(), argv);
+        (void)chdir(sdir.c_str());
+        std::vector<char*> argv;
+        argv.push_back(const_cast<char*>(sexe.c_str()));
+        if (!rom_arg.empty()) {
+            argv.push_back(const_cast<char*>(rom_arg.c_str()));
+        }
+        argv.push_back(nullptr);
+        execv(sexe.c_str(), argv.data());
         _exit(127); // exec itself failed (not found / not executable)
     }
 #endif

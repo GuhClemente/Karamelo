@@ -908,6 +908,11 @@ int main(int argc, char* argv[])
 		was_busy = busy;
 
 		MenuRun();
+		if (MenuIsQuitRequested())
+		{
+			running = false;
+			break;
+		}
 		RenderFrame();
 
 		SDL_UpdateTexture(g_texture, NULL, pixel_buffer, CANVAS_WIDTH * sizeof(uint32_t));

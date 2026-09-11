@@ -3703,7 +3703,12 @@ static bool CoreLoad(const char* core_dll_path)
 	InterlockedExchange(&g_core_in_module_op, 0);
 	if (!h_core_dll)
 	{
+#ifndef _WIN32
+		const char* err = dlerror();
+		printf("[CoreRunner] Failed to load DLL: %s (error: %s)\n", core_dll_path, err ? err : "unknown");
+#else
 		printf("[CoreRunner] Failed to load DLL: %s\n", core_dll_path);
+#endif
 		return false;
 	}
 
@@ -3851,19 +3856,30 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	EnterCriticalSection(&name_lock);
 	loaded_game_stem = orig_p.stem().string();
 	loaded_game_name = orig_p.filename().string();
-	LeaveCriticalSection(&name_lock);
-	EnterCriticalSection(&name_lock);
 	loaded_rom_dir = orig_p.parent_path().string();
-	LeaveCriticalSection(&name_lock);
 	loaded_system_dir = orig_p.parent_path().filename().string();
+	if (loaded_core_name == "Genesis")
+	{
+		std::string rp = rom_path ? rom_path : "";
+		std::string orig_rp = orig_p.string();
+		std::string parent = orig_p.parent_path().filename().string();
+		if (is_disc || parent == "MegaCD" || parent == "megacd" ||
+		    rp.find("MegaCD") != std::string::npos || rp.find("megacd") != std::string::npos ||
+		    orig_rp.find("MegaCD") != std::string::npos || orig_rp.find("megacd") != std::string::npos)
+		{
+			loaded_core_name = "Mega CD";
+			loaded_system_dir = "MegaCD";
+		}
+	}
 	{
 		// Fall back to the core name if directory says nothing
 		if (loaded_system_dir.empty() || loaded_system_dir == "." ||
 			loaded_system_dir == "roms" || loaded_system_dir == "cache" || loaded_system_dir == "app")
 		{
-			loaded_system_dir = loaded_core_name;
+			loaded_system_dir = (loaded_core_name == "Mega CD") ? "MegaCD" : loaded_core_name;
 		}
 	}
+	LeaveCriticalSection(&name_lock);
 
 	struct retro_game_info game_info = { 0 };
 	std::string abs_rom_path = fs::absolute(p).string();
