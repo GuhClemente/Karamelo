@@ -39,6 +39,41 @@ const int WINDOW_HEIGHT = 720;
 const int CANVAS_WIDTH = 640;
 const int CANVAS_HEIGHT = 360;
 
+struct ThemeColor
+{
+	uint32_t header_bg;
+	uint32_t header_txt;
+	uint32_t border_out;
+	uint32_t border_in;
+	uint32_t side_bg;
+	uint32_t side_txt;
+	uint32_t side_line;
+	uint32_t menu_bg;
+	uint32_t cursor_bg;
+	uint32_t cursor_txt;
+	uint32_t text_white;
+	uint32_t text_dim;
+};
+
+static const ThemeColor THEMES[] = {
+	{ 0xFFDFC4C1, 0xFF1E0808, 0xFF000000, 0xFF000000, 0xFFDFC4C1, 0xFF1E0808, 0xFF1E0808, 0xFF1E0808, 0xFFDFC4C1, 0xFF1E0808, 0xFFDFC4C1, 0xFFA09090 },
+	{ 0xFFD0DEF4, 0xFF0E1428, 0xFF000000, 0xFF000000, 0xFFD0DEF4, 0xFF0E1428, 0xFF0E1428, 0xFF0E1428, 0xFFD0DEF4, 0xFF0E1428, 0xFFD0DEF4, 0xFF90A0B0 },
+	{ 0xFFD0F4D8, 0xFF082010, 0xFF000000, 0xFF000000, 0xFFD0F4D8, 0xFF082010, 0xFF082010, 0xFF082010, 0xFFD0F4D8, 0xFF082010, 0xFFD0F4D8, 0xFF90B098 },
+	{ 0xFFF8E8C8, 0xFF281808, 0xFF000000, 0xFF000000, 0xFFF8E8C8, 0xFF281808, 0xFF281808, 0xFF281808, 0xFFF8E8C8, 0xFF281808, 0xFFF8E8C8, 0xFFB8A890 },
+	{ 0xFFE0E0E0, 0xFF181818, 0xFF000000, 0xFF000000, 0xFFE0E0E0, 0xFF181818, 0xFF181818, 0xFF181818, 0xFFE0E0E0, 0xFF181818, 0xFFE0E0E0, 0xFFA0A0A0 },
+	{ 0xFFC8C8D4, 0xFF0E0E14, 0xFF000000, 0xFF000000, 0xFFC8C8D4, 0xFF0E0E14, 0xFF0E0E14, 0xFF0E0E14, 0xFFC8C8D4, 0xFF0E0E14, 0xFFC8C8D4, 0xFF9090A0 }
+};
+
+static uint32_t* pixel_buffer = nullptr;
+static SDL_Window* g_window = nullptr;
+static SDL_Renderer* g_renderer = nullptr;
+static SDL_Texture* g_texture = nullptr;
+
+SDL_Window* MainGetSdlWindow()
+{
+	return g_window;
+}
+
 #define PRESENT_MAX_W 1920
 #define PRESENT_MAX_H 1200
 
@@ -75,41 +110,6 @@ static bool EnsurePresentBuffer(int w, int h)
 	present_w = w;
 	present_h = h;
 	return true;
-}
-
-struct ThemeColor
-{
-	uint32_t header_bg;
-	uint32_t header_txt;
-	uint32_t border_out;
-	uint32_t border_in;
-	uint32_t side_bg;
-	uint32_t side_txt;
-	uint32_t side_line;
-	uint32_t menu_bg;
-	uint32_t cursor_bg;
-	uint32_t cursor_txt;
-	uint32_t text_white;
-	uint32_t text_dim;
-};
-
-static const ThemeColor THEMES[] = {
-	{ 0xFFDFC4C1, 0xFF1E0808, 0xFF000000, 0xFF000000, 0xFFDFC4C1, 0xFF1E0808, 0xFF1E0808, 0xFF1E0808, 0xFFDFC4C1, 0xFF1E0808, 0xFFDFC4C1, 0xFFA09090 },
-	{ 0xFFD0DEF4, 0xFF0E1428, 0xFF000000, 0xFF000000, 0xFFD0DEF4, 0xFF0E1428, 0xFF0E1428, 0xFF0E1428, 0xFFD0DEF4, 0xFF0E1428, 0xFFD0DEF4, 0xFF90A0B0 },
-	{ 0xFFD0F4D8, 0xFF082010, 0xFF000000, 0xFF000000, 0xFFD0F4D8, 0xFF082010, 0xFF082010, 0xFF082010, 0xFFD0F4D8, 0xFF082010, 0xFFD0F4D8, 0xFF90B098 },
-	{ 0xFFF8E8C8, 0xFF281808, 0xFF000000, 0xFF000000, 0xFFF8E8C8, 0xFF281808, 0xFF281808, 0xFF281808, 0xFFF8E8C8, 0xFF281808, 0xFFF8E8C8, 0xFFB8A890 },
-	{ 0xFFE0E0E0, 0xFF181818, 0xFF000000, 0xFF000000, 0xFFE0E0E0, 0xFF181818, 0xFF181818, 0xFF181818, 0xFFE0E0E0, 0xFF181818, 0xFFE0E0E0, 0xFFA0A0A0 },
-	{ 0xFFC8C8D4, 0xFF0E0E14, 0xFF000000, 0xFF000000, 0xFFC8C8D4, 0xFF0E0E14, 0xFF0E0E14, 0xFF0E0E14, 0xFFC8C8D4, 0xFF0E0E14, 0xFFC8C8D4, 0xFF9090A0 }
-};
-
-static uint32_t* pixel_buffer = nullptr;
-static SDL_Window* g_window = nullptr;
-static SDL_Renderer* g_renderer = nullptr;
-static SDL_Texture* g_texture = nullptr;
-
-SDL_Window* MainGetSdlWindow()
-{
-	return g_window;
 }
 
 static void DrawCharTo(uint32_t* buf, int bw, int bh, int x, int y, char c, uint32_t color)
@@ -1020,11 +1020,22 @@ int main(int argc, char* argv[])
 
 		if (g_use_present && g_present_texture && present_buffer)
 		{
+			// present_w/present_h are the *buffer's* dimensions, capped at
+			// PRESENT_MAX_W/H - on a window bigger than the cap (a maximized
+			// window on a 1440p/4K display) they no longer match the real
+			// window size. Stretching dst to the actual window here, instead
+			// of reusing present_w/present_h, is what makes that still fill
+			// the window instead of only covering a PRESENT_MAX_W x
+			// PRESENT_MAX_H rectangle in the corner with black past it.
+			int draw_w = 0, draw_h = 0;
+			SDL_GetWindowSizeInPixels(g_window, &draw_w, &draw_h);
+			if (draw_w <= 0 || draw_h <= 0) { draw_w = present_w; draw_h = present_h; }
+
 			SDL_SetRenderLogicalPresentation(g_renderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
 			SDL_UpdateTexture(g_present_texture, NULL, present_buffer, present_w * sizeof(uint32_t));
 			SDL_SetRenderDrawColor(g_renderer, 0, 0, 0, 255);
 			SDL_RenderClear(g_renderer);
-			SDL_FRect dst = { 0.0f, 0.0f, (float)present_w, (float)present_h };
+			SDL_FRect dst = { 0.0f, 0.0f, (float)draw_w, (float)draw_h };
 			SDL_RenderTexture(g_renderer, g_present_texture, NULL, &dst);
 			SDL_RenderPresent(g_renderer);
 		}
