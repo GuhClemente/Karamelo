@@ -5,11 +5,11 @@
     "notes": "Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.",
     "force_full_package": false,
     "linux_bin_url": "https://karamelo-emu.com/downloads/Karamelo_linux",
-    "linux_bin_size": 5380024,
-    "linux_bin_sha256": "331E1BE1A0708000F0065AF3A6A41CF6B0328CDEBDD9DBE8387795732589B746",
+    "linux_bin_size": 5384608,
+    "linux_bin_sha256": "155AD7EFC831692CB06AF3434C5A640972541C7CA54F8C775BD6CF80A62ABA03",
     "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Linux64.tar.gz",
     "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
     "exe_size": 4029440,
-    "exe_sha256": "A8CE4D9CCBD14E889F2266A0D70E59CF2D4B24B01D3F9967718B4DC8AC168054",
+    "exe_sha256": "E8509AE23038BB67D101CEBD5EB0F3F959951901A6D4FF659A00A3137A3213C9",
     "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Win64.zip"
 }
