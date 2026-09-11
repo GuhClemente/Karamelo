@@ -866,6 +866,19 @@ int main(int argc, char* argv[])
 		return (passed == iterations) ? 0 : 1;
 	}
 
+	if (argc > 1 && strcasecmp(argv[1], "--list-ports") == 0)
+	{
+		PortInit();
+		auto list = PortGetAvailableList();
+		printf("[PORTS] Total: %zu\n", list.size());
+		for (const auto& p : list) {
+			printf("  - [%s] %s (installed=%d, exe=%s)\n",
+				p.id.c_str(), p.name.c_str(), p.is_installed ? 1 : 0, p.exe_path.c_str());
+		}
+		PortShutdown();
+		return 0;
+	}
+
 	// -------------------------------------------------------------
 	// 2. Headless Port Installer Mode
 	// -------------------------------------------------------------

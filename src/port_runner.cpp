@@ -160,7 +160,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "Ghostship", "Ghostship",
           "harbourmasters/ghostship", "", true, {}, true, true },
         { "PerfectDark", "Perfect Dark",
-          "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" }, false, false },
+          "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" }, false, true },
         { "SM64CoopDX", "Super Mario 64 CoopDX",
           "coop-deluxe/sm64coopdx", "", true, {}, true, true },
         { "CannonballDX", "OutRun (CannonBall DX)",
@@ -277,10 +277,10 @@ static std::string FindBestExecutable(const std::string& dir) {
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
         std::string ext = ToLowerStr(e.path().extension().string());
-        bool is_exe = (ext == ".exe");
-        if (!ext.empty() && !is_exe) continue;
+        bool is_exe = (ext == ".exe" || ext.empty() || ext == ".arm64" || ext == ".x86_64" || ext == ".bin");
+        if (!is_exe) continue;
         auto perms = e.status(ec).permissions();
-        if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+        if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
             continue;
 #endif
 
@@ -318,10 +318,10 @@ static std::string FindBestExecutable(const std::string& dir) {
             if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
             std::string ext = ToLowerStr(e.path().extension().string());
-            bool is_exe = (ext == ".exe");
-            if (!ext.empty() && !is_exe) continue;
+            bool is_exe = (ext == ".exe" || ext.empty() || ext == ".arm64" || ext == ".x86_64" || ext == ".bin");
+            if (!is_exe) continue;
             auto perms = e.status(ec).permissions();
-            if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+            if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
                 continue;
 #endif
             std::string fname = ToLowerStr(e.path().filename().string());
@@ -633,12 +633,12 @@ static bool IsMacOsAssetName(const std::string& lower_name) {
                                    "linux", ".deb", ".rpm", "appimage", "flatpak",
                                    "switch", "android", "source" }))
         return false;
-    return ContainsAny(lower_name, { "macos", "osx", "darwin", "apple", "-mac", "_mac" });
+    return ContainsAny(lower_name, { "macos", "osx", "darwin", "apple", "-mac", "_mac", ".mac", "mac." });
 }
 
 static int MacOsArchPreferenceRank(const std::string& lower_name) {
 #if defined(__arm64__) || defined(__aarch64__)
-    if (ContainsAny(lower_name, { "arm64", "apple-silicon", "arm", "_m1", "-m1", "aarch64" })) return 0;
+    if (ContainsAny(lower_name, { "arm64", "apple-silicon", "arm", "_m1", "-m1", "m1.", "_m1.", "aarch64" })) return 0;
     if (ContainsAny(lower_name, { "universal" })) return 1;
     if (ContainsAny(lower_name, { "x64", "x86_64", "intel" })) return 2;
 #else
@@ -652,7 +652,8 @@ static int MacOsArchPreferenceRank(const std::string& lower_name) {
 static GhAsset PickMacOsAsset(const std::vector<GhAsset>& assets) {
     auto is_archive = [](const std::string& n) {
         return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||
-               (n.size() >= 7 && n.substr(n.size() - 7) == ".tar.gz");
+               (n.size() >= 7 && n.substr(n.size() - 7) == ".tar.gz") ||
+               (n.size() >= 7 && n.substr(n.size() - 7) == ".tar.xz");
     };
 
     std::vector<GhAsset> matches;

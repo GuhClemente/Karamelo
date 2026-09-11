@@ -23,6 +23,9 @@
 /app/*.exe
 /app/*.pdb
 /app/last_wer_check.txt
+*.json.old
+psx_last_run_report.json
+/app/psx_last_run_report.json
 # Rewritten by compile_port.bat on every successful build (release_date becomes
 # today, exe_size the size just linked), so it showed up as a modified file
 # after every single compile. Nothing reads it: the auto-updater fetches the
