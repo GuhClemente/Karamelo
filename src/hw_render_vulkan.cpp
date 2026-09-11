@@ -943,16 +943,69 @@ bool VkHwContextReset()
 	return true;
 }
 
+// context_destroy pertence ao core, e nem todo core volta dele. O PCSX2 nao
+// volta: medido, gira indefinidamente esperando o estado da VM transicionar
+// para Paused/Stopped, mas retro_unload_game ja foi chamado e ja encerrou
+// as threads da VM.
+//
+// Para cores conhecidos por esse comportamento (como PCSX2), pulamos diretamente
+// via VkHwSetSkipContextDestroy(true). Para qualquer outro core que venha a travar,
+// chamamos em uma thread dedicada com prazo de 3s para nao pendurar o processo.
+static DWORD WINAPI VkDestroyThreadProc(LPVOID param)
+{
+	retro_hw_context_reset_t fn = *(retro_hw_context_reset_t*)param;
+	VK_TRY { fn(); }
+	VK_EXCEPT_ALL
+	{
+		VkHwLog("excecao dentro do context_destroy do core (thread com prazo) - ignorada");
+	}
+	free(param);
+	return 0;
+}
+
+static bool g_destroy_never_returns = false;
+static bool g_skip_context_destroy = false;
+
+void VkHwSetSkipContextDestroy(bool skip)
+{
+	g_skip_context_destroy = skip;
+}
+
 void VkHwContextDestroy()
 {
 	if (!g_hw_active) return;
 
-	if (g_context_live && g_hw_cb.context_destroy)
+	if ((g_skip_context_destroy || g_destroy_never_returns) && g_context_live && g_hw_cb.context_destroy)
 	{
-		VK_TRY { g_hw_cb.context_destroy(); }
-		VK_EXCEPT_ALL
+		VkHwLog("pulando context_destroy - este core nao retorna ou foi marcado para pular");
+	}
+	else if (g_context_live && g_hw_cb.context_destroy)
+	{
+		retro_hw_context_reset_t* fn =
+			(retro_hw_context_reset_t*)malloc(sizeof(retro_hw_context_reset_t));
+		HANDLE h = NULL;
+		if (fn)
 		{
-			VkHwLog("excecao dentro do context_destroy do core - ignorada");
+			*fn = g_hw_cb.context_destroy;
+			h = CreateThread(NULL, 0, VkDestroyThreadProc, fn, 0, NULL);
+			if (!h) free(fn);
+		}
+		if (h)
+		{
+			if (WaitForSingleObject(h, 3000) == WAIT_TIMEOUT)
+			{
+				g_destroy_never_returns = true;
+				VkHwLog("context_destroy do core nao retornou em 3s - seguindo sem ele; nao sera chamado de novo nesta sessao");
+			}
+			CloseHandle(h);
+		}
+		else
+		{
+			VK_TRY { g_hw_cb.context_destroy(); }
+			VK_EXCEPT_ALL
+			{
+				VkHwLog("excecao dentro do context_destroy do core - ignorada");
+			}
 		}
 	}
 
@@ -962,22 +1015,8 @@ void VkHwContextDestroy()
 	g_pending_core_cmds.clear();
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 
-	// Um dispositivo negociado (g_core_created_device) e da sessao deste core,
-	// nao do frontend - reaproveita-lo no proximo load (o que VkHwEnsureDevice
-	// faz por padrao, via g_vk_ready, para o caso comum do dispositivo generico
-	// que so o frontend possui) entrega ao PROXIMO context_reset um device/fila
-	// que ja passou pelo context_destroy deste core. Medido com PPSSPP e PCSX2
-	// sob Vulkan forcado (stress_cores.ps1 -Driver 2): a primeira carga do
-	// processo funciona (device negociado, renderiza, fecha limpo); a segunda
-	// carga do MESMO processo reusa o device velho - PPSSPP lanca excecao no
-	// context_reset seguinte (capturada, cai para o dispositivo padrao) e
-	// PCSX2 trava indefinidamente (sem excecao para capturar, provavelmente
-	// esperando um fence/semaphore de um device que ele mesmo ja considera
-	// morto). Forcar teardown completo aqui obriga a proxima carga a negociar
-	// de novo do zero - mesmo teardown que o branch de excecao do
-	// VkHwContextReset acima ja faz pelo mesmo motivo. O dispositivo generico
-	// (sem negociacao) continua sendo reaproveitado entre loads, sem mudanca.
 	if (g_core_created_device) VkHwShutdown();
+	g_skip_context_destroy = false;
 }
 
 bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)

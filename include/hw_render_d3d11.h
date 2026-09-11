@@ -40,6 +40,7 @@ const void* D3D11HwGetRenderInterface();
 bool D3D11HwEnsureSurface(unsigned width, unsigned height);
 bool D3D11HwContextReset();
 void D3D11HwContextDestroy();
+void D3D11HwSetSkipContextDestroy(bool skip);
 bool D3D11HwReadPixels(uint32_t* dest, unsigned width, unsigned height);
 void D3D11HwShutdown();
 

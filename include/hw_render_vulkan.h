@@ -44,6 +44,7 @@ bool VkHwEnsureSurface(unsigned width, unsigned height);
 // caller should treat that the same as a failed load.
 bool VkHwContextReset();
 void VkHwContextDestroy();
+void VkHwSetSkipContextDestroy(bool skip);
 bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height);
 void VkHwShutdown();
 

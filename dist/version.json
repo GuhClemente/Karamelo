@@ -5,7 +5,7 @@
     "version":  "0.9.4",
     "release_date":  "2026-09-10",
     "notes":  "Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.",
-    "exe_sha256":  "AF3E858A860BEB9CD42854E2ADE679DE3D2B3CB347685412462E6CFC77BD9167",
+    "exe_sha256":  "9FEC0FA7F4704C03E33E147A7361E772A490B9B0A1AF44BB57458648A946001A",
     "force_full_package":  false,
     "title":  "Karamelo v0.9.4"
 }

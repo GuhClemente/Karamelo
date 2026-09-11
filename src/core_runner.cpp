@@ -1837,15 +1837,6 @@ static bool CB_Environment(unsigned cmd, void* data)
 			const char* user_value = (it != g_core_options.end()) ? StableOptionValue(it->second) : NULL;
 			LeaveCriticalSection(&options_lock);
 
-			// A Vulkan choice for pcsx2_renderer saved before this was known
-			// (Settings > Core Options lists every value the core declares,
-			// Vulkan included) would otherwise be honored here, ahead of the
-			// safe-default logic below that keeps Vulkan out of the running for
-			// this specific option - see the long comment on that branch for
-			// why. Treated as if nothing were saved so it falls through to it.
-			if (user_value && strcmp(var->key, "pcsx2_renderer") == 0 && strcmp(user_value, "Vulkan") == 0)
-				user_value = NULL;
-
 			if (user_value)
 			{
 				var->value = user_value;
@@ -1912,24 +1903,8 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "pcsx2_renderer") == 0)
 			{
 				int drv = MenuGetVideoDriver();
-				// Vulkan fica de fora da lista deste core, de proposito - nao e
-				// falta de suporte a negociacao (essa existe, ver
-				// hw_render_vulkan.cpp), e um travamento medido dentro do
-				// proprio ps2.dll. Fechar um jogo de PS2 com Vulkan forcado
-				// prende o processo inteiro: confirmado com cdb (thread
-				// principal presa girando dentro do ps2.dll, endereco avancando
-				// devagar - um busy-wait, nao um lock nosso) e reproduzido
-				// tanto na thread original (watchdog de 3s mata via
-				// TerminateThread) quanto na segunda tentativa que
-				// RecoverAfterKilledCore faz a partir da thread principal, que
-				// trava exatamente no mesmo lugar - sem watchdog para essa
-				// segunda vez. Nao ha nada do lado do frontend para
-				// timeoutar sem arriscar corromper o processo (a mesma
-				// classe de risco documentada em CoreRecoverLocksHeldByThread).
-				// PPSSPP usa a mesma negociacao (VkHwContextDestroy em
-				// hw_render_vulkan.cpp) sem esse problema - e especifico do
-				// proprio PCSX2/LRPS2, nao da negociacao em si.
-				if (drv == 3 && D3D11HwIsAvailable()) var->value = "Direct3D11";
+				if (drv == 2 && VkHwIsAvailable()) var->value = "Vulkan";
+				else if (drv == 3 && D3D11HwIsAvailable()) var->value = "Direct3D11";
 				else if (drv == 1 && HwGlProbed()) var->value = "OpenGL";
 				else if (drv == 4) var->value = "Software";
 				else var->value = (MenuGetHwRender() && HwGlProbed()) ? "OpenGL" : "Auto";
@@ -3708,6 +3683,8 @@ static bool CoreLoad(const char* core_dll_path)
 	s_loaded_core_path = core_dll_path ? core_dll_path : "";
 	s_loaded_core_is_pcsx2 = (strstr(core_dll_path, "pcsx2") != NULL) ||
 	                         (strstr(core_dll_path, "ps2") != NULL && strstr(core_dll_path, "play") == NULL);
+	VkHwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
+	D3D11HwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
 
 	p_retro_init = (retro_init_t)GetProcAddress(h_core_dll, "retro_init");
 	p_retro_deinit = (retro_deinit_t)GetProcAddress(h_core_dll, "retro_deinit");
@@ -4149,6 +4126,8 @@ static void CoreUnload()
 	// chama de volta o context_destroy do core, que e codigo de terceiro e pode
 	// nao voltar: com um unico log antes do bloco, o que se via era "Chamando
 	// HwContextDestroy..." e silencio, sem dizer qual dos quatro prendeu.
+	VkHwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
+	D3D11HwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy (GL)...");
 	HwContextDestroy();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] VkHwContextDestroy...");

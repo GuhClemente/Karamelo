@@ -249,14 +249,20 @@ static DWORD WINAPI D3D11DestroyThreadProc(LPVOID param)
 // ficaria com cinco. Depois do primeiro estouro, o teardown e simplesmente
 // pulado: o contexto vaza igual, sem thread nova e sem os 5s de espera.
 static bool g_destroy_never_returns = false;
+static bool g_skip_context_destroy = false;
+
+void D3D11HwSetSkipContextDestroy(bool skip)
+{
+	g_skip_context_destroy = skip;
+}
 
 void D3D11HwContextDestroy()
 {
 	if (!g_hw_active) return;
 
-	if (g_destroy_never_returns && g_context_live && g_hw_cb.context_destroy)
+	if ((g_skip_context_destroy || g_destroy_never_returns) && g_context_live && g_hw_cb.context_destroy)
 	{
-		D3D11HwLog("pulando context_destroy - este core ja provou que nao retorna");
+		D3D11HwLog("pulando context_destroy - core marcado para pular ou ja provou que nao retorna");
 	}
 	else if (g_context_live && g_hw_cb.context_destroy)
 	{
@@ -296,6 +302,7 @@ void D3D11HwContextDestroy()
 	g_context_live = false;
 	g_hw_active = false;
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
+	g_skip_context_destroy = false;
 }
 
 bool D3D11HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
