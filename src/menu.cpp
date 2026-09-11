@@ -8,8 +8,14 @@
 #include <string.h>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include "compat_win32.h"
+#endif
 
 #include "app_info.h"
 #include "archive_helper.h"
@@ -921,36 +927,54 @@ static const SystemCore kSystemCores[] = {
 
 // NULL above means the system has its own core selector; ask that instead.
 static bool SystemHasCore(int action_id) {
-  const char *dll = NULL;
-  bool known = false;
-  for (const auto &e : kSystemCores)
-    if (e.action_id == action_id) {
-      dll = e.dll;
-      known = true;
-      break;
-    }
+  static std::unordered_map<int, bool> s_cache;
+  auto it = s_cache.find(action_id);
+  if (it != s_cache.end()) return it->second;
+
+  if (action_id == 140) {
+    s_cache[action_id] = true;
+    return true;
+  }
 
   if (action_id == 107) {
     std::error_code ec;
-    return fs::exists("cores/n64_gopher.dll", ec) ||
-           fs::exists("cores/n64.dll", ec) ||
-           fs::exists("cores/n64_parallel.dll", ec) ||
-           fs::exists("cores/n64_mupen.dll", ec);
+    bool has_n64 = fs::exists("cores/n64_gopher.dll", ec) ||
+                   fs::exists("cores/n64.dll", ec) ||
+                   fs::exists("cores/n64_parallel.dll", ec) ||
+                   fs::exists("cores/n64_mupen.dll", ec) ||
+                   fs::exists("cores/n64.so", ec) ||
+                   fs::exists("cores/n64_parallel.so", ec) ||
+                   fs::exists("cores/n64_mupen.so", ec);
+    s_cache[action_id] = has_n64;
+    return has_n64;
   }
+
+  const char *dll = NULL;
+  for (const auto &e : kSystemCores)
+    if (e.action_id == action_id) {
+      dll = e.dll;
+      break;
+    }
+
   if (action_id == 117)
     dll = GetArcadeCoreDll();
-  if (action_id == 140) {
-    // Same list PopulateBrowse() and the About screen's count use, rather
-    // than a second, looser check (the old fs::exists("ports") was always
-    // true anyway - PortInit() creates the folder unconditionally on
-    // startup, whether or not anything has been downloaded into it yet).
-    return !PortGetAvailableList().empty();
-  }
-  if (!dll)
+
+  if (!dll) {
+    s_cache[action_id] = true;
     return true;
+  }
 
   std::error_code ec;
-  return fs::exists(dll, ec);
+  std::string p = dll;
+  bool exists = fs::exists(p, ec);
+#ifndef _WIN32
+  if (!exists && p.size() >= 4 && p.substr(p.size() - 4) == ".dll") {
+    std::string so = p.substr(0, p.size() - 4) + ".so";
+    exists = fs::exists(so, ec);
+  }
+#endif
+  s_cache[action_id] = exists;
+  return exists;
 }
 
 void PopulateMainMenu() {

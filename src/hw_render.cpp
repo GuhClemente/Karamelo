@@ -1,7 +1,16 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <algorithm>
 #include <gl/GL.h>
+#pragma comment(lib, "opengl32.lib")
+#else
+#include "compat_win32.h"
+#include <GL/gl.h>
+#ifndef APIENTRY
+#define APIENTRY
+#endif
+#endif
+#include <algorithm>
 #include <stdio.h>
 #include <string.h>
 
@@ -10,8 +19,6 @@
 
 #include "libretro.h"
 #include "hw_render.h"
-
-#pragma comment(lib, "opengl32.lib")
 
 // ---------------------------------------------------------------------------
 // Framebuffer-object entry points.
@@ -96,8 +103,13 @@ bool HwInit()
 	if (g_gl_ready) return true;
 
 	// Enable GPU driver threaded optimizations and persistent shader disk cache
+#ifdef _WIN32
 	_putenv("__GL_THREADED_OPTIMIZATIONS=1");
 	_putenv("__GL_SHADER_DISK_CACHE=1");
+#else
+	setenv("__GL_THREADED_OPTIMIZATIONS", "1", 1);
+	setenv("__GL_SHADER_DISK_CACHE", "1", 1);
+#endif
 
 	// The window is created once and then reused for the life of the process.
 	// HwMakeCurrent's recovery path calls HwShutdown()/HwInit() to rebuild a

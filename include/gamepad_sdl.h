@@ -1,7 +1,11 @@
 #ifndef GAMEPAD_SDL_H_INCLUDED
 #define GAMEPAD_SDL_H_INCLUDED
 
+#ifdef _WIN32
 #include <xinput.h>
+#else
+#include "compat_win32.h"
+#endif
 
 union SDL_Event;
 

@@ -4,6 +4,7 @@
 #else
 #include <spawn.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 extern char **environ;
 #endif
@@ -313,20 +314,25 @@ static std::string FindBestExecutable(const std::string& dir) {
     std::error_code ec;
     if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec)) return "";
 
-    std::vector<fs::path> top_level, nested;
-    for (const auto& e : fs::recursive_directory_iterator(dir, ec)) {
-        if (ec || !e.is_regular_file(ec)) continue;
+    std::vector<fs::path> top_level;
+    std::vector<fs::path> subdirs;
+
+    // Fast Pass 1: Check top level only
+    for (const auto& e : fs::directory_iterator(dir, ec)) {
+        if (ec) continue;
+        if (e.is_directory(ec)) {
+            subdirs.push_back(e.path());
+            continue;
+        }
+        if (!e.is_regular_file(ec)) continue;
+
 #ifdef _WIN32
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
-        // Linux binaries conventionally ship with no extension at all - a
-        // release zip built for Linux is not going to contain a ".exe", so
-        // "no extension" is the closest equivalent signal available from the
-        // filename alone. Files that do have an extension here are data,
-        // scripts, or libraries (.so, .txt, .json, ...), never the binary to
-        // launch, so they are excluded the same way ".exe"-only excludes
-        // everything else on Windows.
         if (!e.path().extension().empty()) continue;
+        auto perms = e.status(ec).permissions();
+        if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+            continue;
 #endif
 
         std::string fname = ToLowerStr(e.path().filename().string());
@@ -335,24 +341,47 @@ static std::string FindBestExecutable(const std::string& dir) {
             if (fname.find(b) != std::string::npos) { skip = true; break; }
         if (skip) continue;
 
-        std::error_code rel_ec;
-        fs::path rel = fs::relative(e.path(), dir, rel_ec);
-        auto rel_it = rel.begin();
-        bool is_top = !rel_ec && rel_it != rel.end() && (++rel_it == rel.end()); // just a filename, no subdirectory components
-        (is_top ? top_level : nested).push_back(e.path());
+        top_level.push_back(e.path());
     }
 
     if (!top_level.empty()) return BestExeAmong(top_level);
 
-    // A root-level "launch.bat" outranks any *nested* .exe, checked before
-    // falling into the recursive fallback below. This is what Severed Chains
-    // needs in practice: its launch.bat downloads a JDK into .\jdk25\bin\ on
-    // first run, which is a folder full of nested .exe (java.exe among
-    // dozens of other JDK CLI tools) that would otherwise win by depth over
-    // the one file that is actually meant to be launched.
+    // Root-level "launch.bat" (or "launch.sh" on Linux)
     std::error_code lb_ec;
     fs::path launch_bat = fs::path(dir) / "launch.bat";
     if (fs::exists(launch_bat, lb_ec)) return launch_bat.string();
+#ifndef _WIN32
+    fs::path launch_sh = fs::path(dir) / "launch.sh";
+    if (fs::exists(launch_sh, lb_ec)) return launch_sh.string();
+#endif
+
+    // Fallback: Check only 1 level deep in immediate subdirs (skip assets/data)
+    std::vector<fs::path> nested;
+    for (const auto& sdir : subdirs) {
+        std::string sname = ToLowerStr(sdir.filename().string());
+        if (sname == "assets" || sname == "sound" || sname == "audio" || sname == "roms" ||
+            sname == "textures" || sname == "music" || sname == "data")
+            continue;
+
+        for (const auto& e : fs::directory_iterator(sdir, ec)) {
+            if (ec || !e.is_regular_file(ec)) continue;
+#ifdef _WIN32
+            if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
+#else
+            if (!e.path().extension().empty()) continue;
+            auto perms = e.status(ec).permissions();
+            if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+                continue;
+#endif
+            std::string fname = ToLowerStr(e.path().filename().string());
+            bool skip = false;
+            for (const auto& b : blacklist)
+                if (fname.find(b) != std::string::npos) { skip = true; break; }
+            if (skip) continue;
+
+            nested.push_back(e.path());
+        }
+    }
 
     if (!nested.empty()) return BestExeAmong(nested);
 

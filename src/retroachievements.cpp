@@ -1,7 +1,12 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#include <stdarg.h>
 #include <windows.h>
 #include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
+#else
+#include "compat_win32.h"
+#endif
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <string>
@@ -24,8 +29,6 @@ extern "C" {
 #include "rc_libretro.h"
 #include "rc_consoles.h"
 }
-
-#pragma comment(lib, "winhttp.lib")
 
 namespace fs = std::filesystem;
 
@@ -170,6 +173,7 @@ static std::atomic<bool>       g_http_running{ false };
 static std::deque<HttpJob*> g_http_pending;
 static std::deque<HttpJob*> g_http_done;
 
+#ifdef _WIN32
 static void HttpPerform(HttpJob* job)
 {
 	job->status = 0;
@@ -248,6 +252,47 @@ static void HttpPerform(HttpJob* job)
 	}
 	WinHttpCloseHandle(session);
 }
+#else
+static void HttpPerform(HttpJob* job)
+{
+	job->status = 0;
+	if (!job || job->url.empty()) return;
+
+	std::string cmd = "curl -s -w \"\\n%{http_code}\"";
+	if (!job->post_data.empty())
+	{
+		cmd += " -X POST -d '" + job->post_data + "'";
+		if (!job->content_type.empty())
+			cmd += " -H 'Content-Type: " + job->content_type + "'";
+	}
+	cmd += " \"" + job->url + "\"";
+
+	FILE* pipe = popen(cmd.c_str(), "r");
+	if (!pipe) return;
+
+	std::string output;
+	char buf[4096];
+	size_t n;
+	while ((n = fread(buf, 1, sizeof(buf), pipe)) > 0)
+	{
+		output.append(buf, n);
+	}
+	pclose(pipe);
+
+	size_t last_nl = output.find_last_of('\n');
+	if (last_nl != std::string::npos && last_nl + 1 < output.size())
+	{
+		std::string code_str = output.substr(last_nl + 1);
+		job->status = atoi(code_str.c_str());
+		job->body = output.substr(0, last_nl);
+	}
+	else
+	{
+		job->body = output;
+		job->status = 200;
+	}
+}
+#endif
 
 static std::atomic<bool> g_http_thread_done{ false };
 

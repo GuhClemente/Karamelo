@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
@@ -422,3 +423,17 @@ bool D3D11HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	g_context->Unmap(g_staging_tex, 0);
 	return true;
 }
+#else
+#include "hw_render_d3d11.h"
+
+bool D3D11HwSetRenderCallback(struct retro_hw_render_callback* cb) { (void)cb; return false; }
+bool D3D11HwIsActive() { return false; }
+bool D3D11HwIsAvailable() { return false; }
+const void* D3D11HwGetRenderInterface() { return nullptr; }
+bool D3D11HwEnsureSurface(unsigned width, unsigned height) { (void)width; (void)height; return false; }
+bool D3D11HwContextReset() { return false; }
+void D3D11HwContextDestroy() {}
+void D3D11HwSetSkipContextDestroy(bool skip) { (void)skip; }
+bool D3D11HwReadPixels(uint32_t* dest, unsigned width, unsigned height) { (void)dest; (void)width; (void)height; return false; }
+void D3D11HwShutdown() {}
+#endif

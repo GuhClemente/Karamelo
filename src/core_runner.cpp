@@ -1,11 +1,16 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#include <thread>
-#include <vector>
 #include <windows.h>
 #include <mmsystem.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <xinput.h>
+#pragma comment(lib, "winmm.lib")
+#else
+#include "compat_win32.h"
+#endif
+#include <thread>
+#include <vector>
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,7 +18,6 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include <vector>
 #include <string>
 #include <filesystem>
 #include <algorithm>
@@ -21,22 +25,6 @@
 #include <set>
 #include <unordered_set>
 #include <fstream>
-
-// LoadLibraryA/GetProcAddress/FreeLibrary have no direct Windows-only
-// dependency other than the calling convention and the handle type - dlopen/
-// dlsym/dlclose take the same (path, RTLD_NOW)/(handle, name)/(handle)
-// shapes, so every existing call site below can stay exactly as written.
-// windows.h above still makes the rest of this file Windows-only for now
-// (WASAPI, XInput, __try/__except); this shim just means the core-loading
-// code specifically won't need touching again once those other blockers
-// are addressed.
-#ifndef _WIN32
-#include <dlfcn.h>
-typedef void* HMODULE;
-#define LoadLibraryA(path) dlopen(path, RTLD_NOW)
-#define GetProcAddress(h, name) dlsym(h, name)
-#define FreeLibrary(h) dlclose(h)
-#endif
 
 #include "libretro.h"
 #include "core_runner.h"
@@ -53,8 +41,6 @@ typedef void* HMODULE;
 #include "hw_render_d3d11.h"
 
 namespace fs = std::filesystem;
-
-#pragma comment(lib, "winmm.lib")
 
 // Libretro Core Function Pointers
 typedef void (*retro_init_t)(void);
@@ -580,6 +566,7 @@ static void ResetAudioRateController()
 // device accepts (the OS mixer resamples for it, same as it always has).
 static int DetectPreferredOutputSampleRate()
 {
+#ifdef _WIN32
 	int result = 48000;
 	HRESULT hr_init = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	bool need_uninit = SUCCEEDED(hr_init);
@@ -614,6 +601,16 @@ static int DetectPreferredOutputSampleRate()
 		fclose(lf);
 	}
 	return result;
+#else
+	int result = 48000;
+	FILE* lf = fopen("karamelo.log", "a");
+	if (lf)
+	{
+		fprintf(lf, "[INFO] [AUDIO] dispositivo de saida: %d Hz (Linux/SDL3 default)\n", result);
+		fclose(lf);
+	}
+	return result;
+#endif
 }
 
 // 4-point / 3rd-order Catmull-Rom Cubic Hermite Spline Interpolator:
@@ -866,7 +863,7 @@ static void InitAudio(int sample_rate)
 		return;
 	}
 
-	SDL_AudioSpec spec = { 0 };
+	SDL_AudioSpec spec{};
 	spec.format = SDL_AUDIO_S16;
 	spec.channels = 2;
 	spec.freq = g_output_sample_rate;
@@ -2786,6 +2783,7 @@ struct FrameRunResult { bool ok; DWORD exc_code; void* exc_addr; };
 static FrameRunResult RunOneFrameGuarded()
 {
 	FrameRunResult r = { true, 0, NULL };
+#if defined(_WIN32) && defined(_MSC_VER)
 	__try
 	{
 		p_retro_run();
@@ -2797,6 +2795,16 @@ static FrameRunResult RunOneFrameGuarded()
 	{
 		r.ok = false;
 	}
+#else
+	try
+	{
+		p_retro_run();
+	}
+	catch (...)
+	{
+		r.ok = false;
+	}
+#endif
 	return r;
 }
 
@@ -3313,6 +3321,7 @@ static void ResetCoreFunctionPointers()
 // thread legitimately holds at the same moment.
 void CoreRecoverLocksHeldByThread(unsigned long thread_id)
 {
+#ifdef _WIN32
 	HANDLE owner = (HANDLE)(ULONG_PTR)thread_id;
 	if (toast_lock.OwningThread == owner)
 	{
@@ -3329,6 +3338,9 @@ void CoreRecoverLocksHeldByThread(unsigned long thread_id)
 		DeleteCriticalSection(&options_lock);
 		InitializeCriticalSection(&options_lock);
 	}
+#else
+	(void)thread_id;
+#endif
 }
 
 // Defined further down, next to the buffer it owns.
@@ -3672,7 +3684,22 @@ static bool CoreLoad(const char* core_dll_path)
 	VkHwClearNegotiationInterface();
 
 	InterlockedExchange(&g_core_in_module_op, 1);
+#ifndef _WIN32
+	std::string path_str = core_dll_path ? core_dll_path : "";
+	if (path_str.size() > 4 && path_str.substr(path_str.size() - 4) == ".dll")
+	{
+		path_str = path_str.substr(0, path_str.size() - 4) + ".so";
+	}
+	if (!path_str.empty() && path_str[0] != '/' && path_str.rfind("./", 0) != 0)
+	{
+		path_str = "./" + path_str;
+	}
+	h_core_dll = LoadLibraryA(path_str.c_str());
+	if (!h_core_dll && core_dll_path)
+		h_core_dll = LoadLibraryA(core_dll_path);
+#else
 	h_core_dll = LoadLibraryA(core_dll_path);
+#endif
 	InterlockedExchange(&g_core_in_module_op, 0);
 	if (!h_core_dll)
 	{

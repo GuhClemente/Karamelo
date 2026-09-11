@@ -7,6 +7,8 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include "compat_win32.h"
 #endif
 #include <stdio.h>
 #include <string.h>
@@ -18,12 +20,14 @@
 // Nao ha equivalente portavel - sinal de segmentacao nao e excecao de C++ e
 // nao pode ser capturado por catch de forma definida - entao o que se pode
 // fazer e deixar a diferenca explicita em vez de escondida.
+#ifndef VK_TRY
 #if defined(_WIN32) && defined(_MSC_VER)
 #define VK_TRY        __try
 #define VK_EXCEPT_ALL __except (EXCEPTION_EXECUTE_HANDLER)
 #else
-#define VK_TRY        if (true)
-#define VK_EXCEPT_ALL else
+#define VK_TRY        try
+#define VK_EXCEPT_ALL catch (...)
+#endif
 #endif
 
 // Dynamic loading, not link-time: there is no Vulkan SDK/import-lib vendored
