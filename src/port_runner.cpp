@@ -316,6 +316,35 @@ static std::string BestExeAmong(const std::vector<fs::path>& candidates) {
 // redistributables, uninstallers, crash handlers - is not. "Largest file
 // anywhere" was the guess this replaced; it happened to work for Dr. Mario
 // 64 but had no real basis once other projects' folder layouts differ.
+#ifndef _WIN32
+// Verified 11/09/2026 against 16 real Linux releases downloaded and
+// extracted from the ports this app actually offers: every single one
+// failed against the old rule here ("no extension at all"), for three
+// different reasons discovered by that pass, not assumed in advance -
+// Godot exports keep the target triple on the binary name
+// ("SMB1R.x86_64"), several projects ship a single-file AppImage
+// (".appimage" is not an empty extension either, and it's the one
+// extension that genuinely is a runnable binary), and the picker's own
+// tie-break can land on a companion tool sitting right next to the real
+// game (see the blacklist below). None of that is specific to any one
+// port - a Linux binary having *some* extension is normal, so the
+// permission bit is what actually decides here; extension is used only
+// to reject the handful of file kinds real ports ship alongside the
+// binary that are never a launch target even when marked executable
+// (shared libraries, data packs, build/setup scripts, docs).
+static bool IsLinuxNeverExecutable(const std::string& lower_ext) {
+    static const std::vector<std::string> never = {
+        ".so", ".dll", ".dylib", ".pck", ".pak", ".dat",
+        ".py", ".sh", ".pl", ".rb",
+        ".txt", ".md", ".yml", ".yaml", ".json", ".cfg", ".ini", ".toml",
+        ".zip", ".tar", ".gz", ".xz", ".7z",
+        ".log", ".pdb", ".map", ".a", ".o"
+    };
+    for (const auto& e : never) if (lower_ext == e) return true;
+    return false;
+}
+#endif
+
 static std::string FindBestExecutable(const std::string& dir) {
     static const std::vector<std::string> blacklist = {
         "unins000.exe", "uninstall.exe", "vc_redist", "dxwebsetup", "dxsetup",
@@ -328,7 +357,14 @@ static std::string FindBestExecutable(const std::string& dir) {
         // just as a separate release asset) - never the thing to launch by
         // default, even though each is a perfectly normal top-level .exe
         // that would otherwise win the alphabetical tie-break.
-        "extractor.exe", "asset_builder.exe", "assetbuilder.exe"
+        "extractor.exe", "asset_builder.exe", "assetbuilder.exe",
+        // Bare (no ".exe") duplicates of the same intent, for Linux - a
+        // release that ships "starfox_asset_builder" or "coopdx_updater"
+        // with no extension at all sorts before the real game alphabetically
+        // (SM64 Coop Deluxe's own Linux build does exactly this: the update
+        // helper "coopdx_updater" would otherwise win over "sm64coopdx"),
+        // and neither matches any of the ".exe"-suffixed entries above.
+        "updater", "asset_builder", "assetbuilder", "extractor"
     };
     std::error_code ec;
     if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec)) return "";
@@ -349,10 +385,9 @@ static std::string FindBestExecutable(const std::string& dir) {
         if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
         std::string ext = ToLowerStr(e.path().extension().string());
-        bool is_exe = (ext == ".exe");
-        if (!ext.empty() && !is_exe) continue;
+        if (IsLinuxNeverExecutable(ext)) continue;
         auto perms = e.status(ec).permissions();
-        if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+        if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
             continue;
 #endif
 
@@ -390,10 +425,9 @@ static std::string FindBestExecutable(const std::string& dir) {
             if (ToLowerStr(e.path().extension().string()) != ".exe") continue;
 #else
             std::string ext = ToLowerStr(e.path().extension().string());
-            bool is_exe = (ext == ".exe");
-            if (!ext.empty() && !is_exe) continue;
+            if (IsLinuxNeverExecutable(ext)) continue;
             auto perms = e.status(ec).permissions();
-            if (!is_exe && (perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
+            if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
                 continue;
 #endif
             std::string fname = ToLowerStr(e.path().filename().string());
@@ -746,6 +780,34 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         if (!extracted) { out_error = "falha ao extrair o pacote"; return false; }
 
         FlattenSingleSubfolder(dest_dir);
+
+#ifndef _WIN32
+        // A zip-of-a-tar.gz: PickLinuxAsset only ever selects a .zip (its own
+        // comment explains why), but several real Linux releases wrap their
+        // actual payload as a single .tar.gz *inside* that zip instead of
+        // shipping the game directly - the zip above extracts fine and
+        // leaves exactly that one .tar.gz sitting in dest_dir, unopened.
+        // ArchiveExtractAll already knows how to open a .tar.gz on Linux
+        // (its non-.zip branch shells out to tar) - it was just never asked
+        // to look at this one. One extra pass, only when the first pass
+        // left a lone archive behind instead of a game.
+        std::error_code peek_ec;
+        std::vector<fs::path> top_entries;
+        for (const auto& e : fs::directory_iterator(dest_dir, peek_ec)) top_entries.push_back(e.path());
+        if (!peek_ec && top_entries.size() == 1 && fs::is_regular_file(top_entries[0], peek_ec)) {
+            std::string inner_name = ToLowerStr(top_entries[0].filename().string());
+            bool is_nested_archive = inner_name.size() > 7 && (
+                inner_name.substr(inner_name.size() - 7) == ".tar.gz" ||
+                inner_name.substr(inner_name.size() - 7) == ".tar.xz");
+            if (is_nested_archive) {
+                std::string inner_path = top_entries[0].string();
+                if (ArchiveExtractAll(inner_path, dest_dir)) {
+                    fs::remove(inner_path, ec);
+                    FlattenSingleSubfolder(dest_dir);
+                }
+            }
+        }
+#endif
     }
 
     if (FindBestExecutable(dest_dir).empty()) { out_error = "pacote instalado sem executavel"; return false; }
