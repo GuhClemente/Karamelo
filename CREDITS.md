@@ -152,6 +152,7 @@ vezes vêm junto).
 | WipEout Phantom Edition | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
 | OutRun (CannonBall DX) | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
 | Valkyrie Profile | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
+| Wave Race 64 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
 
 Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
 tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que
@@ -161,6 +162,12 @@ trás (PSXRecomp) é licenciado PolyForm Noncommercial, não a mesma licença do
 demais projetos desta lista - isso não afeta a licença do Karamelo em si (o
 port é um binário externo, baixado sob demanda, nunca embutido), mas vale
 saber antes de indicar essa entrada para alguém.
+
+E um detalhe da linha do Wave Race 64: o projeto se descreve como "em beta" e
+o pacote baixado é bem maior que o normal desta tabela (~390 MB, contra
+dezenas de MB da maioria) porque embute um pacote de texturas HD e trilha
+sonora substituta junto com o jogo recompilado - baixa e roda normalmente,
+só demora mais.
 
 Assim como os cores, nenhum ROM/disco/ISO é baixado ou distribuído pelo app -
 só o executável de cada projeto, que é open source e distribuído livremente

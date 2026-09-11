@@ -260,6 +260,32 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // isn't free for commercial use the way Karamelo now is.
         { "ValkyrieRecomp", "Valkyrie Profile",
           "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {} },
+
+        // N64Recomp-family, MIT-licensed (GitHub misreports it as "Other" -
+        // the LICENSE file is standard MIT text with one extra disclaimer
+        // paragraph up top about not covering the game itself, which trips
+        // GitHub's detector; read it directly to confirm). Windows-only for
+        // us - the release also ships an Apple Silicon build, irrelevant
+        // here. exe_hint and the flat top-level layout ("run
+        // WaveRace64Recomp.exe", "keep the three DLLs and assets folder
+        // beside the executable") both come straight from the v0.4.0
+        // release notes rather than a re-download - that release body is
+        // unusually detailed (exact ROM SHA-1, per-platform automated test
+        // counts, checksums), a stronger source than usual for a repo this
+        // size. rom_keywords is safe here: no other N64 title shares "wave"
+        // and "race" together.
+        //
+        // Two things worth knowing before pointing someone at this one:
+        // (1) it is explicitly "currently in beta" per the repo's own
+        // description, with real caveats in its own release notes (e.g.
+        // "other GPU families... remain untested" on Windows); (2) the
+        // download is far bigger than anything else in this table (~390 MB
+        // vs a typical few tens of MB) because it bundles a full HD texture
+        // and replacement-soundtrack pack alongside the recompiled game -
+        // fine for PortLaunch's own download/extract path, just slower.
+        { "WaveRace64Recomp", "Wave Race 64",
+          "elliotttate/wave-race-64-recomp", "WaveRace64Recomp.exe",
+          true, { "wave", "race" } },
     };
     return defs;
 }

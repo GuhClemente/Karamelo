@@ -341,11 +341,12 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 10/09/2026:** são **40** jogos de "Ports & Recomp", não mais
-39 — entrou Valkyrie Profile (ver seção 10). O número foi conferido contra o
-`CREDITS.md`, que é sempre a fonte — essa tabela só cresce, não copie 39 nem
-40 de outra página no futuro. É coincidência infeliz que 39 já tenha sido, um
-dia, o número errado de motores — não confunda os dois.
+**Atualizado em 11/09/2026:** são **41** jogos de "Ports & Recomp" — 39 até
+09/09, +1 (Valkyrie Profile) em 10/09, +1 (Wave Race 64) em 11/09 (ver seções
+10 e 11). O número foi conferido contra o `CREDITS.md`, que é sempre a fonte —
+essa tabela só cresce, não copie 39, 40 nem 41 de outra página no futuro. É
+coincidência infeliz que 39 já tenha sido, um dia, o número errado de
+motores — não confunda os dois.
 
 ### 9.4 Motores creditados a quem não é
 
@@ -438,7 +439,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **40** jogos de Ports & Recomp (atualizado em 10/09/2026 — ver seção 10),
+- Os **41** jogos de Ports & Recomp (atualizado em 11/09/2026 — ver seções
+  10 e 11),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -486,3 +488,30 @@ que não é verdade para ela: nem "baixa e já roda", nem "todo mundo aqui é
 código aberto sem ressalva". Se a página não descrever entradas individuais de
 Ports & Recomp (a maioria não descreve), não há nada a mudar além da contagem
 da seção 9.3/9.9.
+
+---
+
+## 11. Adição de 11/09/2026 — Wave Race 64 em Ports & Recomp
+
+Mais uma linha em `CREDITS.md`: **Wave Race 64**, via
+[elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp).
+N64Recomp normal — baixa, extrai, roda, pede o `.z64` do jogador como qualquer
+outro da categoria. Ao contrário do Valkyrie Profile (seção 10), este **não**
+tem ressalva de licença: o `LICENSE` do repositório é MIT de verdade (o
+GitHub mostra "Other" porque o arquivo tem um parágrafo extra de aviso antes
+do texto padrão da MIT, o que confunde o detector automático — o texto em si
+é MIT sem modificação).
+
+Duas coisas que valem nota, se o site descrever essa entrada especificamente:
+
+1. **Ainda é beta.** A descrição do próprio repositório diz isso, e as notas
+   de release trazem ressalvas reais (ex.: "outras famílias de GPU no Windows
+   permanecem não testadas"). Não é motivo para tirar da lista — vários outros
+   projetos da categoria também são WIP —, só não descreva como "finalizado".
+2. **Pacote bem maior que o normal.** O zip do Windows tem ~390 MB, contra
+   dezenas de MB da maioria da tabela — ele embute um pacote de texturas HD e
+   trilha sonora substituta junto com o jogo recompilado. Funciona igual,
+   demora mais para baixar.
+
+Se a página não descrever entradas individuais (o caso comum), a única
+mudança necessária é a contagem da seção 9.3/9.9.
