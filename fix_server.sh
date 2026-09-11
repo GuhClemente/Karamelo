@@ -44,9 +44,11 @@ echo "=== 2. Removendo pacotes de versoes anteriores ==="
 # publica o novo pacote ja esquece o antigo.
 ATUAL=""
 ATUAL_LINUX=""
+ATUAL_MACOS=""
 if [ -f "$SRC/version.json" ]; then
     ATUAL=$(grep -o '"zip_url"[^,]*' "$SRC/version.json" | sed 's|.*/||; s|"||g')
     ATUAL_LINUX=$(grep -o '"linux_tar_url"[^,]*' "$SRC/version.json" | sed 's|.*/||; s|"||g')
+    ATUAL_MACOS=$(grep -o '"macos_tar_url"[^,]*' "$SRC/version.json" | sed 's|.*/||; s|"||g')
 fi
 
 if [ -z "$ATUAL" ] || [ ! -f "$SRC/$ATUAL" ]; then
@@ -86,6 +88,24 @@ if [ -n "$ATUAL_LINUX" ] && [ -f "$SRC/$ATUAL_LINUX" ]; then
         fi
     done
     [ "$apagados_linux" = "0" ] && echo "  nenhuma versao Linux64 antiga para apagar."
+fi
+
+if [ -n "$ATUAL_MACOS" ] && [ -f "$SRC/$ATUAL_MACOS" ]; then
+    echo "  mantendo macOS: $ATUAL_MACOS"
+    apagados_macos=0
+    for z in "$SRC"/Karamelo_v*_macOS*.tar.gz "$SRC"/Karamelo_v*_macOS*.zip; do
+        [ -f "$z" ] || continue
+        base=$(basename "$z")
+        [ "$base" = "$ATUAL_MACOS" ] && continue
+        tam=$(du -h "$z" | cut -f1)
+        if rm -f "$z"; then
+            echo "  apagado macOS:  $base ($tam)"
+            apagados_macos=$((apagados_macos + 1))
+        else
+            echo "  [ERRO] nao consegui apagar $base"
+        fi
+    done
+    [ "$apagados_macos" = "0" ] && echo "  nenhuma versao macOS antiga para apagar."
 fi
 
 echo ""

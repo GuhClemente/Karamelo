@@ -24,7 +24,7 @@ não estimá-la.
 | Domínio | **karamelo-emu.com** |
 | Repositório | **https://github.com/GuhClemente/Karamelo** |
 | Autor | Guh Clemente — YouTube [@GuhClemente](https://youtube.com/@GuhClemente) |
-| Plataforma | **Windows x64 e Linux x64 (nativos)** |
+| Plataforma | **Windows x64, Linux x64 e macOS ARM64 (Apple Silicon) nativos** |
 
 Use "Karamelo Emulador" na primeira menção de uma página, em títulos e no
 `<title>`. Depois disso, "Karamelo" sozinho está correto e lê melhor.
@@ -120,7 +120,11 @@ Formato (exemplo real):
     "linux_bin_url": "https://karamelo-emu.com/downloads/Karamelo_linux",
     "linux_bin_size": 5380024,
     "linux_bin_sha256": "331E1BE1...",
-    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Linux64.tar.gz"
+    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Linux64.tar.gz",
+    "macos_bin_url": "https://karamelo-emu.com/downloads/Karamelo_mac",
+    "macos_bin_size": 1213512,
+    "macos_bin_sha256": "ABC7BE57...",
+    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_macOS_arm64.tar.gz"
 }
 ```
 
@@ -128,7 +132,7 @@ O site deve montar os botões de download **lendo esse arquivo**, nunca com o
 número da versão escrito à mão no código da página. Assim uma release nova não
 exige tocar no site.
 
-⚠️ **Esse arquivo é lido pelo auto-update do aplicativo (Windows e Linux).**
+⚠️ **Esse arquivo é lido pelo auto-update do aplicativo (Windows, Linux e macOS).**
 Não altere nomes de campos nem quebre o JSON. Se ele quebrar, os usuários perdem
 a atualização automática.
 
@@ -138,25 +142,35 @@ a atualização automática.
 |---|---|
 | `Karamelo_v<versão>_Win64.zip` | **sim** — download principal para Windows (x64) |
 | `Karamelo_v<versão>_Linux64.tar.gz` | **sim** — download principal para Linux (x64) |
+| `Karamelo_v<versão>_macOS_arm64.tar.gz` | **sim** — download principal para macOS (Apple Silicon M1/M2/M3/M4) |
 | `Karamelo.exe` | **não** ofereça avulso (usado pelo auto-update do Windows) |
 | `Karamelo_linux` | **não** ofereça avulso (usado pelo auto-update do Linux) |
+| `Karamelo_mac` | **não** ofereça avulso (usado pelo auto-update do macOS) |
 | `Karamelo_Pack_BIOS.zip` | **não existe mais** |
 
-O `Karamelo.exe` e o `Karamelo_linux` avulsos **não funcionam sozinhos**: eles
+O `Karamelo.exe`, `Karamelo_linux` e `Karamelo_mac` avulsos **não funcionam sozinhos**: eles
 localizam `cores/`, `bios/`, `roms/` e `saves/` a partir da própria pasta. Quem
 baixar só o executável fica sem os motores de emulação. Eles existem nas URLs
 acima porque é onde o auto-update do próprio app busca atualizações.
 
 ### Como apresentar no site
 
-Recomenda-se oferecer dois botões ou abas claras:
+Recomenda-se oferecer três botões ou abas claras:
 - **Baixar para Windows (x64)** (apontando para `zip_url`)
 - **Baixar para Linux (x64)** (apontando para `linux_tar_url`)
+- **Baixar para macOS (Apple Silicon)** (apontando para `macos_tar_url`)
 
 Para Linux, instrua o usuário a descompactar e executar:
 ```bash
 tar -xzf Karamelo_v*_Linux64.tar.gz
 cd Karamelo_v*_Linux64
+./Karamelo
+```
+
+Para macOS (Apple Silicon M1/M2/M3/M4):
+```bash
+tar -xzf Karamelo_v*_macOS_arm64.tar.gz
+cd Karamelo_v*_macOS_arm64
 ./Karamelo
 ```
 
