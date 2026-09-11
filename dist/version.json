@@ -9,7 +9,7 @@
     "linux_bin_sha256": "331E1BE1A0708000F0065AF3A6A41CF6B0328CDEBDD9DBE8387795732589B746",
     "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Linux64.tar.gz",
     "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
-    "exe_size": 4038144,
-    "exe_sha256": "4AA64512400AD6BE669868D268762C70227966F93FBEB98B47B0E25B74B807A0",
+    "exe_size": 4029440,
+    "exe_sha256": "A8CE4D9CCBD14E889F2266A0D70E59CF2D4B24B01D3F9967718B4DC8AC168054",
     "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Win64.zip"
 }
