@@ -224,6 +224,30 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "Fallout1CE", "Fallout (Community Edition)",
           "alexbatalov/fallout1-ce", "fallout-ce.exe",
           false, {}, true, false },
+        { "Reblue", "Pokemon Red and Blue (reblue)",
+          "zolaware/reblue", "reblue.exe",
+          true, { "pokemon" }, false, false },
+        { "OpenSpideyPS1", "Spider-Man (OpenSpidey)",
+          "GTTeancum/OpenSpideyPS1", "",
+          true, { "spider", "man" }, false, false },
+        { "FZeroRecomp", "F-Zero X",
+          "craigshaw/FZeroRecomp", "FZeroRecomp.exe",
+          true, { "f-zero" }, false, true },
+        { "AeroGaugeRecomp", "AeroGauge",
+          "alondero/aerogauge-recomp", "aerogauge_modern.exe",
+          true, { "aerogauge" }, true, false },
+        { "CrashBandicootLauncher", "Crash Bandicoot",
+          "Matteo842/CrashBandicoot-Launcher", "CrashBandicoot.exe",
+          true, { "crash" }, true, false },
+        { "MarioStrikers", "Super Mario Strikers",
+          "new-coke/strikers", "strikers.exe",
+          true, { "strikers" }, true, true },
+        { "OpenNectar", "Pikmin (Open Nectar)",
+          "SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port", "nectar.exe",
+          true, { "pikmin" }, true, false },
+        { "RingOut", "Soulcalibur II (Ring Out)",
+          "jackpoison-prog/RingOut", "RingOut.exe",
+          true, { "soul" }, true, false },
     };
     return defs;
 }
@@ -647,7 +671,9 @@ static bool IsLinuxAssetName(const std::string& lower_name) {
 // falls through to "no Linux build" until extraction grows those formats too.
 static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
     auto is_archive = [](const std::string& n) {
-        return n.size() >= 4 && n.substr(n.size() - 4) == ".zip";
+        return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||
+               (n.size() >= 7 && (n.substr(n.size() - 7) == ".tar.gz" || n.substr(n.size() - 7) == ".tar.xz")) ||
+               (n.find("linux") != std::string::npos && !ContainsAny(n, { ".apk", ".deb", ".rpm", ".appimage", "flatpak" }));
     };
 
     std::vector<GhAsset> matches;
@@ -782,7 +808,12 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     std::string dest_dir = "ports/" + def.id;
     fs::create_directories(dest_dir, ec);
 
+#ifndef _WIN32
+    bool is_bare_exe = (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".exe") ||
+                       (!ContainsAny(lower_name, { ".zip", ".tar.gz", ".tar.xz", ".7z", ".rar", ".msi", ".dmg", ".pkg", ".apk", ".deb", ".rpm" }));
+#else
     bool is_bare_exe = lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".exe";
+#endif
 
     if (is_bare_exe) {
         // Some releases ship the whole game as one executable with no
@@ -796,6 +827,9 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         std::string exe_name = safe_name.empty() ? (def.id + ".exe") : safe_name;
         std::string exe_path = dest_dir + "/" + exe_name;
         if (!UpdaterHttpDownloadToFile(asset.url, exe_path)) { out_error = "falha no download"; return false; }
+#ifndef _WIN32
+        chmod(exe_path.c_str(), 0755);
+#endif
     } else {
         // Match the local cache file's extension to what was actually picked
         // instead of assuming .zip: PickMacOsAsset (unlike PickWindowsAsset/

@@ -373,11 +373,12 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 20/09/2026:** são **47** jogos de "Ports & Recomp" — 42 até
-11/09, +5 em 20/09 (Body Harvest, Diddy Kong Racing, Diablo / DevilutionX,
-Star Wars: Dark Forces / The Force Engine, Fallout Community Edition — ver seção 15).
+**Atualizado em 21/09/2026:** são **55** jogos de "Ports & Recomp" — 42 até
+11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
+F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
+Soulcalibur II / Ring Out — ver seção 16).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte — essa tabela só cresce,
-não copie nenhum número antigo (39, 40, 41, 42) de outra página no futuro. É coincidência
+não copie nenhum número antigo (39, 40, 41, 42, 47) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -551,14 +552,14 @@ mudança necessária é a contagem da seção 9.3/9.9.
 
 ---
 
-## 12. Filtro e ícone de SO em Ports & Recomp (Atualizado em 20/09/2026)
+## 12. Filtro e ícone de SO em Ports & Recomp (Atualizado em 21/09/2026)
 
 Pedido direto do dono do projeto: a lista de "Ports & Recomp" no site deve
 **filtrar por sistema operacional e mostrar um ícone de qual SO cada jogo
 suporta** — 🪟 para Windows, 🐧 para Linux, 🍎 para macOS (Apple Silicon &
 Universal). A fonte de verdade agora é a própria tabela em
 [CREDITS.md](../CREDITS.md), que traz a coluna **SO** com esses três ícones,
-verificada em 20/09/2026 contra a release mais recente de cada um dos 47
+verificada em 21/09/2026 contra a release mais recente de cada um dos 55
 repositórios. Leia de lá — não estime, não invente.
 
 ### O que "SO" significa aqui
@@ -567,47 +568,48 @@ repositórios. Leia de lá — não estime, não invente.
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 47 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip` ou `.tar.xz`/`.tar.gz` com binário Linux executável nativo direto.
+- No **Windows**: todos os 55 ports possuem builds executáveis (.exe).
+- No **Linux**: requer um `.zip` ou `.tar.xz`/`.tar.gz` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`).
   Pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
-  não contam hoje (total: 19 ports).
+  não contam hoje (total: 24 ports).
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips e tarballs.
-  Hoje 20 ports possuem releases comprovadas para macOS.
+  Hoje 22 ports possuem releases comprovadas para macOS.
 
 ### O que implementar no site
 
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 47 jogos.
-   - **Filtro Linux (🐧)**: 19 jogos.
-   - **Filtro macOS (🍎)**: 20 jogos.
+   - **Filtro Windows (🪟)**: 55 jogos.
+   - **Filtro Linux (🐧)**: 24 jogos.
+   - **Filtro macOS (🍎)**: 22 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
    derive-os da contagem dos ícones em `CREDITS.md`.
 
-### Resumo das compatibilidades (20/09/2026)
+### Resumo das compatibilidades (21/09/2026)
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (15 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (16 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
-  Infinite Mario 64, Valkyrie Profile, Diablo (DevilutionX).
-- **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
-  Space Station Silicon Valley, Wave Race 64.
-- **🪟🐧 (4 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
-  Remastered, Body Harvest, Fallout (Community Edition).
-- **🪟 apenas (23 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+  Infinite Mario 64, Valkyrie Profile, Diablo (DevilutionX), Super Mario Strikers.
+- **🪟🍎 (6 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
+  Space Station Silicon Valley, Wave Race 64, F-Zero X.
+- **🪟🐧 (8 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
+  Remastered, Body Harvest, Fallout (Community Edition), AeroGauge, Crash Bandicoot,
+  Pikmin (Open Nectar), Soulcalibur II (Ring Out).
+- **🪟 apenas (25 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, Animal Crossing (GC),
   Banjo-Kazooie: Nuts & Bolts, DBZ Budokai, Jak & Daxter, LoD: Severed Chains,
   REDRIVER 2, Castlevania: SotN, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
   Unleashed, Super Mario World, Super Metroid, Viva Pinata, WipEout Phantom
   Edition, OutRun (CannonBall DX), Pokemon Snap, Diddy Kong Racing,
-  Star Wars: Dark Forces (TFE).
+  Star Wars: Dark Forces (TFE), Pokemon Red and Blue (reblue), Spider-Man (OpenSpidey).
 
 ---
 
@@ -649,7 +651,7 @@ O Karamelo agora possui compilação e suporte nativo completo para **macOS (App
 5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
    - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
    - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
-   - 20 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
+   - 22 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
 6. **Detecção no Site**:
    - Recomenda-se detectar o SO do usuário (`MacIntel` com `navigator.maxTouchPoints > 0` ou `navigator.userAgent` contendo `Macintosh`) para destacar o botão **Baixar para macOS (Apple Silicon)** por padrão para usuários Apple.
 
@@ -682,3 +684,47 @@ Em 20/09/2026, o catálogo de "Ports & Recomp" foi expandido de 42 para **47 tí
 
 ### Validação dos 35 Sistemas com ROMs Sintéticas
 - Todos os 35 sistemas agora possuem cobertura de testes automatizada através de geradores de ROMs sintéticas válidas (`tools/generate_test_roms.py`), permitindo autotestes de ponta a ponta (`--core-selftest`) para Atari 5200, Lynx, WonderSwan, Neo Geo Pocket, PC-FX e 3DO com 100% de estabilidade e fechamento gracioso.
+
+---
+
+## 16. Adição de 21/09/2026 — Expansão de Ports & Recompilados (55 Ports) e Suporte a Executáveis Avulsos
+
+Em 21/09/2026, o catálogo de "Ports & Recomp" foi expandido de 47 para **55 títulos** com a homologação de 8 novos ports provenientes de projetos da comunidade:
+
+1. **Pokémon Red / Blue (reblue)** (`zolaware/reblue` — 🪟):
+   - Recompilação nativa em C do clássico de Game Boy.
+   - Release v1.2.1 com executável nativo Windows x64.
+2. **Spider-Man (OpenSpidey)** (`GTTeancum/OpenSpideyPS1` — 🪟):
+   - Recompilação nativa de Spider-Man 1 & 2 (PS1).
+   - Suporte a alta taxa de quadros e controles modernos no Windows.
+3. **F-Zero X** (`craigshaw/FZeroRecomp` — 🪟🍎):
+   - Motor N64Recomp de F-Zero X.
+   - Suporte nativo completo a **Windows x64** e **macOS Apple Silicon ARM64**.
+   - Timing NTSC aprimorado independente de taxa de atualização de tela.
+4. **AeroGauge** (`alondero/aerogauge-recomp` — 🪟🐧):
+   - Motor N64Recomp de AeroGauge (N64).
+   - Suporte nativo a **Windows** e **Linux** (Vulkan, 60fps+, Easy Turbo assist).
+5. **Crash Bandicoot** (`Matteo842/CrashBandicoot-Launcher` — 🪟🐧):
+   - Port nativo para PC de Crash Bandicoot 1 (PS1).
+   - Widescreen 16:9 real nativo (sem esticar ou cortar geometria), suporte a 60/120/240/uncapped FPS e suporte a imagens de disco `.chd` e `.cue+.bin`.
+   - Distribui binários executáveis diretos (`CrashBandicoot.exe` no Windows e `CrashBandicoot-Linux` no Linux).
+6. **Super Mario Strikers** (`new-coke/strikers` — 🪟🐧🍎):
+   - Port nativo completo de Super Mario Strikers / Mario Smash Football (GameCube).
+   - Compatibilidade Triple Crown: **Windows** (.zip), **Linux** (.tar.gz) e **macOS** (.tar.gz ARM64).
+   - Suporte a 60fps+, widescreen e compilação de shaders em segundo plano.
+7. **Pikmin (Open Nectar)** (`SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port` — 🪟🐧):
+   - Port nativo de Pikmin 1 (GameCube).
+   - Suporte nativo para **Windows** e **Linux**.
+   - Suporte a texturas HD e modelos aprimorados, controles modernos via mouse e gamepad.
+8. **Soulcalibur II (Ring Out)** (`jackpoison-prog/RingOut` — 🪟🐧):
+   - Port nativo / recompilador de Soulcalibur II (GameCube).
+   - Suporte nativo a **Windows** e **Linux**.
+   - Suporte nativo a widescreen 16:9 real, netplay P2P e 60 FPS cravados.
+
+### Suporte a Executáveis Avulsos e Tarballs Linux no Downloader (`src/port_runner.cpp`)
+- O instalador automático agora reconhece assets que sejam executáveis diretos (como `CrashBandicoot.exe` ou binários ELF do Linux como `CrashBandicoot-Linux`), gravando-os diretamente em `ports/<id>/` com permissões adequadas de execução (`chmod 0755`), sem tentar forçar descompactação via `ArchiveExtractAll`.
+- O matcher de assets do Linux (`PickLinuxAsset`) agora suporta `.tar.gz` e `.tar.xz`, além do tradicional `.zip`.
+
+### Projetos Analisados e Não Adicionados nesta Rodada
+- `mstan/SuperMetroidRecomp`: Já constava no catálogo desde versões anteriores (não requer ação).
+- `GenryTheFox/Spider-Man-Edge-of-Time-PC-Edition`: O repositório retornou HTTP 404 (privado ou deletado). Não foi adicionado.

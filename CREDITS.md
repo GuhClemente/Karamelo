@@ -164,8 +164,16 @@ recente de cada repositório.
 | Diablo (DevilutionX) | 🪟🐧🍎 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
 | Star Wars: Dark Forces (TFE) | 🪟 | [TheForceEngine/TheForceEngine](https://github.com/TheForceEngine/TheForceEngine) |
 | Fallout (Community Edition) | 🪟🐧 | [alexbatalov/fallout1-ce](https://github.com/alexbatalov/fallout1-ce) |
+| Pokemon Red and Blue (reblue) | 🪟 | [zolaware/reblue](https://github.com/zolaware/reblue) |
+| Spider-Man (OpenSpidey) | 🪟 | [GTTeancum/OpenSpideyPS1](https://github.com/GTTeancum/OpenSpideyPS1) |
+| F-Zero X | 🪟🍎 | [craigshaw/FZeroRecomp](https://github.com/craigshaw/FZeroRecomp) |
+| AeroGauge | 🪟🐧 | [alondero/aerogauge-recomp](https://github.com/alondero/aerogauge-recomp) |
+| Crash Bandicoot | 🪟🐧 | [Matteo842/CrashBandicoot-Launcher](https://github.com/Matteo842/CrashBandicoot-Launcher) |
+| Super Mario Strikers | 🪟🐧🍎 | [new-coke/strikers](https://github.com/new-coke/strikers) |
+| Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
+| Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 
-**19 de 47 têm build Linux** e **20 de 47 têm build macOS** (Apple Silicon /
+**24 de 55 têm build Linux** e **22 de 55 têm build macOS** (Apple Silicon /
 Universal). Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app` descompactados, arquivos
 `.zip` e `.tar.xz` com binários Mach-O nativos e prioriza compilações ARM64. No Linux,
