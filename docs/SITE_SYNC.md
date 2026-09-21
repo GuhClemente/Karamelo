@@ -373,11 +373,11 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 11/09/2026:** são **42** jogos de "Ports & Recomp" — 39 até
-09/09, +1 (Valkyrie Profile) e +1 (Wave Race 64) em 10-11/09, +1 (Pokemon
-Snap) ainda em 11/09 (ver seções 10, 11 e 13). O número foi conferido contra
-o `CREDITS.md`, que é sempre a fonte — essa tabela só cresce, não copie
-nenhum número antigo (39, 40, 41) de outra página no futuro. É coincidência
+**Atualizado em 20/09/2026:** são **47** jogos de "Ports & Recomp" — 42 até
+11/09, +5 em 20/09 (Body Harvest, Diddy Kong Racing, Diablo / DevilutionX,
+Star Wars: Dark Forces / The Force Engine, Fallout Community Edition — ver seção 15).
+O número foi conferido contra o `CREDITS.md`, que é sempre a fonte — essa tabela só cresce,
+não copie nenhum número antigo (39, 40, 41, 42) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -472,8 +472,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **42** jogos de Ports & Recomp (atualizado em 11/09/2026 — ver seções
-  10, 11 e 13),
+- Os **47** jogos de Ports & Recomp (atualizado em 20/09/2026 — ver seções
+  10, 11, 13 e 15),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -551,14 +551,14 @@ mudança necessária é a contagem da seção 9.3/9.9.
 
 ---
 
-## 12. Filtro e ícone de SO em Ports & Recomp (11/09/2026)
+## 12. Filtro e ícone de SO em Ports & Recomp (Atualizado em 20/09/2026)
 
 Pedido direto do dono do projeto: a lista de "Ports & Recomp" no site deve
 **filtrar por sistema operacional e mostrar um ícone de qual SO cada jogo
 suporta** — 🪟 para Windows, 🐧 para Linux, 🍎 para macOS (Apple Silicon &
 Universal). A fonte de verdade agora é a própria tabela em
 [CREDITS.md](../CREDITS.md), que traz a coluna **SO** com esses três ícones,
-verificada em 11/09/2026 contra a release mais recente de cada um dos 42
+verificada em 20/09/2026 contra a release mais recente de cada um dos 47
 repositórios. Leia de lá — não estime, não invente.
 
 ### O que "SO" significa aqui
@@ -567,46 +567,47 @@ repositórios. Leia de lá — não estime, não invente.
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 42 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip` com binário Linux executável nativo direto.
-  Pacotes Flatpak dentro de zip (`Banjo 64`, `Sonic Unleashed Recompiled`) e
-  arquivos `.tar.gz` (`Pokemon Snap`) não contam hoje (total: 16 ports).
+- No **Windows**: todos os 47 ports possuem builds executáveis (.exe).
+- No **Linux**: requer um `.zip` ou `.tar.xz`/`.tar.gz` com binário Linux executável nativo direto.
+  Pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
+  não contam hoje (total: 19 ports).
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
-  Universal > Intel), extrai pacotes `.app` descompactados e zips aninhados.
-  Hoje 19 ports possuem releases comprovadas para macOS.
+  Universal > Intel), extrai pacotes `.app` descompactados, zips e tarballs.
+  Hoje 20 ports possuem releases comprovadas para macOS.
 
 ### O que implementar no site
 
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 42 jogos.
-   - **Filtro Linux (🐧)**: 16 jogos.
-   - **Filtro macOS (🍎)**: 19 jogos.
+   - **Filtro Windows (🪟)**: 47 jogos.
+   - **Filtro Linux (🐧)**: 19 jogos.
+   - **Filtro macOS (🍎)**: 20 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
    derive-os da contagem dos ícones em `CREDITS.md`.
 
-### Resumo das compatibilidades (11/09/2026)
+### Resumo das compatibilidades (20/09/2026)
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (14 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (15 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
-  Infinite Mario 64, Valkyrie Profile.
+  Infinite Mario 64, Valkyrie Profile, Diablo (DevilutionX).
 - **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
   Space Station Silicon Valley, Wave Race 64.
-- **🪟🐧 (2 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
-  Remastered.
-- **🪟 apenas (21 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟🐧 (4 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
+  Remastered, Body Harvest, Fallout (Community Edition).
+- **🪟 apenas (23 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, Animal Crossing (GC),
   Banjo-Kazooie: Nuts & Bolts, DBZ Budokai, Jak & Daxter, LoD: Severed Chains,
   REDRIVER 2, Castlevania: SotN, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
   Unleashed, Super Mario World, Super Metroid, Viva Pinata, WipEout Phantom
-  Edition, OutRun (CannonBall DX), Pokemon Snap.
+  Edition, OutRun (CannonBall DX), Pokemon Snap, Diddy Kong Racing,
+  Star Wars: Dark Forces (TFE).
 
 ---
 
@@ -648,6 +649,36 @@ O Karamelo agora possui compilação e suporte nativo completo para **macOS (App
 5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
    - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
    - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
-   - 19 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
+   - 20 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
 6. **Detecção no Site**:
    - Recomenda-se detectar o SO do usuário (`MacIntel` com `navigator.maxTouchPoints > 0` ou `navigator.userAgent` contendo `Macintosh`) para destacar o botão **Baixar para macOS (Apple Silicon)** por padrão para usuários Apple.
+
+---
+
+## 15. Adição de 20/09/2026 — Expansão de Ports & Recompilados (47 Ports) e Validação dos 35 Sistemas
+
+Em 20/09/2026, o catálogo de "Ports & Recomp" foi expandido de 42 para **47 títulos** com a adição de 5 projetos amplamente testados e validados:
+
+1. **Body Harvest** (`danielgomesvieira2000/body-harvest-recomp` — 🪟🐧):
+   - Motor N64Recomp nativo de Body Harvest (USA).
+   - Suporte a widescreen com HUD ancorado, interpolação de alta taxa de quadros e suporte total a gamepads.
+   - Suporta cópia automática de ROM (`body-harvest-recomp.exe` no Windows, `body-harvest-recomp.sh` no Linux).
+2. **Diddy Kong Racing** (`ThatGuyMcd/DKR-R` — 🪟):
+   - Motor N64Recomp / RT64 de DKR.
+   - Suporte a widescreen, 60fps+, multiplayer online e suporte nativo a controles.
+3. **Diablo (DevilutionX)** (`diasurgical/devilutionX` — 🪟🐧🍎):
+   - Source port moderno e aprimorado de Diablo 1 e da expansão Hellfire.
+   - Suporte nativo completo para **Windows**, **Linux** (`.tar.xz`) e **macOS** (`.dmg` universal Apple Silicon).
+   - Suporta gamepads modernos, resolução escalável e multiplayer.
+4. **Star Wars: Dark Forces (The Force Engine)** (`TheForceEngine/TheForceEngine` — 🪟):
+   - Engine moderna substituta para o clássico Star Wars: Dark Forces da LucasArts.
+   - Suporte a renderização em alta resolução, mouse look e áudio aprimorado.
+5. **Fallout (Community Edition)** (`alexbatalov/fallout1-ce` — 🪟🐧):
+   - Reimplementação open-source e nativa da engine do Fallout 1 original.
+   - Roda perfeitamente em Windows e Linux com suporte a resoluções modernas e controles.
+
+### Aprimoramento no Seletor de Assets (`src/port_runner.cpp`)
+- O seletor de assets do Karamelo foi atualizado para descartar automaticamente pacotes de símbolos de depuração (`debug-symbols`, `debug_symbols`, `-pdb`, `_pdb`, `symbols`). Isso garante que o instalador baixe sempre o arquivo de jogo executável em vez de pacotes complementares de PDB.
+
+### Validação dos 35 Sistemas com ROMs Sintéticas
+- Todos os 35 sistemas agora possuem cobertura de testes automatizada através de geradores de ROMs sintéticas válidas (`tools/generate_test_roms.py`), permitindo autotestes de ponta a ponta (`--core-selftest`) para Atari 5200, Lynx, WonderSwan, Neo Geo Pocket, PC-FX e 3DO com 100% de estabilidade e fechamento gracioso.
