@@ -54,6 +54,7 @@ bool CoreSaveState(int slot = 0);
 bool CoreLoadState(int slot = 0);
 int  CoreGetSelectedSlot();
 void CoreSetSelectedSlot(int slot);
+bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t max_time_len, int64_t* out_bytes);
 bool CoreTakeScreenshot();
 
 // Volume & Audio Controls

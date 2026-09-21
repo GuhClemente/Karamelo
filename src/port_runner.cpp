@@ -137,7 +137,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "PokemonStadiumRecomp", "Pokemon Stadium",
           "mstan/PokemonStadiumRecomp", "", true, { "pokemon", "stadium" }, false, false },
         { "Banjo64Recomp", "Banjo 64",
-          "BanjoRecomp/BanjoRecomp", "", true, { "banjo" }, false, true },
+          "BanjoRecomp/BanjoRecomp", "", true, { "banjo" }, true, true },
         { "BM64Recomp", "Bomberman 64",
           "RevoSucks/BM64Recomp", "", true, { "bomberman" }, true, true },
         { "ChameleonTwistRecomp", "Chameleon Twist",
@@ -180,13 +180,13 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "SeveredChains", "Severed Chains",
           "Legend-of-Dragoon-Modding/Severed-Chains", "", true, {}, false, false },
         { "REDRIVER2", "REDRIVER 2",
-          "OpenDriver2/REDRIVER2", "", true, {}, false, false },
+          "OpenDriver2/REDRIVER2", "", true, {}, true, false },
         { "SymphonyRecomp", "Castlevania: Symphony of the Night",
           "GuhClemente/SymphonyRecomp", "", true, {}, false, false },
         { "Sonic1Forever", "Sonic 1 Forever",
           "ElspethThePict/S1Forever", "", true, {}, false, false },
         { "Sonic3AIR", "Sonic 3 A.I.R.",
-          "Eukaryot/sonic3air", "", true, {}, false, false },
+          "Eukaryot/sonic3air", "", true, {}, true, false },
         { "SonicUnleashedRecomp", "Sonic Unleashed",
           "hedge-dev/UnleashedRecomp", "", true, {}, false, false },
         { "SpaceStationSiliconValley", "Space Station Silicon Valley",
@@ -194,7 +194,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "SMBRemastered", "Super Mario Bros. Remastered",
           "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {}, true, false },
         { "SuperMarioWorldRecomp", "Super Mario World",
-          "mstan/SuperMarioWorldRecomp", "", true, {}, false, false },
+          "mstan/SuperMarioWorldRecomp", "", true, {}, true, false },
         { "SuperMetroidRecomp", "Super Metroid",
           "mstan/SuperMetroidRecomp", "SuperMetroidSNESRecomp.exe", true, { "metroid" }, true, true },
         { "VivaPinataTiP", "Viva Pinata: Trouble in Paradise",
@@ -219,7 +219,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           true, { "body", "harvest" }, true, false },
         { "DKRRecomp", "Diddy Kong Racing",
           "ThatGuyMcd/DKR-R", "DKR-R.exe",
-          true, { "diddy", "kong", "racing" }, false, false },
+          true, { "diddy", "kong", "racing" }, true, false },
         // DevilutionX and Fallout1CE ship .dmg for macOS - native mounting
         // via hdiutil in ArchiveExtractAll handles this seamlessly.
         { "DevilutionX", "Diablo (DevilutionX)",
@@ -233,7 +233,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           false, {}, true, true },
         { "Reblue", "Pokemon Red and Blue (reblue)",
           "zolaware/reblue", "reblue.exe",
-          true, { "pokemon" }, false, false },
+          true, { "pokemon" }, true, false },
         { "OpenSpideyPS1", "Spider-Man (OpenSpidey)",
           "GTTeancum/OpenSpideyPS1", "",
           true, { "spider", "man" }, false, false },
@@ -721,7 +721,8 @@ static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
     auto is_archive = [](const std::string& n) {
         return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||
                (n.size() >= 7 && (n.substr(n.size() - 7) == ".tar.gz" || n.substr(n.size() - 7) == ".tar.xz")) ||
-               (n.find("linux") != std::string::npos && !ContainsAny(n, { ".apk", ".deb", ".rpm", ".appimage", "flatpak" }));
+               (n.size() >= 9 && n.substr(n.size() - 9) == ".appimage") ||
+               (n.find("linux") != std::string::npos && !ContainsAny(n, { ".apk", ".deb", ".rpm", "flatpak" }));
     };
 
     std::vector<GhAsset> matches;

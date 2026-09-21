@@ -47,7 +47,9 @@ enum MenuState {
   STATE_UPDATE,
   STATE_CORE_OPTIONS,
   STATE_RESET_CONFIRM,
-  STATE_ABOUT_CORES
+  STATE_ABOUT_CORES,
+  STATE_SAVESTATES,
+  STATE_SHADER_LIST
 };
 
 struct MenuItem {
@@ -145,10 +147,12 @@ static int setting_filter = 0; // renderer filter id; see kFilters
 // button they want bound. Holds the binding being rebound.
 static int capture_bind = -1;
 static bool capture_armed = false;
+static bool wizard_active = false;
+static int wizard_step = 0;
 static int setting_pad_device = 0; // 0=Gamepad, 1=Keyboard
 
 // Row index of the first key/pad binding on the Controller page.
-static const int kBindRow0 = 3;
+static const int kBindRow0 = 4;
 
 static const int kOsdTimeouts[] = {0, 5, 10, 15, 30, 60};
 static const int kOsdTimeoutCount = 6;
@@ -818,6 +822,9 @@ void PopulateAchievementList();
 void PopulateUpdate();
 void PopulateResetConfirm();
 void PopulateCoresList();
+void PopulateSaveStates();
+void PopulateShaderList();
+static MenuState shader_list_previous_state = STATE_VIDEO;
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
 static int neo_bios = 0;         // 0: Original, 1: UniBIOS
@@ -1036,7 +1043,7 @@ void PopulateMainMenu() {
     items.push_back(
         {"Aspect Ratio", aspects[setting_aspect], false, false, 301});
     items.push_back(
-        {"Scanlines", FilterLabel(setting_filter), false, false, 302});
+        {"CRT Shader", FilterLabel(setting_filter), false, true, 302});
 
     // Master System FM: the YM2413 sound chip a handful of Japanese games
     // use. Genesis Plus GX exposes it, but nothing here ever offered it.
@@ -1104,10 +1111,18 @@ void PopulateMainMenu() {
 
     // 5. Savestates & Controls
     items.push_back({" ", "", false, false, 0});
-    char save_str[32];
-    snprintf(save_str, sizeof(save_str), "Slot %d", CoreGetSelectedSlot());
-    items.push_back({"Save State", save_str, false, true, 2});
-    items.push_back({"Load State", save_str, false, true, 3});
+    int cur_slot = CoreGetSelectedSlot();
+    bool slot_has_state = false;
+    char slot_time[32] = "Vazio";
+    int64_t slot_sz = 0;
+    CoreGetStateSlotInfo(cur_slot, &slot_has_state, slot_time, sizeof(slot_time), &slot_sz);
+
+    char slot_display[40];
+    snprintf(slot_display, sizeof(slot_display), "< %d: %s >", cur_slot, slot_time);
+    items.push_back({"Slot de Save", slot_display, false, false, 5});
+    items.push_back({"Salvar Estado (F2)", "", false, true, 2});
+    items.push_back({"Carregar Estado (F4)", slot_has_state ? "OK" : "-", false, true, 3});
+    items.push_back({"Gerenciador Slots", ">", false, true, 4});
     items.push_back({"Define Buttons", ">", false, true, 203});
     items.push_back({" ", "", false, false, 0});
     items.push_back({"Close Game", "", false, true, 7});
@@ -1244,6 +1259,7 @@ void PopulateControllerSettings() {
 
   const char *deadzones[] = {"5%", "10%", "15%", "20%"};
   items.push_back({"Deadzone", deadzones[setting_deadzone], false, false, 508});
+  items.push_back({"Mapear Tudo (Passo a Passo)", ">", false, true, 798});
 
   // Labels come from the running core when it supplied them, so the page reads
   // in that system's own terms - "Cross" on PSP, not a generic "Botao B".
@@ -1418,7 +1434,7 @@ void PopulateVideoSettings() {
 
   items.push_back({"Aspect Ratio", aspects[setting_aspect], false, false, 301});
   items.push_back(
-      {"CRT Shader", FilterLabel(setting_filter), false, false, 302});
+      {"CRT Shader", FilterLabel(setting_filter), false, true, 302});
   items.push_back(
       {"Wallpaper", WallpaperDisplayLabel(setting_wallpaper), false, false, 303});
   items.push_back(
@@ -1464,6 +1480,79 @@ void PopulateVideoSettings() {
   items.push_back({"Rolagem Nome", scroll_lbl, false, false, 313});
 
   selected_idx = 0;
+  scroll_top = 0;
+}
+
+void PopulateShaderList() {
+  items.clear();
+  current_title = "Shaders CRT";
+  OsdSetSize(12);
+
+  for (int i = 0; i < kFilterCount; i++) {
+    bool is_active = (kFilters[i].mode == setting_filter);
+    char label_buf[32];
+    snprintf(label_buf, sizeof(label_buf), "%s%s", is_active ? "* " : "  ", kFilters[i].label);
+
+    const char* desc = "";
+    switch (kFilters[i].mode) {
+      case 0: desc = "Pixel Raw"; break;
+      case 8: desc = "Scanlines"; break;
+      case 9: desc = "TV Tubo"; break;
+      case 4: desc = "PVM 600TVL"; break;
+      case 1: desc = "Trinitron"; break;
+      case 2: desc = "Shadow Mask"; break;
+      case 5: desc = "Grade 50%"; break;
+      case 6: desc = "Composite"; break;
+      case 7: desc = "LCD Matrix"; break;
+      case 3: desc = "Tubo Curvo"; break;
+      default: desc = ""; break;
+    }
+
+    items.push_back({label_buf, desc, false, true, 650 + i});
+  }
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({"Voltar", "<", false, true, 699});
+
+  selected_idx = FilterIndex(setting_filter);
+  scroll_top = 0;
+}
+
+void PopulateSaveStates() {
+  items.clear();
+  current_title = "Save States";
+  OsdSetSize(12);
+
+  int active_slot = CoreGetSelectedSlot();
+
+  for (int s = 0; s < 10; s++) {
+    bool has_state = false;
+    char time_str[32] = "Vazio";
+    int64_t bytes = 0;
+    CoreGetStateSlotInfo(s, &has_state, time_str, sizeof(time_str), &bytes);
+
+    char slot_label[32];
+    snprintf(slot_label, sizeof(slot_label), "%sSlot %d", (s == active_slot ? "> " : "  "), s);
+
+    char slot_val[40];
+    if (has_state) {
+      if (bytes > 1024 * 1024)
+        snprintf(slot_val, sizeof(slot_val), "%s (%.1fMB)", time_str, bytes / (1024.0 * 1024.0));
+      else if (bytes > 1024)
+        snprintf(slot_val, sizeof(slot_val), "%s (%dKB)", time_str, (int)(bytes / 1024));
+      else
+        snprintf(slot_val, sizeof(slot_val), "%s (%dB)", time_str, (int)bytes);
+    } else {
+      snprintf(slot_val, sizeof(slot_val), "Vazio");
+    }
+
+    items.push_back({slot_label, slot_val, false, true, 850 + s});
+  }
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({"Voltar", "<", false, true, 899});
+
+  selected_idx = active_slot;
   scroll_top = 0;
 }
 
@@ -2378,27 +2467,72 @@ void MenuRun() {
       int pad = InputCaptureScanPad();
 
       if (vk == VK_ESCAPE) {
+        wizard_active = false;
         capture_bind = -1;
         PopulateControllerSettings();
+        CoreSetToast("CONFIGURACAO CANCELADA", 90);
       } else if (pad != 0) {
         int target = capture_bind;
         InputBindSetPad(target, pad);
         setting_pad_device = 0;
-        capture_bind = -1;
-        PopulateControllerSettings();
-        selected_idx = kBindRow0 + target;
-        MenuSaveSettings();
+        if (wizard_active) {
+          wizard_step++;
+          int max_wizard_steps = 16;
+          if (wizard_step < max_wizard_steps) {
+            capture_bind = wizard_step;
+            capture_armed = false;
+            char toast_buf[64];
+            snprintf(toast_buf, sizeof(toast_buf), "[%d/%d] PRESSIONE: %s",
+                     wizard_step + 1, max_wizard_steps, InputBindLabel(wizard_step));
+            CoreSetToast(toast_buf, 120);
+            PopulateControllerSettings();
+            selected_idx = kBindRow0 + wizard_step;
+          } else {
+            wizard_active = false;
+            capture_bind = -1;
+            PopulateControllerSettings();
+            MenuSaveSettings();
+            CoreSetToast("CONTROLE MAPEADO COM SUCESSO!", 150);
+          }
+        } else {
+          capture_bind = -1;
+          PopulateControllerSettings();
+          selected_idx = kBindRow0 + target;
+          MenuSaveSettings();
+        }
       } else if (vk != 0) {
         int target = capture_bind;
         bool ok = InputBindSetKey(target, vk);
         setting_pad_device = 1;
-        capture_bind = -1;
-        PopulateControllerSettings();
-        selected_idx = kBindRow0 + target;
-        if (ok)
-          MenuSaveSettings();
-        else
+        if (ok) {
+          if (wizard_active) {
+            wizard_step++;
+            int max_wizard_steps = BIND_COUNT;
+            if (wizard_step < max_wizard_steps) {
+              capture_bind = wizard_step;
+              capture_armed = false;
+              char toast_buf[64];
+              snprintf(toast_buf, sizeof(toast_buf), "[%d/%d] PRESSIONE: %s",
+                       wizard_step + 1, max_wizard_steps, InputBindLabel(wizard_step));
+              CoreSetToast(toast_buf, 120);
+              PopulateControllerSettings();
+              selected_idx = kBindRow0 + wizard_step;
+            } else {
+              wizard_active = false;
+              capture_bind = -1;
+              PopulateControllerSettings();
+              MenuSaveSettings();
+              CoreSetToast("TECLADO MAPEADO COM SUCESSO!", 150);
+            }
+          } else {
+            capture_bind = -1;
+            PopulateControllerSettings();
+            selected_idx = kBindRow0 + target;
+            MenuSaveSettings();
+          }
+        } else {
           CoreSetToast("ESSA TECLA E RESERVADA PARA O MENU", 120);
+        }
       }
     }
   }
@@ -2658,6 +2792,23 @@ static void MenuProcessKeyImpl(MenuKey key) {
       else
         PopulateVideoSettings();
       selected_idx = cur;
+    } else if (item.action_id == 5) // Slot de Save
+    {
+      int cur = selected_idx;
+      int s = (CoreGetSelectedSlot() + delta + 10) % 10;
+      CoreSetSelectedSlot(s);
+      PopulateMainMenu();
+      selected_idx = cur;
+    } else if (current_state == STATE_SAVESTATES && item.action_id >= 850 && item.action_id <= 859) {
+      int s = item.action_id - 850;
+      CoreSetSelectedSlot(s);
+      if (delta > 0) {
+        CoreSaveState(s);
+        PopulateSaveStates();
+      } else if (delta < 0) {
+        CoreLoadState(s);
+        PopulateSaveStates();
+      }
     } else if (item.action_id == 302) // CRT Shaders
     {
       int cur = selected_idx;
@@ -2984,11 +3135,20 @@ static void MenuProcessKeyImpl(MenuKey key) {
       } else if (item.action_id == 2) // Save State
       {
         CoreSaveState(CoreGetSelectedSlot());
-        OsdDisable();
+        PopulateMainMenu();
       } else if (item.action_id == 3) // Load State
       {
         CoreLoadState(CoreGetSelectedSlot());
         OsdDisable();
+      } else if (item.action_id == 4) // Gerenciador Slots
+      {
+        current_state = STATE_SAVESTATES;
+        PopulateSaveStates();
+      } else if (item.action_id == 302) // CRT Shaders
+      {
+        shader_list_previous_state = STATE_MAIN;
+        current_state = STATE_SHADER_LIST;
+        PopulateShaderList();
       } else if (item.action_id == 5) // Screenshot
       {
         CoreTakeScreenshot();
@@ -3201,6 +3361,18 @@ static void MenuProcessKeyImpl(MenuKey key) {
         setting_pad_device = (setting_pad_device + 1) % 2;
         PopulateControllerSettings();
         SelectByAction(item.action_id, 1);
+      } else if (item.action_id == 798) {
+        wizard_active = true;
+        wizard_step = 0;
+        capture_bind = wizard_step;
+        capture_armed = false;
+        char toast_buf[64];
+        snprintf(toast_buf, sizeof(toast_buf), "[1/%d] PRESSIONE: %s",
+                 (setting_pad_device == 0 ? 16 : BIND_COUNT),
+                 InputBindLabel(wizard_step));
+        CoreSetToast(toast_buf, 120);
+        PopulateControllerSettings();
+        selected_idx = kBindRow0 + wizard_step;
       } else if (item.action_id >= 700 && item.action_id < 700 + BIND_COUNT) {
         capture_bind = item.action_id - 700;
         capture_armed = false;
@@ -3211,6 +3383,42 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateControllerSettings();
         MenuSaveSettings();
         CoreSetToast("CONTROLES RESTAURADOS AO PADRAO", 120);
+      }
+    } else if (current_state == STATE_SAVESTATES) {
+      if (item.action_id >= 850 && item.action_id <= 859) {
+        int s = item.action_id - 850;
+        CoreSetSelectedSlot(s);
+        bool has_state = false;
+        char time_str[32];
+        int64_t bytes = 0;
+        CoreGetStateSlotInfo(s, &has_state, time_str, sizeof(time_str), &bytes);
+        if (has_state) {
+          CoreLoadState(s);
+          current_state = STATE_MAIN;
+          PopulateMainMenu();
+        } else {
+          CoreSaveState(s);
+          PopulateSaveStates();
+        }
+      } else if (item.action_id == 899) {
+        current_state = STATE_MAIN;
+        PopulateMainMenu();
+      }
+    } else if (current_state == STATE_SHADER_LIST) {
+      if (item.action_id >= 650 && item.action_id < 650 + kFilterCount) {
+        int idx = item.action_id - 650;
+        setting_filter = kFilters[idx].mode;
+        char msg[64];
+        snprintf(msg, sizeof(msg), "SHADER: %s", FilterLabel(setting_filter));
+        CoreSetToast(msg, 90);
+        MenuSaveSettings();
+        PopulateShaderList();
+      } else if (item.action_id == 699) {
+        current_state = shader_list_previous_state;
+        if (current_state == STATE_MAIN)
+          PopulateMainMenu();
+        else
+          PopulateVideoSettings();
       }
     } else if (current_state == STATE_NETPLAY) {
       if (item.action_id == 601) // Host
@@ -3227,7 +3435,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateNetplay();
       }
     } else if (current_state == STATE_VIDEO) {
-      if (item.action_id == 304) {
+      if (item.action_id == 302) {
+        shader_list_previous_state = STATE_VIDEO;
+        current_state = STATE_SHADER_LIST;
+        PopulateShaderList();
+      } else if (item.action_id == 304) {
         setting_fullscreen = !setting_fullscreen;
         PopulateVideoSettings();
         SelectByAction(item.action_id, 3);
@@ -3316,6 +3528,20 @@ static void MenuProcessKeyImpl(MenuKey key) {
       current_state = STATE_SETTINGS;
       PopulateSettings();
       SelectByAction(210, 6); // "Restaurar Padroes", de onde se veio
+    } else if (current_state == STATE_SHADER_LIST) {
+      current_state = shader_list_previous_state;
+      if (current_state == STATE_MAIN)
+        PopulateMainMenu();
+      else
+        PopulateVideoSettings();
+    } else if (current_state == STATE_SAVESTATES) {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
+    } else if (current_state == STATE_CONTROLLER && wizard_active) {
+      wizard_active = false;
+      capture_bind = -1;
+      PopulateControllerSettings();
+      CoreSetToast("CONFIGURACAO CANCELADA", 90);
     } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
                current_state == STATE_CONTROLLER ||
                current_state == STATE_NETPLAY || current_state == STATE_ABOUT) {

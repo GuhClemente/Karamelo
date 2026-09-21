@@ -125,7 +125,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Harvest Moon 64 | 🪟🐧🍎 | [HarvestMoon64Recomp/HarvestMoon64Recomp](https://github.com/HarvestMoon64Recomp/HarvestMoon64Recomp) |
 | Snowboard Kids 2 | 🪟🍎 | [cdlewis/snowboardkids2-recomp](https://github.com/cdlewis/snowboardkids2-recomp) |
 | Pokemon Stadium | 🪟 | [mstan/PokemonStadiumRecomp](https://github.com/mstan/PokemonStadiumRecomp) |
-| Banjo 64 | 🪟🍎 | [BanjoRecomp/BanjoRecomp](https://github.com/BanjoRecomp/BanjoRecomp) |
+| Banjo 64 | 🪟🐧🍎 | [BanjoRecomp/BanjoRecomp](https://github.com/BanjoRecomp/BanjoRecomp) |
 | Bomberman 64 | 🪟🐧🍎 | [RevoSucks/BM64Recomp](https://github.com/RevoSucks/BM64Recomp) |
 | Chameleon Twist | 🪟 | [Rainchus/ChameleonTwist1-JP-Recomp](https://github.com/Rainchus/ChameleonTwist1-JP-Recomp) |
 | Mega Man 64 | 🪟🐧🍎 | [MegaMan64Recomp/MegaMan64Recompiled](https://github.com/MegaMan64Recomp/MegaMan64Recompiled) |
@@ -145,14 +145,14 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Infinite Mario 64 | 🪟🐧🍎 | [Brawmario/infinite-mario-64-ever](https://github.com/Brawmario/infinite-mario-64-ever) |
 | Jak & Daxter (OpenGOAL) | 🪟 | [open-goal/jak-project](https://github.com/open-goal/jak-project) |
 | LoD: Severed Chains | 🪟 | [Legend-of-Dragoon-Modding/Severed-Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) |
-| REDRIVER 2 | 🪟 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
+| REDRIVER 2 | 🪟🐧 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
 | Castlevania: Symphony of the Night | 🪟 | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
 | Sonic 1 Forever | 🪟 | [ElspethThePict/S1Forever](https://github.com/ElspethThePict/S1Forever) |
-| Sonic 3 A.I.R. | 🪟 | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
+| Sonic 3 A.I.R. | 🪟🐧 | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
 | Sonic Unleashed Recompiled | 🪟 | [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) |
 | Space Station Silicon Valley | 🪟🍎 | [Cellenseres/SSSV_Recomp](https://github.com/Cellenseres/SSSV_Recomp) |
 | Super Mario Bros. Remastered | 🪟🐧 | [JHDev2006/Super-Mario-Bros.-Remastered-Public](https://github.com/JHDev2006/Super-Mario-Bros.-Remastered-Public) |
-| Super Mario World | 🪟 | [mstan/SuperMarioWorldRecomp](https://github.com/mstan/SuperMarioWorldRecomp) |
+| Super Mario World | 🪟🐧 | [mstan/SuperMarioWorldRecomp](https://github.com/mstan/SuperMarioWorldRecomp) |
 | Super Metroid | 🪟🐧🍎 | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
 | Viva Pinata: Trouble in Paradise | 🪟 | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
 | WipEout Phantom Edition | 🪟 | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
@@ -161,11 +161,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Wave Race 64 | 🪟🍎 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
 | Pokemon Snap | 🪟🐧 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
 | Body Harvest | 🪟🐧 | [danielgomesvieira2000/body-harvest-recomp](https://github.com/danielgomesvieira2000/body-harvest-recomp) |
-| Diddy Kong Racing | 🪟 | [ThatGuyMcd/DKR-R](https://github.com/ThatGuyMcd/DKR-R) |
+| Diddy Kong Racing | 🪟🐧 | [ThatGuyMcd/DKR-R](https://github.com/ThatGuyMcd/DKR-R) |
 | Diablo (DevilutionX) | 🪟🐧🍎 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
 | Star Wars: Dark Forces (TFE) | 🪟 | [TheForceEngine/TheForceEngine](https://github.com/TheForceEngine/TheForceEngine) |
 | Fallout (Community Edition) | 🪟🐧🍎 | [alexbatalov/fallout1-ce](https://github.com/alexbatalov/fallout1-ce) |
-| Pokemon Red and Blue (reblue) | 🪟 | [zolaware/reblue](https://github.com/zolaware/reblue) |
+| Pokemon Red and Blue (reblue) | 🪟🐧 | [zolaware/reblue](https://github.com/zolaware/reblue) |
 | Spider-Man (OpenSpidey) | 🪟 | [GTTeancum/OpenSpideyPS1](https://github.com/GTTeancum/OpenSpideyPS1) |
 | F-Zero X | 🪟🍎 | [craigshaw/FZeroRecomp](https://github.com/craigshaw/FZeroRecomp) |
 | AeroGauge | 🪟🐧 | [alondero/aerogauge-recomp](https://github.com/alondero/aerogauge-recomp) |
@@ -174,18 +174,15 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 
-**26 de 55 têm build Linux** e **24 de 55 têm build macOS** (Apple Silicon /
+**32 de 55 têm build Linux** e **24 de 55 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
 repositório. Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
 compilações ARM64.
-No Linux, o extrator abre `.zip`, `.tar.gz` e `.tar.xz` diretamente e
-reconhece um binário avulso sem nenhum empacotamento (ex.: `Crash
-Bandicoot`); só pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic
-Unleashed Recompiled`) continuam de fora, por não serem um executável
-direto.
+No Linux, o extrator abre `.zip`, `.tar.gz`, `.tar.xz` e pacotes `.AppImage`
+diretamente, reconhecendo também binários avulsos sem nenhum empacotamento.
 
 Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
 tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que

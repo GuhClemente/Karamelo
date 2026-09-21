@@ -25,6 +25,7 @@
 #include <set>
 #include <unordered_set>
 #include <fstream>
+#include <chrono>
 
 #include "libretro.h"
 #include "core_runner.h"
@@ -4480,6 +4481,55 @@ void CoreSetSelectedSlot(int slot)
 		snprintf(toast_str, sizeof(toast_str), "ACTIVE SLOT: %d", slot);
 		CoreSetToast(toast_str, 90);
 	}
+}
+
+bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t max_time_len, int64_t* out_bytes)
+{
+	if (out_exists) *out_exists = false;
+	if (out_time_str && max_time_len > 0) out_time_str[0] = '\0';
+	if (out_bytes) *out_bytes = 0;
+
+	if (!CoreIsRunning() || slot < 0 || slot > 9) return false;
+
+	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir);
+	char slot_filename[512];
+	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", GetLoadedGameStemSafe().c_str(), slot);
+	fs::path save_file = save_dir / slot_filename;
+
+	std::error_code ec;
+	if (!fs::exists(save_file, ec) || !fs::is_regular_file(save_file, ec))
+	{
+		if (out_time_str && max_time_len > 0)
+			snprintf(out_time_str, max_time_len, "Vazio");
+		return true;
+	}
+
+	if (out_exists) *out_exists = true;
+	if (out_bytes) *out_bytes = (int64_t)fs::file_size(save_file, ec);
+
+	if (out_time_str && max_time_len > 0)
+	{
+		auto ftime = fs::last_write_time(save_file, ec);
+		if (!ec)
+		{
+			auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+				ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
+			);
+			std::time_t tt = std::chrono::system_clock::to_time_t(sctp);
+			std::tm tm_buf{};
+#ifdef _WIN32
+			localtime_s(&tm_buf, &tt);
+#else
+			localtime_r(&tt, &tm_buf);
+#endif
+			std::strftime(out_time_str, max_time_len, "%d/%m %H:%M", &tm_buf);
+		}
+		else
+		{
+			snprintf(out_time_str, max_time_len, "Salvo");
+		}
+	}
+	return true;
 }
 
 bool CoreTakeScreenshot()

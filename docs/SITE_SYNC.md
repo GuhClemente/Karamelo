@@ -569,9 +569,7 @@ cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 - No **Windows**: todos os 55 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip` ou `.tar.xz`/`.tar.gz` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`).
-  Pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
-  não contam hoje (total: 26 ports).
+- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 32 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
   (montadas e extraídas transparentemente via `hdiutil`). Hoje 24 ports possuem
@@ -583,7 +581,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
    - **Filtro Windows (🪟)**: 55 jogos.
-   - **Filtro Linux (🐧)**: 26 jogos.
+   - **Filtro Linux (🐧)**: 32 jogos.
    - **Filtro macOS (🍎)**: 24 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
@@ -594,24 +592,24 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (18 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
-  Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
+- **🪟🐧🍎 (19 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+  Harvest Moon 64, Banjo 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
   Infinite Mario 64, Valkyrie Profile, Super Mario Strikers, Super Metroid,
   Diablo (DevilutionX), Fallout (Community Edition).
-- **🪟🍎 (6 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
+- **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
-- **🪟🐧 (8 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
-  Remastered, Pokemon Snap, Body Harvest, AeroGauge, Crash Bandicoot, Pikmin (Open Nectar),
-  Soulcalibur II (Ring Out).
-- **🪟 apenas (23 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
-  Pokemon Stadium, Chameleon Twist, Quest 64, Animal Crossing (GC),
-  Banjo-Kazooie: Nuts & Bolts, DBZ Budokai, Jak & Daxter, LoD: Severed Chains,
-  REDRIVER 2, Castlevania: SotN, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
-  Unleashed, Super Mario World, Viva Pinata, WipEout Phantom
-  Edition, OutRun (CannonBall DX), Diddy Kong Racing,
-  Star Wars: Dark Forces (TFE), Pokemon Red and Blue (reblue), Spider-Man (OpenSpidey).
+- **🪟🐧 (13 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
+  Sonic 3 A.I.R., Super Mario Bros. Remastered, Super Mario World,
+  Pokemon Snap, Body Harvest, Diddy Kong Racing, Pokemon Red and Blue (reblue),
+  AeroGauge, Crash Bandicoot, Pikmin (Open Nectar), Soulcalibur II (Ring Out).
+- **🪟 apenas (18 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+  Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
+  Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
+  Jak & Daxter, LoD: Severed Chains, Castlevania: SotN, Sonic 1 Forever,
+  Sonic Unleashed, Viva Pinata, WipEout Phantom Edition,
+  Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey).
 
 ---
 
@@ -742,3 +740,46 @@ Em 21/09/2026, o catálogo de "Ports & Recomp" foi expandido de 47 para **55 tí
 
 ### Projetos Analisados e Não Adicionados nesta Rodada
 - `GenryTheFox/Spider-Man-Edge-of-Time-PC-Edition`: O repositório retornou HTTP 404 (privado ou deletado). Não foi adicionado.
+
+---
+
+## 17. Adição de 21/09/2026 — Expansão Linux (32 Ports), Save States com Timestamps, Shaders CRT e Wizard de Controles
+
+Nesta atualização, quatro melhorias significativas de experiência do usuário (UX) e catálogo foram implementadas diretamente no Karamelo:
+
+### 1. Expansão de Ports no Linux (32 Ports) e Suporte a `.AppImage`
+- O seletor de assets Linux (`PickLinuxAsset`) passou a aceitar pacotes executáveis `.AppImage` além de `.tar.gz`, `.tar.xz` e `.zip`.
+- Com isso e a homologação dos releases oficiais com binários nativos de Linux, mais 6 títulos ganharam suporte oficial a Linux (🐧):
+  - **Banjo 64** (`BanjoRecomp/BanjoRecomp` — 🪟🐧🍎): tarball nativo com binário ELF x86_64.
+  - **Super Mario World** (`mstan/SuperMarioWorldRecomp` — 🪟🐧): pacote AppImage oficial.
+  - **Diddy Kong Racing** (`ThatGuyMcd/DKR-R` — 🪟🐧): pacote AppImage oficial.
+  - **Pokemon Red and Blue (reblue)** (`zolaware/reblue` — 🪟🐧): pacote AppImage oficial.
+  - **Sonic 3 A.I.R.** (`Eukaryot/sonic3air` — 🪟🐧): tarball nativo com executável Linux.
+  - **REDRIVER 2** (`OpenDriver2/REDRIVER2` — 🪟🐧): tarball nativo com executável Linux.
+- Total no Linux salta de **26 para 32 ports compatíveis**.
+
+### 2. Save States com Slots Visuais e Timestamps em Tempo Real
+- O menu in-game agora conta com o seletor **"Slot de Save"**:
+  - Exibe dinamicamente `< Slot N: DD/MM HH:MM >` (ou `Vazio`).
+  - Setas Esquerda/Direita alternam os 10 slots (0 a 9) em tempo real, lendo e exibindo a data/hora exata em que o estado foi gravado.
+  - O atalho **F2 / Salvar Estado** atualiza o rótulo do timestamp imediatamente na tela.
+  - Adicionado o **"Gerenciador Slots >"** (`STATE_SAVESTATES`), listando todos os 10 slots com tamanho em KB/MB, data/hora e permitindo salvar, carregar ou alternar slots diretamente.
+
+### 3. Menu Dedicado de Shaders CRT com Lista e Preview em Tempo Real
+- Ao selecionar "CRT Shader" com Enter/A, abre-se a tela **"Shaders CRT"** (`STATE_SHADER_LIST`) listando todos os 10 presets visuais com descrições objetivas:
+  1. `Off (Pixel Raw)`
+  2. `Scanlines Leve (Scanlines)`
+  3. `CRT Suave (TV Tubo)`
+  4. `PVM Pro 600TVL (PVM 600TVL)`
+  5. `Sony Trinitron (Trinitron Aperture)`
+  6. `Arcade Shadow Mask (Shadow Mask)`
+  7. `Scanlines 50% (Grade 50%)`
+  8. `NTSC Composite (Composite)`
+  9. `LCD Matrix (LCD Matrix)`
+  10. `Tubo Curvado 3D (Tubo Curvo)`
+- O shader ativo exibe um marcador `*` e navegar/selecionar qualquer preset aplica o efeito instantaneamente na tela com live preview e toast de confirmação.
+
+### 4. Assistente de Mapeamento de Controles (Wizard) no OSD
+- Na tela de controles (`Controller`), foi adicionada a opção **"Mapear Tudo (Passo a Passo) >"**.
+- Ao ser ativado, o assistente guia o jogador automaticamente botão por botão (D-Pad Cima, Baixo, Esquerda, Direita, B, A, Y, X, L1, R1, Start, Select, L2, R2, L3, R3), exibindo a contagem progressiva `[N/16]` e o botão esperado em notificações na tela.
+- Ao pressionar um botão, o binding é atribuído e o assistente avança automaticamente para o próximo. Ao concluir, salva a configuração e exibe mensagem de sucesso. Tecla ESC cancela a qualquer instante.
