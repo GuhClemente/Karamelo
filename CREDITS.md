@@ -111,9 +111,10 @@ pacote, evitando instaladores, ferramentas de build e outros arquivos que às
 vezes vêm junto).
 
 A coluna **SO** diz em qual build do Karamelo (Windows, Linux ou macOS) aquele
-jogo pode ser baixado - **todos** têm 🪟, alguns têm 🐧 e 19 têm 🍎 (macOS
-Apple Silicon / Universal). Verificado em 11/09/2026 contra a release mais
-recente de cada repositório.
+jogo pode ser baixado: 🪟 Windows, 🐧 Linux, 🍎 macOS (Apple Silicon /
+Universal). O total de cada plataforma está logo abaixo da tabela - aqui não,
+de propósito: este parágrafo ficou dizendo "19 têm 🍎" por dez dias enquanto a
+tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 
 | Jogo | SO | Repositório |
 |---|---|---|
@@ -174,7 +175,8 @@ recente de cada repositório.
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 
 **25 de 55 têm build Linux** e **21 de 55 têm build macOS** (Apple Silicon /
-Universal). Os outros publicam build utilizável apenas no Windows por este
+Universal), verificado em 21/09/2026 contra a release mais recente de cada
+repositório. Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app` descompactados, arquivos
 `.zip` e `.tar.xz`/`.tar.gz` com binários Mach-O nativos e prioriza
 compilações ARM64 - mas não monta `.dmg` (imagem de disco), o motivo do
