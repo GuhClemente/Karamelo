@@ -23,12 +23,14 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
 --------------------------------------------------------------------------
 
 [3DO] cores/3do.dll (Opera)
-  Status: FALTANDO - o arquivo baixado em 09/09 veio como ponteiro do
-  Git LFS (132 bytes de texto no lugar da ROM). Baixar de outra fonte.
+  Status: PRESENTE E CONFERIDO (21/09) - panafz1.bin veio corrigido nesta
+  sessao (o ponteiro do Git LFS de 09/09 foi substituido por uma ROM real
+  de 1.048.576 bytes) e panafz10.bin foi baixado de outra fonte e conferido
+  do mesmo jeito.
   Precisa de UM destes (qualquer um serve, sao variantes regionais do
   mesmo boot ROM):
-    panafz1.bin        MD5 f47264dd47fe30f73ab3c010015c155b
-    panafz10.bin
+    panafz1.bin        MD5 f47264dd47fe30f73ab3c010015c155b   [confere]
+    panafz10.bin        MD5 51f2f43ae2f3508a14d9f56597e2d3ce   [confere - 1.048.576 bytes]
     panafz10-norsa.bin
     panafz10e-anvil.bin
     panafz10e-anvil-norsa.bin
