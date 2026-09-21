@@ -158,10 +158,10 @@ recente de cada repositório.
 | OutRun (CannonBall DX) | 🪟 | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
 | Valkyrie Profile | 🪟🐧🍎 | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
 | Wave Race 64 | 🪟🍎 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
-| Pokemon Snap | 🪟 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
+| Pokemon Snap | 🪟🐧 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
 | Body Harvest | 🪟🐧 | [danielgomesvieira2000/body-harvest-recomp](https://github.com/danielgomesvieira2000/body-harvest-recomp) |
 | Diddy Kong Racing | 🪟 | [ThatGuyMcd/DKR-R](https://github.com/ThatGuyMcd/DKR-R) |
-| Diablo (DevilutionX) | 🪟🐧🍎 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
+| Diablo (DevilutionX) | 🪟🐧 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
 | Star Wars: Dark Forces (TFE) | 🪟 | [TheForceEngine/TheForceEngine](https://github.com/TheForceEngine/TheForceEngine) |
 | Fallout (Community Edition) | 🪟🐧 | [alexbatalov/fallout1-ce](https://github.com/alexbatalov/fallout1-ce) |
 | Pokemon Red and Blue (reblue) | 🪟 | [zolaware/reblue](https://github.com/zolaware/reblue) |
@@ -173,13 +173,17 @@ recente de cada repositório.
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 
-**24 de 55 têm build Linux** e **22 de 55 têm build macOS** (Apple Silicon /
+**25 de 55 têm build Linux** e **21 de 55 têm build macOS** (Apple Silicon /
 Universal). Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app` descompactados, arquivos
-`.zip` e `.tar.xz` com binários Mach-O nativos e prioriza compilações ARM64. No Linux,
-pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
-e `.tar.gz` (`Pokemon Snap`) não são executáveis diretos compatíveis com o
-extrator padrão.
+`.zip` e `.tar.xz`/`.tar.gz` com binários Mach-O nativos e prioriza
+compilações ARM64 - mas não monta `.dmg` (imagem de disco), o motivo do
+Diablo/DevilutionX não ter o selo 🍎 apesar de publicar um build de Mac.
+No Linux, o extrator abre `.zip`, `.tar.gz` e `.tar.xz` diretamente e
+reconhece um binário avulso sem nenhum empacotamento (ex.: `Crash
+Bandicoot`); só pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic
+Unleashed Recompiled`) continuam de fora, por não serem um executável
+direto.
 
 Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
 tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que

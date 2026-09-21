@@ -473,8 +473,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **47** jogos de Ports & Recomp (atualizado em 20/09/2026 — ver seções
-  10, 11, 13 e 15),
+- Os **55** jogos de Ports & Recomp (atualizado em 21/09/2026 — ver seções
+  10, 11, 13, 15 e 16),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -571,10 +571,13 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 - No **Windows**: todos os 55 ports possuem builds executáveis (.exe).
 - No **Linux**: requer um `.zip` ou `.tar.xz`/`.tar.gz` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`).
   Pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
-  não contam hoje (total: 24 ports).
+  não contam hoje (total: 25 ports).
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
-  Universal > Intel), extrai pacotes `.app` descompactados, zips e tarballs.
-  Hoje 22 ports possuem releases comprovadas para macOS.
+  Universal > Intel), extrai pacotes `.app` descompactados, zips e tarballs -
+  mas não monta `.dmg` (imagem de disco), então um projeto que só publica
+  `.dmg` para Mac não conta, mesmo tendo Mac "de verdade" (caso do Diablo/
+  DevilutionX, corrigido em 21/09 - ver seção 15). Hoje 21 ports possuem
+  releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
 
@@ -582,8 +585,8 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
    - **Filtro Windows (🪟)**: 55 jogos.
-   - **Filtro Linux (🐧)**: 24 jogos.
-   - **Filtro macOS (🍎)**: 22 jogos.
+   - **Filtro Linux (🐧)**: 25 jogos.
+   - **Filtro macOS (🍎)**: 21 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
@@ -593,22 +596,23 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (16 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (15 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
-  Infinite Mario 64, Valkyrie Profile, Diablo (DevilutionX), Super Mario Strikers.
+  Infinite Mario 64, Valkyrie Profile, Super Mario Strikers.
 - **🪟🍎 (6 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
-- **🪟🐧 (8 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
-  Remastered, Body Harvest, Fallout (Community Edition), AeroGauge, Crash Bandicoot,
-  Pikmin (Open Nectar), Soulcalibur II (Ring Out).
-- **🪟 apenas (25 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟🐧 (10 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
+  Remastered, Pokemon Snap, Body Harvest, Diablo (DevilutionX), Fallout
+  (Community Edition), AeroGauge, Crash Bandicoot, Pikmin (Open Nectar),
+  Soulcalibur II (Ring Out).
+- **🪟 apenas (24 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, Animal Crossing (GC),
   Banjo-Kazooie: Nuts & Bolts, DBZ Budokai, Jak & Daxter, LoD: Severed Chains,
   REDRIVER 2, Castlevania: SotN, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
   Unleashed, Super Mario World, Super Metroid, Viva Pinata, WipEout Phantom
-  Edition, OutRun (CannonBall DX), Pokemon Snap, Diddy Kong Racing,
+  Edition, OutRun (CannonBall DX), Diddy Kong Racing,
   Star Wars: Dark Forces (TFE), Pokemon Red and Blue (reblue), Spider-Man (OpenSpidey).
 
 ---
@@ -626,12 +630,15 @@ especificamente:
 1. **Precisa de Direct3D 12 no Windows** - mesmo requisito que o Wave Race
    64 (seção 11) já tem. Qualquer PC com Windows 10/11 e GPU dedicada dos
    últimos anos atende, mas não é universal como um core libretro em OpenGL.
-2. **Tem build Linux de verdade, mas não conta pra este app** (ver a
-   ressalva da seção 12) - o release publica `.tar.gz`, não `.zip`, e o
-   próprio projeto chama esse build de "experimental... rodado num Steam
-   Deck em modo Desktop e em lugar nenhum mais até agora". Não é motivo pra
-   tratar a entrada como incompleta no Windows, só não prometa Linux pra
-   ela.
+2. **Atualização de 21/09/2026: agora também roda no Linux (🐧).** Quando
+   esta entrada foi adicionada em 11/09, o instalador só sabia abrir `.zip`
+   no Linux, e o release desse jogo só publica `.tar.gz` - por isso ficou
+   Windows-only por dez dias. O suporte a `.tar.gz`/`.tar.xz` direto (seção
+   16) resolveu isso; testado de ponta a ponta com `--install-port`, não só
+   lendo os assets da release. O projeto ainda chama esse build de
+   "experimental... rodado num Steam Deck em modo Desktop e em lugar nenhum
+   mais até agora", o que vale como nota se o site descrever a entrada, mas
+   não é mais motivo pra omitir o ícone 🐧.
 
 Se a página não descrever entradas individuais (o caso comum), a única
 mudança necessária é a contagem da seção 9.3/9.9 e a lista da seção 12.
@@ -651,7 +658,9 @@ O Karamelo agora possui compilação e suporte nativo completo para **macOS (App
 5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
    - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
    - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
-   - 22 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
+   - 21 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`) -
+     não conta um projeto cujo único build de Mac é `.dmg` (não montado por este
+     instalador; ver a ressalva da seção 12).
 6. **Detecção no Site**:
    - Recomenda-se detectar o SO do usuário (`MacIntel` com `navigator.maxTouchPoints > 0` ou `navigator.userAgent` contendo `Macintosh`) para destacar o botão **Baixar para macOS (Apple Silicon)** por padrão para usuários Apple.
 
@@ -668,9 +677,15 @@ Em 20/09/2026, o catálogo de "Ports & Recomp" foi expandido de 42 para **47 tí
 2. **Diddy Kong Racing** (`ThatGuyMcd/DKR-R` — 🪟):
    - Motor N64Recomp / RT64 de DKR.
    - Suporte a widescreen, 60fps+, multiplayer online e suporte nativo a controles.
-3. **Diablo (DevilutionX)** (`diasurgical/devilutionX` — 🪟🐧🍎):
+3. **Diablo (DevilutionX)** (`diasurgical/devilutionX` — 🪟🐧):
    - Source port moderno e aprimorado de Diablo 1 e da expansão Hellfire.
-   - Suporte nativo completo para **Windows**, **Linux** (`.tar.xz`) e **macOS** (`.dmg` universal Apple Silicon).
+   - Suporte nativo para **Windows** e **Linux** (`.tar.xz`). O projeto também
+     publica um `.dmg` de macOS, mas **não conta como suportado aqui**:
+     corrigido em 21/09/2026 depois de uma auditoria de código (a auditoria
+     original desta seção, de 20/09, listou macOS por engano) — o instalador
+     do Karamelo só sabe abrir `.zip`/`.tar.gz`/`.tar.xz`, e `.dmg` é um
+     formato de imagem de disco diferente que ele não monta. Ofereceria a
+     entrada no menu do macOS e falharia ao selecionar.
    - Suporta gamepads modernos, resolução escalável e multiplayer.
 4. **Star Wars: Dark Forces (The Force Engine)** (`TheForceEngine/TheForceEngine` — 🪟):
    - Engine moderna substituta para o clássico Star Wars: Dark Forces da LucasArts.
