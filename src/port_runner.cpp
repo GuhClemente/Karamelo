@@ -196,7 +196,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "SuperMarioWorldRecomp", "Super Mario World",
           "mstan/SuperMarioWorldRecomp", "", true, {}, false, false },
         { "SuperMetroidRecomp", "Super Metroid",
-          "mstan/SuperMetroidRecomp", "", true, { "metroid" }, false, false },
+          "mstan/SuperMetroidRecomp", "SuperMetroidSNESRecomp.exe", true, { "metroid" }, true, true },
         { "VivaPinataTiP", "Viva Pinata: Trouble in Paradise",
           "SolarCookies/TiP-Recomp", "", true, {}, false, false },
         { "WipeoutPhantomEdition", "WipEout Phantom Edition",
@@ -339,12 +339,19 @@ static bool LooksLikeRealBinary(const std::string& path) {
     fclose(f);
     if (n < 4) return false;
 #if defined(__APPLE__)
-    // Mach-O: FEEDFACE (32-bit), FEEDFACF (64-bit), CAFEBABE/BEBAFECA
-    // (fat/universal, either byte order) - covers every arch macOS ships.
+    // Mach-O:
+    // 64-bit little-endian (Apple Silicon ARM64 & x86_64): CF FA ED FE
+    // 32-bit little-endian: CE FA ED FE
+    // 64-bit big-endian (PowerPC): FE ED FA CF
+    // 32-bit big-endian (PowerPC): FE ED FA CE
+    // Fat/universal binary: CA FE BA BE or BE BA FE CA (or CA FE BA BF / BF BA FE CA)
+    if (magic[0] == 0xCF && magic[1] == 0xFA && magic[2] == 0xED && magic[3] == 0xFE) return true;
+    if (magic[0] == 0xCE && magic[1] == 0xFA && magic[2] == 0xED && magic[3] == 0xFE) return true;
     if (magic[0] == 0xFE && magic[1] == 0xED && magic[2] == 0xFA &&
         (magic[3] == 0xCE || magic[3] == 0xCF)) return true;
-    if (magic[0] == 0xCA && magic[1] == 0xFE && magic[2] == 0xBA && magic[3] == 0xBE) return true;
-    if (magic[0] == 0xBE && magic[1] == 0xBA && magic[2] == 0xFE && magic[3] == 0xCA) return true;
+    if (magic[0] == 0xCA && magic[1] == 0xFE && magic[2] == 0xBA &&
+        (magic[3] == 0xBE || magic[3] == 0xBF)) return true;
+    if ((magic[0] == 0xBE || magic[0] == 0xBF) && magic[1] == 0xBA && magic[2] == 0xFE && magic[3] == 0xCA) return true;
     return false;
 #else
     return magic[0] == 0x7F && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F';
@@ -814,6 +821,11 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
             return false;
         }
         json = FirstReleaseObjectOnly(list_json);
+    }
+
+    if (json.find("\"assets\"") == std::string::npos && json.find("rate limit exceeded") != std::string::npos) {
+        out_error = "limite de requisicoes da API do GitHub atingido (tente mais tarde)";
+        return false;
     }
 
     std::vector<GhAsset> assets = ParseReleaseAssets(json);

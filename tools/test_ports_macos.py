@@ -46,7 +46,10 @@ MACOS_VERIFIED_PORTS = [
     ("SpaceStationSiliconValley", "Cellenseres/SSSV_Recomp", "Space Station Silicon Valley"),
     ("ValkyrieRecomp", "Ed1z19/ValkyrieRecomp", "Valkyrie Profile (PSXRecomp ARM64)"),
     ("WaveRace64Recomp", "elliotttate/wave-race-64-recomp", "Wave Race 64 (Apple Silicon)"),
-    ("DevilutionX", "diasurgical/devilutionX", "Diablo (DevilutionX)"),
+    ("SuperMetroidRecomp", "mstan/SuperMetroidRecomp", "Super Metroid (macOS ARM64 & Intel)"),
+    ("PerfectDark", "perfect-dark-pc-port/perfect_dark", "Perfect Dark (macOS ARM64 & x86_64)"),
+    ("FZeroRecomp", "craigshaw/FZeroRecomp", "F-Zero X (macOS ARM64)"),
+    ("MarioStrikers", "new-coke/strikers", "Super Mario Strikers (macOS ARM64)"),
 ]
 
 def run_test_port_filtering():

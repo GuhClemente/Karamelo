@@ -108,23 +108,23 @@ Formato (exemplo real):
 
 ```json
 {
-    "version": "0.9.4",
-    "title": "Karamelo v0.9.4",
-    "release_date": "2026-09-11",
+    "version": "0.9.5",
+    "title": "Karamelo v0.9.5",
+    "release_date": "2026-09-21",
     "notes": "Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.",
     "force_full_package": false,
     "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
-    "exe_size": 4038144,
-    "exe_sha256": "4AA64512...",
-    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Win64.zip",
+    "exe_size": 4135936,
+    "exe_sha256": "AE929BA15E5D83283C1DBC541B2E25F2DA8B91945962D28485AE3B50BA506996",
+    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.5_Win64.zip",
     "linux_bin_url": "https://karamelo-emu.com/downloads/Karamelo_linux",
-    "linux_bin_size": 5380024,
-    "linux_bin_sha256": "331E1BE1...",
-    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_Linux64.tar.gz",
+    "linux_bin_size": 5393912,
+    "linux_bin_sha256": "8153F6F4D680DC9347AEE33310E64BBEA6EE8216EF88A000046DD8970376294F",
+    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.5_Linux64.tar.gz",
     "macos_bin_url": "https://karamelo-emu.com/downloads/Karamelo_mac",
-    "macos_bin_size": 1213512,
-    "macos_bin_sha256": "ABC7BE57...",
-    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.4_macOS_arm64.tar.gz"
+    "macos_bin_size": 1231032,
+    "macos_bin_sha256": "30AD85438252CCAF0FED1B746D0E74DEC9E6D3CFFF88027F6EA4295D4C5CE50C",
+    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.5_macOS_arm64.tar.gz"
 }
 ```
 
@@ -571,12 +571,12 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 - No **Windows**: todos os 55 ports possuem builds executáveis (.exe).
 - No **Linux**: requer um `.zip` ou `.tar.xz`/`.tar.gz` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`).
   Pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
-  não contam hoje (total: 25 ports).
+  não contam hoje (total: 26 ports).
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips e tarballs -
   mas não monta `.dmg` (imagem de disco), então um projeto que só publica
   `.dmg` para Mac não conta, mesmo tendo Mac "de verdade" (caso do Diablo/
-  DevilutionX, corrigido em 21/09 - ver seção 15). Hoje 21 ports possuem
+  DevilutionX, corrigido em 21/09 - ver seção 15). Hoje 22 ports possuem
   releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
@@ -585,8 +585,8 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
    - **Filtro Windows (🪟)**: 55 jogos.
-   - **Filtro Linux (🐧)**: 25 jogos.
-   - **Filtro macOS (🍎)**: 21 jogos.
+   - **Filtro Linux (🐧)**: 26 jogos.
+   - **Filtro macOS (🍎)**: 22 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
@@ -596,22 +596,22 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (15 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (16 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
-  Infinite Mario 64, Valkyrie Profile, Super Mario Strikers.
+  Infinite Mario 64, Valkyrie Profile, Super Mario Strikers, Super Metroid.
 - **🪟🍎 (6 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
 - **🪟🐧 (10 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
   Remastered, Pokemon Snap, Body Harvest, Diablo (DevilutionX), Fallout
   (Community Edition), AeroGauge, Crash Bandicoot, Pikmin (Open Nectar),
   Soulcalibur II (Ring Out).
-- **🪟 apenas (24 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟 apenas (23 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, Animal Crossing (GC),
   Banjo-Kazooie: Nuts & Bolts, DBZ Budokai, Jak & Daxter, LoD: Severed Chains,
   REDRIVER 2, Castlevania: SotN, Sonic 1 Forever, Sonic 3 A.I.R., Sonic
-  Unleashed, Super Mario World, Super Metroid, Viva Pinata, WipEout Phantom
+  Unleashed, Super Mario World, Viva Pinata, WipEout Phantom
   Edition, OutRun (CannonBall DX), Diddy Kong Racing,
   Star Wars: Dark Forces (TFE), Pokemon Red and Blue (reblue), Spider-Man (OpenSpidey).
 
@@ -658,7 +658,7 @@ O Karamelo agora possui compilação e suporte nativo completo para **macOS (App
 5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
    - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
    - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
-   - 21 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`) -
+   - 22 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`) -
      não conta um projeto cujo único build de Mac é `.dmg` (não montado por este
      instalador; ver a ressalva da seção 12).
 6. **Detecção no Site**:
@@ -740,6 +740,11 @@ Em 21/09/2026, o catálogo de "Ports & Recomp" foi expandido de 47 para **55 tí
 - O instalador automático agora reconhece assets que sejam executáveis diretos (como `CrashBandicoot.exe` ou binários ELF do Linux como `CrashBandicoot-Linux`), gravando-os diretamente em `ports/<id>/` com permissões adequadas de execução (`chmod 0755`), sem tentar forçar descompactação via `ArchiveExtractAll`.
 - O matcher de assets do Linux (`PickLinuxAsset`) agora suporta `.tar.gz` e `.tar.xz`, além do tradicional `.zip`.
 
+### Atualização de Compatibilidade: Super Metroid Recomp (`mstan/SuperMetroidRecomp` — 🪟🐧🍎)
+- O port de **Super Metroid** agora conta com suporte nativo homologado e comprovado para **Linux** (`supermetroid-0.3.8-linux-x64.zip`) e **macOS** (`supermetroid-0.3.8-macos-arm64.zip` / `supermetroid-0.3.8-macos-x64.zip`).
+- O executável nativo Mach-O ARM64 (`SuperMetroidSNESRecomp`) foi validado diretamente no macOS Apple Silicon.
+- O subsistema `src/port_runner.cpp` teve a checagem de magic bytes de Mach-O corrigida para reconhecer binários little-endian puros ARM64/x86_64 (`0xCF, 0xFA, 0xED, 0xFE`) além dos cabeçalhos fat/universal.
+- Com isso, o total de ports sobe para **26 no Linux (🐧)** e **22 no macOS (🍎)**.
+
 ### Projetos Analisados e Não Adicionados nesta Rodada
-- `mstan/SuperMetroidRecomp`: Já constava no catálogo desde versões anteriores (não requer ação).
 - `GenryTheFox/Spider-Man-Edge-of-Time-PC-Edition`: O repositório retornou HTTP 404 (privado ou deletado). Não foi adicionado.

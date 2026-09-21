@@ -153,7 +153,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Space Station Silicon Valley | 🪟🍎 | [Cellenseres/SSSV_Recomp](https://github.com/Cellenseres/SSSV_Recomp) |
 | Super Mario Bros. Remastered | 🪟🐧 | [JHDev2006/Super-Mario-Bros.-Remastered-Public](https://github.com/JHDev2006/Super-Mario-Bros.-Remastered-Public) |
 | Super Mario World | 🪟 | [mstan/SuperMarioWorldRecomp](https://github.com/mstan/SuperMarioWorldRecomp) |
-| Super Metroid | 🪟 | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
+| Super Metroid | 🪟🐧🍎 | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
 | Viva Pinata: Trouble in Paradise | 🪟 | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
 | WipEout Phantom Edition | 🪟 | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
 | OutRun (CannonBall DX) | 🪟 | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
@@ -174,7 +174,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 
-**25 de 55 têm build Linux** e **21 de 55 têm build macOS** (Apple Silicon /
+**26 de 55 têm build Linux** e **22 de 55 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
 repositório. Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app` descompactados, arquivos
