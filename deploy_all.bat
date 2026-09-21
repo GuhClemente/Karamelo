@@ -168,6 +168,15 @@ echo   - https://karamelo-emu.com/downloads/Karamelo_mac
 echo   - https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_macOS_arm64.tar.gz
 )
 echo.
+rem -------------------------------------------------------------
+rem Notificar no Discord (Resumo em #anuncios + Links dos Pacotes Completos em #downloads)
+rem -------------------------------------------------------------
+if exist "c:\github\Server-Discord-Karamelo\notify_deploy.bat" (
+    echo.
+    echo Notificando servidor Discord...
+    call "c:\github\Server-Discord-Karamelo\notify_deploy.bat" --json "%LOCAL_JSON%"
+)
+
 echo =====================================================================
 echo.
 pause
