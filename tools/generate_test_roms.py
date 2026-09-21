@@ -180,6 +180,40 @@ def make_pce():
     with open(os.path.join(OUT_DIR, "pce.pce"), "wb") as f:
         f.write(rom)
 
+def make_atari5200():
+    # Atari 5200 (32KB ROM: $8000-$FFFF)
+    # Header CART de 16 bytes: 'CART', type 4 (32KB), checksum, zeros
+    header = bytearray(16)
+    header[0:4] = b"CART"
+    struct.pack_into(">I", header, 4, 4) # Tipo 4 = 32KB 5200 cart
+    rom = bytearray(32768)
+    # Loop em $8000: SEI (78), CLD (D8), JMP $8000 (4C 00 80)
+    rom[0] = 0x78
+    rom[1] = 0xD8
+    rom[2] = 0x4C
+    rom[3] = 0x00
+    rom[4] = 0x80
+    # Reset vector 6502 em 0x7FFC -> 0x8000
+    struct.pack_into("<H", rom, 0x7FFC, 0x8000)
+    # Checksum do header
+    chk = sum(rom) & 0xFFFFFFFF
+    struct.pack_into(">I", header, 8, chk)
+    with open(os.path.join(OUT_DIR, "atari5200.a52"), "wb") as f:
+        f.write(header + rom)
+
+def make_lynx():
+    # Atari Lynx (64 bytes header + 128KB ROM)
+    header = bytearray(64)
+    header[0:4] = b"LYNX"
+    struct.pack_into("<H", header, 4, 256) # page_size_bank0 = 256
+    struct.pack_into("<H", header, 6, 0)   # page_size_bank1 = 0
+    struct.pack_into("<H", header, 8, 1)   # version = 1
+    header[10:10+17] = b"KARAMELO TEST ROM"
+    header[42:42+8] = b"KARAMELO"
+    rom = bytearray(131072)
+    with open(os.path.join(OUT_DIR, "lynx.lnx"), "wb") as f:
+        f.write(header + rom)
+
 def make_wswan():
     # WonderSwan (64KB)
     rom = bytearray(65536)
@@ -189,6 +223,17 @@ def make_wswan():
     rom[0xFFF2] = 0x00
     rom[0xFFF3] = 0x00
     rom[0xFFF4] = 0xF0
+    # WonderSwan Footer em 0xFFF6-0xFFFF
+    rom[0xFFF6] = 0x01 # Developer ID
+    rom[0xFFF7] = 0x00 # Min model (0=WS Mono, 1=Color)
+    rom[0xFFF8] = 0x01 # Cart ID
+    rom[0xFFF9] = 0x00 # Game version
+    rom[0xFFFA] = 0x00 # ROM size (0=64KB)
+    rom[0xFFFB] = 0x00 # Save type (none)
+    rom[0xFFFC] = 0x00 # Flags
+    rom[0xFFFD] = 0x00 # RTC
+    chk = sum(rom[0:0xFFFE]) & 0xFFFF
+    struct.pack_into("<H", rom, 0xFFFE, chk)
     with open(os.path.join(OUT_DIR, "wswan.ws"), "wb") as f:
         f.write(rom)
 
@@ -196,8 +241,35 @@ def make_ngp():
     # Neo Geo Pocket (64KB)
     rom = bytearray(65536)
     rom[0x00:0x0C] = b"COPYRIGHT BY SNK CORPORATION"
+    rom[0x24:0x30] = b"KARAMELO    "
+    struct.pack_into("<I", rom, 0x30, 0x00000001)
+    rom[0x34] = 0x01 # Version
+    rom[0x35] = 0x00 # 0x00 = Mono, 0x10 = Color
     with open(os.path.join(OUT_DIR, "ngp.ngp"), "wb") as f:
         f.write(rom)
+
+def make_pcfx():
+    # PC-FX (cue + bin com header PC-FX:Hu_CD-ROM no setor 0)
+    bin_path = os.path.join(OUT_DIR, "pcfx.bin")
+    cue_path = os.path.join(OUT_DIR, "pcfx.cue")
+    buf = bytearray(2352 * 16)
+    buf[0:16] = b"PC-FX:Hu_CD-ROM "
+    with open(bin_path, "wb") as f:
+        f.write(buf)
+    cue_content = 'FILE "pcfx.bin" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00\n'
+    with open(cue_path, "w") as f:
+        f.write(cue_content)
+
+def make_3do():
+    # 3DO ISO dummy (Primary Volume Descriptor com magic 3DO no setor 0)
+    iso_path = os.path.join(OUT_DIR, "3do.iso")
+    buf = bytearray(2048 * 20)
+    # Magic 3DO Volume Identifier no setor 0
+    buf[0:7] = bytes([0x01, 0x5a, 0x5a, 0x5a, 0x5a, 0x5a, 0x01])
+    buf[0x28:0x28+6] = b"CD-ROM"
+    buf[0x48:0x48+13] = b"iamadiscimage"
+    with open(iso_path, "wb") as f:
+        f.write(buf)
 
 def make_n64():
     # N64 ROM (4KB header)
@@ -260,14 +332,18 @@ def main():
     make_genesis()
     make_sms()
     make_atari2600()
+    make_atari5200()
     make_atari7800()
+    make_lynx()
     make_c64()
     make_coleco()
     make_pce()
+    make_pcfx()
     make_wswan()
     make_ngp()
     make_n64()
     make_nds()
+    make_3do()
     
     # Dummies para arcade e outros
     make_zip_dummy("arcade.zip")

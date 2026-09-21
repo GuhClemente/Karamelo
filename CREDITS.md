@@ -159,8 +159,13 @@ recente de cada repositório.
 | Valkyrie Profile | 🪟🐧🍎 | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
 | Wave Race 64 | 🪟🍎 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
 | Pokemon Snap | 🪟 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
+| Body Harvest | 🪟🐧 | [danielgomesvieira2000/body-harvest-recomp](https://github.com/danielgomesvieira2000/body-harvest-recomp) |
+| Diddy Kong Racing | 🪟 | [ThatGuyMcd/DKR-R](https://github.com/ThatGuyMcd/DKR-R) |
+| Diablo (DevilutionX) | 🪟🐧🍎 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
+| Star Wars: Dark Forces (TFE) | 🪟 | [TheForceEngine/TheForceEngine](https://github.com/TheForceEngine/TheForceEngine) |
+| Fallout (Community Edition) | 🪟🐧 | [alexbatalov/fallout1-ce](https://github.com/alexbatalov/fallout1-ce) |
 
-**16 de 42 têm build Linux** e **19 de 42 têm build macOS** (Apple Silicon /
+**19 de 47 têm build Linux** e **20 de 47 têm build macOS** (Apple Silicon /
 Universal). Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app` descompactados, arquivos
 `.zip` e `.tar.xz` com binários Mach-O nativos e prioriza compilações ARM64. No Linux,

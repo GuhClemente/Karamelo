@@ -46,6 +46,7 @@ MACOS_VERIFIED_PORTS = [
     ("SpaceStationSiliconValley", "Cellenseres/SSSV_Recomp", "Space Station Silicon Valley"),
     ("ValkyrieRecomp", "Ed1z19/ValkyrieRecomp", "Valkyrie Profile (PSXRecomp ARM64)"),
     ("WaveRace64Recomp", "elliotttate/wave-race-64-recomp", "Wave Race 64 (Apple Silicon)"),
+    ("DevilutionX", "diasurgical/devilutionX", "Diablo (DevilutionX)"),
 ]
 
 def run_test_port_filtering():

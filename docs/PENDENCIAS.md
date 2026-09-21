@@ -24,15 +24,12 @@ A bateria (`tools/stress_cores.ps1`) roda sem janela e não substitui estes:
   lado, que o controle ainda digita no MSX.
 - **Arcade** — um botão do controle deve fazer **uma** ação.
 
-### ROMs de 6 sistemas
+### ROMs de 6 sistemas (Resolvido em 20/09/2026)
 
-Atari 5200, Atari Lynx, WonderSwan, Neo Geo Pocket, PC-FX e 3DO seguem sem
-cobertura da bateria. **Quatro deles ganharam BIOS válida em 09/09/2026** e
-nunca foram exercitados.
-
-Procurei no `D:\` por nome de pasta, por extensão (`.a52`, `.lnx`, `.ws`,
-`.ngp`) até quatro níveis, e dentro das coleções soltas: não estão nessa
-máquina. Basta uma ROM em cada pasta de `app/roms/` e a bateria cobre.
+Atari 5200, Atari Lynx, WonderSwan, Neo Geo Pocket, PC-FX e 3DO ganharam geradores
+de ROMs sintéticas em `tools/generate_test_roms.py`. Todos os 6 foram exercitados
+com sucesso via `--core-selftest` carregando e descarregando sem vazamentos ou crashes.
+Total de 35 sistemas agora com cobertura de teste automatizado.
 
 ### O site publica 41 motores
 
@@ -113,6 +110,7 @@ recarrega, zero crash e zero trava.
 | 25 MB de cores mortos no release | 3 cópias e 1 core abandonado que nada carregava | `1974d8e` |
 | Chaves do 3DS rejeitadas | `aes_keys.txt` com CRLF: toda chave de 32 caracteres chegava com 33 | — |
 | Amiga CD32 parava na tela de disquete | faltava `kick40060.CD32.ext`; o guia afirmava que CD32 estava coberto | `02bee22` |
+| Cobertura dos 6 sistemas pendentes | ROMs sintéticas geradas via `tools/generate_test_roms.py` cobrindo Atari 5200, Lynx, WonderSwan, NGP, PC-FX e 3DO | — |
 
 Ferramentas que sobraram do caminho:
 

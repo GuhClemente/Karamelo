@@ -209,6 +209,21 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "Snap64Recomp", "Pokemon Snap",
           "JackandBeans/Snap64Recomp", "Snap64Recomp.exe",
           true, { "pokemon", "snap" }, false, false },
+        { "BodyHarvestRecomp", "Body Harvest",
+          "danielgomesvieira2000/body-harvest-recomp", "body-harvest-recomp.exe",
+          true, { "body", "harvest" }, true, false },
+        { "DKRRecomp", "Diddy Kong Racing",
+          "ThatGuyMcd/DKR-R", "DKR-R.exe",
+          true, { "diddy", "kong", "racing" }, false, false },
+        { "DevilutionX", "Diablo (DevilutionX)",
+          "diasurgical/devilutionX", "devilutionx.exe",
+          false, {}, true, true },
+        { "TheForceEngine", "Star Wars: Dark Forces (TFE)",
+          "TheForceEngine/TheForceEngine", "TheForceEngine.exe",
+          false, {}, false, false },
+        { "Fallout1CE", "Fallout (Community Edition)",
+          "alexbatalov/fallout1-ce", "fallout-ce.exe",
+          false, {}, true, false },
     };
     return defs;
 }
@@ -549,7 +564,8 @@ static int ArchPreferenceRank(const std::string& lower_name) {
 // on disk to inspect.
 static bool LooksLikeCompanionTool(const std::string& lower_name) {
     return ContainsAny(lower_name, { "assetbuilder", "asset-builder", "toolkit", "buildtools",
-                                      "build-tools", "sdk" });
+                                      "build-tools", "sdk", "debug-symbols", "debug_symbols",
+                                      "-pdb", "_pdb", "symbols" });
 }
 
 // Prefers an archive over a bare .exe/.msi when a release offers both -
