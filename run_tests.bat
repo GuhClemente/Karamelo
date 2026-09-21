@@ -24,10 +24,12 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     tests\test_netplay.cpp ^
     tests\test_math_video.cpp ^
     tests\test_updater.cpp ^
+    tests\test_crash_reporter.cpp ^
     src\karamelo_math.cpp ^
     src\netplay_protocol.cpp ^
     src\archive_helper.cpp ^
     src\updater.cpp ^
+    src\crash_reporter.cpp ^
     /link /OUT:build\karamelo_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib shell32.lib user32.lib
 
 if %ERRORLEVEL% neq 0 (
