@@ -220,18 +220,17 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "DKRRecomp", "Diddy Kong Racing",
           "ThatGuyMcd/DKR-R", "DKR-R.exe",
           true, { "diddy", "kong", "racing" }, false, false },
-        // macOS release is .dmg-only (devilutionx-macOS-universal.dmg) -
-        // PickMacOsAsset only matches .zip/.tar.gz/.tar.xz, same reason
-        // Fallout1CE below is macOS=false despite having a real release.
+        // DevilutionX and Fallout1CE ship .dmg for macOS - native mounting
+        // via hdiutil in ArchiveExtractAll handles this seamlessly.
         { "DevilutionX", "Diablo (DevilutionX)",
           "diasurgical/devilutionX", "devilutionx.exe",
-          false, {}, true, false },
+          false, {}, true, true },
         { "TheForceEngine", "Star Wars: Dark Forces (TFE)",
           "TheForceEngine/TheForceEngine", "TheForceEngine.exe",
           false, {}, false, false },
         { "Fallout1CE", "Fallout (Community Edition)",
           "alexbatalov/fallout1-ce", "fallout-ce.exe",
-          false, {}, true, false },
+          false, {}, true, true },
         { "Reblue", "Pokemon Red and Blue (reblue)",
           "zolaware/reblue", "reblue.exe",
           true, { "pokemon" }, false, false },
@@ -776,9 +775,8 @@ static int MacOsArchPreferenceRank(const std::string& lower_name) {
 
 static GhAsset PickMacOsAsset(const std::vector<GhAsset>& assets) {
     auto is_archive = [](const std::string& n) {
-        return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||
-               (n.size() >= 7 && n.substr(n.size() - 7) == ".tar.gz") ||
-               (n.size() >= 7 && n.substr(n.size() - 7) == ".tar.xz");
+        return (n.size() >= 4 && (n.substr(n.size() - 4) == ".zip" || n.substr(n.size() - 4) == ".dmg")) ||
+               (n.size() >= 7 && (n.substr(n.size() - 7) == ".tar.gz" || n.substr(n.size() - 7) == ".tar.xz"));
     };
 
     std::vector<GhAsset> matches;
@@ -893,7 +891,8 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         // call unzip on a tar.gz, which unzip cannot read, then fall back to
         // 7z (not installed on a stock Mac), failing extraction outright.
         std::string cache_ext = ".zip";
-        if (lower_name.size() >= 7 && lower_name.substr(lower_name.size() - 7) == ".tar.gz") cache_ext = ".tar.gz";
+        if (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".dmg") cache_ext = ".dmg";
+        else if (lower_name.size() >= 7 && lower_name.substr(lower_name.size() - 7) == ".tar.gz") cache_ext = ".tar.gz";
         else if (lower_name.size() >= 7 && lower_name.substr(lower_name.size() - 7) == ".tar.xz") cache_ext = ".tar.xz";
         std::string zip_path = "cache/" + def.id + "_download" + cache_ext;
         if (!UpdaterHttpDownloadToFile(asset.url, zip_path)) { out_error = "falha no download"; return false; }
@@ -917,7 +916,8 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
                 std::string fname = ToLowerStr(e.path().filename().string());
                 if (fname.rfind("._", 0) == 0) continue;
                 bool is_nested_archive =
-                    (fname.size() >= 4 && fname.substr(fname.size() - 4) == ".zip") ||
+                    (fname.size() >= 4 && (fname.substr(fname.size() - 4) == ".zip" ||
+                                            fname.substr(fname.size() - 4) == ".dmg")) ||
                     (fname.size() >= 7 && (fname.substr(fname.size() - 7) == ".tar.gz" ||
                                             fname.substr(fname.size() - 7) == ".tar.xz"));
                 if (is_nested_archive) {

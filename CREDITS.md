@@ -162,9 +162,9 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Pokemon Snap | 🪟🐧 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
 | Body Harvest | 🪟🐧 | [danielgomesvieira2000/body-harvest-recomp](https://github.com/danielgomesvieira2000/body-harvest-recomp) |
 | Diddy Kong Racing | 🪟 | [ThatGuyMcd/DKR-R](https://github.com/ThatGuyMcd/DKR-R) |
-| Diablo (DevilutionX) | 🪟🐧 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
+| Diablo (DevilutionX) | 🪟🐧🍎 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
 | Star Wars: Dark Forces (TFE) | 🪟 | [TheForceEngine/TheForceEngine](https://github.com/TheForceEngine/TheForceEngine) |
-| Fallout (Community Edition) | 🪟🐧 | [alexbatalov/fallout1-ce](https://github.com/alexbatalov/fallout1-ce) |
+| Fallout (Community Edition) | 🪟🐧🍎 | [alexbatalov/fallout1-ce](https://github.com/alexbatalov/fallout1-ce) |
 | Pokemon Red and Blue (reblue) | 🪟 | [zolaware/reblue](https://github.com/zolaware/reblue) |
 | Spider-Man (OpenSpidey) | 🪟 | [GTTeancum/OpenSpideyPS1](https://github.com/GTTeancum/OpenSpideyPS1) |
 | F-Zero X | 🪟🍎 | [craigshaw/FZeroRecomp](https://github.com/craigshaw/FZeroRecomp) |
@@ -174,13 +174,13 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 
-**26 de 55 têm build Linux** e **22 de 55 têm build macOS** (Apple Silicon /
+**26 de 55 têm build Linux** e **24 de 55 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
 repositório. Os outros publicam build utilizável apenas no Windows por este
-app. No macOS, o Karamelo suporta pacotes `.app` descompactados, arquivos
-`.zip` e `.tar.xz`/`.tar.gz` com binários Mach-O nativos e prioriza
-compilações ARM64 - mas não monta `.dmg` (imagem de disco), o motivo do
-Diablo/DevilutionX não ter o selo 🍎 apesar de publicar um build de Mac.
+app. No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
+`.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
+transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
+compilações ARM64.
 No Linux, o extrator abre `.zip`, `.tar.gz` e `.tar.xz` diretamente e
 reconhece um binário avulso sem nenhum empacotamento (ex.: `Crash
 Bandicoot`); só pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic

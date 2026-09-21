@@ -18,6 +18,7 @@ extern char **environ;
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 
 #include "archive_helper.h"
 #include "menu.h"
@@ -575,6 +576,12 @@ static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
 	int exit_code = -1;
 	std::string ext = fs::path(archive_path).extension().string();
 	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+#ifdef __APPLE__
+	if (ext == ".dmg")
+	{
+		return false;
+	}
+#endif
 	if (ext == ".7z" || ext == ".rar")
 	{
 		std::string raw_output;
@@ -658,6 +665,24 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 	bool ok = false;
 	std::string ext = fs::path(archive_path).extension().string();
 	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+#ifdef __APPLE__
+	if (ext == ".dmg")
+	{
+		std::string mount_dir = "/tmp/km_dmg_" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+		std::error_code ec;
+		fs::create_directories(mount_dir, ec);
+		bool attached = RunHiddenCommand({ "hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mount_dir, archive_path, "-quiet" }, EXTRACT_TIMEOUT_MS);
+		if (attached)
+		{
+			ok = RunHiddenCommand({ "cp", "-a", mount_dir + "/.", dest_dir + "/" }, EXTRACT_TIMEOUT_MS);
+			RunHiddenCommand({ "hdiutil", "detach", mount_dir, "-force", "-quiet" }, EXTRACT_TIMEOUT_MS);
+			fs::path app_symlink = fs::path(dest_dir) / "Applications";
+			if (fs::is_symlink(app_symlink, ec)) fs::remove(app_symlink, ec);
+		}
+		fs::remove_all(mount_dir, ec);
+	}
+	else
+#endif
 	if (ext == ".7z" || ext == ".rar")
 	{
 		ok = RunHiddenCommand({ "7z", "x", "-y", "-o" + dest_dir, archive_path }, EXTRACT_TIMEOUT_MS);
@@ -678,6 +703,7 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 			ok = RunHiddenCommand({ "7z", "x", "-y", "-o" + dest_dir, archive_path }, EXTRACT_TIMEOUT_MS);
 		}
 	}
+
 	if (!ok) return false;
 #endif
 

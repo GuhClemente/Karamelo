@@ -573,10 +573,8 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
   Pacotes Flatpak dentro de zip (`Banjo 64` e `Sonic Unleashed Recompiled`)
   não contam hoje (total: 26 ports).
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
-  Universal > Intel), extrai pacotes `.app` descompactados, zips e tarballs -
-  mas não monta `.dmg` (imagem de disco), então um projeto que só publica
-  `.dmg` para Mac não conta, mesmo tendo Mac "de verdade" (caso do Diablo/
-  DevilutionX, corrigido em 21/09 - ver seção 15). Hoje 22 ports possuem
+  Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
+  (montadas e extraídas transparentemente via `hdiutil`). Hoje 24 ports possuem
   releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
@@ -586,7 +584,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
    Recomp exibida deve filtrar conforme o SO selecionado:
    - **Filtro Windows (🪟)**: 55 jogos.
    - **Filtro Linux (🐧)**: 26 jogos.
-   - **Filtro macOS (🍎)**: 22 jogos.
+   - **Filtro macOS (🍎)**: 24 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
@@ -596,16 +594,16 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (16 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (18 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
-  Infinite Mario 64, Valkyrie Profile, Super Mario Strikers, Super Metroid.
+  Infinite Mario 64, Valkyrie Profile, Super Mario Strikers, Super Metroid,
+  Diablo (DevilutionX), Fallout (Community Edition).
 - **🪟🍎 (6 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2, Banjo 64,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
-- **🪟🐧 (10 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
-  Remastered, Pokemon Snap, Body Harvest, Diablo (DevilutionX), Fallout
-  (Community Edition), AeroGauge, Crash Bandicoot, Pikmin (Open Nectar),
+- **🪟🐧 (8 jogos, Windows e Linux):** Star Fox 64 (Starship), Super Mario Bros.
+  Remastered, Pokemon Snap, Body Harvest, AeroGauge, Crash Bandicoot, Pikmin (Open Nectar),
   Soulcalibur II (Ring Out).
 - **🪟 apenas (23 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, Animal Crossing (GC),
@@ -658,9 +656,8 @@ O Karamelo agora possui compilação e suporte nativo completo para **macOS (App
 5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
    - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
    - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
-   - 22 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`) -
-     não conta um projeto cujo único build de Mac é `.dmg` (não montado por este
-     instalador; ver a ressalva da seção 12).
+   - 24 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
+   - Suporte nativo a imagens `.dmg` através de montagem/desmontagem automática e segura via `hdiutil`, permitindo instalar jogos distribuídos em `.dmg` no macOS (como Diablo/DevilutionX e Fallout 1 CE).
 6. **Detecção no Site**:
    - Recomenda-se detectar o SO do usuário (`MacIntel` com `navigator.maxTouchPoints > 0` ou `navigator.userAgent` contendo `Macintosh`) para destacar o botão **Baixar para macOS (Apple Silicon)** por padrão para usuários Apple.
 
@@ -677,22 +674,16 @@ Em 20/09/2026, o catálogo de "Ports & Recomp" foi expandido de 42 para **47 tí
 2. **Diddy Kong Racing** (`ThatGuyMcd/DKR-R` — 🪟):
    - Motor N64Recomp / RT64 de DKR.
    - Suporte a widescreen, 60fps+, multiplayer online e suporte nativo a controles.
-3. **Diablo (DevilutionX)** (`diasurgical/devilutionX` — 🪟🐧):
+3. **Diablo (DevilutionX)** (`diasurgical/devilutionX` — 🪟🐧🍎):
    - Source port moderno e aprimorado de Diablo 1 e da expansão Hellfire.
-   - Suporte nativo para **Windows** e **Linux** (`.tar.xz`). O projeto também
-     publica um `.dmg` de macOS, mas **não conta como suportado aqui**:
-     corrigido em 21/09/2026 depois de uma auditoria de código (a auditoria
-     original desta seção, de 20/09, listou macOS por engano) — o instalador
-     do Karamelo só sabe abrir `.zip`/`.tar.gz`/`.tar.xz`, e `.dmg` é um
-     formato de imagem de disco diferente que ele não monta. Ofereceria a
-     entrada no menu do macOS e falharia ao selecionar.
+   - Suporte nativo para **Windows**, **Linux** (`.tar.xz`) e **macOS** (imagem `.dmg` com binário Universal ARM64/x86_64 montada e extraída automaticamente via `hdiutil`).
    - Suporta gamepads modernos, resolução escalável e multiplayer.
 4. **Star Wars: Dark Forces (The Force Engine)** (`TheForceEngine/TheForceEngine` — 🪟):
    - Engine moderna substituta para o clássico Star Wars: Dark Forces da LucasArts.
    - Suporte a renderização em alta resolução, mouse look e áudio aprimorado.
-5. **Fallout (Community Edition)** (`alexbatalov/fallout1-ce` — 🪟🐧):
+5. **Fallout (Community Edition)** (`alexbatalov/fallout1-ce` — 🪟🐧🍎):
    - Reimplementação open-source e nativa da engine do Fallout 1 original.
-   - Roda perfeitamente em Windows e Linux com suporte a resoluções modernas e controles.
+   - Roda perfeitamente em **Windows**, **Linux** e **macOS** (imagem `.dmg` Universal ARM64/x86_64) com suporte a resoluções modernas e controles.
 
 ### Aprimoramento no Seletor de Assets (`src/port_runner.cpp`)
 - O seletor de assets do Karamelo foi atualizado para descartar automaticamente pacotes de símbolos de depuração (`debug-symbols`, `debug_symbols`, `-pdb`, `_pdb`, `symbols`). Isso garante que o instalador baixe sempre o arquivo de jogo executável em vez de pacotes complementares de PDB.
@@ -743,8 +734,11 @@ Em 21/09/2026, o catálogo de "Ports & Recomp" foi expandido de 47 para **55 tí
 ### Atualização de Compatibilidade: Super Metroid Recomp (`mstan/SuperMetroidRecomp` — 🪟🐧🍎)
 - O port de **Super Metroid** agora conta com suporte nativo homologado e comprovado para **Linux** (`supermetroid-0.3.8-linux-x64.zip`) e **macOS** (`supermetroid-0.3.8-macos-arm64.zip` / `supermetroid-0.3.8-macos-x64.zip`).
 - O executável nativo Mach-O ARM64 (`SuperMetroidSNESRecomp`) foi validado diretamente no macOS Apple Silicon.
-- O subsistema `src/port_runner.cpp` teve a checagem de magic bytes de Mach-O corrigida para reconhecer binários little-endian puros ARM64/x86_64 (`0xCF, 0xFA, 0xED, 0xFE`) além dos cabeçalhos fat/universal.
-- Com isso, o total de ports sobe para **26 no Linux (🐧)** e **22 no macOS (🍎)**.
+- Com isso e o suporte a imagens `.dmg`, o total de ports sobe para **26 no Linux (🐧)** e **24 no macOS (🍎)**.
+
+### Suporte a Imagens de Disco `.dmg` no macOS (`src/archive_helper.cpp`)
+- Adicionado suporte nativo à montagem e extração transparente de imagens `.dmg` através do utilitário padrão do macOS `hdiutil attach/detach`.
+- Os jogos distribuídos pela comunidade exclusivamente em `.dmg` para macOS (como **Diablo / DevilutionX** e **Fallout 1 Community Edition**) agora são baixados, montados, extraídos para `ports/<id>/` e desmontados automaticamente, com detecção do bundle `.app` interno e executáveis Mach-O universais (ARM64 + x86_64).
 
 ### Projetos Analisados e Não Adicionados nesta Rodada
 - `GenryTheFox/Spider-Man-Edge-of-Time-PC-Edition`: O repositório retornou HTTP 404 (privado ou deletado). Não foi adicionado.

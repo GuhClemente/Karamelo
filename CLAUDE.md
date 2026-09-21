@@ -24,7 +24,7 @@ This file provides project guidelines, architecture details, and essential comma
 
 1. **Never Invent Counts or Numbers**:
    - Systems & Engines: Read from `include/app_info.h` (`APP_SYSTEM_COUNT = 35`, `APP_CORE_ENGINES = 40`). Never report `APP_CORE_FILES` (41) as an engine count.
-   - Ports & Recomp: Source of truth is `CREDITS.md` and `src/port_runner.cpp` (Total: 55 ports — 55 Windows 🪟, 26 Linux 🐧, 22 macOS 🍎).
+   - Ports & Recomp: Source of truth is `CREDITS.md` and `src/port_runner.cpp` (Total: 55 ports — 55 Windows 🪟, 26 Linux 🐧, 24 macOS 🍎).
    - BIOS Information: Source of truth is `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Repository Hygiene**:
    - **Never commit BIOS files, ROMs, saves, or runtime caches**. The `.gitignore` enforces this (`bios/`, `roms/`, `saves/`, `cache/`, `cores/`).

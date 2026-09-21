@@ -48,6 +48,8 @@ MACOS_VERIFIED_PORTS = [
     ("WaveRace64Recomp", "elliotttate/wave-race-64-recomp", "Wave Race 64 (Apple Silicon)"),
     ("SuperMetroidRecomp", "mstan/SuperMetroidRecomp", "Super Metroid (macOS ARM64 & Intel)"),
     ("PerfectDark", "perfect-dark-pc-port/perfect_dark", "Perfect Dark (macOS ARM64 & x86_64)"),
+    ("DevilutionX", "diasurgical/devilutionx", "Diablo (DevilutionX macOS DMG)"),
+    ("Fallout1CE", "alexbatalov/fallout1-ce", "Fallout (Community Edition macOS DMG)"),
     ("FZeroRecomp", "craigshaw/FZeroRecomp", "F-Zero X (macOS ARM64)"),
     ("MarioStrikers", "new-coke/strikers", "Super Mario Strikers (macOS ARM64)"),
 ]
