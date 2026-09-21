@@ -166,7 +166,7 @@
                      ├─────────────────────────┬───────────────┤
                      ▼ [SIM]                   ▼ [NÃO]
            [Envio Assíncrono POST]        [Apaga crash_dump.txt]
-          karamelo-emu.com/api/crash      Nenhum dado transmitido
+       karamelo-emu.com/api/crash-report   Nenhum dado transmitido
                      │
                      ▼
           [Notificação Webhook Discord]
@@ -224,23 +224,23 @@ Antes de qualquer transmissão de log ou dump de erro:
 2. **Mascaramento de Credenciais**:
    - Tokens de RetroAchievements: `token=a1b2c3d4...` -> `token=[REDACTED]`
    - Senhas ou hashes presentes no arquivo `.ini` são estritamente excluídos.
-3. **Payload Transmitido (JSON Seguro)**:
+3. **Payload Transmitido (JSON Seguro)** — este é o schema exato que `src/crash_reporter.cpp` (`CrashReporterCheckAndDispatch`/`CrashReporterSendTest`) monta e envia; a API do site precisa aceitar exatamente estes nomes de campo, todos string (`stack_trace` é uma string única com `\n` entre frames, não um array):
    ```json
    {
-       "app_version": "0.9.5",
-       "os": "macOS 15.0 arm64",
+       "app": "Karamelo",
+       "version": "0.9.5",
+       "os": "macOS arm64",
+       "timestamp": "2026-09-21 19:25:00 UTC",
        "core": "ParaLLEl N64 (n64_parallel.dylib)",
-       "game_stem": "Super Mario 64",
-       "fault_type": "SIGSEGV (0x0000000B)",
-       "fault_module": "n64_parallel.dylib",
-       "stack_trace": [
-           "0x000000010012a4c0",
-           "0x000000010012bc88",
-           "0x0000000100140210"
-       ],
-       "timestamp": "2026-09-21T19:25:00Z"
+       "game": "Super Mario 64",
+       "fault_type": "SIGSEGV (Segmentation Fault)",
+       "code": "0x0000000B",
+       "module": "n64_parallel.dylib",
+       "fault_addr": "0x10012A4C0",
+       "stack_trace": "n64_parallel.dylib 0x000000010012a4c0\nKaramelo 0x000000010012bc88\n..."
    }
    ```
+   `fault_type` é literal `"TEST_DIAGNOSTIC_PING"` para o ping manual do botão "Testar Envio" no OSD — a API deve aceitar isso sem tratar como um crash real (não deve gerar webhook de alarme no Discord, se possível diferenciar).
 
 ---
 
