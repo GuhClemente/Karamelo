@@ -206,18 +206,26 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "WaveRace64Recomp", "Wave Race 64",
           "elliotttate/wave-race-64-recomp", "WaveRace64Recomp.exe",
           true, { "wave", "race" }, false, true },
+        // Linux flipped true 21/09/2026: PickLinuxAsset now accepts .tar.gz
+        // directly (it didn't when this entry was first added, on 11/09 -
+        // see CREDITS.md's own note on this row, now stale) and the release
+        // still ships a real linux-x86_64.tar.gz. Verified end to end with
+        // --install-port, not just by re-reading the release assets.
         { "Snap64Recomp", "Pokemon Snap",
           "JackandBeans/Snap64Recomp", "Snap64Recomp.exe",
-          true, { "pokemon", "snap" }, false, false },
+          true, { "pokemon", "snap" }, true, false },
         { "BodyHarvestRecomp", "Body Harvest",
           "danielgomesvieira2000/body-harvest-recomp", "body-harvest-recomp.exe",
           true, { "body", "harvest" }, true, false },
         { "DKRRecomp", "Diddy Kong Racing",
           "ThatGuyMcd/DKR-R", "DKR-R.exe",
           true, { "diddy", "kong", "racing" }, false, false },
+        // macOS release is .dmg-only (devilutionx-macOS-universal.dmg) -
+        // PickMacOsAsset only matches .zip/.tar.gz/.tar.xz, same reason
+        // Fallout1CE below is macOS=false despite having a real release.
         { "DevilutionX", "Diablo (DevilutionX)",
           "diasurgical/devilutionX", "devilutionx.exe",
-          false, {}, true, true },
+          false, {}, true, false },
         { "TheForceEngine", "Star Wars: Dark Forces (TFE)",
           "TheForceEngine/TheForceEngine", "TheForceEngine.exe",
           false, {}, false, false },
@@ -310,6 +318,38 @@ static bool IsUnixNeverExecutable(const std::string& lower_ext) {
     for (const auto& e : never) if (lower_ext == e) return true;
     return false;
 }
+
+// Verified 21/09/2026 running `--list-ports` for real: the extension
+// denylist plus the executable permission bit above picks LICENSE, COPYING,
+// a .sav, a .pdf and even a ROM as "the executable" the moment ports/ sits
+// on a filesystem that does not carry real Unix permission bits - a Windows
+// drive mounted into WSL (9p/drvfs) reports every file as rwxrwxrwx
+// regardless of content, and the same is true of exFAT/NTFS drives some
+// people keep their game library on for cross-platform use. The permission
+// bit was never the wrong idea, just not sufficient on its own - this reads
+// the file's own first bytes and requires the real magic number of a
+// native binary (ELF on Linux, Mach-O - plain or fat/universal - on macOS),
+// which no filesystem can fake. An AppImage passes this too: it is a real
+// ELF with a filesystem image appended, not a different format.
+static bool LooksLikeRealBinary(const std::string& path) {
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) return false;
+    unsigned char magic[4] = { 0, 0, 0, 0 };
+    size_t n = fread(magic, 1, 4, f);
+    fclose(f);
+    if (n < 4) return false;
+#if defined(__APPLE__)
+    // Mach-O: FEEDFACE (32-bit), FEEDFACF (64-bit), CAFEBABE/BEBAFECA
+    // (fat/universal, either byte order) - covers every arch macOS ships.
+    if (magic[0] == 0xFE && magic[1] == 0xED && magic[2] == 0xFA &&
+        (magic[3] == 0xCE || magic[3] == 0xCF)) return true;
+    if (magic[0] == 0xCA && magic[1] == 0xFE && magic[2] == 0xBA && magic[3] == 0xBE) return true;
+    if (magic[0] == 0xBE && magic[1] == 0xBA && magic[2] == 0xFE && magic[3] == 0xCA) return true;
+    return false;
+#else
+    return magic[0] == 0x7F && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F';
+#endif
+}
 #endif
 
 static std::string FindBestExecutable(const std::string& dir) {
@@ -356,6 +396,7 @@ static std::string FindBestExecutable(const std::string& dir) {
         auto perms = e.status(ec).permissions();
         if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
             continue;
+        if (!LooksLikeRealBinary(e.path().string())) continue;
 #endif
 
         std::string fname = ToLowerStr(e.path().filename().string());
@@ -396,6 +437,7 @@ static std::string FindBestExecutable(const std::string& dir) {
             auto perms = e.status(ec).permissions();
             if ((perms & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) == fs::perms::none)
                 continue;
+            if (!LooksLikeRealBinary(e.path().string())) continue;
 #endif
             std::string fname = ToLowerStr(e.path().filename().string());
             bool skip = false;

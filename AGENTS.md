@@ -24,7 +24,7 @@ Este documento é o guia de referência operacional e arquitetural para agentes 
 
 1. **Fontes Únicas da Verdade (Não Invente Números)**:
    - Contagem de Sistemas e Motores: Leia SEMPRE de `include/app_info.h` (`APP_SYSTEM_COUNT = 35`, `APP_CORE_ENGINES = 40`). Nunca use `APP_CORE_FILES` (41) pois conta duplicata técnica de N64.
-   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `CREDITS.md` e verifique em `src/port_runner.cpp` (55 ports totais: 55 Windows 🪟, 22 macOS 🍎, 24 Linux 🐧).
+   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `CREDITS.md` e verifique em `src/port_runner.cpp` (55 ports totais: 55 Windows 🪟, 25 Linux 🐧, 21 macOS 🍎).
    - Guia de BIOS: A fonte canônica é `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Higiene de Repositório**:
    - **NUNCA versione ROMs, BIOS, saves, estados ou caches**. O `.gitignore` cobre `roms/`, `bios/`, `saves/`, `cores/`, `cache/`.
@@ -82,13 +82,13 @@ src/
 
 ## 5. Subsistema de PC Ports & Recompilados (`port_runner.cpp`)
 
-- **Contagem total**: 55 ports catalogados (55 Windows 🪟, 22 macOS 🍎, 24 Linux 🐧).
-- **Suporte macOS**: 22 ports com executáveis nativos Mach-O (`ARM64` > `Universal` > `x86_64`).
+- **Contagem total**: 55 ports catalogados (55 Windows 🪟, 25 Linux 🐧, 21 macOS 🍎).
+- **Suporte macOS**: 21 ports com executáveis nativos Mach-O (`ARM64` > `Universal` > `x86_64`) - não conta um projeto cujo único build de Mac é `.dmg`, formato que este instalador não monta.
 - **Regras de Execução no macOS**:
   - `FindBestExecutable()` prioriza binários com permissão de execução (`chmod +x`), descartando utilitários como `crashpad_handler` ou `make`.
   - Extração de `.app` bundles: detecta executáveis dentro de `Contents/MacOS/<nome>`.
   - Extração de formatos: suporta `.zip`, `.tar.gz`, `.tar.xz`.
-  - Flag de inspeção: `./app/Karamelo --list-ports` lista os 22 ports disponíveis no macOS.
+  - Flag de inspeção: `./app/Karamelo --list-ports` lista os ports disponíveis para o SO em que o binário foi compilado (21 no macOS, 25 no Linux, 55 no Windows).
 
 ---
 
