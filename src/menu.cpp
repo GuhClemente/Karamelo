@@ -1124,6 +1124,7 @@ void PopulateMainMenu() {
     items.push_back({"Carregar Estado (F4)", slot_has_state ? "OK" : "-", false, true, 3});
     items.push_back({"Gerenciador Slots", ">", false, true, 4});
     items.push_back({"Define Buttons", ">", false, true, 203});
+    items.push_back({"Screenshot (F9)", "", false, true, 8});
     items.push_back({" ", "", false, false, 0});
     items.push_back({"Close Game", "", false, true, 7});
 
@@ -2686,9 +2687,17 @@ void MenuRun() {
 static void MenuProcessKeyImpl(MenuKey key) {
   g_last_input_tick = TickCountMs();
 
-  // While waiting for a key to bind, the menu must not also act on it.
-  if (capture_bind >= 0)
+  // While waiting for a key to bind, the menu must not also act on it,
+  // except for KEY_CANCEL (ESC) which aborts the capture / wizard.
+  if (capture_bind >= 0) {
+    if (key == KEY_CANCEL) {
+      wizard_active = false;
+      capture_bind = -1;
+      PopulateControllerSettings();
+      CoreSetToast("CONFIGURACAO CANCELADA", 90);
+    }
     return;
+  }
 
   if (key == KEY_MENU_TOGGLE) {
     if (OsdIsEnabled()) {
@@ -2802,13 +2811,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (current_state == STATE_SAVESTATES && item.action_id >= 850 && item.action_id <= 859) {
       int s = item.action_id - 850;
       CoreSetSelectedSlot(s);
-      if (delta > 0) {
-        CoreSaveState(s);
-        PopulateSaveStates();
-      } else if (delta < 0) {
-        CoreLoadState(s);
-        PopulateSaveStates();
-      }
+      PopulateSaveStates();
     } else if (item.action_id == 302) // CRT Shaders
     {
       int cur = selected_idx;
@@ -3149,7 +3152,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
         shader_list_previous_state = STATE_MAIN;
         current_state = STATE_SHADER_LIST;
         PopulateShaderList();
-      } else if (item.action_id == 5) // Screenshot
+      } else if (item.action_id == 5) // Slot de Save: Enter avanca para o proximo slot
+      {
+        int cur = selected_idx;
+        int s = (CoreGetSelectedSlot() + 1) % 10;
+        CoreSetSelectedSlot(s);
+        PopulateMainMenu();
+        selected_idx = cur;
+      } else if (item.action_id == 8) // Screenshot
       {
         CoreTakeScreenshot();
         OsdDisable();
