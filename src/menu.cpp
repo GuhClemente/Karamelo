@@ -32,6 +32,7 @@
 #include "retroachievements.h"
 #include "updater.h"
 #include "port_runner.h"
+#include "crash_reporter.h"
 
 namespace fs = std::filesystem;
 
@@ -49,7 +50,8 @@ enum MenuState {
   STATE_RESET_CONFIRM,
   STATE_ABOUT_CORES,
   STATE_SAVESTATES,
-  STATE_SHADER_LIST
+  STATE_SHADER_LIST,
+  STATE_DIAGNOSTICS
 };
 
 struct MenuItem {
@@ -824,6 +826,7 @@ void PopulateResetConfirm();
 void PopulateCoresList();
 void PopulateSaveStates();
 void PopulateShaderList();
+void PopulateDiagnostics();
 static MenuState shader_list_previous_state = STATE_VIDEO;
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
@@ -1376,15 +1379,33 @@ static void SelectByAction(int action_id, int fallback_idx);
 void PopulateSettings() {
   items.clear();
   current_title = "Settings";
-  OsdSetSize(8);
+  OsdSetSize(9);
 
   items.push_back({"Video", ">", false, true, 201});
   items.push_back({"Audio", ">", false, true, 202});
   items.push_back({"Controller", ">", false, true, 203});
   items.push_back({"Netplay (Online)", ">", false, true, 204});
   items.push_back({"RetroAchievements", ">", false, true, 206});
+  items.push_back({"Diagnostico & Falhas", ">", false, true, 215});
   items.push_back({"About", ">", false, true, 205});
   items.push_back({"Restaurar Padroes", ">", false, true, 210});
+
+  selected_idx = 0;
+  scroll_top = 0;
+}
+
+void PopulateDiagnostics() {
+  items.clear();
+  current_title = "Diagnostico";
+  OsdSetSize(6);
+
+  bool enabled = CrashReporterIsEnabled();
+  items.push_back({"Relatorio de Falhas", enabled ? "Ativado" : "Desativado", false, false, 520});
+  items.push_back({"[INFO] Envia falhas para correcao", "", false, false, 0});
+  items.push_back({"[INFO] Se desligar, falhas nao sobem", "", false, false, 0});
+  items.push_back({"Testar Envio (Diagnostico)", ">", false, true, 521});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({"Voltar", "<", false, true, 999});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -3077,6 +3098,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
       setting_deadzone = (setting_deadzone + delta + 4) % 4;
       PopulateControllerSettings();
       SelectByAction(item.action_id, 2);
+    } else if (item.action_id == 520) // Toggle crash reporting
+    {
+      int cur = selected_idx;
+      CrashReporterSetEnabled(!CrashReporterIsEnabled());
+      PopulateDiagnostics();
+      selected_idx = cur;
     } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
     {
       int opt_index = item.action_id - 800;
@@ -3342,9 +3369,21 @@ static void MenuProcessKeyImpl(MenuKey key) {
       } else if (item.action_id == 205) {
         current_state = STATE_ABOUT;
         PopulateAbout();
+      } else if (item.action_id == 215) {
+        current_state = STATE_DIAGNOSTICS;
+        PopulateDiagnostics();
       } else if (item.action_id == 210) {
         current_state = STATE_RESET_CONFIRM;
         PopulateResetConfirm();
+      }
+    } else if (current_state == STATE_DIAGNOSTICS) {
+      if (item.action_id == 520) {
+        int cur = selected_idx;
+        CrashReporterSetEnabled(!CrashReporterIsEnabled());
+        PopulateDiagnostics();
+        selected_idx = cur;
+      } else if (item.action_id == 521) {
+        CrashReporterSendTest();
       }
     } else if (current_state == STATE_ABOUT) {
       if (item.action_id == 209) {
@@ -3554,7 +3593,8 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetToast("CONFIGURACAO CANCELADA", 90);
     } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
                current_state == STATE_CONTROLLER ||
-               current_state == STATE_NETPLAY || current_state == STATE_ABOUT) {
+               current_state == STATE_NETPLAY || current_state == STATE_ABOUT ||
+               current_state == STATE_DIAGNOSTICS) {
       current_state = STATE_SETTINGS;
       PopulateSettings();
     } else if (current_state == STATE_UPDATE) {

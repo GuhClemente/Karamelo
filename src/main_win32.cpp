@@ -37,6 +37,7 @@ namespace fs = std::filesystem;
 #include "resource.h"
 #include "karamelo_math.h"
 #include "gamepad_sdl.h"
+#include "crash_reporter.h"
 
 // dev-sdl3: first slice of the SDL3 migration. This only proves the vendored,
 // statically-linked SDL3 build actually links and runs inside this exe - it
@@ -480,6 +481,7 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 		uintptr_t* sp = (uintptr_t*)ep->ContextRecord->Rsp;
 		fprintf(f, "[ERROR] [CRASH] pilha (RVAs no executavel):");
 
+		std::string stack_rvas = "";
 		int found = 0;
 		for (int i = 0; i < 4096 && found < 12; i++)
 		{
@@ -493,11 +495,24 @@ static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ep)
 			if (mbi.State != MEM_COMMIT) break;
 			if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) break;
 			v = sp[i];
-			if (v > lo && v < hi) { fprintf(f, " 0x%llX", (unsigned long long)(v - (uintptr_t)base)); found++; }
+			if (v > lo && v < hi) {
+				char rva_buf[32];
+				snprintf(rva_buf, sizeof(rva_buf), "0x%llX ", (unsigned long long)(v - (uintptr_t)base));
+				stack_rvas += rva_buf;
+				fprintf(f, " 0x%llX", (unsigned long long)(v - (uintptr_t)base));
+				found++;
+			}
 		}
 		fprintf(f, "\n");
 
 		fclose(f);
+
+		CrashReporterWriteDump(
+			(ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) ? "EXCEPTION_ACCESS_VIOLATION" : "SEH_EXCEPTION",
+			ep->ExceptionRecord->ExceptionCode, module,
+			fault_mod ? (uintptr_t)((uintptr_t)addr - (uintptr_t)fault_mod)
+			          : (uintptr_t)((uintptr_t)addr - (uintptr_t)base),
+			stack_rvas);
 	}
 
 	// A fault whose address lands inside a loaded module that is not this
@@ -1381,7 +1396,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 	}
 
+	CrashReporterInit();
 	CheckWindowsCrashReportsOnStartup();
+	CrashReporterCheckAndDispatch();
 
 	// Root cause of a real crash: SDL_Init(SDL_INIT_VIDEO) registers a Win32
 	// window class named "SDL_app" (SDL's own hardcoded default) under

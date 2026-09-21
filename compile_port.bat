@@ -104,6 +104,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     src\retroachievements.cpp ^
     src\updater.cpp ^
     src\port_runner.cpp ^
+    src\crash_reporter.cpp ^
     src\main_win32.cpp ^
     third_party\rcheevos\src\*.c ^
     third_party\rcheevos\src\rapi\*.c ^

@@ -29,6 +29,7 @@ namespace fs = std::filesystem;
 #include "retroachievements.h"
 #include "updater.h"
 #include "port_runner.h"
+#include "crash_reporter.h"
 #include "hw_render.h"
 #include "hw_render_vulkan.h"
 #include "hw_render_d3d11.h"
@@ -897,6 +898,8 @@ int main(int argc, char* argv[])
 	// -------------------------------------------------------------
 	// 3. SDL3 Initialization & Window Creation
 	// -------------------------------------------------------------
+	CrashReporterInit();
+
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
 	{
 		fprintf(stderr, "[ERROR] [SDL3] SDL_Init falhou: %s\n", SDL_GetError());
@@ -963,6 +966,7 @@ int main(int argc, char* argv[])
 	RaInit();
 	UpdaterInit();
 	PortInit();
+	CrashReporterCheckAndDispatch();
 
 	if (argc > 1 && argv[1] && argv[1][0] != '\0' && argv[1][0] != '-')
 	{

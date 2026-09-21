@@ -40,6 +40,7 @@
 #include "hw_render.h"
 #include "hw_render_vulkan.h"
 #include "hw_render_d3d11.h"
+#include "crash_reporter.h"
 
 namespace fs = std::filesystem;
 
@@ -2967,6 +2968,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			loaded_system_dir = init_p.stem().string();
 		}
 		keyboard_bridge_active = SystemNeedsKeyboardBridge(loaded_system_dir);
+		CrashReporterSetLastGameInfo(loaded_core_name.c_str(), loaded_game_stem.c_str());
 		LeaveCriticalSection(&name_lock);
 	}
 
@@ -3473,6 +3475,7 @@ void CoreShutdown()
 			h_core_thread = NULL;
 			RecoverAfterKilledCore();
 			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+			CrashReporterSetLastGameInfo("Nenhum", "Nenhum");
 			CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Finalizado apos recuperacao forcada.");
 			return;
 		}
@@ -3482,6 +3485,7 @@ void CoreShutdown()
 	}
 
 	InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+	CrashReporterSetLastGameInfo("Nenhum", "Nenhum");
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Shutdown concluido com sucesso.");
 }
 
@@ -3900,6 +3904,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			loaded_system_dir = (loaded_core_name == "Mega CD") ? "MegaCD" : loaded_core_name;
 		}
 	}
+	CrashReporterSetLastGameInfo(loaded_core_name.c_str(), loaded_game_stem.c_str());
 	LeaveCriticalSection(&name_lock);
 
 	struct retro_game_info game_info = { 0 };

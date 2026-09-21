@@ -83,6 +83,7 @@ KARAMELO_SRCS=(
     src/retroachievements.cpp
     src/updater.cpp
     src/port_runner.cpp
+    src/crash_reporter.cpp
     src/main_linux.cpp
 )
 
@@ -117,10 +118,12 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     tests/test_netplay.cpp \
     tests/test_math_video.cpp \
     tests/test_updater.cpp \
+    tests/test_crash_reporter.cpp \
     build/macos_obj/karamelo_math.o \
     build/macos_obj/netplay_protocol.o \
     build/macos_obj/archive_helper.o \
     build/macos_obj/updater.o \
+    build/macos_obj/crash_reporter.o \
     -lpthread -ldl \
     -o build/karamelo_tests
 
