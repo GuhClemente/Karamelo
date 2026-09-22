@@ -136,6 +136,8 @@ for c in $APPS; do
     name=$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')
     if docker restart "$c" >/dev/null 2>&1; then
         echo "  reiniciado: $name"
+        docker exec -u 0 "$c" mkdir -p /data/crash-reports 2>/dev/null || true
+        docker exec -u 0 "$c" chown -R 1001:65533 /data 2>/dev/null || true
     else
         echo "  [ERRO] falha ao reiniciar $name."
         exit 1
