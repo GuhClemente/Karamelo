@@ -148,18 +148,18 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | REDRIVER 2 | 🪟🐧 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
 | Castlevania: Symphony of the Night | 🪟 | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
 | Sonic 1 Forever | 🪟 | [ElspethThePict/S1Forever](https://github.com/ElspethThePict/S1Forever) |
-| Sonic 3 A.I.R. | 🪟🐧 | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
+| Sonic 3 A.I.R. | 🪟🐧🍎 | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
 | Sonic Unleashed Recompiled | 🪟 | [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) |
 | Space Station Silicon Valley | 🪟🍎 | [Cellenseres/SSSV_Recomp](https://github.com/Cellenseres/SSSV_Recomp) |
 | Super Mario Bros. Remastered | 🪟🐧 | [JHDev2006/Super-Mario-Bros.-Remastered-Public](https://github.com/JHDev2006/Super-Mario-Bros.-Remastered-Public) |
 | Super Mario World | 🪟🐧 | [mstan/SuperMarioWorldRecomp](https://github.com/mstan/SuperMarioWorldRecomp) |
-| Super Metroid | 🪟🐧🍎 | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
+| Super Metroid | 🪟 | [mstan/SuperMetroidRecomp](https://github.com/mstan/SuperMetroidRecomp) |
 | Viva Pinata: Trouble in Paradise | 🪟 | [SolarCookies/TiP-Recomp](https://github.com/SolarCookies/TiP-Recomp) |
 | WipEout Phantom Edition | 🪟 | [wipeout-phantom-edition/wipeout-phantom-edition](https://github.com/wipeout-phantom-edition/wipeout-phantom-edition) |
 | OutRun (CannonBall DX) | 🪟 | [Endprodukt/cannonball-dx](https://github.com/Endprodukt/cannonball-dx) |
 | Valkyrie Profile | 🪟🐧🍎 | [Ed1z19/ValkyrieRecomp](https://github.com/Ed1z19/ValkyrieRecomp) |
 | Wave Race 64 | 🪟🍎 | [elliotttate/wave-race-64-recomp](https://github.com/elliotttate/wave-race-64-recomp) |
-| Pokemon Snap | 🪟🐧 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
+| Pokemon Snap | 🪟🐧🍎 | [JackandBeans/Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) |
 | Body Harvest | 🪟🐧 | [danielgomesvieira2000/body-harvest-recomp](https://github.com/danielgomesvieira2000/body-harvest-recomp) |
 | Diddy Kong Racing | 🪟🐧 | [ThatGuyMcd/DKR-R](https://github.com/ThatGuyMcd/DKR-R) |
 | Diablo (DevilutionX) | 🪟🐧🍎 | [diasurgical/devilutionX](https://github.com/diasurgical/devilutionX) |
@@ -176,11 +176,14 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Super Smash Bros. Melee (Melee Unlocked) | 🪟 | [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) |
 | Monster Hunter Portable 3rd (Yakumo) | 🪟🐧🍎 | [TeamGDB/Yakumo](https://github.com/TeamGDB/Yakumo) |
 
-**33 de 57 têm build Linux** e **25 de 57 têm build macOS** (Apple Silicon /
+**32 de 57 têm build Linux** e **26 de 57 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
 repositório (Melee Unlocked, adicionado em 27/09/2026, só publica Windows;
 Yakumo, adicionado em 27/09/2026, publica os três). Os outros publicam build utilizável apenas no Windows por este
-app. No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
+app. Revisado em 27/09/2026: Super Metroid voltou a 🪟 apenas (a v0.3.9 só
+publica Windows; até a v0.3.8 havia Linux e macOS), Pokemon Snap ganhou 🍎
+(a v1.1.0 é a primeira com `macos-universal.zip`) e Sonic 3 A.I.R. ganhou 🍎
+(o `.dmg` da release estável falhava na extração, corrigida nesta data). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
 compilações ARM64.
@@ -218,8 +221,9 @@ próprio Yakumo mostra uma tela de setup (funciona com controle) para escolher
 a imagem, confere e prepara o jogo. O pacote tem ~220 MB e o projeto está em
 *alpha* (v0.6.0-alpha.4 em 24/09/2026), com releases quase diárias.
 Conferido em 27/09/2026: instalação pelo Karamelo no Windows (abre em Vulkan
-na tela de setup) e no Linux (pacote certo, binário sem biblioteca faltando);
-macOS pelo `.dmg`, ainda não testado num Mac.
+na tela de setup), no Linux (pacote certo, binário sem biblioteca faltando)
+e no macOS (o `.dmg` instala; abre nativo em ARM64, Vulkan via MoltenVK,
+na tela de setup — testado num Mac M1).
 
 E um detalhe da linha do Wave Race 64: o projeto se descreve como "em beta" e
 o pacote baixado é bem maior que o normal desta tabela (~390 MB, contra

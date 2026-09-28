@@ -253,8 +253,13 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           "GuhClemente/SymphonyRecomp", "", true, {}, false, false },
         { "Sonic1Forever", "Sonic 1 Forever",
           "ElspethThePict/S1Forever", "", true, {}, false, false },
+        // macOS flipped true 27/09/2026: the stable release's .dmg only
+        // failed to install because ArchiveExtractAll tripped over the
+        // volume's unreadable .Trashes - fixed there. Verified end to end
+        // with --install-port (universal Mach-O, Developer ID signed) and a
+        // launch that reaches the game's own ROM prompt.
         { "Sonic3AIR", "Sonic 3 A.I.R.",
-          "Eukaryot/sonic3air", "", true, {}, true, false },
+          "Eukaryot/sonic3air", "", true, {}, true, true },
         { "SonicUnleashedRecomp", "Sonic Unleashed",
           "hedge-dev/UnleashedRecomp", "", true, {}, false, false },
         { "SpaceStationSiliconValley", "Space Station Silicon Valley",
@@ -263,8 +268,14 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {}, true, false },
         { "SuperMarioWorldRecomp", "Super Mario World",
           "mstan/SuperMarioWorldRecomp", "", true, {}, true, false },
+        // Linux and macOS flipped back to false 27/09/2026: v0.3.9 (22/09)
+        // ships only SuperMetroidSNESRecomp-windows-x64-v0.3.9.zip, where
+        // v0.3.4-v0.3.8 also had linux-x64 and macos-arm64/x64 zips. On a Mac
+        // --install-port now fails with "nenhum build macOS na release deste
+        // port"; Linux was not run here, but the one asset left has nothing
+        // PickLinuxAsset can match. Flip again if upstream brings them back.
         { "SuperMetroidRecomp", "Super Metroid",
-          "mstan/SuperMetroidRecomp", "SuperMetroidSNESRecomp.exe", true, { "metroid" }, true, true },
+          "mstan/SuperMetroidRecomp", "SuperMetroidSNESRecomp.exe", true, { "metroid" }, false, false },
         { "VivaPinataTiP", "Viva Pinata: Trouble in Paradise",
           "SolarCookies/TiP-Recomp", "", true, {}, false, false },
         { "WipeoutPhantomEdition", "WipEout Phantom Edition",
@@ -279,9 +290,13 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // see CREDITS.md's own note on this row, now stale) and the release
         // still ships a real linux-x86_64.tar.gz. Verified end to end with
         // --install-port, not just by re-reading the release assets.
+        // macOS flipped true 27/09/2026: v1.1.0 is the first release with a
+        // macos-universal.zip. Verified with --install-port (universal
+        // Mach-O .app, exe found inside Contents/MacOS) and a launch that
+        // reaches the game's own ROM prompt.
         { "Snap64Recomp", "Pokemon Snap",
           "JackandBeans/Snap64Recomp", "Snap64Recomp.exe",
-          true, { "pokemon", "snap" }, true, false },
+          true, { "pokemon", "snap" }, true, true },
         { "BodyHarvestRecomp", "Body Harvest",
           "danielgomesvieira2000/body-harvest-recomp", "body-harvest-recomp.exe",
           true, { "body", "harvest" }, true, false },

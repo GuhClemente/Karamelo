@@ -674,10 +674,27 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 		bool attached = RunHiddenCommand({ "hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mount_dir, archive_path, "-quiet" }, EXTRACT_TIMEOUT_MS);
 		if (attached)
 		{
-			ok = RunHiddenCommand({ "cp", "-a", mount_dir + "/.", dest_dir + "/" }, EXTRACT_TIMEOUT_MS);
+			// Copy entry by entry, skipping the volume's own dot-entries: a
+			// Finder-made image carries .Trashes and .TemporaryItems as
+			// d-wx--x--t, so "cp -a <volume>/." exited 1 on them after the
+			// .app had already landed - Sonic 3 A.I.R.'s .dmg failed install
+			// that way. None of those entries (.fseventsd, .background,
+			// .DS_Store, ...) are ever part of the game. "Applications" is the
+			// drag-to-install shortcut, a symlink or a Finder alias file.
+			bool copied_any = false;
+			bool copy_failed = false;
+			for (const auto& e : fs::directory_iterator(mount_dir, ec))
+			{
+				std::string name = e.path().filename().string();
+				if (name.empty() || name[0] == '.') continue;
+				if (name == "Applications" && (e.is_symlink(ec) || !e.is_directory(ec))) continue;
+				if (RunHiddenCommand({ "cp", "-a", e.path().string(), dest_dir + "/" }, EXTRACT_TIMEOUT_MS))
+					copied_any = true;
+				else
+					copy_failed = true;
+			}
+			ok = copied_any && !copy_failed;
 			RunHiddenCommand({ "hdiutil", "detach", mount_dir, "-force", "-quiet" }, EXTRACT_TIMEOUT_MS);
-			fs::path app_symlink = fs::path(dest_dir) / "Applications";
-			if (fs::is_symlink(app_symlink, ec)) fs::remove(app_symlink, ec);
 		}
 		fs::remove_all(mount_dir, ec);
 	}

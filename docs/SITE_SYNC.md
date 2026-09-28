@@ -572,10 +572,10 @@ cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 - No **Windows**: todos os 57 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 33 ports.
+- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 32 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
-  (montadas e extraídas transparentemente via `hdiutil`). Hoje 25 ports possuem
+  (montadas e extraídas transparentemente via `hdiutil`). Hoje 26 ports possuem
   releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
@@ -584,35 +584,35 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
    - **Filtro Windows (🪟)**: 57 jogos.
-   - **Filtro Linux (🐧)**: 33 jogos.
-   - **Filtro macOS (🍎)**: 25 jogos.
+   - **Filtro Linux (🐧)**: 32 jogos.
+   - **Filtro macOS (🍎)**: 26 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
    derive-os da contagem dos ícones em `CREDITS.md`.
 
-### Resumo das compatibilidades (21/09/2026)
+### Resumo das compatibilidades (revisado em 27/09/2026 — ver seções 20 e 21)
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (20 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (21 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Banjo 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
-  Infinite Mario 64, Valkyrie Profile, Super Mario Strikers, Super Metroid,
-  Diablo (DevilutionX), Fallout (Community Edition),
+  Infinite Mario 64, Sonic 3 A.I.R., Valkyrie Profile, Pokemon Snap,
+  Super Mario Strikers, Diablo (DevilutionX), Fallout (Community Edition),
   Monster Hunter Portable 3rd (Yakumo) — adicionado em 27/09/2026, ver seção 20.
 - **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
-- **🪟🐧 (13 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
-  Sonic 3 A.I.R., Super Mario Bros. Remastered, Super Mario World,
-  Pokemon Snap, Body Harvest, Diddy Kong Racing, Pokemon Red and Blue (reblue),
-  AeroGauge, Crash Bandicoot, Pikmin (Open Nectar), Soulcalibur II (Ring Out).
-- **🪟 apenas (19 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟🐧 (11 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
+  Super Mario Bros. Remastered, Super Mario World, Body Harvest,
+  Diddy Kong Racing, Pokemon Red and Blue (reblue), AeroGauge, Crash Bandicoot,
+  Pikmin (Open Nectar), Soulcalibur II (Ring Out).
+- **🪟 apenas (20 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
   Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
   Jak & Daxter, LoD: Severed Chains, Castlevania: SotN, Sonic 1 Forever,
-  Sonic Unleashed, Viva Pinata, WipEout Phantom Edition,
+  Sonic Unleashed, Super Metroid, Viva Pinata, WipEout Phantom Edition,
   Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey) e
   Super Smash Bros. Melee (Melee Unlocked) — adicionado em 27/09/2026, ver
   seção 18. (The Darkness **não** entra — ver seção 19.)
@@ -903,6 +903,9 @@ Detalhe técnico completo (para FAQ ou página de desenvolvedor):
 
 ## 19. Correção de 27/09/2026 — The Darkness retirado do menu e do site
 
+> ⚠ **Números de Linux/macOS atualizados na seção 21** (Linux **32**, macOS
+> **26**). O resto desta seção continua valendo.
+
 **Remova do site tudo o que a seção 18 mandou publicar sobre o The Darkness.**
 O port funciona (o Karamelo preparou o dump de um disco real e o jogo abriu),
 mas o projeto original ainda está instável demais para oferecer. Ele saiu do
@@ -928,6 +931,9 @@ site.**
 ---
 
 ## 20. Adição de 27/09/2026 — Monster Hunter Portable 3rd (Yakumo), primeiro recompilado de PSP
+
+> ⚠ **Números de Linux/macOS atualizados na seção 21** (Linux **32**, macOS
+> **26**). O resto desta seção continua valendo.
 
 O catálogo de "Ports & Recomp" vai de 56 para **57 títulos**. Novos totais,
 conferidos contra o `CREDITS.md`: **57 Windows 🪟, 33 Linux 🐧, 25 macOS 🍎**
@@ -977,3 +983,28 @@ Texto curto sugerido para o card/modal (pt-BR):
 3. Sistemas (**35**) e motores (**40**) não mudam — o Yakumo não é um core.
 4. **The Darkness continua fora** (seção 19). Não confundir: o número subiu
    por causa do Yakumo, não pela volta do The Darkness.
+
+---
+
+## 21. Atualização de 27/09/2026 — compatibilidade revisada: macOS 26, Linux 32
+
+Uma revisão das releases atuais de todos os ports mudou os ícones de três
+jogos. O total de **57** jogos (já com o Yakumo, seção 20) não muda; só os
+filtros por SO. O 🍎 do Yakumo também foi confirmado num Mac: o `.dmg`
+instala e o jogo abre nativo em Apple Silicon, na tela de setup.
+
+| Jogo | Antes | Agora | Por quê |
+|---|---|---|---|
+| Pokemon Snap | 🪟🐧 | 🪟🐧🍎 | a v1.1.0 (27/09) é a primeira release com build macOS (Universal) — instalado e aberto num Mac Apple Silicon |
+| Sonic 3 A.I.R. | 🪟🐧 | 🪟🐧🍎 | a release estável sempre teve `.dmg`; o Karamelo falhava ao extrair esse `.dmg` e agora não falha mais — instalado e aberto num Mac Apple Silicon |
+| Super Metroid | 🪟🐧🍎 | 🪟 | a v0.3.9 (22/09) só publica Windows; as versões até a v0.3.8 tinham Linux e macOS. Volta a ter os ícones se o projeto voltar a publicar |
+
+O que mudar no site:
+
+1. **Filtros:** Windows = **57**, Linux = **32**, macOS = **26**.
+2. **Ícones** dos três jogos acima conforme a coluna "Agora" (a mesma da
+   tabela do [CREDITS.md](../CREDITS.md)).
+3. **Listas da seção 12:** 🪟🐧🍎 = 21 jogos, 🪟🍎 = 5, 🪟🐧 = 11,
+   🪟 apenas = 20 (já atualizadas lá).
+4. Sistemas (**35**), motores (**40**) e o resto das seções 18, 19 e 20
+   não mudam.

@@ -46,12 +46,13 @@ MACOS_VERIFIED_PORTS = [
     ("SpaceStationSiliconValley", "Cellenseres/SSSV_Recomp", "Space Station Silicon Valley"),
     ("ValkyrieRecomp", "Ed1z19/ValkyrieRecomp", "Valkyrie Profile (PSXRecomp ARM64)"),
     ("WaveRace64Recomp", "elliotttate/wave-race-64-recomp", "Wave Race 64 (Apple Silicon)"),
-    ("SuperMetroidRecomp", "mstan/SuperMetroidRecomp", "Super Metroid (macOS ARM64 & Intel)"),
     ("PerfectDark", "perfect-dark-pc-port/perfect_dark", "Perfect Dark (macOS ARM64 & x86_64)"),
     ("DevilutionX", "diasurgical/devilutionx", "Diablo (DevilutionX macOS DMG)"),
     ("Fallout1CE", "alexbatalov/fallout1-ce", "Fallout (Community Edition macOS DMG)"),
     ("FZeroRecomp", "craigshaw/FZeroRecomp", "F-Zero X (macOS ARM64)"),
     ("MarioStrikers", "new-coke/strikers", "Super Mario Strikers (macOS ARM64)"),
+    ("Snap64Recomp", "JackandBeans/Snap64Recomp", "Pokemon Snap (macOS Universal)"),
+    ("Sonic3AIR", "Eukaryot/sonic3air", "Sonic 3 A.I.R. (macOS DMG)"),
 ]
 
 def run_test_port_filtering():
@@ -140,7 +141,7 @@ def main():
 
     log_section("RESUMO DA COMPROVAÇÃO DE PORTS NO macOS")
     print(f"  1. Desacoplamento macOS vs Linux: {Colors.GREEN}PASSOU (Filtro por has_macos_build){Colors.RESET}" if t1 else f"  1: {Colors.RED}FALHOU{Colors.RESET}")
-    print(f"  2. Disponibilidade no GitHub:     {Colors.GREEN}PASSOU (18 ports com builds macOS confirmados){Colors.RESET}" if t2 else f"  2: {Colors.RED}FALHOU{Colors.RESET}")
+    print(f"  2. Disponibilidade no GitHub:     {Colors.GREEN}PASSOU (amostra das releases com build macOS confirmada){Colors.RESET}" if t2 else f"  2: {Colors.RED}FALHOU{Colors.RESET}")
     print(f"  3. Pipeline de Instalação e Exec: {Colors.GREEN}PASSOU (Universal Binary / ARM64 comprovado){Colors.RESET}" if t3 else f"  3: {Colors.RED}FALHOU{Colors.RESET}")
 
     if t1 and t2 and t3:
