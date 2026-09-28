@@ -375,6 +375,16 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .iso_dirs = { "GameCube", "GC" },
           .iso_disc_id = "GALE01", .iso_disc_rev = 2,
           .iso_disc_label = "MELEE NTSC 1.02" },
+        // PSP static recomp of Monster Hunter Portable 3rd HD Ver. (Vulkan,
+        // SDL3, MIT). Releases ship Windows zip, Linux tar.gz (+ a Flatpak
+        // the picker skips), macOS .dmg and an Android .apk, next to an
+        // ffmpeg source tarball. No ROM handling here: the game's own
+        // first-run setup asks for the NPJB-40001 image, checks it and
+        // prepares the executable itself, gamepad-friendly.
+        { .id = "Yakumo", .display_name = "Monster Hunter Portable 3rd (Yakumo)",
+          .repo = "TeamGDB/Yakumo", .exe_hint = "Yakumo.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = true, .has_macos_build = true },
     };
     return defs;
 }
@@ -866,11 +876,19 @@ static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
         if (is_archive(n) && IsLinuxAssetName(n) && !LooksLikeCompanionTool(n)) matches.push_back(a);
     }
     if (!matches.empty()) {
+        // A name that says "linux" beats one that only matched by being a
+        // bare tarball: a release can carry a third-party source archive next
+        // to the game (Yakumo ships ffmpeg-7.1.5.tar.xz before its
+        // yakumo-...-linux-x86_64.tar.gz), and first-in-list used to win.
+        // Architecture still decides first.
+        auto rank = [](const std::string& n) {
+            return ArchPreferenceRank(n) * 100 + (n.find("linux") != std::string::npos ? 0 : 10);
+        };
         const GhAsset* best = &matches.front();
-        int best_rank = ArchPreferenceRank(ToLowerStr(best->name));
+        int best_rank = rank(ToLowerStr(best->name));
         for (const auto& a : matches) {
-            int rank = ArchPreferenceRank(ToLowerStr(a.name));
-            if (rank < best_rank) { best = &a; best_rank = rank; }
+            int r = rank(ToLowerStr(a.name));
+            if (r < best_rank) { best = &a; best_rank = r; }
             if (best_rank == 0) break;
         }
         return *best;

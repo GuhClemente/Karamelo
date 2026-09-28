@@ -373,14 +373,15 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 27/09/2026:** são **56** jogos de "Ports & Recomp" — 42 até
+**Atualizado em 27/09/2026:** são **57** jogos de "Ports & Recomp" — 42 até
 11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
 F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
 Soulcalibur II / Ring Out — ver seção 16), +1 em 27/09 (Super Smash Bros. Melee /
-Melee Unlocked — ver seção 18). The Darkness (Xbox 360) chegou a ser anunciado
+Melee Unlocked — ver seção 18), +1 em 27/09 (Monster Hunter Portable 3rd /
+Yakumo — ver seção 20). The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
-nenhum número antigo (39, 40, 41, 42, 47, 55, 57) de outra página no futuro. É coincidência
+nenhum número antigo (39, 40, 41, 42, 47, 55, 56) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -475,8 +476,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **56** jogos de Ports & Recomp (atualizado em 27/09/2026 — ver seções
-  10, 11, 13, 15, 16, 18 e 19),
+- Os **57** jogos de Ports & Recomp (atualizado em 27/09/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19 e 20),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -562,7 +563,7 @@ suporta** — 🪟 para Windows, 🐧 para Linux, 🍎 para macOS (Apple Silicon
 Universal). A fonte de verdade agora é a própria tabela em
 [CREDITS.md](../CREDITS.md), que traz a coluna **SO** com esses três ícones,
 verificada em 21/09/2026 contra a release mais recente de cada um dos 55
-repositórios daquela data (+ Melee Unlocked, verificado em 27/09/2026). Leia de lá — não estime, não invente.
+repositórios daquela data (+ Melee Unlocked e Yakumo, verificados em 27/09/2026). Leia de lá — não estime, não invente.
 
 ### O que "SO" significa aqui
 
@@ -570,11 +571,11 @@ repositórios daquela data (+ Melee Unlocked, verificado em 27/09/2026). Leia de
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 56 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 32 ports.
+- No **Windows**: todos os 57 ports possuem builds executáveis (.exe).
+- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 33 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
-  (montadas e extraídas transparentemente via `hdiutil`). Hoje 24 ports possuem
+  (montadas e extraídas transparentemente via `hdiutil`). Hoje 25 ports possuem
   releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
@@ -582,9 +583,9 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 56 jogos.
-   - **Filtro Linux (🐧)**: 32 jogos.
-   - **Filtro macOS (🍎)**: 24 jogos.
+   - **Filtro Windows (🪟)**: 57 jogos.
+   - **Filtro Linux (🐧)**: 33 jogos.
+   - **Filtro macOS (🍎)**: 25 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
@@ -594,12 +595,13 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (19 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (20 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Banjo 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
   Infinite Mario 64, Valkyrie Profile, Super Mario Strikers, Super Metroid,
-  Diablo (DevilutionX), Fallout (Community Edition).
+  Diablo (DevilutionX), Fallout (Community Edition),
+  Monster Hunter Portable 3rd (Yakumo) — adicionado em 27/09/2026, ver seção 20.
 - **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
 - **🪟🐧 (13 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
@@ -658,7 +660,7 @@ O Karamelo agora possui compilação e suporte nativo completo para **macOS (App
 5. **Ports Recompilados no Mac**: O subsistema de PC Ports (`port_runner.cpp`) possui suporte a macOS completo:
    - Seletor com prioridade: **ARM64 nativo > Universal Binary (`x86_64 + arm64`) > x86_64**.
    - Extração inteligente de pacotes de ports no formato `.app` (`Contents/MacOS/`) e zips aninhados.
-   - 24 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
+   - 25 ports compatíveis catalogados com o selo 🍎 (ver Seção 12 e `CREDITS.md`).
    - Suporte nativo a imagens `.dmg` através de montagem/desmontagem automática e segura via `hdiutil`, permitindo instalar jogos distribuídos em `.dmg` no macOS (como Diablo/DevilutionX e Fallout 1 CE).
 6. **Detecção no Site**:
    - Recomenda-se detectar o SO do usuário (`MacIntel` com `navigator.maxTouchPoints > 0` ou `navigator.userAgent` contendo `Macintosh`) para destacar o botão **Baixar para macOS (Apple Silicon)** por padrão para usuários Apple.
@@ -793,8 +795,9 @@ Nesta atualização, quatro melhorias significativas de experiência do usuário
 ## 18. Adição de 27/09/2026 — The Darkness (primeiro recompilado de Xbox 360), Melee Unlocked e ISO do jogador lido automaticamente
 
 > ⚠ **Corrigido no mesmo dia — leia a seção 19 antes desta.** The Darkness
-> foi retirado do menu e **não deve ir para o site**. Valem os números da
-> seção 19 (**56** / Windows **56**), não os 57 abaixo. A "Entrada 1" e o
+> foi retirado do menu e **não deve ir para o site**. Os números atuais
+> estão na seção 20 (**57**: Windows 57, Linux 33, macOS 25, já com o Yakumo),
+> não os desta seção. A "Entrada 1" e o
 > item 3 de "O que mudar no site" ficam só como registro — não publicar.
 
 O catálogo de "Ports & Recomp" ia de 55 para **57 títulos** (57 Windows 🪟,
@@ -882,8 +885,8 @@ Texto curto sugerido para o card/modal (pt-BR):
 
 ### O que mudar no site
 
-1. Contagens: **56** jogos em Ports & Recomp (seções 9.3/9.9), filtro
-   **Windows = 56**, Linux = 32, macOS = 24 (seção 12).
+1. Contagens: ~~56 / Windows 56, Linux 32, macOS 24~~ — superado: use os
+   números da seção 20.
 2. Lista "🪟 apenas" da seção 12: agora **19 jogos**, com
    Super Smash Bros. Melee (Melee Unlocked). Sem The Darkness.
 3. ~~Se houver página~~ **Não publicar enquanto The Darkness estiver fora
@@ -909,8 +912,9 @@ O que fazer no site:
 
 1. **Tirar o card/modal/linha do The Darkness** da lista de Ports & Recomp,
    inclusive qualquer destaque de "primeiro jogo de Xbox 360".
-2. **Contagens:** **56** jogos em Ports & Recomp; filtro **Windows = 56**,
-   Linux = 32, macOS = 24. Lista "🪟 apenas": **19 jogos**.
+2. **Contagens:** sem o The Darkness, **56** jogos (Windows 56, Linux 32,
+   macOS 24) — e, com o Yakumo da seção 20, **57** (Windows **57**, Linux
+   **33**, macOS **25**). Lista "🪟 apenas": **19 jogos**.
 3. **Não mencionar** `roms/Xbox360/`, ISO de Xbox 360, XexTool nem Xbox 360
    Image Browser em nenhuma página (FAQ, "como adicionar jogos", pastas de ROM).
 4. Melee Unlocked continua — só o The Darkness sai.
@@ -920,3 +924,51 @@ O código e a documentação técnica continuam no repositório
 ([docs/XBOX360_RECOMP.md](XBOX360_RECOMP.md)); quando ele voltar, uma nova
 seção aqui vai dizer. Até lá, a regra é simples: **The Darkness não existe no
 site.**
+
+---
+
+## 20. Adição de 27/09/2026 — Monster Hunter Portable 3rd (Yakumo), primeiro recompilado de PSP
+
+O catálogo de "Ports & Recomp" vai de 56 para **57 títulos**. Novos totais,
+conferidos contra o `CREDITS.md`: **57 Windows 🪟, 33 Linux 🐧, 25 macOS 🍎**
+— o Yakumo publica build para os três. Na lista "rodam em todos" (seção 12)
+são agora **20 jogos**.
+
+### A entrada
+
+- **Monster Hunter Portable 3rd (Yakumo)** — [TeamGDB/Yakumo](https://github.com/TeamGDB/Yakumo) — 🪟🐧🍎.
+- Recompilação estática do Monster Hunter Portable 3rd HD Ver. (PSP) para
+  C++, rodando sobre uma reimplementação do sistema do PSP; gráficos Vulkan,
+  SDL3. **Não é emulação.** Licença MIT.
+- É o **primeiro jogo de PSP** da lista de Ports & Recomp — vale destaque se o
+  site agrupar por console de origem.
+- Estado: o próprio projeto diz "jogável" (vila, caçadas, saves, música,
+  vídeos, multiplayer ad hoc), mas as versões são *alpha* e saem quase todo
+  dia. Descreva como **alpha / em desenvolvimento**, nunca como "completo".
+- Download de ~220 MB, feito pelo Karamelo na primeira abertura.
+
+### O que o jogador precisa saber (use no card/modal)
+
+- **Jogo em japonês.** Não existe versão ocidental do MHP3rd.
+- **Precisa do ISO original `NPJB-40001`** — o ISO de PSP que vem dentro da
+  versão HD do PS3. ISO de UMD de PSP comum, `.cso` ou imagem modificada são
+  recusados pelo próprio jogo, com uma tela explicando o motivo.
+- Na primeira abertura, o **próprio Yakumo** mostra uma tela para escolher o
+  ISO (funciona com controle), confere e prepara o jogo. Depois abre direto.
+- Pacotes de textura HD no formato do PPSSPP funcionam.
+
+Texto curto sugerido para o card/modal (pt-BR):
+
+> **Monster Hunter Portable 3rd — Yakumo** *(PSP · alpha)* — recompilação
+> nativa para PC com Vulkan, taxa de quadros destravada e multiplayer. Em
+> japonês. Na primeira abertura, escolha o ISO `NPJB-40001` do seu jogo.
+> Windows, Linux e macOS.
+
+### O que mudar no site
+
+1. Contagens: **57** jogos em Ports & Recomp; filtro **Windows = 57**,
+   **Linux = 33**, **macOS = 25** (seção 12).
+2. Lista "rodam em todos" (🪟🐧🍎) da seção 12: **20 jogos**, com o Yakumo.
+3. Sistemas (**35**) e motores (**40**) não mudam — o Yakumo não é um core.
+4. **The Darkness continua fora** (seção 19). Não confundir: o número subiu
+   por causa do Yakumo, não pela volta do The Darkness.

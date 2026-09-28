@@ -174,10 +174,12 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 | Super Smash Bros. Melee (Melee Unlocked) | 🪟 | [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) |
+| Monster Hunter Portable 3rd (Yakumo) | 🪟🐧🍎 | [TeamGDB/Yakumo](https://github.com/TeamGDB/Yakumo) |
 
-**32 de 56 têm build Linux** e **24 de 56 têm build macOS** (Apple Silicon /
+**33 de 57 têm build Linux** e **25 de 57 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
-repositório (Melee Unlocked, adicionado em 27/09/2026, só publica Windows). Os outros publicam build utilizável apenas no Windows por este
+repositório (Melee Unlocked, adicionado em 27/09/2026, só publica Windows;
+Yakumo, adicionado em 27/09/2026, publica os três). Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -202,6 +204,19 @@ e só usa o que for `GALE01` revisão 2 — então ISOs 1.00, Training Mode ou
 20XX na mesma pasta são ignorados, e se só houver esses o aviso diz que o
 disco é o errado. O ISO é lido no lugar, não copiado. Jogo online exige conta
 Slippi (logada uma vez pelo Slippi Launcher); offline não.
+
+E um detalhe da linha do Yakumo: é o **Monster Hunter Portable 3rd HD Ver.**
+(PSP) recompilado estaticamente para C++ (PSPRecomp, Vulkan + SDL3, licença
+MIT), o primeiro recompilado de **PSP** da tabela. O jogo é **em japonês** e
+só aceita a imagem original `NPJB-40001` — o ISO de PSP que vem dentro da
+versão HD do PS3; um ISO de UMD comum (ULJM), comprimido (`.cso`) ou
+modificado é recusado. O Karamelo não mexe no ISO: na primeira abertura o
+próprio Yakumo mostra uma tela de setup (funciona com controle) para escolher
+a imagem, confere e prepara o jogo. O pacote tem ~220 MB e o projeto está em
+*alpha* (v0.6.0-alpha.4 em 24/09/2026), com releases quase diárias.
+Conferido em 27/09/2026: instalação pelo Karamelo no Windows (abre em Vulkan
+na tela de setup) e no Linux (pacote certo, binário sem biblioteca faltando);
+macOS pelo `.dmg`, ainda não testado num Mac.
 
 E um detalhe da linha do Wave Race 64: o projeto se descreve como "em beta" e
 o pacote baixado é bem maior que o normal desta tabela (~390 MB, contra
