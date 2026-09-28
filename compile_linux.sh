@@ -28,8 +28,14 @@ if [ ! -f "build/sdl3_linux/libSDL3.a" ]; then
         -DSDL_SHARED=OFF \
         -DSDL_TEST_LIBRARY=OFF \
         -DSDL_EXAMPLES=OFF \
+        -DSDL_WAYLAND=OFF \
         -DSDL_DISABLE_INSTALL=ON \
         -DSDL_DISABLE_INSTALL_DOCS=ON
+    # SDL_WAYLAND=OFF: third_party/SDL3 does not carry SDL's wayland-protocols/
+    # XML files, so on a machine that has libwayland-dev installed the build
+    # stopped on missing *-client-protocol.h. Every release so far was X11-only
+    # anyway (runs on Wayland desktops through XWayland); this keeps it that
+    # way no matter which -dev packages the build machine happens to have.
     cmake --build build/sdl3_linux --config Release -j$(nproc)
 fi
 
