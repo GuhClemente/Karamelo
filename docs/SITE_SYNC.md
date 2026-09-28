@@ -949,10 +949,14 @@ são agora **20 jogos**.
 
 ### O que o jogador precisa saber (use no card/modal)
 
-- **Jogo em japonês.** Não existe versão ocidental do MHP3rd.
-- **Precisa do ISO original `NPJB-40001`** — o ISO de PSP que vem dentro da
-  versão HD do PS3. ISO de UMD de PSP comum, `.cso` ou imagem modificada são
-  recusados pelo próprio jogo, com uma tela explicando o motivo.
+- **Oficialmente em japonês** — o MHP3rd nunca saiu fora do Japão. Existe
+  tradução para inglês feita por fãs, que funciona no Yakumo (o README do
+  projeto cita o jogo com esse patch). O site pode mencionar que ela existe,
+  mas **não deve linkar nem distribuir** o patch ou ISOs.
+- **Precisa do ISO `NPJB-40001`** — o ISO de PSP que vem dentro da versão HD
+  do PS3. O Yakumo confere o código do disco e o executável: ISO de UMD de PSP
+  comum (ULJM), `.cso` ou executável alterado são recusados, com uma tela
+  explicando o motivo; um patch que só troca textos (como a tradução) passa.
 - Na primeira abertura, o **próprio Yakumo** mostra uma tela para escolher o
   ISO (funciona com controle), confere e prepara o jogo. Depois abre direto.
 - Pacotes de textura HD no formato do PPSSPP funcionam.
@@ -961,7 +965,8 @@ Texto curto sugerido para o card/modal (pt-BR):
 
 > **Monster Hunter Portable 3rd — Yakumo** *(PSP · alpha)* — recompilação
 > nativa para PC com Vulkan, taxa de quadros destravada e multiplayer. Em
-> japonês. Na primeira abertura, escolha o ISO `NPJB-40001` do seu jogo.
+> japonês (há tradução em inglês feita por fãs). Na primeira abertura,
+> escolha o ISO `NPJB-40001` do seu jogo.
 > Windows, Linux e macOS.
 
 ### O que mudar no site

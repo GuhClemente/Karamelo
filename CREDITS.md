@@ -207,10 +207,13 @@ Slippi (logada uma vez pelo Slippi Launcher); offline não.
 
 E um detalhe da linha do Yakumo: é o **Monster Hunter Portable 3rd HD Ver.**
 (PSP) recompilado estaticamente para C++ (PSPRecomp, Vulkan + SDL3, licença
-MIT), o primeiro recompilado de **PSP** da tabela. O jogo é **em japonês** e
-só aceita a imagem original `NPJB-40001` — o ISO de PSP que vem dentro da
-versão HD do PS3; um ISO de UMD comum (ULJM), comprimido (`.cso`) ou
-modificado é recusado. O Karamelo não mexe no ISO: na primeira abertura o
+MIT), o primeiro recompilado de **PSP** da tabela. O jogo nunca saiu
+oficialmente fora do Japão, então a versão oficial é **em japonês**; existe
+tradução para inglês feita por fãs, e o próprio README do Yakumo cita o jogo
+com esse patch. O Yakumo só aceita a imagem `NPJB-40001` — o ISO de PSP que
+vem dentro da versão HD do PS3 — e confere o código do disco e o executável
+criptografado: um patch que só troca textos passa; um ISO de UMD comum
+(ULJM), comprimido (`.cso`) ou com o executável alterado é recusado. O Karamelo não mexe no ISO: na primeira abertura o
 próprio Yakumo mostra uma tela de setup (funciona com controle) para escolher
 a imagem, confere e prepara o jogo. O pacote tem ~220 MB e o projeto está em
 *alpha* (v0.6.0-alpha.4 em 24/09/2026), com releases quase diárias.
