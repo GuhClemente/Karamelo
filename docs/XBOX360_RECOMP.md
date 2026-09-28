@@ -4,11 +4,37 @@ Primeiro caso: **The Darkness** — [portingpete/The-Darkness-Recomp](https://gi
 (GPL-3.0, feito sobre o XenonRecomp). Id no Karamelo: `TheDarknessRecomp`.
 Só Windows x64 (é o único build que o projeto publica).
 
+> **Status em 27/09/2026: oculto.** O pipeline foi validado com um disco real
+> (Title ID `545407EE`, Media ID `0F213645`, versão 1) e o jogo abre, mas o
+> runtime do projeto ainda está instável demais para oferecer. A entrada
+> continua em `src/port_runner.cpp` com `hidden = true`: **não aparece no menu
+> Ports & Recomp, não entra em nenhuma contagem e não vai para o site**
+> (`docs/SITE_SYNC.md`, seção 19). Para testar, pela linha de comando, dentro de `app/`:
+>
+> ```
+> Karamelo.exe --prepare-port TheDarknessRecomp
+> ```
+>
+> Isso baixa o port, extrai o ISO e gera os arquivos. Depois, rode
+> `ports\TheDarknessRecomp\Launch.cmd`. Para liberar no menu:
+>
+> 1. tirar o `.hidden = true` da entrada em `src/port_runner.cpp`;
+> 2. somar 1 às contagens (Windows) em `CREDITS.md`, `CLAUDE.md`, `AGENTS.md`,
+>    `README.md` e `SITE_SYNC.md` (nova seção dizendo que voltou), e devolver
+>    a linha à tabela principal do `CREDITS.md`;
+> 3. voltar o guia `packaging/hidden-ports/Xbox360/LEIA-ME.txt` e a criação de
+>    `roms\Xbox360` no `package_release.bat` (no Linux/macOS o port não existe:
+>    se o guia voltar para `packaging/rom-folder-guides/`, os scripts de lá
+>    precisam pular essa pasta).
+>
+> As instruções abaixo valem para quando ele voltar ao menu.
+
 ## Para o jogador
 
 1. Coloque o `.iso` do **seu** disco em `roms/Xbox360/`. O nome do arquivo
    precisa conter `darkness` (ex.: `The Darkness (USA).iso`).
-2. No menu **Ports & Recomp**, abra **The Darkness**.
+2. No menu **Ports & Recomp**, abra **The Darkness** (enquanto estiver oculto,
+   use o `--prepare-port` acima).
 3. Na primeira vez o Karamelo baixa o port (~43 MB), extrai o ISO (vários GB,
    alguns minutos, com porcentagem na tela) e gera os arquivos do jogo. Das
    próximas vezes abre direto.
@@ -67,17 +93,29 @@ download de ports, antes do launch.
    libmspack (`third_party/libmspack/`, o mesmo que o Xenia usa). AES e SHA-256
    vêm do BCrypt do Windows.
 3. **Saídas** — `basefile.exe` (equivalente a `xextool -b`: a imagem de
-   memória, arquivo = RVA) e `_uncrypted.xex` (equivalente a
-   `xextool -e u -c u`: os mesmos cabeçalhos com o payload em claro).
+   memória inteira, arquivo = RVA) e `_uncrypted.xex` (equivalente a
+   `xextool -e u -c u`). O `_uncrypted.xex` não é "o mesmo cabeçalho com o
+   payload em claro": o XexTool **reconstrói o cabeçalho inteiro** a cada
+   gravação — entradas opcionais em ordem de chave, security info movida para
+   `0x18 + n*8 + 0x80`, blobs empacotados logo depois dela, import libraries
+   encostadas no início do payload (alinhado em 4 KiB), *header digest*
+   (SHA-1) recalculado e assinatura RSA zerada (não há chave privada retail).
+   `-c u` é compressão *basic* (sem os trechos zerados): um XEX que já é
+   *basic*, como o do The Darkness, mantém os próprios blocos; um XEX LZX é
+   recortado em grânulos de 32 KiB. Esse layout foi portado do
+   [XexTool-RE](https://github.com/RexxColder/XexTool-RE) (MIT), uma
+   reimplementação *clean-room* do XexTool 6.3 verificada byte a byte contra o
+   original. Conferido em 27/09/2026 com um dump real (Title ID `545407EE`,
+   Media ID `0F213645`, versão 1): os dois hashes batem.
 4. **Portão de hash.** O runtime do port recusa qualquer `basefile.exe` ou
    `_uncrypted.xex` cujo SHA-256 não seja o da geração AOT. Em vez de uma
    tabela fixa no Karamelo (que ficaria velha na próxima release), os hashes
    aceitos são lidos **do próprio `DarkRecomp.exe` instalado**, que os embute
    como texto hexadecimal (confirmado na v0.1.2: `a7ccd878…d535e` para o
-   `.xex` e `180b7fc8…2d049` para o `basefile.exe`). Como o corte de zeros no
-   fim e a regravação do cabeçalho do XexTool não são documentados, o
-   Karamelo gera as poucas variantes plausíveis e fica com a que bate. Nada
-   que não bata é gravado.
+   `.xex` e `180b7fc8…2d049` para o `basefile.exe`). As poucas escolhas que
+   o layout deixa em aberto (blocos originais ou recortados, payload com ou
+   sem preenchimento) são todas geradas e fica a que bate. Nada que não bata
+   é gravado; o log mostra o hash gerado para comparação.
 5. **Fallback opcional.** Se a geração nativa não bater e houver um
    `xextool.exe` do próprio usuário (em `Darkness/`, na pasta do port ou em
    `tools/`), ele é executado com os mesmos argumentos do README do projeto e

@@ -78,11 +78,9 @@ for %%S in (
     mkdir "%ROMS_DIR%\%%S"
     copy /Y "%~dp0packaging\rom-folder-guides\%%S\LEIA-ME.txt" "%ROMS_DIR%\%%S\LEIA-ME.txt" >nul 2>&1
 )
-rem Xbox360 is not one of the 35 systems (no core reads it): it is where the
-rem user drops their own disc image for the Xbox 360 recomps in "Ports &
-rem Recomp" - port_runner.cpp's FindX360Iso() looks here first.
-mkdir "%ROMS_DIR%\Xbox360"
-copy /Y "%~dp0packaging\rom-folder-guides\Xbox360\LEIA-ME.txt" "%ROMS_DIR%\Xbox360\LEIA-ME.txt" >nul 2>&1
+rem No roms\Xbox360 folder while The Darkness (the only Xbox 360 recomp) is
+rem hidden from the menu - its guide waits in packaging\hidden-ports\Xbox360\.
+rem See docs\XBOX360_RECOMP.md for what to restore when it comes back.
 
 rem 3. Copy binaries and assets (Engines and wallpapers only - NO ROMs or BIOSes)
 echo.

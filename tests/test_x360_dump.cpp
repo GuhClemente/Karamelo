@@ -106,6 +106,7 @@ std::vector<uint8_t> MakeXexHeader(uint16_t enc, uint16_t comp, uint32_t info_si
     PutBe32(x, 0x20, 0x40006); PutBe32(x, 0x24, 0x60);
     PutBe32(x, 0x60, 0x0F213645); PutBe32(x, 0x64, 1); PutBe32(x, 0x6C, 0x545407EE);
     PutBe32(x, 0x80, info_size); PutBe16(x, 0x84, enc); PutBe16(x, 0x86, comp);
+    PutBe32(x, 0x100, 0x184);                 // security info size, no page descriptors
     PutBe32(x, 0x100 + 0x004, 0x8000);
     PutBe32(x, 0x100 + 0x110, 0x82000000);
     return x;
@@ -119,6 +120,18 @@ void Encrypt(std::vector<uint8_t>& xex) {
     AesEncrypt(kRetail, false, wrapped, 16);
     memcpy(&xex[0x100 + 0x150], wrapped, 16);
     AesEncrypt(session, true, xex.data() + 0x1000, xex.size() - 0x1000);
+}
+
+void Sha1(const uint8_t* a, size_t an, const uint8_t* b, size_t bn, uint8_t out[20]) {
+    BCRYPT_ALG_HANDLE alg = nullptr;
+    BCRYPT_HASH_HANDLE h = nullptr;
+    BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA1_ALGORITHM, nullptr, 0);
+    BCryptCreateHash(alg, &h, nullptr, 0, nullptr, 0, 0);
+    BCryptHashData(h, const_cast<PUCHAR>(a), ULONG(an), 0);
+    BCryptHashData(h, const_cast<PUCHAR>(b), ULONG(bn), 0);
+    BCryptFinishHash(h, out, 20, 0);
+    BCryptDestroyHash(h);
+    BCryptCloseAlgorithmProvider(alg, 0);
 }
 
 } // namespace
@@ -215,13 +228,24 @@ TEST_CASE(X360RecompInputsDigestGate)
     Encrypt(xex);
 
     // Expected outputs: basefile trimmed to 0x6000 (the last data byte is
-    // at 0x5FFF); _uncrypted = header with an 8-byte "none/none" info and
-    // the whole image as payload.
+    // at 0x5FFF); _uncrypted = XexTool's rebuilt header - security info
+    // moved to 0x18 + 2*8 + 0x80 = 0xA8, blobs packed in key order after it
+    // (format info at 0x22C keeping the file's own basic runs, unencrypted;
+    // execution info at 0x23C), payload at 0x1000, signature zeroed, header
+    // digest recomputed - and only the data run stored, in the clear.
     std::vector<uint8_t> want_base(image.begin(), image.begin() + 0x6000);
-    std::vector<uint8_t> want_xex(xex.begin(), xex.begin() + 0x1000);
-    memset(&want_xex[0x80], 0, 16);
-    PutBe32(want_xex, 0x80, 8);
-    want_xex.insert(want_xex.end(), image.begin(), image.end());
+    std::vector<uint8_t> want_xex(0x1000, 0);
+    memcpy(&want_xex[0], &xex[0], 0x18);
+    PutBe32(want_xex, 0x08, 0x1000);
+    PutBe32(want_xex, 0x10, 0xA8);
+    PutBe32(want_xex, 0x18, 0x3FF);   PutBe32(want_xex, 0x1C, 0x22C);
+    PutBe32(want_xex, 0x20, 0x40006); PutBe32(want_xex, 0x24, 0x23C);
+    memcpy(&want_xex[0xA8], &xex[0x100], 0x184);
+    PutBe32(want_xex, 0x22C, 16); PutBe16(want_xex, 0x230, 0); PutBe16(want_xex, 0x232, 1);
+    PutBe32(want_xex, 0x234, 0x6000); PutBe32(want_xex, 0x238, 0x2000);
+    memcpy(&want_xex[0x23C], &xex[0x60], 24);
+    Sha1(&want_xex[0xA8 + 0x17C], 0x1000 - (0xA8 + 0x17C), &want_xex[0], 0xA8 + 8, &want_xex[0xA8 + 0x164]);
+    want_xex.insert(want_xex.end(), image.begin(), image.begin() + 0x6000);
 
     std::vector<std::string> accepted = {
         x360::Sha256Hex(want_base.data(), want_base.size()),

@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <bcrypt.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -49,23 +50,23 @@ static std::string Hex(const uint8_t* d, size_t n) {
 }
 
 // -------------------------------------------------------------
-// BCrypt: SHA-256 (incremental, duplicable) and AES-128
+// BCrypt: SHA-256 / SHA-1 (incremental, duplicable) and AES-128
 // -------------------------------------------------------------
 
 namespace {
 
-struct Sha256 {
+struct Hasher {
     BCRYPT_ALG_HANDLE alg = nullptr;
     BCRYPT_HASH_HANDLE h = nullptr;
     bool ok = false;
 
-    Sha256() {
-        if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0) return;
+    explicit Hasher(LPCWSTR algorithm = BCRYPT_SHA256_ALGORITHM) {
+        if (BCryptOpenAlgorithmProvider(&alg, algorithm, nullptr, 0) < 0) return;
         ok = BCryptCreateHash(alg, &h, nullptr, 0, nullptr, 0, 0) >= 0;
     }
-    Sha256(const Sha256&) = delete;
-    Sha256& operator=(const Sha256&) = delete;
-    ~Sha256() {
+    Hasher(const Hasher&) = delete;
+    Hasher& operator=(const Hasher&) = delete;
+    ~Hasher() {
         if (h) BCryptDestroyHash(h);
         if (alg) BCryptCloseAlgorithmProvider(alg, 0);
     }
@@ -92,6 +93,7 @@ struct Sha256 {
         BCryptDestroyHash(dup);
         return fin ? Hex(out, 32) : "";
     }
+    bool Finish(uint8_t* out, ULONG n) { return ok && BCryptFinishHash(h, out, n, 0) >= 0; }
 };
 
 bool AesDecrypt(const uint8_t key[16], bool cbc, uint8_t* data, size_t size) {
@@ -125,7 +127,7 @@ bool AesDecrypt(const uint8_t key[16], bool cbc, uint8_t* data, size_t size) {
 } // namespace
 
 std::string Sha256Hex(const uint8_t* data, size_t size) {
-    Sha256 s;
+    Hasher s;
     s.Update(data, size);
     return s.PeekHex();
 }
@@ -564,6 +566,144 @@ std::vector<size_t> LengthCandidates(const std::vector<uint8_t>& image, size_t p
     return std::vector<size_t>(s.begin(), s.end());
 }
 
+// --- _uncrypted.xex exactly as XexTool 6.3 writes it -----------------------
+// The layout below was reverse-engineered by XexTool-RE (github.com/RexxColder/
+// XexTool-RE, MIT, (c) 2026 Logan Greer and contributors), a clean-room rebuild
+// verified byte-identical against xorloser's binary; this is a port of its
+// -c u path (convert.cpp: decompress_to_basic / build_header / devkit_sign)
+// trimmed to what a retail disc needs. Checked against The Darkness: it
+// reproduces the digest DarkRecomp.exe expects.
+
+constexpr uint32_t kHeaderImportLibraries = 0x000103FF;
+constexpr uint32_t kGranule = 0x8000;
+
+struct Run { uint32_t data, zero; };
+
+// "-c u" of an LZX-compressed (or plain) file: xextool cuts the image into
+// 32 KiB granules and every all-zero granule joins a zero run. A tail shorter
+// than a granule is data, folded into the last run only if that run has no
+// zero part (it would otherwise sit after those zeros).
+std::vector<Run> GranuleRuns(const std::vector<uint8_t>& image) {
+    std::vector<Run> runs;
+    const size_t ng = image.size() / kGranule;
+    auto zero_granule = [&](size_t g) {
+        const uint8_t* p = image.data() + g * kGranule;
+        for (size_t k = 0; k < kGranule; ++k) if (p[k]) return false;
+        return true;
+    };
+    for (size_t g = 0; g < ng;) {
+        size_t d = 0, z = 0;
+        while (g < ng && !zero_granule(g)) { ++d; ++g; }
+        while (g < ng && zero_granule(g)) { ++z; ++g; }
+        if (d || z) runs.push_back({ uint32_t(d * kGranule), uint32_t(z * kGranule) });
+    }
+    if (runs.empty()) runs.push_back({ uint32_t(image.size()), 0 });
+    size_t tail = image.size() - ng * kGranule;
+    if (tail) {
+        if (runs.back().zero == 0) runs.back().data += uint32_t(tail);
+        else runs.push_back({ uint32_t(tail), 0 });
+    }
+    return runs;
+}
+
+// A file that is already "basic" keeps its own runs - that is what The
+// Darkness's digest shows: xextool only decrypted the payload.
+std::vector<Run> OriginalRuns(const std::vector<uint8_t>& xex, const XexInfo& info) {
+    std::vector<Run> runs;
+    const uint8_t* fmt = xex.data() + info.format_info_offset;
+    uint64_t covered = 0;
+    for (uint32_t i = 0; i < (info.format_info_size - 8) / 8; ++i) {
+        Run r{ Be32(fmt + 8 + i * 8), Be32(fmt + 12 + i * 8) };
+        covered += uint64_t(r.data) + r.zero;
+        runs.push_back(r);
+    }
+    if (covered > info.image_size) runs.clear();
+    return runs;
+}
+
+// XexTool rebuilds the whole header on every write: optional-header entries
+// sorted by key; the security info moved to 0x18 + count*8 + 0x80; every
+// data blob packed in key order right after it, except the import libraries,
+// which sit flush against a 4 KiB-aligned payload offset. It then recomputes
+// the header digest and, having no retail private key, zeroes the signature.
+// The per-file AES key is left as it was.
+bool XexToolUncrypted(const std::vector<uint8_t>& xex, const XexInfo& info,
+                      const std::vector<uint8_t>& image, const std::vector<Run>& runs,
+                      bool pad_payload, std::vector<uint8_t>& out) {
+    struct Entry { uint32_t key, val; std::vector<uint8_t> body; };
+    const uint32_t count = Be32(&xex[0x14]);
+    std::vector<Entry> ents;
+    for (uint32_t j = 0; j < count; ++j) {
+        Entry e{ Be32(&xex[0x18 + j * 8]), Be32(&xex[0x1C + j * 8]), {} };
+        const uint32_t lo = e.key & 0xFF;
+        if (e.key == kHeaderFileFormat) {
+            e.body.assign(8 + runs.size() * 8, 0);
+            PutBe32(e.body.data(), uint32_t(e.body.size()));
+            PutBe16(e.body.data() + 4, 0);   // not encrypted
+            PutBe16(e.body.data() + 6, 1);   // basic
+            for (size_t r = 0; r < runs.size(); ++r) {
+                PutBe32(e.body.data() + 8 + r * 8, runs[r].data);
+                PutBe32(e.body.data() + 12 + r * 8, runs[r].zero);
+            }
+        } else if (lo > 1 && e.val && uint64_t(e.val) + 4 <= info.header_size) {
+            // Low byte 0/1: the value itself is the data. 0xFF: the blob
+            // leads with its own size. Otherwise: that many dwords.
+            uint32_t sz = lo == 0xFF ? Be32(&xex[e.val]) : lo * 4;
+            if (!sz || uint64_t(e.val) + sz > info.header_size) return false;
+            e.body.assign(xex.begin() + e.val, xex.begin() + e.val + sz);
+        }
+        ents.push_back(std::move(e));
+    }
+    std::stable_sort(ents.begin(), ents.end(), [](const Entry& a, const Entry& b) { return a.key < b.key; });
+
+    const uint32_t old_sec = info.security_offset;
+    const uint32_t sec_size = Be32(&xex[old_sec]);
+    if (sec_size < 0x184 || uint64_t(old_sec) + sec_size > info.header_size) return false;
+    const uint32_t sec = 0x18 + count * 8 + 0x80;
+    uint32_t pos = sec + sec_size, import_size = 0;
+    for (Entry& e : ents) {
+        if (e.body.empty()) continue;
+        if (e.key == kHeaderImportLibraries) { import_size = uint32_t(e.body.size()); continue; }
+        e.val = pos;
+        pos += uint32_t(e.body.size());
+    }
+    const uint32_t data_offset = (pos + import_size + 0xFFF) & ~0xFFFu;
+    for (Entry& e : ents)
+        if (e.key == kHeaderImportLibraries && !e.body.empty()) e.val = data_offset - import_size;
+
+    out.assign(data_offset, 0);
+    memcpy(out.data(), xex.data(), 0x18);
+    PutBe32(&out[0x08], data_offset);
+    PutBe32(&out[0x10], sec);
+    PutBe32(&out[0x14], count);
+    memcpy(&out[sec], &xex[old_sec], sec_size);
+    for (uint32_t j = 0; j < count; ++j) {
+        PutBe32(&out[0x18 + j * 8], ents[j].key);
+        PutBe32(&out[0x1C + j * 8], ents[j].val);
+        if (!ents[j].body.empty()) memcpy(&out[ents[j].val], ents[j].body.data(), ents[j].body.size());
+    }
+
+    // Signature at sec+8 (0x100 bytes), then the signed image info; the
+    // header digest at sec+0x164 covers everything after the signed region
+    // up to the payload, then everything before the signature.
+    const uint32_t sig = sec + 8, signed_end = sec + 0x17C;
+    memset(&out[sig], 0, 0x100);
+    Hasher sha1(BCRYPT_SHA1_ALGORITHM);
+    sha1.Update(&out[signed_end], data_offset - signed_end);
+    sha1.Update(out.data(), sig);
+    if (!sha1.Finish(&out[sec + 0x164], 20)) return false;
+
+    // Payload: the data runs only, in the clear.
+    size_t at = 0;
+    for (const Run& r : runs) {
+        if (at + r.data > image.size()) return false;
+        out.insert(out.end(), image.begin() + at, image.begin() + at + r.data);
+        at += size_t(r.data) + r.zero;
+    }
+    if (pad_payload) out.resize(data_offset + ((out.size() - data_offset + kGranule - 1) & ~size_t(kGranule - 1)), 0);
+    return true;
+}
+
 } // namespace
 
 bool X360BuildRecompInputs(const std::vector<uint8_t>& xex,
@@ -588,7 +728,7 @@ bool X360BuildRecompInputs(const std::vector<uint8_t>& xex,
     // --- basefile.exe: a prefix of the image ---
     size_t base_len = 0;
     {
-        Sha256 h;
+        Hasher h;
         size_t fed = 0;
         for (size_t L : lengths) {
             h.Update(image.data() + fed, L - fed);
@@ -599,7 +739,7 @@ bool X360BuildRecompInputs(const std::vector<uint8_t>& xex,
     out_report += " | basefile(imagem inteira)=" + Sha256Hex(image.data(), image.size());
     if (!base_len) { err = "basefile.exe gerado nao confere com esta versao do port"; return false; }
 
-    // --- _uncrypted.xex: original headers with the payload stored plain ---
+    // --- _uncrypted.xex: XexTool's rebuilt header + the payload in the clear ---
     // A file that is already plain is its own answer.
     if (info.encryption_type == 0 && info.compression_type == 0 && Accepted(accepted, Sha256Hex(xex.data(), xex.size()))) {
         out_basefile.assign(image.begin(), image.begin() + base_len);
@@ -607,69 +747,28 @@ bool X360BuildRecompInputs(const std::vector<uint8_t>& xex,
         return true;
     }
 
-    const uint8_t* orig_fmt = xex.data() + info.format_info_offset;
-    // The header rewrite options: compression "none" (8-byte info) or
-    // "basic" with the trailing zeros expressed as one zero run; the bytes
-    // the shorter info no longer uses either zeroed or left as they were;
-    // and the per-file AES key either kept or cleared.
-    for (int comp : { 0, 1 }) {
-        for (int tail : { 0, 1, 2 }) {        // 0 = zero leftovers, 1 = keep leftovers, 2 = keep original info_size
-            for (int clear_key : { 0, 1 }) {
-                auto make_header = [&](size_t L) {
-                    std::vector<uint8_t> hdr(xex.begin(), xex.begin() + info.header_size);
-                    uint8_t* f = hdr.data() + info.format_info_offset;
-                    uint32_t new_size = comp == 0 ? 8u : 16u;
-                    if (new_size > info.format_info_size) new_size = info.format_info_size;
-                    if (tail == 0) memset(f, 0, info.format_info_size);
-                    else if (tail == 2) new_size = info.format_info_size;
-                    else memcpy(f, orig_fmt, info.format_info_size);
-                    PutBe32(f, new_size);
-                    PutBe16(f + 4, 0);
-                    PutBe16(f + 6, uint16_t(comp));
-                    if (comp == 1 && info.format_info_size >= 16) {
-                        PutBe32(f + 8, uint32_t(L));
-                        PutBe32(f + 12, uint32_t(info.image_size - L));
-                    }
-                    if (clear_key) memset(hdr.data() + info.security_offset + kSecAesKey, 0, 16);
-                    return hdr;
-                };
-
-                if (comp == 0) {
-                    std::vector<uint8_t> hdr = make_header(0);
-                    Sha256 h;
-                    h.Update(hdr.data(), hdr.size());
-                    size_t fed = 0;
-                    for (size_t L : lengths) {
-                        h.Update(image.data() + fed, L - fed);
-                        fed = L;
-                        if (Accepted(accepted, h.PeekHex())) {
-                            out_basefile.assign(image.begin(), image.begin() + base_len);
-                            out_uncrypted = hdr;
-                            out_uncrypted.insert(out_uncrypted.end(), image.begin(), image.begin() + L);
-                            return true;
-                        }
-                    }
-                } else {
-                    // The header depends on L here, so each length is its
-                    // own hash - restricted to the few natural cut points.
-                    std::set<size_t> few{ image.size(), produced, base_len };
-                    for (size_t L : few) {
-                        if (!L || L > image.size()) continue;
-                        std::vector<uint8_t> hdr = make_header(L);
-                        Sha256 h;
-                        h.Update(hdr.data(), hdr.size());
-                        h.Update(image.data(), L);
-                        if (Accepted(accepted, h.PeekHex())) {
-                            out_basefile.assign(image.begin(), image.begin() + base_len);
-                            out_uncrypted = hdr;
-                            out_uncrypted.insert(out_uncrypted.end(), image.begin(), image.begin() + L);
-                            return true;
-                        }
-                    }
-                }
+    std::vector<std::vector<Run>> layouts;
+    if (info.compression_type == 1) layouts.push_back(OriginalRuns(xex, info));
+    layouts.push_back(GranuleRuns(image));
+    std::string first_digest;
+    for (const auto& runs : layouts) {
+        if (runs.empty()) continue;
+        uint64_t stored = 0;
+        for (const Run& r : runs) stored += r.data;
+        for (bool pad : { false, true }) {
+            if (pad && stored % kGranule == 0) continue;   // same bytes as unpadded
+            std::vector<uint8_t> candidate;
+            if (!XexToolUncrypted(xex, info, image, runs, pad, candidate)) continue;
+            std::string digest = Sha256Hex(candidate.data(), candidate.size());
+            if (first_digest.empty()) first_digest = digest;
+            if (Accepted(accepted, digest)) {
+                out_basefile.assign(image.begin(), image.begin() + base_len);
+                out_uncrypted = std::move(candidate);
+                return true;
             }
         }
     }
+    out_report += " | _uncrypted=" + (first_digest.empty() ? std::string("(cabecalho invalido)") : first_digest);
     // Keep the basefile anyway - it matched - so a caller falling back to
     // XexTool for the .xex alone still has it.
     out_basefile.assign(image.begin(), image.begin() + base_len);

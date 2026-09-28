@@ -373,13 +373,14 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 27/09/2026:** são **57** jogos de "Ports & Recomp" — 42 até
+**Atualizado em 27/09/2026:** são **56** jogos de "Ports & Recomp" — 42 até
 11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
 F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
-Soulcalibur II / Ring Out — ver seção 16), +2 em 27/09 (The Darkness, Xbox 360,
-e Super Smash Bros. Melee / Melee Unlocked — ver seção 18).
-O número foi conferido contra o `CREDITS.md`, que é sempre a fonte — essa tabela só cresce,
-não copie nenhum número antigo (39, 40, 41, 42, 47, 55, 56) de outra página no futuro. É coincidência
+Soulcalibur II / Ring Out — ver seção 16), +1 em 27/09 (Super Smash Bros. Melee /
+Melee Unlocked — ver seção 18). The Darkness (Xbox 360) chegou a ser anunciado
+em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
+O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
+nenhum número antigo (39, 40, 41, 42, 47, 55, 57) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -474,8 +475,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **57** jogos de Ports & Recomp (atualizado em 27/09/2026 — ver seções
-  10, 11, 13, 15, 16 e 18),
+- Os **56** jogos de Ports & Recomp (atualizado em 27/09/2026 — ver seções
+  10, 11, 13, 15, 16, 18 e 19),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -561,7 +562,7 @@ suporta** — 🪟 para Windows, 🐧 para Linux, 🍎 para macOS (Apple Silicon
 Universal). A fonte de verdade agora é a própria tabela em
 [CREDITS.md](../CREDITS.md), que traz a coluna **SO** com esses três ícones,
 verificada em 21/09/2026 contra a release mais recente de cada um dos 55
-repositórios daquela data (+ The Darkness e Melee Unlocked, verificados em 27/09/2026). Leia de lá — não estime, não invente.
+repositórios daquela data (+ Melee Unlocked, verificado em 27/09/2026). Leia de lá — não estime, não invente.
 
 ### O que "SO" significa aqui
 
@@ -569,7 +570,7 @@ repositórios daquela data (+ The Darkness e Melee Unlocked, verificados em 27/0
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 57 ports possuem builds executáveis (.exe).
+- No **Windows**: todos os 56 ports possuem builds executáveis (.exe).
 - No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 32 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
@@ -581,7 +582,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 57 jogos.
+   - **Filtro Windows (🪟)**: 56 jogos.
    - **Filtro Linux (🐧)**: 32 jogos.
    - **Filtro macOS (🍎)**: 24 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
@@ -605,14 +606,14 @@ Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
   Sonic 3 A.I.R., Super Mario Bros. Remastered, Super Mario World,
   Pokemon Snap, Body Harvest, Diddy Kong Racing, Pokemon Red and Blue (reblue),
   AeroGauge, Crash Bandicoot, Pikmin (Open Nectar), Soulcalibur II (Ring Out).
-- **🪟 apenas (20 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟 apenas (19 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
   Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
   Jak & Daxter, LoD: Severed Chains, Castlevania: SotN, Sonic 1 Forever,
   Sonic Unleashed, Viva Pinata, WipEout Phantom Edition,
-  Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey),
-  The Darkness (Xbox 360) e Super Smash Bros. Melee (Melee Unlocked) —
-  ambos adicionados em 27/09/2026, ver seção 18.
+  Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey) e
+  Super Smash Bros. Melee (Melee Unlocked) — adicionado em 27/09/2026, ver
+  seção 18. (The Darkness **não** entra — ver seção 19.)
 
 ---
 
@@ -791,11 +792,16 @@ Nesta atualização, quatro melhorias significativas de experiência do usuário
 
 ## 18. Adição de 27/09/2026 — The Darkness (primeiro recompilado de Xbox 360), Melee Unlocked e ISO do jogador lido automaticamente
 
-O catálogo de "Ports & Recomp" vai de 55 para **57 títulos**. Novos totais,
-conferidos contra o `CREDITS.md`: **57 Windows 🪟, 32 Linux 🐧, 24 macOS 🍎**
-(Linux e macOS não mudam — os dois projetos só publicam build Windows).
+> ⚠ **Corrigido no mesmo dia — leia a seção 19 antes desta.** The Darkness
+> foi retirado do menu e **não deve ir para o site**. Valem os números da
+> seção 19 (**56** / Windows **56**), não os 57 abaixo. A "Entrada 1" e o
+> item 3 de "O que mudar no site" ficam só como registro — não publicar.
 
-### Entrada 1 — The Darkness
+O catálogo de "Ports & Recomp" ia de 55 para **57 títulos** (57 Windows 🪟,
+32 Linux 🐧, 24 macOS 🍎). Com a retirada do The Darkness, o total ficou em
+**56** — ver seção 19.
+
+### Entrada 1 — The Darkness (NÃO PUBLICAR — retirado, ver seção 19)
 
 - **The Darkness (Xbox 360)** — [portingpete/The-Darkness-Recomp](https://github.com/portingpete/The-Darkness-Recomp) — 🪟 apenas.
 - Recompilação estática do executável de Xbox 360 para C++ (XenonRecomp),
@@ -876,11 +882,12 @@ Texto curto sugerido para o card/modal (pt-BR):
 
 ### O que mudar no site
 
-1. Contagens: **57** jogos em Ports & Recomp (seções 9.3/9.9), filtro
-   **Windows = 57**, Linux = 32, macOS = 24 (seção 12).
-2. Lista "🪟 apenas" da seção 12: agora **20 jogos**, com The Darkness e
-   Super Smash Bros. Melee (Melee Unlocked).
-3. Se houver página de "como adicionar jogos" ou "pastas de ROM": acrescentar
+1. Contagens: **56** jogos em Ports & Recomp (seções 9.3/9.9), filtro
+   **Windows = 56**, Linux = 32, macOS = 24 (seção 12).
+2. Lista "🪟 apenas" da seção 12: agora **19 jogos**, com
+   Super Smash Bros. Melee (Melee Unlocked). Sem The Darkness.
+3. ~~Se houver página~~ **Não publicar enquanto The Darkness estiver fora
+   (seção 19).** Registro: se houver página de "como adicionar jogos" ou "pastas de ROM": acrescentar
    `roms/Xbox360/` com a explicação acima — **não é um sistema emulado** (a
    contagem de **35 sistemas** e **40 motores** não muda), é só onde fica o
    ISO dos recompilados de Xbox 360.
@@ -888,3 +895,28 @@ Texto curto sugerido para o card/modal (pt-BR):
 
 Detalhe técnico completo (para FAQ ou página de desenvolvedor):
 [docs/XBOX360_RECOMP.md](XBOX360_RECOMP.md).
+
+---
+
+## 19. Correção de 27/09/2026 — The Darkness retirado do menu e do site
+
+**Remova do site tudo o que a seção 18 mandou publicar sobre o The Darkness.**
+O port funciona (o Karamelo preparou o dump de um disco real e o jogo abriu),
+mas o projeto original ainda está instável demais para oferecer. Ele saiu do
+menu do aplicativo; o site acompanha.
+
+O que fazer no site:
+
+1. **Tirar o card/modal/linha do The Darkness** da lista de Ports & Recomp,
+   inclusive qualquer destaque de "primeiro jogo de Xbox 360".
+2. **Contagens:** **56** jogos em Ports & Recomp; filtro **Windows = 56**,
+   Linux = 32, macOS = 24. Lista "🪟 apenas": **19 jogos**.
+3. **Não mencionar** `roms/Xbox360/`, ISO de Xbox 360, XexTool nem Xbox 360
+   Image Browser em nenhuma página (FAQ, "como adicionar jogos", pastas de ROM).
+4. Melee Unlocked continua — só o The Darkness sai.
+5. Sistemas (**35**) e motores (**40**) não mudam.
+
+O código e a documentação técnica continuam no repositório
+([docs/XBOX360_RECOMP.md](XBOX360_RECOMP.md)); quando ele voltar, uma nova
+seção aqui vai dizer. Até lá, a regra é simples: **The Darkness não existe no
+site.**

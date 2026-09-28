@@ -70,10 +70,11 @@ bool XexDecodeImage(const std::vector<uint8_t>& xex, std::vector<uint8_t>& out_i
 
 // Builds basefile.exe and _uncrypted.xex from default.xex and accepts them
 // only when both SHA-256 digests are in accepted_sha256 (lowercase hex).
-// XexTool's exact trailing-zero trimming and header rewrite are not
-// documented, so the few layouts it could plausibly emit are generated and
-// the one whose digest matches wins. On failure, out_report says which
-// digests were produced, for the log.
+// _uncrypted.xex reproduces XexTool 6.3's header rebuild byte for byte (the
+// layout XexTool-RE reverse-engineered - see x360_dump.cpp); the few choices
+// it leaves open (keep the file's own basic runs or re-cut them, pad the
+// payload or not) are all generated and the one whose digest matches wins.
+// On failure, out_report says which digests were produced, for the log.
 bool X360BuildRecompInputs(const std::vector<uint8_t>& xex,
                            const std::vector<std::string>& accepted_sha256,
                            std::vector<uint8_t>& out_basefile,

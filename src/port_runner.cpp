@@ -176,6 +176,12 @@ struct PortDefinition {
     int iso_disc_rev = -1;
     // What the toast calls the required disc when none matches.
     std::string iso_disc_label;
+    // Kept out of the menu (and so out of every count) while the upstream
+    // project is too unfinished to offer - the entry, its install path and
+    // --install-port / --prepare-port all keep working for testing. A folder
+    // already under ports/ stays hidden too: it still matches this entry, so
+    // it never falls through to the hand-dropped "(PC Port)" listing.
+    bool hidden = false;
 };
 
 static const std::vector<PortDefinition>& KnownPortDefs() {
@@ -327,6 +333,9 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         // --engine-preview is the playable engine path. --game-dir is left
         // at its default ("Darkness", relative to the working directory,
         // which exe_relpath makes the port folder). No Linux/macOS build.
+        // Hidden since 27/09/2026: the dump pipeline is validated against a
+        // real disc and the game boots, but upstream's runtime is still far
+        // too broken to offer - see docs/XBOX360_RECOMP.md.
         { .id = "TheDarknessRecomp", .display_name = "The Darkness",
           .repo = "portingpete/The-Darkness-Recomp", .exe_hint = "DarkRecomp.exe",
           .needs_rom = false, .rom_keywords = {},
@@ -336,7 +345,8 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .console_log_relpath = "build_native/run/karamelo_runtime.log",
           .x360_game_dir = "Darkness",
           .iso_keywords = { "darkness" },
-          .iso_dirs = { "Xbox360", "Xbox 360", "X360" } },
+          .iso_dirs = { "Xbox360", "Xbox 360", "X360" },
+          .hidden = true },
         // GameCube static recomp (PowerPC -> C++ plus Slippi's Gecko codes),
         // D3D12/D3D11. Verified 27/09/2026 against the real v0.7.1 release:
         // one "-win64.zip" wrapping a single MeleeUnlocked-<ver>/ folder
@@ -1076,6 +1086,7 @@ std::vector<PortGameInfo> PortGetAvailableList() {
     std::vector<PortGameInfo> list;
 
     for (const auto& def : KnownPortDefs()) {
+        if (def.hidden) continue;
         PortGameInfo info;
         info.id = def.id;
         info.name = def.display_name;

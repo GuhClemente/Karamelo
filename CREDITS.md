@@ -173,13 +173,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Super Mario Strikers | 🪟🐧🍎 | [new-coke/strikers](https://github.com/new-coke/strikers) |
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
-| The Darkness (Xbox 360) | 🪟 | [portingpete/The-Darkness-Recomp](https://github.com/portingpete/The-Darkness-Recomp) |
 | Super Smash Bros. Melee (Melee Unlocked) | 🪟 | [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) |
 
-**32 de 57 têm build Linux** e **24 de 57 têm build macOS** (Apple Silicon /
+**32 de 56 têm build Linux** e **24 de 56 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
-repositório (The Darkness e Melee Unlocked, adicionados em 27/09/2026, só
-publicam Windows). Os outros publicam build utilizável apenas no Windows por este
+repositório (Melee Unlocked, adicionado em 27/09/2026, só publica Windows). Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -195,17 +193,6 @@ trás (PSXRecomp) é licenciado PolyForm Noncommercial, não a mesma licença do
 demais projetos desta lista - isso não afeta a licença do Karamelo em si (o
 port é um binário externo, baixado sob demanda, nunca embutido), mas vale
 saber antes de indicar essa entrada para alguém.
-
-Um detalhe da linha do The Darkness: é o primeiro recompilado de **Xbox 360**
-da tabela (XenonRecomp, GPL-3.0) e o jogador precisa fornecer o dump do
-próprio disco. O projeto original pede para extrair o ISO com o "Xbox 360
-Image Browser" e rodar o XexTool do xorloser duas vezes; o Karamelo faz as
-duas coisas sozinho — basta pôr o `.iso` em `roms/Xbox360/` — e só aceita o
-resultado se o SHA-256 de `basefile.exe` e `_uncrypted.xex` bater com o que o
-próprio `DarkRecomp.exe` instalado exige. Como funciona:
-[docs/XBOX360_RECOMP.md](docs/XBOX360_RECOMP.md). O repositório só publica
-*prereleases* (v0.1.2 em 27/09/2026) e o autor chama o runtime de "development
-build, gameplay incomplete".
 
 E um detalhe da linha do Melee Unlocked: recompilação estática do Super Smash
 Bros. Melee **NTSC 1.02** (GameCube) com Slippi online e FPS destravado,
@@ -240,6 +227,30 @@ fork [dobsondev/N64RecompLauncher](https://github.com/dobsondev/N64RecompLaunche
 - nenhum código foi copiado, mas a lógica de detecção foi adaptada de lá
 depois que a abordagem original deste projeto (pegar o maior `.exe`) errou o
 executável em mais de um port real.
+
+### Fora do menu: The Darkness (Xbox 360)
+
+| Jogo | SO | Repositório |
+|---|---|---|
+| The Darkness (Xbox 360) | 🪟 | [portingpete/The-Darkness-Recomp](https://github.com/portingpete/The-Darkness-Recomp) |
+
+**Não entra na tabela acima nem em nenhuma contagem.** A entrada existe no
+código (`hidden = true` em `src/port_runner.cpp`) e funciona — dump preparado
+e jogo aberto em 27/09/2026 com um disco real —, mas o runtime do projeto ainda
+está instável demais para oferecer, então fica fora do menu e do site até
+segunda ordem. Para testar: `Karamelo.exe --prepare-port TheDarknessRecomp`.
+
+É o primeiro recompilado de **Xbox 360** (XenonRecomp, GPL-3.0) e o jogador precisa fornecer o dump do
+próprio disco. O projeto original pede para extrair o ISO com o "Xbox 360
+Image Browser" e rodar o XexTool do xorloser duas vezes; o Karamelo faz as
+duas coisas sozinho — basta pôr o `.iso` em `roms/Xbox360/` — e só aceita o
+resultado se o SHA-256 de `basefile.exe` e `_uncrypted.xex` bater com o que o
+próprio `DarkRecomp.exe` instalado exige. O layout exato do `_uncrypted.xex`
+foi portado do [XexTool-RE](https://github.com/RexxColder/XexTool-RE) (MIT,
+© 2026 Logan Greer e colaboradores), reimplementação aberta do XexTool 6.3.
+Como funciona: [docs/XBOX360_RECOMP.md](docs/XBOX360_RECOMP.md). O repositório só publica
+*prereleases* (v0.1.2 em 27/09/2026) e o autor chama o runtime de "development
+build, gameplay incomplete".
 
 ## Bibliotecas usadas diretamente
 
