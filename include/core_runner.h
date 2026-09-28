@@ -58,6 +58,10 @@ bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t
 bool CoreTakeScreenshot();
 
 // Volume & Audio Controls
+typedef void (*CoreAudioCallback)(const int16_t* data, size_t frames);
+void CoreSetAudioCallback(CoreAudioCallback cb);
+int  CoreGetAudioSampleRate();
+
 void CoreSetVolume(int volume_percent);
 int  CoreGetVolume();
 void CoreSetMute(bool mute);

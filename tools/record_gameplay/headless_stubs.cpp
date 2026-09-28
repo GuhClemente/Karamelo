@@ -28,3 +28,7 @@ void RaDoFrame() {}
 void RaOnGameLoad(const char*, const char*) {}
 void RaOnGameUnload() {}
 bool RaIsHardcoreActive() { return false; }
+
+const char* MenuGetPersistedCoreOption(const char*) { return nullptr; }
+int MenuGetVideoDriver() { return 0; }
+void CrashReporterSetLastGameInfo(const char*, const char*) {}

@@ -262,6 +262,8 @@ static int  master_volume = 100;
 static bool audio_muted = false;
 static int16_t joypad_buttons[4][16] = { 0 };
 static int16_t analog_sticks[4][2][2] = { 0 };
+static int16_t s_injected_buttons[4][16] = { 0 };
+static int16_t s_injected_analog[4][2][2] = { 0 };
 
 // Labels the core supplies through SET_INPUT_DESCRIPTORS, so the Controller
 // page can name a control the way that system does - "Cross" on PSP instead of
@@ -2377,14 +2379,26 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 	InterlockedExchange(&g_fb_dirty, 1);
 }
 
+static CoreAudioCallback g_audio_tap_callback = nullptr;
+void CoreSetAudioCallback(CoreAudioCallback cb)
+{
+	g_audio_tap_callback = cb;
+}
+int CoreGetAudioSampleRate()
+{
+	return (g_core_sample_rate > 0.0) ? (int)g_core_sample_rate : 48000;
+}
+
 static void CB_AudioSample(int16_t left, int16_t right)
 {
 	int16_t frame[2] = { left, right };
+	if (g_audio_tap_callback) g_audio_tap_callback(frame, 1);
 	SendAudioSamples(frame, 1);
 }
 
 static size_t CB_AudioSampleBatch(const int16_t* data, size_t frames)
 {
+	if (g_audio_tap_callback && data && frames > 0) g_audio_tap_callback(data, frames);
 	SendAudioSamples(data, frames);
 	return frames;
 }
@@ -2394,6 +2408,22 @@ static void CB_InputPoll(void)
 	// Must clear buttons every frame, otherwise any pressed button remains stuck
 	memset(joypad_buttons, 0, sizeof(joypad_buttons));
 	memset(analog_sticks, 0, sizeof(analog_sticks));
+
+	// Re-apply injected inputs from CoreSetButtonState / CoreSetAnalogState
+	for (int p = 0; p < 4; p++)
+	{
+		for (int b = 0; b < 16; b++)
+		{
+			if (s_injected_buttons[p][b]) joypad_buttons[p][b] = 1;
+		}
+		for (int s = 0; s < 2; s++)
+		{
+			for (int a = 0; a < 2; a++)
+			{
+				if (s_injected_analog[p][s][a] != 0) analog_sticks[p][s][a] = s_injected_analog[p][s][a];
+			}
+		}
+	}
 
 	// With the OSD open the player is driving the menu, not the game. Without
 	// this gate every arrow key and Enter used to navigate also reached the
@@ -2702,11 +2732,11 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 			int16_t mask = 0;
 			for (int b = 0; b < 16; b++)
 			{
-				if (joypad_buttons[port][b]) mask |= (int16_t)(1 << b);
+				if (joypad_buttons[port][b] || s_injected_buttons[port][b]) mask |= (int16_t)(1 << b);
 			}
 			return mask;
 		}
-		if (id < 16) return joypad_buttons[port][id];
+		if (id < 16) return (joypad_buttons[port][id] || s_injected_buttons[port][id]) ? 1 : 0;
 	}
 	else if (device == RETRO_DEVICE_KEYBOARD && port == 0)
 	{
@@ -2760,7 +2790,11 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 	}
 	else if (device == RETRO_DEVICE_ANALOG)
 	{
-		if (index < 2 && id < 2) return analog_sticks[port][index][id];
+		if (index < 2 && id < 2)
+		{
+			if (s_injected_analog[port][index][id] != 0) return s_injected_analog[port][index][id];
+			return analog_sticks[port][index][id];
+		}
 	}
 	else if (device == RETRO_DEVICE_POINTER && port == 0 && index == 0)
 	{
@@ -5206,6 +5240,7 @@ void CoreSetButtonState(int player, int button_id, bool pressed)
 {
 	if (player >= 0 && player < 4 && button_id >= 0 && button_id < 16)
 	{
+		s_injected_buttons[player][button_id] = pressed ? 1 : 0;
 		joypad_buttons[player][button_id] = pressed ? 1 : 0;
 	}
 }
@@ -5214,6 +5249,7 @@ void CoreSetAnalogState(int player, int stick_id, int axis_id, int16_t value)
 {
 	if (player >= 0 && player < 4 && stick_id >= 0 && stick_id < 2 && axis_id >= 0 && axis_id < 2)
 	{
+		s_injected_analog[player][stick_id][axis_id] = value;
 		analog_sticks[player][stick_id][axis_id] = value;
 	}
 }
