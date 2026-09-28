@@ -711,6 +711,7 @@ int main(int argc, char* argv[])
 		printf("  --core-selftest <core> <rom>  Executa teste de carregamento e encerramento de core\n");
 		printf("  --core-stress <c> <r> [n]     Executa stress test de N ciclos (abrir/carregar/fechar)\n");
 		printf("  --install-port <id>           Instala um port sem abrir a interface grafica\n");
+		printf("  --prepare-port <id>           Instala e prepara o jogo (dump Xbox 360: so Windows)\n");
 		return 0;
 	}
 
@@ -891,6 +892,16 @@ int main(int argc, char* argv[])
 		std::string err;
 		bool ok = PortInstallOnly(port_id, err);
 		printf("[INFO] [PORT-INSTALL] Resultado: %s %s\n", ok ? "SUCESSO" : "FALHA", err.c_str());
+		PortShutdown();
+		return ok ? 0 : 1;
+	}
+
+	if (argc > 2 && strcasecmp(argv[1], "--prepare-port") == 0)
+	{
+		PortInit();
+		std::string err;
+		bool ok = PortPrepareOnly(argv[2], err);
+		printf("[INFO] [PORT-PREPARE] Resultado: %s %s\n", ok ? "SUCESSO" : "FALHA", err.c_str());
 		PortShutdown();
 		return ok ? 0 : 1;
 	}

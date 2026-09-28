@@ -173,10 +173,13 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Super Mario Strikers | 🪟🐧🍎 | [new-coke/strikers](https://github.com/new-coke/strikers) |
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
+| The Darkness (Xbox 360) | 🪟 | [portingpete/The-Darkness-Recomp](https://github.com/portingpete/The-Darkness-Recomp) |
+| Super Smash Bros. Melee (Melee Unlocked) | 🪟 | [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) |
 
-**32 de 55 têm build Linux** e **24 de 55 têm build macOS** (Apple Silicon /
+**32 de 57 têm build Linux** e **24 de 57 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
-repositório. Os outros publicam build utilizável apenas no Windows por este
+repositório (The Darkness e Melee Unlocked, adicionados em 27/09/2026, só
+publicam Windows). Os outros publicam build utilizável apenas no Windows por este
 app. No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -192,6 +195,26 @@ trás (PSXRecomp) é licenciado PolyForm Noncommercial, não a mesma licença do
 demais projetos desta lista - isso não afeta a licença do Karamelo em si (o
 port é um binário externo, baixado sob demanda, nunca embutido), mas vale
 saber antes de indicar essa entrada para alguém.
+
+Um detalhe da linha do The Darkness: é o primeiro recompilado de **Xbox 360**
+da tabela (XenonRecomp, GPL-3.0) e o jogador precisa fornecer o dump do
+próprio disco. O projeto original pede para extrair o ISO com o "Xbox 360
+Image Browser" e rodar o XexTool do xorloser duas vezes; o Karamelo faz as
+duas coisas sozinho — basta pôr o `.iso` em `roms/Xbox360/` — e só aceita o
+resultado se o SHA-256 de `basefile.exe` e `_uncrypted.xex` bater com o que o
+próprio `DarkRecomp.exe` instalado exige. Como funciona:
+[docs/XBOX360_RECOMP.md](docs/XBOX360_RECOMP.md). O repositório só publica
+*prereleases* (v0.1.2 em 27/09/2026) e o autor chama o runtime de "development
+build, gameplay incomplete".
+
+E um detalhe da linha do Melee Unlocked: recompilação estática do Super Smash
+Bros. Melee **NTSC 1.02** (GameCube) com Slippi online e FPS destravado,
+licença GPL-2.0, ainda em beta. O jogador fornece o próprio `.iso` em
+`roms/GameCube/` (nome contendo "melee"); o Karamelo lê o cabeçalho do disco
+e só usa o que for `GALE01` revisão 2 — então ISOs 1.00, Training Mode ou
+20XX na mesma pasta são ignorados, e se só houver esses o aviso diz que o
+disco é o errado. O ISO é lido no lugar, não copiado. Jogo online exige conta
+Slippi (logada uma vez pelo Slippi Launcher); offline não.
 
 E um detalhe da linha do Wave Race 64: o projeto se descreve como "em beta" e
 o pacote baixado é bem maior que o normal desta tabela (~390 MB, contra

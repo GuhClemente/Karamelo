@@ -51,4 +51,9 @@ void PortPumpPendingLaunch();
 // is already installed. Sets out_error on failure.
 bool PortInstallOnly(const std::string& port_id, std::string& out_error);
 
+// PortInstallOnly() plus, for an Xbox 360 recomp, the dump preparation the
+// menu otherwise does right before launch (ISO extraction + basefile.exe /
+// _uncrypted.xex generation, digest-checked). Used by --prepare-port.
+bool PortPrepareOnly(const std::string& port_id, std::string& out_error);
+
 #endif

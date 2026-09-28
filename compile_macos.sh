@@ -83,6 +83,7 @@ KARAMELO_SRCS=(
     src/retroachievements.cpp
     src/updater.cpp
     src/port_runner.cpp
+    src/x360_dump.cpp
     src/crash_reporter.cpp
     src/main_linux.cpp
 )

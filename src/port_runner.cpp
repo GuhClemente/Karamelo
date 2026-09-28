@@ -27,6 +27,7 @@ extern char **environ;
 #include "osd.h"
 #include "archive_helper.h"
 #include "updater.h"
+#include "x360_dump.h"
 
 namespace fs = std::filesystem;
 
@@ -65,6 +66,26 @@ static std::atomic<bool> s_port_needs_restore(false);
 // Nome do port que esta baixando, para o aviso de progresso (ver o topo de
 // PortPumpPendingLaunch). Protegido pelo mesmo s_pending_lock.
 static std::string      s_installing_name;
+// "BAIXANDO " or "PREPARANDO " (Xbox 360 dump preparation) - same lock.
+static std::string      s_installing_verb = "BAIXANDO ";
+
+#ifdef _WIN32
+// One argument quoted per the CommandLineToArgvW / MSVC CRT rules, trailing
+// backslashes included - the same routine upstream's own launcher uses.
+static std::wstring QuoteWinArg(const std::wstring& arg) {
+    if (!arg.empty() && arg.find_first_of(L" \t\"") == std::wstring::npos) return arg;
+    std::wstring out = L"\"";
+    size_t slashes = 0;
+    for (wchar_t c : arg) {
+        if (c == L'\\') { ++slashes; continue; }
+        out.append(c == L'"' ? slashes * 2 + 1 : slashes, L'\\');
+        slashes = 0;
+        out += c;
+    }
+    out.append(slashes * 2, L'\\');
+    return out + L'"';
+}
+#endif
 
 static std::string ToLowerStr(const std::string& s) {
     std::string out = s;
@@ -114,6 +135,47 @@ struct PortDefinition {
     // a project can add or drop platforms between verifications.
     bool has_linux_build = false;
     bool has_macos_build = false;
+
+    // Everything below is optional and only used by ports whose release
+    // cannot be launched by "find the one .exe and run it bare". The Darkness
+    // Recomp (first user of all four) ships a 93 MB console-subsystem
+    // DarkRecomp.exe two folders deep, next to a 64 KB DarkRecompPreview.exe
+    // launcher that fires the game off and exits at once - which would make
+    // the exit monitor restore Karamelo over a game that is still running.
+    //
+    // exe_relpath: exact executable, relative to the port folder. When set it
+    // replaces FindBestExecutable() entirely (a guess there would pick the
+    // dump's own basefile.exe, which is a memory image, not a program) and
+    // the process starts with the port folder itself as working directory.
+    std::string exe_relpath;
+    // Extra command-line arguments. "{iso}" inside one is replaced with the
+    // absolute path of the user's disc image (see iso_keywords) - a port
+    // that reads the ISO in place gets pointed at it instead of a multi-GB
+    // copy. With no matching image the launch stops with a toast saying
+    // where to put it.
+    std::vector<std::string> launch_args;
+    // Non-empty: start the process with no console window and send its
+    // stdout/stderr to this file (relative to the port folder) instead.
+    std::string console_log_relpath;
+    // Non-empty: Xbox 360 dump folder (relative to the port folder) that
+    // must hold basefile.exe + _uncrypted.xex before launch. Karamelo builds
+    // them itself - extracting the user's ISO (found by iso_keywords) and
+    // decoding default.xex - see PrepareX360Game().
+    std::string x360_game_dir;
+    // The user's own .iso: every keyword must appear in its lowercased file
+    // name; looked for in the port folder, in roms/<d> and app/roms/<d> for
+    // each iso_dirs entry, then in roms/ itself. See FindUserIso().
+    std::vector<std::string> iso_keywords;
+    std::vector<std::string> iso_dirs;
+    // GameCube/Wii disc header check: the 6-character game ID at offset 0
+    // and the disc revision byte at offset 7 (-1 = any revision). When set,
+    // only an image whose header matches is picked - Melee players commonly
+    // keep 1.00, Training Mode and 20XX images, all named "...melee...",
+    // next to the one NTSC 1.02 disc the recomp was built from.
+    std::string iso_disc_id;
+    int iso_disc_rev = -1;
+    // What the toast calls the required disc when none matches.
+    std::string iso_disc_label;
 };
 
 static const std::vector<PortDefinition>& KnownPortDefs() {
@@ -255,6 +317,54 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
         { "RingOut", "Soulcalibur II (Ring Out)",
           "jackpoison-prog/RingOut", "RingOut.exe",
           true, { "soul" }, true, false },
+        // Xbox 360 static recomp. Verified 27/09/2026 against the real
+        // v0.1.2 release (prerelease-only repo - /latest 404s, the /releases
+        // fallback in DownloadAndInstall picks it up): one
+        // "-windows-x64.zip" with Launch.cmd at the root and the game in
+        // build_native/Release/. Arguments mirror what upstream's own
+        // DarkRecompPreview.exe passes ("play" mode): without
+        // --timeout-ms 0 the runtime quits itself after 30 s, and
+        // --engine-preview is the playable engine path. --game-dir is left
+        // at its default ("Darkness", relative to the working directory,
+        // which exe_relpath makes the port folder). No Linux/macOS build.
+        { .id = "TheDarknessRecomp", .display_name = "The Darkness",
+          .repo = "portingpete/The-Darkness-Recomp", .exe_hint = "DarkRecomp.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = false, .has_macos_build = false,
+          .exe_relpath = "build_native/Release/DarkRecomp.exe",
+          .launch_args = { "--timeout-ms", "0", "--engine-preview" },
+          .console_log_relpath = "build_native/run/karamelo_runtime.log",
+          .x360_game_dir = "Darkness",
+          .iso_keywords = { "darkness" },
+          .iso_dirs = { "Xbox360", "Xbox 360", "X360" } },
+        // GameCube static recomp (PowerPC -> C++ plus Slippi's Gecko codes),
+        // D3D12/D3D11. Verified 27/09/2026 against the real v0.7.1 release:
+        // one "-win64.zip" wrapping a single MeleeUnlocked-<ver>/ folder
+        // (flattened on install). The pinned exe matters here: the
+        // alphabetical tie-break would pick MeleeUnlockedLauncher.exe, the
+        // project's optional launcher that updates itself into Versions/ -
+        // not something Karamelo should hand control to. Arguments are
+        // exactly MeleeUnlocked.bat's, with paths relative to the port
+        // folder (the working directory) and the ISO read in place from
+        // roms/GameCube/ rather than copied next to it as melee.iso. GUI
+        // subsystem, so no console to hide. Needs the NTSC 1.02 disc; the
+        // game itself checks the revision. No Linux/macOS build.
+        { .id = "MeleeUnlocked", .display_name = "Super Smash Bros. Melee (Unlocked)",
+          .repo = "Hero88go/melee-unlocked", .exe_hint = "melee_port.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = false, .has_macos_build = false,
+          .exe_relpath = "melee_port.exe",
+          .launch_args = { "--iso", "{iso}",
+                           "--settings-path", "port-settings.ini",
+                           "--sys-dir", "Sys",
+                           "--user-dir", "User/Slippi",
+                           "--replay-dir", "Replays",
+                           "--card-dir", "User/GC/CardA",
+                           "--threaded-renderer" },
+          .iso_keywords = { "melee" },
+          .iso_dirs = { "GameCube", "GC" },
+          .iso_disc_id = "GALE01", .iso_disc_rev = 2,
+          .iso_disc_label = "MELEE NTSC 1.02" },
     };
     return defs;
 }
@@ -263,6 +373,21 @@ static const PortDefinition* FindPortDef(const std::string& id) {
     for (const auto& d : KnownPortDefs())
         if (d.id == id) return &d;
     return nullptr;
+}
+
+static std::string FindBestExecutable(const std::string& dir);
+
+// The executable a port folder resolves to: the exact exe_relpath when the
+// definition pins one (empty if that file is not there yet, so the port reads
+// as "not installed" and gets downloaded), otherwise the usual guess.
+static std::string ResolvePortExe(const PortDefinition* def, const std::string& dir) {
+    if (dir.empty()) return "";
+    if (def && !def->exe_relpath.empty()) {
+        std::error_code ec;
+        fs::path p = fs::path(dir) / def->exe_relpath;
+        return fs::is_regular_file(p, ec) ? p.string() : "";
+    }
+    return FindBestExecutable(dir);
 }
 
 // -------------------------------------------------------------
@@ -911,7 +1036,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         // single .tar.gz *inside* the outer .zip instead of shipping the game
         // directly. ArchiveExtractAll already knows how to open any of these
         // three by extension - this just has to notice one was left behind.
-        if (FindBestExecutable(dest_dir).empty()) {
+        if (ResolvePortExe(&def, dest_dir).empty()) {
             for (const auto& e : fs::directory_iterator(dest_dir, ec)) {
                 if (ec || !e.is_regular_file(ec)) continue;
                 std::string fname = ToLowerStr(e.path().filename().string());
@@ -931,7 +1056,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         }
     }
 
-    if (FindBestExecutable(dest_dir).empty()) { out_error = "pacote instalado sem executavel"; return false; }
+    if (ResolvePortExe(&def, dest_dir).empty()) { out_error = "pacote instalado sem executavel"; return false; }
 
     return true;
 }
@@ -957,8 +1082,8 @@ std::vector<PortGameInfo> PortGetAvailableList() {
         info.rom_pattern = def.rom_keywords.empty() ? "" : def.rom_keywords.front();
 
         std::string dir = ResolvePortDir(def.id);
-        std::string exe = dir.empty() ? "" : FindBestExecutable(dir);
-        if (exe.empty() && !dir.empty() && !def.exe_hint.empty()) {
+        std::string exe = ResolvePortExe(&def, dir);
+        if (exe.empty() && !dir.empty() && !def.exe_hint.empty() && def.exe_relpath.empty()) {
             std::string hinted = dir + "/" + def.exe_hint;
             if (fs::exists(hinted)) exe = hinted;
         }
@@ -1016,7 +1141,7 @@ std::vector<PortGameInfo> PortGetAvailableList() {
 bool PortIsInstalled(const std::string& port_id) {
     std::string dir = ResolvePortDir(port_id);
     if (dir.empty()) return false;
-    return !FindBestExecutable(dir).empty();
+    return !ResolvePortExe(FindPortDef(port_id), dir).empty();
 }
 
 bool PortAutoSetupRom(const std::string& port_id) {
@@ -1161,6 +1286,225 @@ bool PortAutoSetupRom(const std::string& port_id) {
     return false;
 }
 
+// -------------------------------------------------------------
+// Xbox 360 dump preparation (The Darkness Recomp and future 360 recomps)
+// -------------------------------------------------------------
+// Upstream asks each user to extract their disc with "Xbox 360 Image
+// Browser" and run xorloser's XexTool twice by hand. Karamelo does both
+// itself (x360_dump.cpp): the user only drops their own ISO into
+// roms/Xbox360/. Every output is accepted only if its SHA-256 is one the
+// installed recomp executable itself embeds - the same digests it enforces
+// at startup - so a different game revision is reported here, in words,
+// instead of as a game window that opens and closes.
+
+static void PortLog(const std::string& line) {
+    FILE* lf = fopen("karamelo.log", "a");
+    if (!lf) return;
+    fprintf(lf, "[INFO] [PORT-X360] %s\n", line.c_str());
+    fclose(lf);
+}
+
+static bool X360GameReady(const PortDefinition& def, const std::string& port_dir) {
+    if (def.x360_game_dir.empty()) return true;
+    std::error_code ec;
+    fs::path g = fs::path(port_dir) / def.x360_game_dir;
+    return fs::is_regular_file(g / "basefile.exe", ec) && fs::is_regular_file(g / "_uncrypted.xex", ec);
+}
+
+// True when the image's GameCube/Wii header matches what the definition
+// asks for (or when it asks for nothing).
+static bool IsoHeaderMatches(const PortDefinition& def, const fs::path& iso) {
+    if (def.iso_disc_id.empty()) return true;
+    std::ifstream f(iso, std::ios::binary);
+    char hdr[8] = {};
+    if (!f.read(hdr, sizeof(hdr))) return false;
+    if (std::string(hdr, 6) != def.iso_disc_id) return false;
+    return def.iso_disc_rev < 0 || (unsigned char)hdr[7] == (unsigned)def.iso_disc_rev;
+}
+
+// The user's own disc image: the port folder itself, then roms/<d> for each
+// of the definition's iso_dirs (the app's roms/<system> convention), then
+// the roms/ root. Every keyword must appear in the lowercased file name, and
+// the disc header must match when the definition pins one. out_wrong_disc
+// reports that a name matched but no header did, so the toast can say
+// "wrong disc" instead of "no disc".
+static std::string FindUserIso(const PortDefinition& def, const std::string& port_dir,
+                               bool* out_wrong_disc = nullptr) {
+    if (out_wrong_disc) *out_wrong_disc = false;
+    if (def.iso_keywords.empty()) return "";
+    std::vector<std::string> search;
+    if (!port_dir.empty()) search.push_back(port_dir);
+    for (const auto& d : def.iso_dirs) { search.push_back("roms/" + d); search.push_back("app/roms/" + d); }
+    search.push_back("roms");
+    search.push_back("app/roms");
+    std::error_code ec;
+    for (const auto& d : search) {
+        if (!fs::is_directory(d, ec)) continue;
+        for (const auto& e : fs::directory_iterator(d, ec)) {
+            if (ec || !e.is_regular_file(ec)) continue;
+            if (ToLowerStr(e.path().extension().string()) != ".iso") continue;
+            std::string name = ToLowerStr(e.path().filename().string());
+            bool all = true;
+            for (const auto& kw : def.iso_keywords)
+                if (name.find(kw) == std::string::npos) { all = false; break; }
+            if (!all) continue;
+            if (IsoHeaderMatches(def, e.path())) return e.path().string();
+            if (out_wrong_disc) *out_wrong_disc = true;
+        }
+    }
+    return "";
+}
+
+static bool ReadWholeFile(const fs::path& p, std::vector<uint8_t>& out) {
+    std::ifstream f(p, std::ios::binary);
+    if (!f) return false;
+    out.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    return !f.bad();
+}
+
+// Written under a temporary name first so a crash can never leave a
+// half-written basefile.exe that X360GameReady() would then trust.
+static bool WriteWholeFile(const fs::path& p, const std::vector<uint8_t>& data) {
+    fs::path part = p;
+    part += ".part";
+    std::error_code ec;
+    {
+        std::ofstream o(part, std::ios::binary | std::ios::trunc);
+        if (!o) return false;
+        o.write(reinterpret_cast<const char*>(data.data()), std::streamsize(data.size()));
+        if (!o) { o.close(); fs::remove(part, ec); return false; }
+    }
+    fs::rename(part, p, ec);
+    return !ec;
+}
+
+static bool DigestAccepted(const std::vector<uint8_t>& v, const std::vector<std::string>& accepted) {
+    std::string h = x360::Sha256Hex(v.data(), v.size());
+    for (const auto& a : accepted) if (a == h) return true;
+    return false;
+}
+
+#ifdef _WIN32
+// Optional fallback: if the user already has xorloser's XexTool (it is not
+// ours to redistribute), its output is used - still under the same digest
+// gate - when the native rewrite did not match.
+static bool RunXexTool(const fs::path& xextool, const fs::path& game_dir, const std::wstring& args) {
+    std::wstring cmd = L"\"" + xextool.wstring() + L"\" " + args;
+    std::vector<wchar_t> buf(cmd.begin(), cmd.end());
+    buf.push_back(L'\0');
+    STARTUPINFOW si = { sizeof(si) };
+    PROCESS_INFORMATION pi = {};
+    if (!CreateProcessW(xextool.wstring().c_str(), buf.data(), NULL, NULL, FALSE, CREATE_NO_WINDOW,
+                        NULL, game_dir.wstring().c_str(), &si, &pi))
+        return false;
+    DWORD rc = 1;
+    if (WaitForSingleObject(pi.hProcess, 120000) == WAIT_OBJECT_0) GetExitCodeProcess(pi.hProcess, &rc);
+    else TerminateProcess(pi.hProcess, 1);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return rc == 0;
+}
+#endif
+
+// Runs on a worker thread (the ISO copy is several GB). Toasts progress.
+// out_error is short enough for a toast; the details go to karamelo.log.
+static bool PrepareX360Game(const PortDefinition& def, const std::string& port_dir, std::string& out_error) {
+#ifndef _WIN32
+    (void)def; (void)port_dir;
+    out_error = "PREPARO DE DUMP XBOX 360 SO EXISTE NO WINDOWS";
+    return false;
+#else
+    std::error_code ec;
+    fs::path game = fs::path(port_dir) / def.x360_game_dir;
+    fs::create_directories(game, ec);
+
+    // 1. Game files: extract the ISO unless the dump is already there (a
+    //    user who extracted it by hand keeps working exactly as before).
+    if (!fs::is_regular_file(game / "default.xex", ec)) {
+        std::string iso = FindUserIso(def, port_dir);
+        if (iso.empty()) {
+            out_error = "COLOQUE SEU ISO DE " + def.display_name + " EM roms/Xbox360";
+            PortLog(def.id + ": nenhum .iso com o nome contendo as palavras-chave do port");
+            return false;
+        }
+        PortLog(def.id + ": extraindo " + iso + " -> " + game.string());
+        int last_pct = -1;
+        std::string x_err;
+        bool ok = x360::XisoExtract(iso, game.string(), x_err, [&](uint64_t done, uint64_t total) {
+            int pct = total ? int(done * 100 / total) : 100;
+            if (pct != last_pct) {
+                last_pct = pct;
+                CoreSetToast(("EXTRAINDO ISO... " + std::to_string(pct) + "%").c_str(), 600);
+            }
+        });
+        if (!ok) {
+            out_error = "FALHA AO EXTRAIR O ISO - VEJA karamelo.log";
+            PortLog(def.id + ": extracao falhou: " + x_err);
+            return false;
+        }
+        if (!fs::is_regular_file(game / "default.xex", ec)) {
+            out_error = "ISO SEM default.xex - E O JOGO CERTO?";
+            PortLog(def.id + ": ISO extraido, mas sem default.xex na raiz");
+            return false;
+        }
+    }
+
+    // 2. The digests the installed recomp enforces.
+    std::vector<std::string> accepted;
+    if (!def.exe_relpath.empty())
+        accepted = x360::FindEmbeddedSha256((fs::path(port_dir) / def.exe_relpath).string());
+    if (accepted.empty()) {
+        out_error = "NAO FOI POSSIVEL LER OS HASHES DO PORT";
+        PortLog(def.id + ": nenhum SHA-256 embutido em " + def.exe_relpath);
+        return false;
+    }
+
+    // 3. basefile.exe + _uncrypted.xex from default.xex.
+    CoreSetToast("GERANDO ARQUIVOS DO JOGO...", 600);
+    std::vector<uint8_t> xex, basefile, uncrypted;
+    if (!ReadWholeFile(game / "default.xex", xex)) {
+        out_error = "default.xex ILEGIVEL";
+        return false;
+    }
+    std::string report, b_err;
+    bool built = x360::X360BuildRecompInputs(xex, accepted, basefile, uncrypted, report, b_err);
+    PortLog(def.id + ": " + report + (built ? " -> OK" : " -> " + b_err));
+    if (built) {
+        if (!WriteWholeFile(game / "basefile.exe", basefile) ||
+            !WriteWholeFile(game / "_uncrypted.xex", uncrypted)) {
+            out_error = "FALHA AO GRAVAR OS ARQUIVOS DO JOGO (DISCO CHEIO?)";
+            return false;
+        }
+        return true;
+    }
+
+    // 4. Fallback: the user's own XexTool, under the same digest gate.
+    fs::path tool;
+    for (const fs::path& c : { game / "xextool.exe", fs::path(port_dir) / "xextool.exe",
+                               fs::path("tools") / "xextool.exe", fs::path("app/tools") / "xextool.exe" })
+        if (fs::is_regular_file(c, ec)) { tool = fs::absolute(c, ec); break; }
+    if (!tool.empty()) {
+        PortLog(def.id + ": tentando o XexTool do usuario em " + tool.string());
+        bool ran = RunXexTool(tool, game, L"-b basefile.exe default.xex") &&
+                   RunXexTool(tool, game, L"-e u -c u -o _uncrypted.xex default.xex");
+        std::vector<uint8_t> b2, u2;
+        if (ran && ReadWholeFile(game / "basefile.exe", b2) && ReadWholeFile(game / "_uncrypted.xex", u2) &&
+            DigestAccepted(b2, accepted) && DigestAccepted(u2, accepted)) {
+            PortLog(def.id + ": XexTool gerou arquivos validos");
+            return true;
+        }
+        // Our own outputs (X360GameReady() only ran us because they did not
+        // exist) - never leave a mismatching pair behind to be launched.
+        fs::remove(game / "basefile.exe", ec);
+        fs::remove(game / "_uncrypted.xex", ec);
+        PortLog(def.id + ": saida do XexTool nao confere com o port");
+    }
+
+    out_error = "DUMP NAO CONFERE COM O PORT (REVISAO DIFERENTE?) - VEJA karamelo.log";
+    return false;
+#endif
+}
+
 // Does the actual OS-level work of launching an already-installed port:
 // ROM auto-copy, stopping any running libretro core, minimizing the window,
 // launching the process, and spawning the exit-monitor thread. Must only
@@ -1171,6 +1515,26 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
                                       const std::string& port_id) {
     // 1. Auto-copy ROM if this port needs one and doesn't have it yet.
     if (def && def->needs_rom) PortAutoSetupRom(port_id);
+
+    // 1b. Resolve "{iso}" in the launch arguments before anything is torn
+    // down or minimized - a missing disc image has to leave the menu as it was.
+    std::vector<std::string> extra_args = def ? def->launch_args : std::vector<std::string>{};
+    for (auto& a : extra_args) {
+        size_t at = a.find("{iso}");
+        if (at == std::string::npos) continue;
+        bool wrong_disc = false;
+        std::string iso = FindUserIso(*def, ResolvePortDir(port_id), &wrong_disc);
+        if (iso.empty()) {
+            std::string where = def->iso_dirs.empty() ? "roms" : "roms/" + def->iso_dirs.front();
+            if (wrong_disc && !def->iso_disc_label.empty())
+                CoreSetToast(("ISO ENCONTRADO NAO E " + def->iso_disc_label + " - VEJA " + where).c_str(), 360);
+            else
+                CoreSetToast(("COLOQUE SEU ISO DE " + def->display_name + " EM " + where).c_str(), 300);
+            return false;
+        }
+        std::error_code aec;
+        a.replace(at, 5, fs::absolute(iso, aec).string());
+    }
 
     // 2. Stop any active Libretro core. CoreIsRunning() alone is false while
     // a ROM/core is still on its way up (CORE_STATE_LOADING) - checking only
@@ -1192,6 +1556,13 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     // 4. Launch process
     fs::path abs_exe = fs::absolute(exe_path);
     fs::path abs_dir = abs_exe.parent_path();
+    // A pinned exe_relpath runs from the port folder itself, the way the
+    // project's own launcher script does (paths in its arguments and its
+    // settings/saves are relative to there, not to the exe's subfolder).
+    if (def && !def->exe_relpath.empty()) {
+        std::string port_dir = ResolvePortDir(port_id);
+        if (!port_dir.empty()) abs_dir = fs::absolute(port_dir);
+    }
 
 #ifdef _WIN32
     STARTUPINFOW si = { sizeof(STARTUPINFOW) };
@@ -1220,8 +1591,57 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         std::vector<wchar_t> buf(cmdline.begin(), cmdline.end());
         buf.push_back(L'\0');
         ok = CreateProcessW(NULL, buf.data(), NULL, NULL, FALSE, 0, NULL, wdir.c_str(), &si, &pi);
-    } else {
+    } else if (extra_args.empty() && (!def || def->console_log_relpath.empty())) {
         ok = CreateProcessW(wexe.c_str(), NULL, NULL, NULL, FALSE, 0, NULL, wdir.c_str(), &si, &pi);
+    } else {
+        std::wstring cmdline = QuoteWinArg(wexe);
+        for (const auto& a : extra_args) cmdline += L" " + QuoteWinArg(fs::path(a).wstring());
+        std::vector<wchar_t> buf(cmdline.begin(), cmdline.end());
+        buf.push_back(L'\0');
+
+        if (def && !def->console_log_relpath.empty()) {
+            // Console-subsystem game: no console window, stdout/stderr to a
+            // log file in the port folder. Only these two handles are
+            // inherited (PROC_THREAD_ATTRIBUTE_HANDLE_LIST) - bInheritHandles
+            // alone would hand the game every inheritable handle Karamelo has.
+            fs::path log_path = abs_dir / def->console_log_relpath;
+            std::error_code lec;
+            fs::create_directories(log_path.parent_path(), lec);
+            SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+            HANDLE hlog = CreateFileW(log_path.wstring().c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa,
+                                      CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            HANDLE hnul = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
+                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            ok = FALSE;
+            if (hlog != INVALID_HANDLE_VALUE && hnul != INVALID_HANDLE_VALUE) {
+                HANDLE inherit[2] = { hlog, hnul };
+                SIZE_T attr_size = 0;
+                InitializeProcThreadAttributeList(NULL, 1, 0, &attr_size);
+                std::vector<uint8_t> attr_buf(attr_size);
+                auto* attrs = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attr_buf.data());
+                if (InitializeProcThreadAttributeList(attrs, 1, 0, &attr_size)) {
+                    if (UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                                  inherit, sizeof(inherit), NULL, NULL)) {
+                        STARTUPINFOEXW six = {};
+                        six.StartupInfo.cb = sizeof(six);
+                        six.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+                        six.StartupInfo.hStdInput = hnul;
+                        six.StartupInfo.hStdOutput = hlog;
+                        six.StartupInfo.hStdError = hlog;
+                        six.lpAttributeList = attrs;
+                        ok = CreateProcessW(wexe.c_str(), buf.data(), NULL, NULL, TRUE,
+                                            CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT,
+                                            NULL, wdir.c_str(), &six.StartupInfo, &pi);
+                    }
+                    DeleteProcThreadAttributeList(attrs);
+                }
+            }
+            // The child holds its own duplicates; ours are no longer needed.
+            if (hlog != INVALID_HANDLE_VALUE) CloseHandle(hlog);
+            if (hnul != INVALID_HANDLE_VALUE) CloseHandle(hnul);
+        } else {
+            ok = CreateProcessW(wexe.c_str(), buf.data(), NULL, NULL, FALSE, 0, NULL, wdir.c_str(), &si, &pi);
+        }
     }
 
     if (!ok) {
@@ -1257,6 +1677,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     if (!rom_arg.empty()) {
         argv.push_back(const_cast<char*>(rom_arg.c_str()));
     }
+    for (const auto& a : extra_args) argv.push_back(const_cast<char*>(a.c_str()));
     argv.push_back(nullptr);
 
     pid_t pid = fork();
@@ -1373,14 +1794,19 @@ bool PortLaunch(const std::string& port_id) {
 
     const PortDefinition* def = FindPortDef(port_id);
     std::string dir = ResolvePortDir(port_id);
-    std::string exe_path = dir.empty() ? "" : FindBestExecutable(dir);
+    std::string exe_path = ResolvePortExe(def, dir);
+    // An Xbox 360 recomp is installed but not playable until the user's
+    // dump has been turned into its inputs - that work (an ISO extraction of
+    // several GB) goes on the same background slot as a download.
+    bool needs_x360_prep = def && !def->x360_game_dir.empty() &&
+                           (exe_path.empty() || !X360GameReady(*def, dir));
 
     // Not installed yet: if this is a known port with a repository, fetch it
     // in the background and launch automatically once it lands. Anything
     // else (an unknown id, or a known one with no repo configured) has
     // nothing to download - say so and stop.
-    if (exe_path.empty()) {
-        if (!def || def->repo.empty()) {
+    if (exe_path.empty() || needs_x360_prep) {
+        if (exe_path.empty() && (!def || def->repo.empty())) {
             CoreSetToast("PORT NAO INSTALADO EM ports/", 200);
             return false;
         }
@@ -1394,29 +1820,49 @@ bool PortLaunch(const std::string& port_id) {
             return false;
         }
 
+        bool needs_download = exe_path.empty();
         {
             std::lock_guard<std::mutex> lock(s_pending_lock);
             s_installing_name = def->display_name;
+            s_installing_verb = needs_download ? "BAIXANDO " : "PREPARANDO ";
         }
         s_installing.store(true);
-        CoreSetToast(("BAIXANDO " + def->display_name + "...").c_str(), 600);
+        CoreSetToast(((needs_download ? "BAIXANDO " : "PREPARANDO ") + def->display_name + "...").c_str(), 600);
 
         PortDefinition def_copy = *def;
         s_active_bg_threads.fetch_add(1);
-        std::thread([def_copy]() {
+        std::thread([def_copy, needs_download]() {
             std::string error;
-            bool ok = DownloadAndInstall(def_copy, error);
-            s_installing.store(false);
-
-            if (!ok) {
-                CoreSetToast(("FALHA AO BAIXAR PORT: " + error).c_str(), 240);
-                s_active_bg_threads.fetch_sub(1);
-                return;
+            if (needs_download) {
+                bool ok = DownloadAndInstall(def_copy, error);
+                if (!ok) {
+                    s_installing.store(false);
+                    CoreSetToast(("FALHA AO BAIXAR PORT: " + error).c_str(), 240);
+                    s_active_bg_threads.fetch_sub(1);
+                    return;
+                }
+                if (def_copy.needs_rom) PortAutoSetupRom(def_copy.id);
             }
 
-            if (def_copy.needs_rom) PortAutoSetupRom(def_copy.id);
+            if (!def_copy.x360_game_dir.empty()) {
+                std::string port_dir = ResolvePortDir(def_copy.id);
+                if (port_dir.empty()) port_dir = "ports/" + def_copy.id;
+                if (!X360GameReady(def_copy, port_dir)) {
+                    {
+                        std::lock_guard<std::mutex> lock(s_pending_lock);
+                        s_installing_verb = "PREPARANDO ";
+                    }
+                    if (!PrepareX360Game(def_copy, port_dir, error)) {
+                        s_installing.store(false);
+                        CoreSetToast(error.c_str(), 420);
+                        s_active_bg_threads.fetch_sub(1);
+                        return;
+                    }
+                }
+            }
+            s_installing.store(false);
 
-            CoreSetToast("PORT INSTALADO! INICIANDO...", 150);
+            CoreSetToast(needs_download ? "PORT INSTALADO! INICIANDO..." : "JOGO PREPARADO! INICIANDO...", 150);
 
             // Hand off to the UI thread instead of launching from here - see
             // the comment on s_pending_lock above for why.
@@ -1452,13 +1898,14 @@ void PortPumpPendingLaunch() {
     // So reexibe quando nenhuma outra mensagem esta na tela, para nao
     // atropelar um aviso mais importante que tenha acabado de sair.
     if (s_installing.load() && !CoreIsToastActive()) {
-        std::string name;
+        std::string name, verb;
         {
             std::lock_guard<std::mutex> lock(s_pending_lock);
             name = s_installing_name;
+            verb = s_installing_verb;
         }
         if (!name.empty())
-            CoreSetToast(("BAIXANDO " + name + "...").c_str(), 300);
+            CoreSetToast((verb + name + "...").c_str(), 300);
     }
 
     if (!s_has_pending_launch.exchange(false)) return;
@@ -1473,7 +1920,7 @@ void PortPumpPendingLaunch() {
     // finished - the files just landed on disk and this is the first look
     // at them from the thread that's actually allowed to act on it.
     std::string dir = ResolvePortDir(id);
-    std::string exe_path = dir.empty() ? "" : FindBestExecutable(dir);
+    std::string exe_path = ResolvePortExe(FindPortDef(id), dir);
     if (exe_path.empty()) {
         CoreSetToast("PORT BAIXADO MAS SEM EXECUTAVEL", 200);
         return;
@@ -1517,7 +1964,7 @@ bool PortInstallOnly(const std::string& port_id, std::string& out_error) {
     if (!def) { out_error = "id de port desconhecido: " + port_id; return false; }
 
     std::string dir = ResolvePortDir(port_id);
-    if (!dir.empty() && !FindBestExecutable(dir).empty()) {
+    if (!ResolvePortExe(def, dir).empty()) {
         out_error.clear();
         return true; // already installed
     }
@@ -1525,4 +1972,14 @@ bool PortInstallOnly(const std::string& port_id, std::string& out_error) {
     bool ok = DownloadAndInstall(*def, out_error);
     if (ok && def->needs_rom) PortAutoSetupRom(def->id);
     return ok;
+}
+
+bool PortPrepareOnly(const std::string& port_id, std::string& out_error) {
+    const PortDefinition* def = FindPortDef(port_id);
+    if (!def) { out_error = "id de port desconhecido: " + port_id; return false; }
+    if (!PortInstallOnly(port_id, out_error)) return false;
+    if (def->x360_game_dir.empty()) { out_error.clear(); return true; }
+    std::string dir = ResolvePortDir(port_id);
+    if (X360GameReady(*def, dir)) { out_error.clear(); return true; }
+    return PrepareX360Game(*def, dir, out_error);
 }

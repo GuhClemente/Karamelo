@@ -1,0 +1,31 @@
+﻿==========================================================================
+ Xbox 360 - Ports & Recomp (nao e um sistema emulado)
+==========================================================================
+
+Esta pasta NAO e usada por nenhum core de emulacao. Ela existe para os
+jogos de Xbox 360 recompilados nativamente do menu "Ports & Recomp"
+(hoje: The Darkness, via portingpete/The-Darkness-Recomp).
+
+Coloque aqui a imagem .iso do SEU disco (dump do seu proprio console).
+O nome do arquivo precisa conter o nome do jogo, por exemplo:
+  The Darkness (USA).iso
+
+Ao abrir o jogo pelo menu, o Karamelo faz sozinho o que o projeto
+original pede para fazer a mao:
+  1. extrai o ISO para ports/TheDarknessRecomp/Darkness/
+     (substitui o "Xbox 360 Image Browser");
+  2. gera basefile.exe e _uncrypted.xex a partir do default.xex
+     (substitui o XexTool);
+  3. confere o SHA-256 dos dois arquivos contra o que o port exige.
+
+A primeira abertura demora alguns minutos (copia varios GB). As seguintes
+abrem direto. Precisa de espaco livre no disco igual ao tamanho do ISO.
+Depois de preparado, o ISO pode ser apagado ou movido.
+
+Se aparecer "DUMP NAO CONFERE COM O PORT", sua revisao do disco e
+diferente da suportada pelo port. Detalhes (Title ID, Media ID e os
+hashes gerados) ficam em karamelo.log, linhas [PORT-X360].
+
+Formatos aceitos: .iso (imagem XGD2/XGD3 completa ou so a particao do
+jogo). Pastas GOD / XBLA / .zip nao sao suportadas.
+==========================================================================

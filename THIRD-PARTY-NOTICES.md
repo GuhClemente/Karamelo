@@ -4,10 +4,10 @@ O Karamelo Emulador é distribuído sob a [GNU GPL-3.0](LICENSE.md) (explicaçã
 é feito só de código próprio. Este arquivo lista tudo que entra no binário ou é
 distribuído junto, com a licença original de cada um.
 
-Todas as bibliotecas abaixo são permissivas (zlib, MIT, BSD-3, CC0) e portanto
-compatíveis com a GPL-3: podem ser combinadas num programa GPL-3 desde que os
-avisos originais sigam junto — que é exatamente para isso que este arquivo
-existe.
+Quase todas as bibliotecas abaixo são permissivas (zlib, MIT, BSD-3, CC0); a
+exceção é o libmspack, LGPL-2.1. Todas são compatíveis com a GPL-3: podem ser
+combinadas num programa GPL-3 desde que os avisos originais sigam junto — que
+é exatamente para isso que este arquivo existe.
 
 Isto aqui é **obrigação legal**, não cortesia: zlib, BSD-3 e MIT exigem que o
 aviso de copyright acompanhe qualquer redistribuição, inclusive em forma
@@ -164,6 +164,26 @@ LZMA SDK is placed in the public domain.
 Anyone is free to copy, modify, publish, use, compile, sell, or distribute the
 original LZMA SDK code, either in source code form or as a compiled binary,
 for any purpose, commercial or non-commercial, and by any means.
+```
+
+### libmspack — LGPL-2.1
+
+Descompressor LZX usado para ler o `default.xex` de jogos de Xbox 360 nos
+ports que exigem o dump do próprio jogador (The Darkness Recomp). Vendorizado
+em `third_party/libmspack/` (só o decodificador LZX; procedência em
+`third_party/libmspack/README.karamelo.md`), sem modificações. Texto completo
+da licença em `third_party/libmspack/COPYING.LIB`. A LGPL-2.1 permite (§3) que
+o código seja distribuído sob a GPL, que é o caso aqui.
+
+```
+This file is part of libmspack.
+(C) 2003-2023 Stuart Caie.
+
+libmspack is free software; you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License (LGPL) version 2.1
+
+The LZX method was created by Jonathan Forbes and Tomi Poutanen, adapted
+by Microsoft Corporation.
 ```
 
 ---

@@ -1453,6 +1453,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return ok ? 0 : 1;
 	}
 
+	// Headless Xbox 360 dump preparation: "Karamelo.exe --prepare-port <id>"
+	// installs the port if needed and then does what the menu does right
+	// before the first launch of an Xbox 360 recomp - extracts the user's ISO
+	// from roms/Xbox360/ and builds basefile.exe/_uncrypted.xex, checked
+	// against the digests the installed recomp enforces. Details go to
+	// karamelo.log ([PORT-X360] lines).
+	if (__argc > 2 && _stricmp(__argv[1], "--prepare-port") == 0)
+	{
+		PortInit();
+		std::string prep_error;
+		bool ok = PortPrepareOnly(__argv[2], prep_error);
+		FILE* lf = fopen("karamelo.log", "a");
+		if (lf)
+		{
+			fprintf(lf, "[INFO] [PORT-PREPARE] %s -> %s%s%s\n", __argv[2],
+				ok ? "OK" : "FALHOU", prep_error.empty() ? "" : ": ", prep_error.c_str());
+			fclose(lf);
+		}
+		return ok ? 0 : 1;
+	}
+
 	// Headless end-to-end test: "Karamelo.exe --launch-port <id>" calls
 	// PortLaunch() exactly the way the "Ports & Recomp" menu entry does -
 	// download-if-needed, then launch - and pumps PortPumpPendingLaunch()

@@ -373,12 +373,13 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 21/09/2026:** são **55** jogos de "Ports & Recomp" — 42 até
+**Atualizado em 27/09/2026:** são **57** jogos de "Ports & Recomp" — 42 até
 11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
 F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
-Soulcalibur II / Ring Out — ver seção 16).
+Soulcalibur II / Ring Out — ver seção 16), +2 em 27/09 (The Darkness, Xbox 360,
+e Super Smash Bros. Melee / Melee Unlocked — ver seção 18).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte — essa tabela só cresce,
-não copie nenhum número antigo (39, 40, 41, 42, 47) de outra página no futuro. É coincidência
+não copie nenhum número antigo (39, 40, 41, 42, 47, 55, 56) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -473,8 +474,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **55** jogos de Ports & Recomp (atualizado em 21/09/2026 — ver seções
-  10, 11, 13, 15 e 16),
+- Os **57** jogos de Ports & Recomp (atualizado em 27/09/2026 — ver seções
+  10, 11, 13, 15, 16 e 18),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -560,7 +561,7 @@ suporta** — 🪟 para Windows, 🐧 para Linux, 🍎 para macOS (Apple Silicon
 Universal). A fonte de verdade agora é a própria tabela em
 [CREDITS.md](../CREDITS.md), que traz a coluna **SO** com esses três ícones,
 verificada em 21/09/2026 contra a release mais recente de cada um dos 55
-repositórios. Leia de lá — não estime, não invente.
+repositórios daquela data (+ The Darkness e Melee Unlocked, verificados em 27/09/2026). Leia de lá — não estime, não invente.
 
 ### O que "SO" significa aqui
 
@@ -568,7 +569,7 @@ repositórios. Leia de lá — não estime, não invente.
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 55 ports possuem builds executáveis (.exe).
+- No **Windows**: todos os 57 ports possuem builds executáveis (.exe).
 - No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 32 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
@@ -580,7 +581,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 55 jogos.
+   - **Filtro Windows (🪟)**: 57 jogos.
    - **Filtro Linux (🐧)**: 32 jogos.
    - **Filtro macOS (🍎)**: 24 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
@@ -604,12 +605,14 @@ Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
   Sonic 3 A.I.R., Super Mario Bros. Remastered, Super Mario World,
   Pokemon Snap, Body Harvest, Diddy Kong Racing, Pokemon Red and Blue (reblue),
   AeroGauge, Crash Bandicoot, Pikmin (Open Nectar), Soulcalibur II (Ring Out).
-- **🪟 apenas (18 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟 apenas (20 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
   Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
   Jak & Daxter, LoD: Severed Chains, Castlevania: SotN, Sonic 1 Forever,
   Sonic Unleashed, Viva Pinata, WipEout Phantom Edition,
-  Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey).
+  Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey),
+  The Darkness (Xbox 360) e Super Smash Bros. Melee (Melee Unlocked) —
+  ambos adicionados em 27/09/2026, ver seção 18.
 
 ---
 
@@ -783,3 +786,105 @@ Nesta atualização, quatro melhorias significativas de experiência do usuário
 - Na tela de controles (`Controller`), foi adicionada a opção **"Mapear Tudo (Passo a Passo) >"**.
 - Ao ser ativado, o assistente guia o jogador automaticamente botão por botão (D-Pad Cima, Baixo, Esquerda, Direita, B, A, Y, X, L1, R1, Start, Select, L2, R2, L3, R3), exibindo a contagem progressiva `[N/16]` e o botão esperado em notificações na tela.
 - Ao pressionar um botão, o binding é atribuído e o assistente avança automaticamente para o próximo. Ao concluir, salva a configuração e exibe mensagem de sucesso. Tecla ESC cancela a qualquer instante.
+
+---
+
+## 18. Adição de 27/09/2026 — The Darkness (primeiro recompilado de Xbox 360), Melee Unlocked e ISO do jogador lido automaticamente
+
+O catálogo de "Ports & Recomp" vai de 55 para **57 títulos**. Novos totais,
+conferidos contra o `CREDITS.md`: **57 Windows 🪟, 32 Linux 🐧, 24 macOS 🍎**
+(Linux e macOS não mudam — os dois projetos só publicam build Windows).
+
+### Entrada 1 — The Darkness
+
+- **The Darkness (Xbox 360)** — [portingpete/The-Darkness-Recomp](https://github.com/portingpete/The-Darkness-Recomp) — 🪟 apenas.
+- Recompilação estática do executável de Xbox 360 para C++ (XenonRecomp),
+  renderizador Direct3D 11 próprio, áudio XMA, mouse + controle, saves.
+  **Não é emulação.** Licença GPL-3.0.
+- É o **primeiro jogo de Xbox 360** da lista — vale destaque se o site
+  agrupar por console de origem (os outros vêm de N64, SNES, PS1, GameCube,
+  Game Boy, Mega Drive, PC).
+- Estado: o projeto só publica *prereleases* (v0.1.2 em 27/09/2026) e o
+  próprio runtime se descreve como "development build, gameplay incomplete".
+  Descreva como **experimental / em desenvolvimento**, nunca como "completo".
+- Requisitos: Windows 10/11 64-bit, GPU com Direct3D 11.
+
+### O diferencial para o site: "coloque o ISO e jogue"
+
+O projeto original exige três ferramentas e passos manuais: extrair o disco
+com o *Xbox 360 Image Browser*, rodar o *XexTool* do xorloser duas vezes em
+PowerShell para gerar `basefile.exe` e `_uncrypted.xex`, e conferir SHA-256 à
+mão. **No Karamelo nada disso é necessário.** O jogador coloca o `.iso` do
+próprio disco em `roms/Xbox360/` e abre o jogo pelo menu; o Karamelo:
+
+1. baixa o port do GitHub;
+2. extrai o ISO sozinho (leitor XDVDFS/GDFX nativo, com % na tela);
+3. descriptografa e descomprime o `default.xex` sozinho (AES + LZX nativos);
+4. confere os hashes contra os que o próprio port exige antes de abrir —
+   se o disco for de outra revisão, avisa em vez de abrir e fechar.
+
+Texto curto sugerido para o card/modal (pt-BR):
+
+> **The Darkness** *(Xbox 360 · experimental)* — recompilação nativa para PC.
+> Coloque o ISO do seu disco em `roms/Xbox360` e abra pelo menu: o Karamelo
+> extrai o jogo e prepara os arquivos sozinho — sem XexTool, sem Image
+> Browser, sem linha de comando. Só Windows.
+
+Pontos obrigatórios em qualquer texto do site sobre essa entrada:
+
+- **O jogo não vem com o Karamelo.** O jogador precisa do dump do **próprio**
+  disco (`.iso`). Não sugira nem linke fontes de ISO.
+- Só uma revisão do disco é suportada pelo port (Title ID `545407EE`, Media ID
+  `0F213645`); o Karamelo diz claramente quando o disco não é essa.
+- A primeira abertura demora alguns minutos (cópia de vários GB); as
+  seguintes abrem direto.
+- Formatos: `.iso` (imagem completa XGD2/XGD3 ou só a partição do jogo).
+  Pastas GOD/XBLA e `.zip` não.
+
+### Entrada 2 — Super Smash Bros. Melee (Melee Unlocked)
+
+- [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) — 🪟 apenas. Licença GPL-2.0.
+- Recompilação estática do executável de GameCube do **Melee NTSC 1.02**
+  (mais os códigos Gecko do Slippi) com renderizador Direct3D 12 (ou 11).
+  A lógica roda a 60 Hz como no console; a imagem roda a qualquer taxa
+  (FPS destravado com quadros intermediários reais, não interpolação de
+  imagem). DLSS/DLAA, resolução interna até 8x, widescreen 16:9, adaptador
+  de controle GameCube (WUP-028) e **Slippi online** contra jogadores do
+  Slippi Dolphin.
+- Estado: **beta** (release v0.7.1 em 27/09/2026). Descreva como beta.
+- Não é afiliado ao Slippi, à Nintendo nem à HAL — se o site citar Slippi,
+  deixe claro que é compatibilidade com o netplay do Slippi, não um produto
+  deles.
+
+Como o jogador usa no Karamelo: coloca o `.iso` do **próprio** disco Melee
+NTSC 1.02 em `roms/GameCube/` (nome contendo "melee") e abre pelo menu. O
+Karamelo baixa o port (~158 MB), lê o cabeçalho de cada ISO com "melee" no
+nome e usa só o que for `GALE01` revisão 2 — ISOs 1.00, Training Mode ou 20XX
+na mesma pasta são ignorados, e se só houver esses o aviso diz que o disco é
+o errado. O ISO é lido no lugar (não é copiado). Primeira abertura: 15-30 s
+compilando shaders. **F1** abre as configurações de PC do jogo.
+
+Online exige uma conta Slippi, criada e logada uma vez pelo Slippi Launcher
+(que também instala o driver do adaptador GameCube). Offline não precisa de
+nada disso.
+
+Texto curto sugerido para o card/modal (pt-BR):
+
+> **Super Smash Bros. Melee — Melee Unlocked** *(GameCube · beta)* —
+> recompilação nativa com FPS destravado, DLSS e Slippi online. Coloque o
+> ISO NTSC 1.02 do seu disco em `roms/GameCube` e abra pelo menu. Só Windows.
+
+### O que mudar no site
+
+1. Contagens: **57** jogos em Ports & Recomp (seções 9.3/9.9), filtro
+   **Windows = 57**, Linux = 32, macOS = 24 (seção 12).
+2. Lista "🪟 apenas" da seção 12: agora **20 jogos**, com The Darkness e
+   Super Smash Bros. Melee (Melee Unlocked).
+3. Se houver página de "como adicionar jogos" ou "pastas de ROM": acrescentar
+   `roms/Xbox360/` com a explicação acima — **não é um sistema emulado** (a
+   contagem de **35 sistemas** e **40 motores** não muda), é só onde fica o
+   ISO dos recompilados de Xbox 360.
+4. Nada muda em BIOS: não há BIOS nem chave para o jogador fornecer.
+
+Detalhe técnico completo (para FAQ ou página de desenvolvedor):
+[docs/XBOX360_RECOMP.md](XBOX360_RECOMP.md).

@@ -83,6 +83,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     /I third_party\libchdr ^
     /I third_party\SDL3\include ^
     /I third_party\Vulkan-Headers\include ^
+    /I third_party\libmspack ^
     /D_CRT_SECURE_NO_WARNINGS ^
     /DRC_CLIENT_SUPPORTS_HASH ^
     /DZSTD_DISABLE_ASM ^
@@ -104,6 +105,8 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     src\retroachievements.cpp ^
     src\updater.cpp ^
     src\port_runner.cpp ^
+    src\x360_dump.cpp ^
+    third_party\libmspack\lzxd.c ^
     src\crash_reporter.cpp ^
     src\main_win32.cpp ^
     third_party\rcheevos\src\*.c ^
@@ -116,7 +119,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     /link /OUT:app\%APP_EXE% ^
     user32.lib gdi32.lib winmm.lib ws2_32.lib winhttp.lib shell32.lib opengl32.lib dwmapi.lib ole32.lib ^
     kernel32.lib imm32.lib oleaut32.lib version.lib uuid.lib advapi32.lib setupapi.lib ^
-    d3d11.lib d3dcompiler.lib ^
+    d3d11.lib d3dcompiler.lib bcrypt.lib ^
     /SUBSYSTEM:WINDOWS /DEBUG /PDBALTPATH:%%_PDB%% /GUARD:CF /MAP:build\%APP_BASE%.map /OPT:REF /OPT:ICF
 
 if errorlevel 1 (

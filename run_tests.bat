@@ -16,6 +16,7 @@ echo [BUILDING UNIT TESTS]...
 cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     /I include ^
     /I tests ^
+    /I third_party\libmspack ^
     /D_CRT_SECURE_NO_WARNINGS ^
     /Fobuild\ ^
     tests\test_main.cpp ^
@@ -25,12 +26,15 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     tests\test_math_video.cpp ^
     tests\test_updater.cpp ^
     tests\test_crash_reporter.cpp ^
+    tests\test_x360_dump.cpp ^
     src\karamelo_math.cpp ^
     src\netplay_protocol.cpp ^
     src\archive_helper.cpp ^
     src\updater.cpp ^
     src\crash_reporter.cpp ^
-    /link /OUT:build\karamelo_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib shell32.lib user32.lib
+    src\x360_dump.cpp ^
+    third_party\libmspack\lzxd.c ^
+    /link /OUT:build\karamelo_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib shell32.lib user32.lib bcrypt.lib
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Unit test compilation failed.
