@@ -16,7 +16,7 @@ Este documento é o guia de referência operacional e arquitetural para agentes 
 * **Multiplataforma Nativa**:
   - **Windows**: x86_64 nativo (Win32 API, Direct3D 11, WASAPI).
   - **Linux**: x86_64 nativo (SDL3, OpenGL, ALSA/Pulse/PipeWire via SDL).
-  - **macOS**: ARM64 nativo Apple Silicon M1/M2/M3/M4 (SDL3, Cocoa, Metal/OpenGL).
+  - **macOS**: ARM64 nativo Apple Silicon M1/M2/M3/M4 (SDL3, Cocoa, Metal/OpenGL). SDL3 estático (compilado de `third_party/SDL3`), mínimo macOS 11.0, sem depender de Homebrew.
 
 ---
 
@@ -52,7 +52,7 @@ src/
 ├── netplay.cpp            # Netplay P2P via UDP
 ├── netplay_protocol.cpp   # Protocolo e framing de pacotes de sincronização de rede
 ├── retroachievements.cpp  # Integração nativa com rcheevos v12.4.0
-├── updater.cpp            # Auto-atualizador multiplataforma consumindo version.json
+├── updater.cpp            # Auto-atualizador (Windows exe_*, macOS macos_bin_*, Linux linux_bin_*), com SHA-256 obrigatório
 └── karamelo_math.cpp      # Cálculos de aspect ratio, viewport integer-scaling e scanlines
 ```
 

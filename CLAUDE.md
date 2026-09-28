@@ -16,7 +16,7 @@ This file provides project guidelines, architecture details, and essential comma
 * **Multiplatform Support**:
   - **Windows x64**: Native Win32 API, Direct3D 11, WASAPI audio.
   - **Linux x64**: Native SDL3, OpenGL, threaded audio ring buffer.
-  - **macOS ARM64**: Native Apple Silicon M1-M4 (SDL3, Cocoa, Metal/OpenGL).
+  - **macOS ARM64**: Native Apple Silicon M1-M4 (SDL3, Cocoa, Metal/OpenGL). SDL3 is built from `third_party/SDL3` and linked statically; the binary targets macOS 11.0+ and needs no Homebrew libraries at runtime.
 
 ---
 
@@ -92,4 +92,5 @@ upload_to_server.bat
 * **`src/core_runner.cpp`**: Libretro core hosting thread, audio resampler, aspect ratio calculations, scanlines and CRT shader pipeline. Loads `.dll` (Win), `.so` (Linux), `.dylib` (macOS).
 * **`src/port_runner.cpp`**: PC Ports & Static Recomp runner. Fetches latest GitHub releases, matches platform assets, unpacks `.zip`/`.tar.gz`/`.tar.xz`, extracts `.app` bundles (`Contents/MacOS/`), resolves executable architectures (`ARM64` > `Universal` > `x86_64`), sets permissions (`chmod +x`), and launches the games.
 * **`src/menu.cpp` & `src/osd.cpp`**: Clean-room raster OSD engine mimicking the MiSTer retro aesthetic without using GPL code from MiSTer.
-* **`src/updater.cpp`**: Checks `https://karamelo-emu.com/downloads/version.json` for binary or full-package auto-updates across Windows, Linux, and macOS.
+* **`src/updater.cpp`**: Checks `https://karamelo-emu.com/downloads/version.json` for binary auto-updates across Windows (`exe_*`), macOS (`macos_bin_*`) and Linux (`linux_bin_*`). Every download is size- and SHA-256-checked before it replaces the running binary. On macOS/Linux, `Karamelo --update` runs the same check/download/apply headless.
+* **App icon**: one source, `src/karamelo.ico` (`tools/make_icon.py`). Windows embeds it via `src/resource.rc`; macOS/Linux get it from `include/karamelo_icon_png.h` (regenerate with `tools/embed_icon.py`) as the window/Dock icon, plus the Finder file icon set by `package_macos.sh` and a `~/.local/share/applications/karamelo-emu.desktop` entry written at startup on Linux.

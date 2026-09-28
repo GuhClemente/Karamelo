@@ -9,6 +9,14 @@
 #pragma comment(lib, "bcrypt.lib")
 #else
 #include "compat_win32.h"
+#include <spawn.h>
+#include <sys/stat.h>
+#ifdef __APPLE__
+#include <sys/xattr.h>
+#endif
+#include <sys/wait.h>
+#include <unistd.h>
+extern char** environ;
 #endif
 
 #include <stdio.h>
@@ -114,21 +122,43 @@ static bool ExtractJsonBool(const std::string& json, const std::string& key)
 	return false;
 }
 
-static bool ParseManifestJson(const std::string& json, UpdateInfo& out)
+bool UpdaterParseManifest(const std::string& json, const std::string& platform, UpdateInfo& out)
 {
+	out = UpdateInfo();
 	out.version = ExtractJsonString(json, "version");
 	if (out.version.empty()) return false;
 
 	out.title = ExtractJsonString(json, "title");
 	out.release_date = ExtractJsonString(json, "release_date");
 	out.notes = ExtractJsonString(json, "notes");
-	out.exe_url = ExtractJsonString(json, "exe_url");
-	out.exe_sha256 = ExtractJsonString(json, "exe_sha256");
-	out.zip_url = ExtractJsonString(json, "zip_url");
-	out.exe_size = ExtractJsonNumber(json, "exe_size");
 	out.force_full_package = ExtractJsonBool(json, "force_full_package");
 
+	// One manifest serves all three builds. Windows keeps the original
+	// exe_* / zip_url keys; macOS and Linux have their own prefixed ones
+	// (written by package_macos.sh / package_linux.sh). Reading exe_* on every
+	// platform used to make a Mac or Linux build download Karamelo.exe.
+	std::string bin, pkg;
+	if (platform == "macos")      { bin = "macos_bin"; pkg = "macos_tar_url"; }
+	else if (platform == "linux") { bin = "linux_bin"; pkg = "linux_tar_url"; }
+	else                          { bin = "exe";       pkg = "zip_url"; }
+
+	out.exe_url = ExtractJsonString(json, bin + "_url");
+	out.exe_sha256 = ExtractJsonString(json, bin + "_sha256");
+	out.exe_size = ExtractJsonNumber(json, bin + "_size");
+	out.zip_url = ExtractJsonString(json, pkg);
+
 	return true;
+}
+
+static bool ParseManifestJson(const std::string& json, UpdateInfo& out)
+{
+#if defined(_WIN32)
+	return UpdaterParseManifest(json, "windows", out);
+#elif defined(__APPLE__)
+	return UpdaterParseManifest(json, "macos", out);
+#else
+	return UpdaterParseManifest(json, "linux", out);
+#endif
 }
 
 // Version Comparison
@@ -184,6 +214,16 @@ static std::string GetCurrentExecutablePath()
 	char path[MAX_PATH] = { 0 };
 	GetModuleFileNameA(NULL, path, MAX_PATH);
 	return std::string(path);
+}
+
+// Where a downloaded update waits until it is applied.
+static std::string GetNewExePath()
+{
+#ifdef _WIN32
+	return GetExecutableDirectory() + "\\Karamelo.new";
+#else
+	return GetExecutableDirectory() + "/Karamelo.new";
+#endif
 }
 
 #ifdef _WIN32
@@ -401,9 +441,79 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 	return success;
 }
 #else
+// Runs argv (no shell) and waits for it. When track_file is set, the size of
+// that file drives g_progress against expected_size while the process runs.
+static bool RunAndWait(const std::vector<std::string>& args, const std::string& track_file, size_t expected_size)
+{
+	std::vector<char*> argv;
+	for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+	argv.push_back(nullptr);
+
+	pid_t pid = 0;
+	if (posix_spawnp(&pid, argv[0], NULL, NULL, argv.data(), environ) != 0) return false;
+
+	int status = 0;
+	for (;;)
+	{
+		pid_t r = waitpid(pid, &status, WNOHANG);
+		if (r == pid) break;
+		if (r < 0) return false;
+		if (!track_file.empty() && expected_size > 0)
+		{
+			struct stat st;
+			if (stat(track_file.c_str(), &st) == 0)
+			{
+				int pct = (int)(((size_t)st.st_size * 100) / expected_size);
+				if (pct > 99) pct = 99;
+				std::lock_guard<std::mutex> lock(g_updater_lock);
+				g_progress = pct;
+			}
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+// Downloads straight to dest_path: HTTPS only (redirects included), a non-2xx
+// answer is a failure instead of an error page saved as the new binary, and a
+// stalled transfer gives up after a minute rather than hanging the updater.
+static bool CurlToFile(const std::string& url, const std::string& dest_path, size_t expected_size)
+{
+	remove(dest_path.c_str());
+	bool ok = RunAndWait({ "curl", "-sSL", "--fail", "--proto", "=https", "--proto-redir", "=https",
+	                       "--connect-timeout", "15", "--speed-limit", "1", "--speed-time", "60",
+	                       "-o", dest_path, url }, dest_path, expected_size);
+	struct stat st;
+	if (ok && stat(dest_path.c_str(), &st) == 0)
+	{
+		size_t got = (size_t)st.st_size;
+		if (expected_size > 0 ? got == expected_size : got > 1024) return true;
+	}
+	remove(dest_path.c_str());
+	return false;
+}
+
+// Quotes a path for popen's /bin/sh: inside single quotes nothing expands, so
+// only a single quote itself needs escaping.
+static std::string ShellQuote(const std::string& s)
+{
+	std::string out = "'";
+	for (char c : s)
+	{
+		if (c == '\'') out += "'\\''";
+		else out += c;
+	}
+	return out + "'";
+}
+
 static std::string Sha256File(const std::string& path)
 {
-	std::string cmd = "sha256sum \"" + path + "\" 2>/dev/null";
+	// sha256sum only ships with macOS 14 and later; shasum is on every macOS.
+#ifdef __APPLE__
+	std::string cmd = "shasum -a 256 " + ShellQuote(path) + " 2>/dev/null";
+#else
+	std::string cmd = "sha256sum " + ShellQuote(path) + " 2>/dev/null";
+#endif
 	FILE* pipe = popen(cmd.c_str(), "r");
 	if (!pipe) return "";
 	char buf[128] = { 0 };
@@ -558,6 +668,7 @@ static void UpdaterThreadProc()
 				expected_size = g_info.exe_size;
 			}
 
+#ifdef _WIN32
 			if (dl_url.empty())
 			{
 				dl_url = "https://karamelo-emu.com/downloads/Karamelo.exe";
@@ -565,6 +676,13 @@ static void UpdaterThreadProc()
 
 			size_t total_size = 0;
 			bool dl_ok = HttpFetchData(dl_url, NULL, NULL, &total_size, expected_size, true);
+#else
+			// No default URL here: the only fallback that ever existed is the
+			// Windows .exe. And a binary is only ever applied with a hash to
+			// check it against.
+			bool dl_ok = !dl_url.empty() && !expected_sha256.empty() &&
+			             CurlToFile(dl_url, GetNewExePath(), expected_size);
+#endif
 
 			// The manifest's exe_sha256 was parsed but never checked against
 			// what actually landed on disk - a MITM'd plain-HTTP fallback
@@ -575,7 +693,7 @@ static void UpdaterThreadProc()
 			std::string new_exe_path;
 			if (dl_ok && !expected_sha256.empty())
 			{
-				new_exe_path = GetExecutableDirectory() + "\\Karamelo.new";
+				new_exe_path = GetNewExePath();
 				std::string actual_sha256 = Sha256File(new_exe_path);
 
 				std::string expected_lower = expected_sha256, actual_lower = actual_sha256;
@@ -609,12 +727,20 @@ static void UpdaterThreadProc()
 void UpdaterInit()
 {
 	// Clean up any leftover temporary files from a previous update
+#ifdef _WIN32
 	std::string app_dir = GetExecutableDirectory();
 	std::string old_bat = app_dir + "\\_update_apply.bat";
 	std::string old_exe = app_dir + "\\Karamelo.exe.old";
 
 	if (fs::exists(old_bat)) fs::remove(old_bat);
 	if (fs::exists(old_exe)) fs::remove(old_exe);
+#else
+	// The previous binary kept by the last update, and a download that was
+	// never applied (the "ready" state does not survive a restart).
+	std::error_code ec;
+	fs::remove(GetCurrentExecutablePath() + ".old", ec);
+	fs::remove(GetNewExePath(), ec);
+#endif
 
 	g_updater_running.store(true);
 	g_updater_thread = std::thread(UpdaterThreadProc);
@@ -671,6 +797,54 @@ void UpdaterStartDownload()
 	}
 	g_updater_cv.notify_one();
 }
+
+#ifndef _WIN32
+bool UpdaterApplyDownloaded()
+{
+	std::string target = GetCurrentExecutablePath();
+	std::string new_exe = GetNewExePath();
+	if (target.empty() || !fs::exists(new_exe)) return false;
+
+	// Checked again right before it replaces the running binary, not only
+	// when the download finished.
+	std::string expected = UpdaterGetInfo().exe_sha256;
+	std::string actual = Sha256File(new_exe);
+	std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
+	std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
+	if (expected.empty() || actual != expected) return false;
+
+	if (chmod(new_exe.c_str(), 0755) != 0) return false;
+
+#ifdef __APPLE__
+	// The Finder icon that package_macos.sh put on the binary lives in these
+	// two xattrs; the downloaded file has none, so carry them over or the
+	// update would leave a blank icon behind.
+	for (const char* name : { "com.apple.FinderInfo", "com.apple.ResourceFork" })
+	{
+		ssize_t len = getxattr(target.c_str(), name, NULL, 0, 0, 0);
+		if (len <= 0) continue;
+		std::vector<char> value((size_t)len);
+		if (getxattr(target.c_str(), name, value.data(), value.size(), 0, 0) == len)
+			setxattr(new_exe.c_str(), name, value.data(), value.size(), 0, 0);
+	}
+#endif
+
+	// Keep the running binary as <name>.old via a hard link, so the name never
+	// points at nothing, then swap the new file in with one rename(): atomic,
+	// and a new inode, which keeps macOS's code-signature check happy (writing
+	// over a signed binary in place gets it killed on launch). The .old copy is
+	// removed by UpdaterInit() on the next start.
+	std::string backup = target + ".old";
+	remove(backup.c_str());
+	bool have_backup = (link(target.c_str(), backup.c_str()) == 0);
+	if (rename(new_exe.c_str(), target.c_str()) != 0)
+	{
+		if (have_backup) remove(backup.c_str());
+		return false;
+	}
+	return true;
+}
+#endif
 
 bool UpdaterApplyAndRestart()
 {
@@ -765,7 +939,12 @@ bool UpdaterApplyAndRestart()
 	}
 	return false;
 #else
-	return false;
+	if (!UpdaterApplyDownloaded()) return false;
+	// Same as Windows: the new version starts with no arguments, back at the
+	// menu. exec keeps the pid and the terminal it was started from.
+	std::string target = GetCurrentExecutablePath();
+	execl(target.c_str(), target.c_str(), (char*)NULL);
+	return false; // exec failed; the new binary is in place for the next start
 #endif
 }
 

@@ -1013,7 +1013,29 @@ O que mudar no site:
 
 ---
 
-## 22. Adição de 29/09/2026 — Star Fox Adventures (Foxhollow)
+## 22. Atualização de 28/09/2026 — macOS sem Homebrew, auto-update no Mac e no Linux, ícone
+
+Os pacotes de macOS e Linux foram gerados com as correções abaixo:
+
+O que o site deve dizer (e corrigir, se disser outra coisa):
+
+1. **Requisito do macOS:** Mac com **Apple Silicon** (M1 ou mais novo) e
+   **macOS 11 (Big Sur) ou mais novo**. **Não precisa de Homebrew** nem de
+   instalar nada: o executável já traz tudo o que usa. (Até a primeira
+   publicação da 0.9.6 o binário exigia o SDL3 do Homebrew —
+   se o site citava `brew install sdl3`, remover.)
+2. **Atualização automática nos três sistemas.** O menu *Update* do
+   Karamelo agora baixa, confere (SHA-256) e instala a versão nova também no
+   macOS e no Linux, e reabre o programa — antes só funcionava no Windows.
+   No macOS e no Linux também existe `./Karamelo --update` no terminal.
+3. **Ícone:** o mesmo ícone do Karamelo do Windows aparece no macOS (Dock e
+   no arquivo `Karamelo` no Finder) e no Linux (janela, e um atalho
+   "Karamelo Emulador" no menu de aplicativos, criado na primeira vez que o
+   programa abre).
+
+---
+
+## 23. Adição de 29/09/2026 — Star Fox Adventures (Foxhollow)
 
 O catálogo de "Ports & Recomp" vai de 57 para **58 títulos** (base: a revisão
 da seção 21). Novos totais,

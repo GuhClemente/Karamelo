@@ -20,30 +20,38 @@ mkdir -p app
 APP_VER=$(grep "#define APP_VERSION " include/app_info.h | awk '{print $3}' | tr -d '"')
 echo "[INFO] Versao do Karamelo: $APP_VER"
 
-# 2. Detectar SDL3 (Homebrew ou pkg-config)
-SDL3_CFLAGS=""
-SDL3_LIBS=""
-if pkg-config --exists sdl3 2>/dev/null; then
-    SDL3_CFLAGS=$(pkg-config --cflags sdl3)
-    SDL3_LIBS=$(pkg-config --libs sdl3)
-    echo "[INFO] SDL3 detectado via pkg-config"
-elif [ -d "/opt/homebrew/include/SDL3" ]; then
-    SDL3_CFLAGS="-I/opt/homebrew/include"
-    SDL3_LIBS="-L/opt/homebrew/lib -Wl,-rpath,/opt/homebrew/lib -lSDL3"
-    echo "[INFO] SDL3 detectado em /opt/homebrew (Apple Silicon)"
-elif [ -d "/usr/local/include/SDL3" ]; then
-    SDL3_CFLAGS="-I/usr/local/include"
-    SDL3_LIBS="-L/usr/local/lib -Wl,-rpath,/usr/local/lib -lSDL3"
-    echo "[INFO] SDL3 detectado em /usr/local (Intel Mac)"
-else
-    echo "[AVISO] SDL3 nao encontrado via Homebrew/pkg-config. Tentando flags padrao..."
-    SDL3_CFLAGS="-Ithird_party/SDL3/include"
-    SDL3_LIBS="-lSDL3"
+# 2. SDL3 estatico, compilado de third_party/SDL3 (o mesmo que o Linux usa)
+# O binario linkava o libSDL3.0.dylib do Homebrew por caminho absoluto: num Mac
+# sem "brew install sdl3" o Karamelo nem abria, e o dylib do Homebrew exige a
+# versao de macOS da maquina que o compilou. Estatico, o executavel se basta -
+# e e o unico arquivo que o auto-update troca.
+MACOS_MIN="11.0"   # primeira versao do macOS em Apple Silicon; os cores tambem pedem 11.0
+if [ ! -f "build/sdl3_macos/libSDL3.a" ]; then
+    echo "[SDL3] Configurando e compilando libSDL3.a estatica (macOS $MACOS_MIN+)..."
+    cmake -S third_party/SDL3 -B build/sdl3_macos -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOS_MIN \
+        -DCMAKE_OSX_ARCHITECTURES=arm64 \
+        -DSDL_STATIC=ON \
+        -DSDL_SHARED=OFF \
+        -DSDL_TEST_LIBRARY=OFF \
+        -DSDL_EXAMPLES=OFF \
+        -DSDL_DISABLE_INSTALL=ON \
+        -DSDL_DISABLE_INSTALL_DOCS=ON
+    cmake --build build/sdl3_macos --config Release -j$(sysctl -n hw.ncpu)
 fi
+echo "[INFO] SDL3 estatico pronto em build/sdl3_macos/libSDL3.a"
+
+# Frameworks que o libSDL3.a estatico precisa (Libs do sdl3.pc gerado pelo cmake)
+SDL3_LIBS="build/sdl3_macos/libSDL3.a \
+    -framework CoreMedia -framework CoreVideo -framework Cocoa -weak_framework UniformTypeIdentifiers \
+    -framework IOKit -framework ForceFeedback -framework Carbon -framework CoreAudio -framework AudioToolbox \
+    -framework AVFoundation -framework Foundation -framework GameController -framework Metal \
+    -framework QuartzCore -weak_framework CoreHaptics"
 
 # Flags comuns
-COMMON_INCLUDES="-Iinclude -Ithird_party/rcheevos/include -Ithird_party/rcheevos/src -Ithird_party/libchdr/include -Ithird_party/libchdr -Ithird_party/SDL3/include -Ithird_party/Vulkan-Headers/include -Ithird_party/libretro-common/include $SDL3_CFLAGS"
-COMMON_DEFS="-DRC_CLIENT_SUPPORTS_HASH -DZSTD_DISABLE_ASM -DGL_SILENCE_DEPRECATION"
+COMMON_INCLUDES="-Iinclude -Ithird_party/rcheevos/include -Ithird_party/rcheevos/src -Ithird_party/libchdr/include -Ithird_party/libchdr -Ithird_party/SDL3/include -Ithird_party/Vulkan-Headers/include -Ithird_party/libretro-common/include"
+COMMON_DEFS="-mmacosx-version-min=$MACOS_MIN -DRC_CLIENT_SUPPORTS_HASH -DZSTD_DISABLE_ASM -DGL_SILENCE_DEPRECATION"
 
 # 3. Compilar libchdr (C)
 echo "[1/4] Compilando libchdr..."
@@ -96,7 +104,7 @@ done
 
 # 6. Linkar Executavel Principal
 echo "[4/4] Linkando app/Karamelo..."
-clang++ -std=c++20 build/macos_obj/*.o \
+clang++ -std=c++20 -mmacosx-version-min=$MACOS_MIN build/macos_obj/*.o \
     $SDL3_LIBS \
     -framework OpenGL \
     -lpthread -ldl -lm \

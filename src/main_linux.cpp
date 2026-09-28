@@ -14,6 +14,7 @@
 #include <thread>
 #include <chrono>
 #include <filesystem>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -34,6 +35,7 @@ namespace fs = std::filesystem;
 #include "hw_render_vulkan.h"
 #include "hw_render_d3d11.h"
 #include "karamelo_math.h"
+#include "karamelo_icon_png.h"
 
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
@@ -664,6 +666,97 @@ static void PollGamepad()
 	}
 }
 
+// -------------------------------------------------------------
+// App icon: the same drawing the Windows .exe carries (src/karamelo.ico, see
+// tools/embed_icon.py). Neither Mach-O nor ELF has an icon resource, so it is
+// applied to the window here - the Dock icon on macOS, the window/taskbar
+// icon on Linux.
+// -------------------------------------------------------------
+#define KARAMELO_APP_ID "karamelo-emu"
+
+static void ApplyWindowIcon(SDL_Window* window)
+{
+	SDL_IOStream* io = SDL_IOFromConstMem(KARAMELO_ICON_PNG, sizeof(KARAMELO_ICON_PNG));
+	SDL_Surface* icon = io ? SDL_LoadPNG_IO(io, true) : NULL;
+	if (!icon)
+	{
+		fprintf(stderr, "[WARN] [ICON] icone nao carregado: %s\n", SDL_GetError());
+		return;
+	}
+	SDL_SetWindowIcon(window, icon);
+	SDL_DestroySurface(icon);
+}
+
+#if !defined(__APPLE__)
+// Writes path only when its content would change, so a normal start does not
+// touch the disk.
+static void WriteFileIfChanged(const std::string& path, const void* data, size_t size)
+{
+	std::error_code ec;
+	if (fs::exists(path, ec) && fs::file_size(path, ec) == size)
+	{
+		std::vector<char> cur(size);
+		FILE* f = fopen(path.c_str(), "rb");
+		bool same = f && fread(cur.data(), 1, size, f) == size && memcmp(cur.data(), data, size) == 0;
+		if (f) fclose(f);
+		if (same) return;
+	}
+	FILE* f = fopen(path.c_str(), "wb");
+	if (!f) return;
+	fwrite(data, 1, size, f);
+	fclose(f);
+}
+
+// Linux: an ELF file has no icon, and GNOME on Wayland ignores window icons
+// altogether - what puts the Karamelo icon in the app menu, dock and taskbar
+// is a .desktop entry whose name matches the window's app id. It lives in the
+// user's own ~/.local/share (nothing system-wide, no root) and points at
+// wherever this copy of Karamelo is, so it is rewritten if the folder moves.
+static void InstallLinuxDesktopEntry()
+{
+	const char* home = getenv("HOME");
+	if (!home || !*home) return;
+	const char* xdg = getenv("XDG_DATA_HOME");
+	std::string base = (xdg && *xdg) ? std::string(xdg) : std::string(home) + "/.local/share";
+
+	char exe[PATH_MAX] = { 0 };
+	ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+	if (n <= 0) return;
+	exe[n] = '\0';
+
+	std::error_code ec;
+	fs::create_directories(base + "/applications", ec);
+	fs::create_directories(base + "/icons", ec);
+
+	std::string icon_path = base + "/icons/" KARAMELO_APP_ID ".png";
+	WriteFileIfChanged(icon_path, KARAMELO_ICON_PNG, sizeof(KARAMELO_ICON_PNG));
+
+	// Exec is quoted per the Desktop Entry spec: inside double quotes, " ` $
+	// and \ are escaped with a backslash, and every backslash is then doubled
+	// once more because the whole value is itself a desktop-file string.
+	std::string quoted = "\"";
+	for (char c : std::string(exe))
+	{
+		if (c == '"' || c == '`' || c == '$' || c == '\\') quoted += "\\\\";
+		quoted += c;
+	}
+	quoted += "\"";
+
+	std::string entry =
+		"[Desktop Entry]\n"
+		"Type=Application\n"
+		"Name=" APP_NAME_FULL "\n"
+		"Comment=Frontend de emulacao e ports nativos\n"
+		"Exec=" + quoted + "\n"
+		"Path=" + fs::path(exe).parent_path().string() + "\n"
+		"Icon=" + icon_path + "\n"
+		"Terminal=false\n"
+		"Categories=Game;Emulator;\n"
+		"StartupWMClass=" KARAMELO_APP_ID "\n";
+	WriteFileIfChanged(base + "/applications/" KARAMELO_APP_ID ".desktop", entry.data(), entry.size());
+}
+#endif
+
 int main(int argc, char* argv[])
 {
 #ifndef _WIN32
@@ -712,7 +805,59 @@ int main(int argc, char* argv[])
 		printf("  --core-stress <c> <r> [n]     Executa stress test de N ciclos (abrir/carregar/fechar)\n");
 		printf("  --install-port <id>           Instala um port sem abrir a interface grafica\n");
 		printf("  --prepare-port <id>           Instala e prepara o jogo (dump Xbox 360: so Windows)\n");
+		printf("  --update                      Procura, baixa, confere e instala a versao nova\n");
 		return 0;
+	}
+
+	// -------------------------------------------------------------
+	// 0b. Headless self-update (--update): the same updater thread and steps
+	// as the Update menu, minus the restart - it swaps the binary and exits.
+	// -------------------------------------------------------------
+	if (argc > 1 && strcasecmp(argv[1], "--update") == 0)
+	{
+		auto wait_while = [](std::initializer_list<UpdaterState> busy, int timeout_s) {
+			auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout_s);
+			for (;;)
+			{
+				UpdaterState s = UpdaterGetState();
+				if (std::find(busy.begin(), busy.end(), s) == busy.end()) return s;
+				if (std::chrono::steady_clock::now() > deadline) return s;
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			}
+		};
+
+		printf("[UPDATE] Versao instalada: %s\n", APP_VERSION);
+		UpdaterInit();
+		UpdaterCheckAsync(true);
+		UpdaterState s = wait_while({ UPDATER_STATE_IDLE, UPDATER_STATE_CHECKING }, 60);
+		int rc = 1;
+		if (s == UPDATER_STATE_UP_TO_DATE)
+		{
+			printf("[UPDATE] Ja esta na versao mais recente.\n");
+			rc = 0;
+		}
+		else if (s == UPDATER_STATE_AVAILABLE)
+		{
+			UpdateInfo info = UpdaterGetInfo();
+			printf("[UPDATE] Nova versao %s: %s\n", info.version.c_str(), info.exe_url.c_str());
+			UpdaterStartDownload();
+			s = wait_while({ UPDATER_STATE_AVAILABLE, UPDATER_STATE_DOWNLOADING }, 900);
+			if (s == UPDATER_STATE_READY && UpdaterApplyDownloaded())
+			{
+				printf("[UPDATE] Atualizado para %s. Abra o Karamelo de novo.\n", info.version.c_str());
+				rc = 0;
+			}
+			else
+			{
+				printf("[UPDATE] FALHA: %s\n", UpdaterGetStatusMessage().c_str());
+			}
+		}
+		else
+		{
+			printf("[UPDATE] FALHA: %s\n", UpdaterGetStatusMessage().c_str());
+		}
+		UpdaterShutdown();
+		return rc;
 	}
 
 	// -------------------------------------------------------------
@@ -911,6 +1056,13 @@ int main(int argc, char* argv[])
 	// -------------------------------------------------------------
 	CrashReporterInit();
 
+	// The identifier is the Wayland app_id / X11 WM_CLASS, matched against the
+	// karamelo-emu.desktop entry below so the desktop shows the right icon.
+	SDL_SetAppMetadata(APP_NAME_FULL, APP_VERSION, KARAMELO_APP_ID);
+#if !defined(__APPLE__)
+	InstallLinuxDesktopEntry();
+#endif
+
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
 	{
 		fprintf(stderr, "[ERROR] [SDL3] SDL_Init falhou: %s\n", SDL_GetError());
@@ -927,6 +1079,7 @@ int main(int argc, char* argv[])
 		SDL_Quit();
 		return 1;
 	}
+	ApplyWindowIcon(g_window);
 
 	g_renderer = SDL_CreateRenderer(g_window, NULL);
 	if (!g_renderer)

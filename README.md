@@ -223,7 +223,7 @@ compile_port.bat
 * Para fazer deploy para o servidor: `deploy_all.bat` (ou `upload_to_server.bat`)
 
 ### macOS (Apple Silicon ARM64)
-Requisitos: **Xcode Command Line Tools** (Clang C++20) e **SDL3** (`brew install sdl3`)
+Requisitos: **Xcode Command Line Tools** (Clang C++20), **CMake** e **Ninja** (`brew install cmake ninja`). O SDL3 é compilado de `third_party/SDL3` e linkado estático na primeira vez; o executável gerado roda em **macOS 11 (Big Sur) ou mais novo** sem Homebrew nem nenhuma biblioteca extra.
 
 ```bash
 ./compile_macos.sh
@@ -239,7 +239,7 @@ Requisitos: **Xcode Command Line Tools** (Clang C++20) e **SDL3** (`brew install
 ```
 
 ### Linux (x86_64)
-Requisitos: **GCC ou Clang (C++20)** e **SDL3** (`libsdl3-dev`)
+Requisitos: **GCC ou Clang (C++20)**, **CMake**, **Ninja** e os pacotes `-dev` de X11/Wayland/áudio que o SDL3 usa. O SDL3 é compilado de `third_party/SDL3` e linkado estático.
 
 ```bash
 ./compile_linux.sh

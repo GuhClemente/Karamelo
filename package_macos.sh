@@ -70,6 +70,17 @@ mkdir -p "$DIST_DIR/roms"
 cp -a "app/Karamelo" "$DIST_DIR/Karamelo"
 chmod 0755 "$DIST_DIR/Karamelo"
 
+# Icone do arquivo no Finder: o mesmo src/karamelo.ico do .exe. Um executavel
+# Mach-O nao tem recurso de icone; o Finder le o icone personalizado dos xattrs
+# com.apple.ResourceFork/FinderInfo, que o tar do macOS preserva. Nao mexe na
+# assinatura (so os bytes do Mach-O sao assinados). O Dock usa o icone que o
+# proprio app aplica na janela (main_linux.cpp).
+osascript -l JavaScript -e 'function run(argv) { ObjC.import("AppKit");
+    var img = $.NSImage.alloc.initWithContentsOfFile(argv[0]);
+    if (img.isNil()) return "sem imagem";
+    return $.NSWorkspace.sharedWorkspace.setIconForFileOptions(img, argv[1], 0) ? "ok" : "falhou"; }' \
+    "$SCRIPT_DIR/src/karamelo.ico" "$DIST_DIR/Karamelo" | sed 's/^/  Icone do Finder: /'
+
 # Criar script wrapper run.sh
 cat << 'EOF' > "$DIST_DIR/run.sh"
 #!/bin/sh
