@@ -24,7 +24,7 @@ Este documento é o guia de referência operacional e arquitetural para agentes 
 
 1. **Fontes Únicas da Verdade (Não Invente Números)**:
    - Contagem de Sistemas e Motores: Leia SEMPRE de `include/app_info.h` (`APP_SYSTEM_COUNT = 35`, `APP_CORE_ENGINES = 40`). Nunca use `APP_CORE_FILES` (41) pois conta duplicata técnica de N64.
-   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `CREDITS.md` e verifique em `src/port_runner.cpp` (57 ports totais: 57 Windows 🪟, 33 Linux 🐧, 25 macOS 🍎). The Darkness (Xbox 360) está no código com `hidden = true` — fora do menu, do site e de toda contagem.
+   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `CREDITS.md` e verifique em `src/port_runner.cpp` (58 ports totais: 58 Windows 🪟, 34 Linux 🐧, 26 macOS 🍎). The Darkness (Xbox 360) está no código com `hidden = true` — fora do menu, do site e de toda contagem.
    - Guia de BIOS: A fonte canônica é `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Higiene de Repositório**:
    - **NUNCA versione ROMs, BIOS, saves, estados ou caches**. O `.gitignore` cobre `roms/`, `bios/`, `saves/`, `cores/`, `cache/`.
@@ -82,7 +82,8 @@ src/
 
 ## 5. Subsistema de PC Ports & Recompilados (`port_runner.cpp`)
 
-- **Contagem total**: 57 ports no menu (57 Windows 🪟, 33 Linux 🐧, 25 macOS 🍎).
+- **Contagem total**: 58 ports no menu (58 Windows 🪟, 34 Linux 🐧, 26 macOS 🍎).
+- **Fonte de download fora do GitHub (Foxhollow)**: `downloads_json_url` faz o `DownloadAndInstall` ler o feed do próprio projeto (`{"releases":[{"downloads":{"windows","linux","macos"}}]}`, mais novo primeiro) em vez da API de Releases; `iso_exts` libera `.rvz`/`.gcm` além de `.iso`.
 - **Ports ocultos** (`PortDefinition::hidden`): continuam no código e instaláveis por `--install-port`/`--prepare-port` para teste, mas `PortGetAvailableList()` os pula — não aparecem no menu nem entram em contagem. Hoje: só The Darkness.
 - **Xbox 360 (The Darkness, oculto)**: o dump do jogador (`roms/Xbox360/*.iso`) é extraído e convertido nativamente por `src/x360_dump.cpp` antes do launch, com portão de SHA-256 lido do próprio executável do port. Ver `docs/XBOX360_RECOMP.md`.
 - **ISO do jogador lido no lugar (Melee Unlocked)**: `launch_args` aceita `{iso}`, resolvido por `FindUserIso()` (palavras-chave no nome + cabeçalho GameCube `iso_disc_id`/`iso_disc_rev`, ex.: `GALE01` rev 2).
@@ -91,7 +92,7 @@ src/
   - `FindBestExecutable()` prioriza binários com permissão de execução (`chmod +x`), descartando utilitários como `crashpad_handler` ou `make`.
   - Extração de `.app` bundles: detecta executáveis dentro de `Contents/MacOS/<nome>`.
   - Extração de formatos: suporta `.zip`, `.tar.gz`, `.tar.xz` e imagens `.dmg` (montadas e extraídas transparentemente via `hdiutil`).
-  - Flag de inspeção: `./app/Karamelo --list-ports` lista os ports disponíveis para o SO em que o binário foi compilado (25 no macOS, 33 no Linux, 57 no Windows).
+  - Flag de inspeção: `./app/Karamelo --list-ports` lista os ports disponíveis para o SO em que o binário foi compilado (26 no macOS, 34 no Linux, 58 no Windows).
 
 ---
 
