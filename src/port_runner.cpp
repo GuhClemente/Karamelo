@@ -167,6 +167,10 @@ struct PortDefinition {
     // each iso_dirs entry, then in roms/ itself. See FindUserIso().
     std::vector<std::string> iso_keywords;
     std::vector<std::string> iso_dirs;
+    // Accepted disc image extensions (lowercase, with the dot). Empty means
+    // ".iso" only. The header check below only applies to raw images
+    // (.iso/.gcm) - a compressed .rvz does not start with the disc header.
+    std::vector<std::string> iso_exts;
     // GameCube/Wii disc header check: the 6-character game ID at offset 0
     // and the disc revision byte at offset 7 (-1 = any revision). When set,
     // only an image whose header matches is picked - Melee players commonly
@@ -182,6 +186,11 @@ struct PortDefinition {
     // already under ports/ stays hidden too: it still matches this entry, so
     // it never falls through to the hand-dropped "(PC Port)" listing.
     bool hidden = false;
+    // Non-empty: the project does not publish builds on GitHub Releases but
+    // on its own feed - a JSON {"releases":[{"downloads":{"windows":url,
+    // "linux":url,"macos":url}}, ...]}, newest first - and DownloadAndInstall
+    // reads that instead of the GitHub API. `repo` stays for credits only.
+    std::string downloads_json_url;
 };
 
 static const std::vector<PortDefinition>& KnownPortDefs() {
@@ -400,6 +409,25 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .repo = "TeamGDB/Yakumo", .exe_hint = "Yakumo.exe",
           .needs_rom = false, .rom_keywords = {},
           .has_linux_build = true, .has_macos_build = true },
+        // Star Fox Adventures native port (SFA decompilation + Aurora),
+        // CC0-1.0. Verified 29/09/2026 against v1.0.7: the GitHub release
+        // carries no binaries - the project's launcher downloads them from
+        // api.foxhollow.dev/releases (public, newest first), one per OS: a
+        // Windows .zip with foxhollow.exe + DLLs at the root, a Linux
+        // x86-64 ELF and a native arm64 Mach-O, each alone in a .tar.gz.
+        // The disc path is argv[1]; the game reads .iso and .rvz in place
+        // and accepts GSAE01 1.0/1.1, GSAP01 1.0/1.1 and GSAJ01 1.0, so
+        // there is no header check here - an unsupported disc makes the
+        // game itself refuse it.
+        { .id = "Foxhollow", .display_name = "Star Fox Adventures (Foxhollow)",
+          .repo = "JackPriceBurns/foxhollow", .exe_hint = "foxhollow.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = true, .has_macos_build = true,
+          .launch_args = { "{iso}" },
+          .iso_keywords = { "fox", "adventures" },
+          .iso_dirs = { "GameCube", "GC" },
+          .iso_exts = { ".iso", ".rvz", ".gcm" },
+          .downloads_json_url = "https://api.foxhollow.dev/releases" },
     };
     return defs;
 }
@@ -970,9 +998,49 @@ static GhAsset PickMacOsAsset(const std::vector<GhAsset>& assets) {
 // Downloads the latest release of def, extracts it into ports/<id>/ and
 // flattens it. Runs on a worker thread - network + disk I/O, seconds to
 // minutes depending on the release size and the user's connection.
-static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error) {
-    if (def.repo.empty()) { out_error = "sem repositorio configurado"; return false; }
+// The newest release's download for this OS from a project's own feed (see
+// PortDefinition::downloads_json_url). The first "downloads" object in the
+// document belongs to the first - newest - release.
+static GhAsset PickFromDownloadsFeed(const std::string& json) {
+#ifdef _WIN32
+    const std::string key = "\"windows\"";
+#elif defined(__APPLE__)
+    const std::string key = "\"macos\"";
+#else
+    const std::string key = "\"linux\"";
+#endif
+    size_t d = json.find("\"downloads\"");
+    if (d == std::string::npos) return GhAsset{};
+    size_t open = json.find('{', d), close = json.find('}', d);
+    if (open == std::string::npos || close == std::string::npos || close < open) return GhAsset{};
+    size_t k = json.find(key, open);
+    if (k == std::string::npos || k > close) return GhAsset{};
+    size_t q1 = json.find('"', json.find(':', k + key.size()));
+    size_t q2 = q1 == std::string::npos ? q1 : json.find('"', q1 + 1);
+    if (q2 == std::string::npos || q2 > close) return GhAsset{};
+    std::string url;
+    for (size_t i = q1 + 1; i < q2; ++i)
+        if (json[i] != '\\') url += json[i];   // JSON may escape '/' as "\/"
+    if (url.rfind("https://", 0) != 0) return GhAsset{};
+    GhAsset a;
+    a.url = url;
+    a.name = url.substr(url.find_last_of('/') + 1);
+    return a;
+}
 
+static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error) {
+    if (def.repo.empty() && def.downloads_json_url.empty()) { out_error = "sem repositorio configurado"; return false; }
+
+    GhAsset asset;
+    if (!def.downloads_json_url.empty()) {
+        std::string feed;
+        if (!UpdaterHttpGetString(def.downloads_json_url, feed)) {
+            out_error = "falha ao consultar o servidor do port";
+            return false;
+        }
+        asset = PickFromDownloadsFeed(feed);
+        if (asset.url.empty()) { out_error = "nenhum build para este sistema no servidor do port"; return false; }
+    } else {
     std::string releases_url = "https://api.github.com/repos/" + def.repo + "/releases/latest";
     std::string json;
     if (!UpdaterHttpGetString(releases_url, json)) {
@@ -997,15 +1065,16 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
 
     std::vector<GhAsset> assets = ParseReleaseAssets(json);
 #ifdef _WIN32
-    GhAsset asset = PickWindowsAsset(assets);
+    asset = PickWindowsAsset(assets);
     if (asset.url.empty()) { out_error = "nenhum build Windows na release"; return false; }
 #elif defined(__APPLE__)
-    GhAsset asset = PickMacOsAsset(assets);
+    asset = PickMacOsAsset(assets);
     if (asset.url.empty()) { out_error = "nenhum build macOS na release deste port"; return false; }
 #else
-    GhAsset asset = PickLinuxAsset(assets);
+    asset = PickLinuxAsset(assets);
     if (asset.url.empty()) { out_error = "nenhum build Linux na release deste port"; return false; }
 #endif
+    }
 
     std::string lower_name = ToLowerStr(asset.name);
 
@@ -1359,6 +1428,10 @@ static bool X360GameReady(const PortDefinition& def, const std::string& port_dir
 // asks for (or when it asks for nothing).
 static bool IsoHeaderMatches(const PortDefinition& def, const fs::path& iso) {
     if (def.iso_disc_id.empty()) return true;
+    // Only a raw image starts with the disc header; a compressed one
+    // (.rvz etc.) cannot be checked here and is left to the game.
+    std::string ext = ToLowerStr(iso.extension().string());
+    if (ext != ".iso" && ext != ".gcm") return true;
     std::ifstream f(iso, std::ios::binary);
     char hdr[8] = {};
     if (!f.read(hdr, sizeof(hdr))) return false;
@@ -1386,7 +1459,10 @@ static std::string FindUserIso(const PortDefinition& def, const std::string& por
         if (!fs::is_directory(d, ec)) continue;
         for (const auto& e : fs::directory_iterator(d, ec)) {
             if (ec || !e.is_regular_file(ec)) continue;
-            if (ToLowerStr(e.path().extension().string()) != ".iso") continue;
+            std::string ext = ToLowerStr(e.path().extension().string());
+            bool ext_ok = def.iso_exts.empty() ? ext == ".iso"
+                        : std::find(def.iso_exts.begin(), def.iso_exts.end(), ext) != def.iso_exts.end();
+            if (!ext_ok) continue;
             std::string name = ToLowerStr(e.path().filename().string());
             bool all = true;
             for (const auto& kw : def.iso_keywords)

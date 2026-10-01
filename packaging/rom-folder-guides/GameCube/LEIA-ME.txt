@@ -20,6 +20,9 @@ Ports & Recomp: o Super Smash Bros. Melee nativo (Melee Unlocked) tambem
 le o ISO desta pasta. Precisa ser o Melee NTSC 1.02 (GALE01 revisao 2), em
 .iso, com "melee" no nome do arquivo. Outras versoes sao ignoradas.
 
+O Star Fox Adventures nativo (Foxhollow) tambem le desta pasta: .iso ou
+.rvz com "fox" e "adventures" no nome (USA, Europa ou Japao).
+
 Referencia completa de BIOS de todos os sistemas:
   app/bios/BIOS_NECESSARIOS.txt
 ==========================================================================

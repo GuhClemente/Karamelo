@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <set>
 #include <stdio.h>
@@ -77,6 +78,17 @@ static int s_scroll_item_idx = -1;
 // zerado e o nome ja aparecia rolando no instante em que a tela abria, sem
 // respeitar o tempo de Video > Rolagem Nome. Guardar tambem o texto resolve:
 // trocar de tela troca o texto.
+// ".md" is both a Mega Drive ROM and a Markdown file. Every cartridge carries
+// "SEGA" at 0x100 (some dumps pad it to 0x101), so that decides which one the
+// file browser is looking at.
+static bool IsMegaDriveRom(const std::filesystem::path &path) {
+  std::ifstream f(path, std::ios::binary);
+  char hdr[0x105] = {};
+  if (!f.read(hdr, sizeof(hdr)))
+    return false;
+  return memcmp(hdr + 0x100, "SEGA", 4) == 0 || memcmp(hdr + 0x101, "SEGA", 4) == 0;
+}
+
 static std::string s_scroll_item_label;
 static uint32_t s_scroll_since = 0;
 
@@ -2110,7 +2122,8 @@ void PopulateBrowse(const std::string &dirpath) {
             lower_fn.ends_with(".exe") || lower_fn.ends_with(".pdb") ||
             lower_fn.ends_with(".dll") || lower_fn.ends_with(".log") ||
             lower_fn.ends_with(".txt") || lower_fn.ends_with(".nfo") ||
-            lower_fn.ends_with(".md") || lower_fn.ends_with(".ini") ||
+            (lower_fn.ends_with(".md") && !IsMegaDriveRom(entry.path())) ||
+            lower_fn.ends_with(".ini") ||
             lower_fn.ends_with(".cfg") || lower_fn.ends_with(".pdf") ||
             lower_fn.ends_with(".doc") || lower_fn.ends_with(".docx") ||
             lower_fn.ends_with(".png") || lower_fn.ends_with(".jpg") ||

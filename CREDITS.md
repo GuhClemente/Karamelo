@@ -175,11 +175,13 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 | Super Smash Bros. Melee (Melee Unlocked) | 🪟 | [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) |
 | Monster Hunter Portable 3rd (Yakumo) | 🪟🐧🍎 | [TeamGDB/Yakumo](https://github.com/TeamGDB/Yakumo) |
+| Star Fox Adventures (Foxhollow) | 🪟🐧🍎 | [JackPriceBurns/foxhollow](https://github.com/JackPriceBurns/foxhollow) |
 
-**32 de 57 têm build Linux** e **26 de 57 têm build macOS** (Apple Silicon /
+**33 de 58 têm build Linux** e **27 de 58 têm build macOS** (Apple Silicon /
 Universal), verificado em 21/09/2026 contra a release mais recente de cada
 repositório (Melee Unlocked, adicionado em 27/09/2026, só publica Windows;
-Yakumo, adicionado em 27/09/2026, publica os três). Os outros publicam build utilizável apenas no Windows por este
+Yakumo, adicionado em 27/09/2026, e Foxhollow, adicionado em 29/09/2026,
+publicam os três). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 27/09/2026: Super Metroid voltou a 🪟 apenas (a v0.3.9 só
 publica Windows; até a v0.3.8 havia Linux e macOS), Pokemon Snap ganhou 🍎
 (a v1.1.0 é a primeira com `macos-universal.zip`) e Sonic 3 A.I.R. ganhou 🍎
@@ -207,6 +209,15 @@ e só usa o que for `GALE01` revisão 2 — então ISOs 1.00, Training Mode ou
 20XX na mesma pasta são ignorados, e se só houver esses o aviso diz que o
 disco é o errado. O ISO é lido no lugar, não copiado. Jogo online exige conta
 Slippi (logada uma vez pelo Slippi Launcher); offline não.
+
+Um detalhe da linha do Foxhollow: é um port nativo do **Star Fox Adventures**
+(GameCube) feito a partir da decompilação SFA-Decomp e do renderizador
+Aurora, licença CC0-1.0. É a única linha da tabela que **não baixa do GitHub**:
+o release do GitHub não traz binários, e os builds oficiais saem do servidor
+do próprio projeto (`api.foxhollow.dev/releases`, o mesmo que o launcher deles
+usa). O jogador põe o `.iso` ou `.rvz` do próprio disco em `roms/GameCube/`
+(nome contendo "fox" e "adventures"); o Karamelo passa o caminho para o jogo,
+sem copiar nada. Aceita USA 1.0/1.1, Europa 1.0/1.1 e Japão 1.0.
 
 E um detalhe da linha do Yakumo: é o **Monster Hunter Portable 3rd HD Ver.**
 (PSP) recompilado estaticamente para C++ (PSPRecomp, Vulkan + SDL3, licença

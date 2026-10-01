@@ -373,15 +373,16 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 27/09/2026:** são **57** jogos de "Ports & Recomp" — 42 até
+**Atualizado em 29/09/2026:** são **58** jogos de "Ports & Recomp" — 42 até
 11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
 F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
 Soulcalibur II / Ring Out — ver seção 16), +1 em 27/09 (Super Smash Bros. Melee /
 Melee Unlocked — ver seção 18), +1 em 27/09 (Monster Hunter Portable 3rd /
-Yakumo — ver seção 20). The Darkness (Xbox 360) chegou a ser anunciado
+Yakumo — ver seção 20), +1 em 29/09 (Star Fox Adventures / Foxhollow — ver
+seção 21). The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
-nenhum número antigo (39, 40, 41, 42, 47, 55, 56) de outra página no futuro. É coincidência
+nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -476,8 +477,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **57** jogos de Ports & Recomp (atualizado em 27/09/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19 e 20),
+- Os **58** jogos de Ports & Recomp (atualizado em 29/09/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20 e 21),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -571,11 +572,11 @@ repositórios daquela data (+ Melee Unlocked e Yakumo, verificados em 27/09/2026
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 57 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 32 ports.
+- No **Windows**: todos os 58 ports possuem builds executáveis (.exe).
+- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 33 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
-  (montadas e extraídas transparentemente via `hdiutil`). Hoje 26 ports possuem
+  (montadas e extraídas transparentemente via `hdiutil`). Hoje 27 ports possuem
   releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
@@ -583,25 +584,26 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 57 jogos.
-   - **Filtro Linux (🐧)**: 32 jogos.
-   - **Filtro macOS (🍎)**: 26 jogos.
+   - **Filtro Windows (🪟)**: 58 jogos.
+   - **Filtro Linux (🐧)**: 33 jogos.
+   - **Filtro macOS (🍎)**: 27 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
    derive-os da contagem dos ícones em `CREDITS.md`.
 
-### Resumo das compatibilidades (revisado em 27/09/2026 — ver seções 20 e 21)
+### Resumo das compatibilidades (revisado em 27/09/2026 — ver seções 20, 21 e 22)
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (21 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (22 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Banjo 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
   Infinite Mario 64, Sonic 3 A.I.R., Valkyrie Profile, Pokemon Snap,
   Super Mario Strikers, Diablo (DevilutionX), Fallout (Community Edition),
-  Monster Hunter Portable 3rd (Yakumo) — adicionado em 27/09/2026, ver seção 20.
+  Monster Hunter Portable 3rd (Yakumo) — adicionado em 27/09/2026, ver seção 20,
+  Star Fox Adventures (Foxhollow) — adicionado em 29/09/2026, ver seção 22.
 - **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
 - **🪟🐧 (11 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
@@ -1008,3 +1010,59 @@ O que mudar no site:
    🪟 apenas = 20 (já atualizadas lá).
 4. Sistemas (**35**), motores (**40**) e o resto das seções 18, 19 e 20
    não mudam.
+
+---
+
+## 22. Adição de 29/09/2026 — Star Fox Adventures (Foxhollow)
+
+O catálogo de "Ports & Recomp" vai de 57 para **58 títulos** (base: a revisão
+da seção 21). Novos totais,
+conferidos contra o `CREDITS.md` e o `src/port_runner.cpp`: **58 Windows 🪟,
+33 Linux 🐧, 27 macOS 🍎** — o Foxhollow publica build para os três. Na lista
+"rodam em todos" (seção 12) são agora **22 jogos**.
+
+### A entrada
+
+- **Star Fox Adventures (Foxhollow)** — site oficial [foxhollow.dev](https://foxhollow.dev/),
+  código em [JackPriceBurns/foxhollow](https://github.com/JackPriceBurns/foxhollow) — 🪟🐧🍎.
+- Port nativo do Star Fox Adventures (GameCube, 2002) feito a partir da
+  decompilação [SFA-Decomp](https://github.com/zcanann/SFA-Decomp) e do
+  renderizador [Aurora](https://github.com/encounter/aurora). **Não é
+  emulação.** Licença CC0-1.0.
+- O projeto diz que foi testado e é **totalmente jogável** em Windows, Linux e
+  macOS, e que tenta ser fiel ao original "com bugs e tudo". As versões saem
+  com frequência (v1.0.7 em 29/09/2026). Pode ser descrito como jogável;
+  não chame de "remaster" nem de "versão melhorada" — a proposta é fidelidade.
+- No macOS é build **nativo Apple Silicon (arm64)**.
+- Download pequeno (~8 MB no macOS, ~14 MB no Linux, ~19 MB no Windows).
+- Suporte a mods existe (troca de assets tipo pacote de textura, patch de
+  funções), documentado em foxhollow.dev/modding — o Karamelo não gerencia
+  mods; quem quiser usa a pasta de mods do próprio jogo.
+
+### O que o jogador precisa saber (use no card/modal)
+
+- **Precisa do dump do próprio disco** de Star Fox Adventures, em `.iso` ou
+  `.rvz`, na pasta `roms/GameCube/`, com "fox" e "adventures" no nome do
+  arquivo (ex.: `Star Fox Adventures (USA).rvz`). O site não deve linkar nem
+  distribuir ISOs.
+- Versões aceitas: **USA 1.0 e 1.1, Europa 1.0 e 1.1, Japão 1.0** — o
+  projeto diz "qualquer cópia serve".
+- O Karamelo lê o disco no lugar, sem copiar nada, e baixa o jogo na primeira
+  abertura. Não precisa do launcher do Foxhollow.
+
+Texto curto sugerido para o card/modal (pt-BR):
+
+> **Star Fox Adventures — Foxhollow** *(GameCube)* — port nativo para PC
+> feito a partir da decompilação do jogo, fiel ao original. Coloque o ISO ou
+> RVZ do seu disco em `roms/GameCube` e abra pelo menu.
+> Windows, Linux e macOS (Apple Silicon).
+
+### O que mudar no site
+
+1. Contagens: **58** jogos em Ports & Recomp; filtro **Windows = 58**,
+   **Linux = 33**, **macOS = 27** (seção 12).
+2. Lista "rodam em todos" (🪟🐧🍎) da seção 12: **22 jogos**, com o Foxhollow.
+3. Sistemas (**35**) e motores (**40**) não mudam — o Foxhollow não é um core.
+4. Não confundir com a linha **Star Fox (SNES, Enhanced)** nem com
+   **Star Fox 64 (Starship)**: são três jogos diferentes.
+5. The Darkness continua fora (seção 19).
