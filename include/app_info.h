@@ -15,7 +15,7 @@
 // bar, the About page and anything the packaging writes out.
 #define APP_NAME        "Karamelo"
 #define APP_NAME_FULL   "Karamelo Emulador"
-#define APP_VERSION     "0.9.6"
+#define APP_VERSION     "0.9.7"
 #if defined(__APPLE__) && defined(__arm64__)
 #define APP_ARCH        "arm64"
 #elif defined(__APPLE__)
@@ -28,7 +28,7 @@
 #define APP_ARCH        "x86"
 #endif
 #define APP_EXE_BASE    "Karamelo"
-#define APP_EXE_NAME    "Karamelo_v0.9.6.exe"
+#define APP_EXE_NAME    "Karamelo_v0.9.7.exe"
 #define APP_GITHUB_REPO "GuhClemente/Karamelo"
 #define APP_SITE        "karamelo-emu.com"
 
