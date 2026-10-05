@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.4 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.7 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -108,23 +108,23 @@ Formato (exemplo real):
 
 ```json
 {
-    "version": "0.9.5",
-    "title": "Karamelo v0.9.5",
-    "release_date": "2026-09-21",
+    "version": "0.9.7",
+    "title": "Karamelo v0.9.7",
+    "release_date": "2026-10-04",
     "notes": "Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.",
     "force_full_package": false,
     "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
-    "exe_size": 4135936,
-    "exe_sha256": "AE929BA15E5D83283C1DBC541B2E25F2DA8B91945962D28485AE3B50BA506996",
-    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.5_Win64.zip",
+    "exe_size": 4283904,
+    "exe_sha256": "97BB368909C280CE89C0E4B3704E4BE8A6ACA0CAFC801ED5B3D3735A81ACC47D",
+    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.7_Win64.zip",
     "linux_bin_url": "https://karamelo-emu.com/downloads/Karamelo_linux",
-    "linux_bin_size": 5393912,
-    "linux_bin_sha256": "8153F6F4D680DC9347AEE33310E64BBEA6EE8216EF88A000046DD8970376294F",
-    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.5_Linux64.tar.gz",
+    "linux_bin_size": 5495904,
+    "linux_bin_sha256": "DDF53B8C27F0A8EA033CFA789DE72EDAD8E88791EF8A546ECBAADE6EAE6CD38B",
+    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.7_Linux64.tar.gz",
     "macos_bin_url": "https://karamelo-emu.com/downloads/Karamelo_mac",
-    "macos_bin_size": 1231032,
-    "macos_bin_sha256": "30AD85438252CCAF0FED1B746D0E74DEC9E6D3CFFF88027F6EA4295D4C5CE50C",
-    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.5_macOS_arm64.tar.gz"
+    "macos_bin_size": 4245576,
+    "macos_bin_sha256": "884A3F7E5852FBF486007DCC9029534DE6AE044BE96E783ED15DF12DD2C78B21",
+    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.7_macOS_arm64.tar.gz"
 }
 ```
 
@@ -1088,3 +1088,25 @@ Texto curto sugerido para o card/modal (pt-BR):
 4. Não confundir com a linha **Star Fox (SNES, Enhanced)** nem com
    **Star Fox 64 (Starship)**: são três jogos diferentes.
 5. The Darkness continua fora (seção 19).
+
+---
+
+## 24. Lançamento da Versão 0.9.7 (04/10/2026)
+
+Lançamento da versão **0.9.7** para **Windows (x64), Linux (x64) e macOS (Apple Silicon ARM64)**.
+
+### Resumo das Novidades e Sincronização
+
+1. **Catálogo de Ports Atualizado (58 Títulos):**
+   - Entrada oficial de **Star Fox Adventures (Foxhollow)** para Windows, Linux e macOS (Apple Silicon arm64 nativo).
+   - Contagens consolidadas: **58 Windows 🪟, 33 Linux 🐧, 27 macOS 🍎**.
+   - Lista "rodam em todos" (🪟🐧🍎): **22 jogos**.
+2. **Correção de ROMs Mega Drive (.md):**
+   - O navegador de arquivos do menu agora detecta e lista ROMs de Mega Drive com extensão `.md` (identificadas pelo cabeçalho SEGA a 0x100/0x101), em vez de ocultá-las como arquivos Markdown.
+3. **Build e Auto-Update Nativo no macOS e Linux:**
+   - No macOS: executável 100% nativo ARM64 (Apple Silicon M1/M2/M3/M4) com SDL3 estático embutido, sem dependência de Homebrew. Requisito mínimo: macOS 11.0 (Big Sur).
+   - Auto-atualizador funcional com checagem de hash SHA-256 no Windows, Linux e macOS (via menu *Update* ou `./Karamelo --update`).
+   - Ícone oficial do Karamelo configurado no Dock e Finder do macOS, e no desktop/menu do Linux.
+4. **Manifesto de Download (`version.json`):**
+   - Atualizado para a versão `0.9.7` com URLs, tamanhos e hashes SHA-256 de todas as plataformas.
+

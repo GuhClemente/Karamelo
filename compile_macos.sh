@@ -54,25 +54,37 @@ COMMON_INCLUDES="-Iinclude -Ithird_party/rcheevos/include -Ithird_party/rcheevos
 COMMON_DEFS="-mmacosx-version-min=$MACOS_MIN -DRC_CLIENT_SUPPORTS_HASH -DZSTD_DISABLE_ASM -DGL_SILENCE_DEPRECATION"
 
 # 3. Compilar libchdr (C)
-echo "[1/4] Compilando libchdr..."
-clang -O2 $COMMON_DEFS $COMMON_INCLUDES -c third_party/libchdr/unity.c -o build/macos_obj/chdr_unity.o
+if [ ! -f "build/macos_obj/chdr_unity.o" ] || [ "third_party/libchdr/unity.c" -nt "build/macos_obj/chdr_unity.o" ]; then
+    echo "[1/4] Compilando libchdr..."
+    clang -O2 $COMMON_DEFS $COMMON_INCLUDES -c third_party/libchdr/unity.c -o build/macos_obj/chdr_unity.o
+else
+    echo "[1/4] libchdr ja compilado."
+fi
 
 # 4. Compilar rcheevos (C)
-echo "[2/4] Compilando rcheevos..."
+echo "[2/4] Verificando e compilando rcheevos..."
 RCHEEVOS_SRCS=(
     third_party/rcheevos/src/*.c
     third_party/rcheevos/src/rapi/*.c
     third_party/rcheevos/src/rcheevos/*.c
     third_party/rcheevos/src/rhash/*.c
 )
+NCPU=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
 for src in ${RCHEEVOS_SRCS[@]}; do
     [ -f "$src" ] || continue
     obj="build/macos_obj/rc_$(basename "$src" .c).o"
-    clang -O2 $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj"
+    if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+        echo "  Compilando $src..."
+        clang -O2 $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj" &
+        if [ $(jobs -r -p | wc -l) -ge "$NCPU" ]; then
+            wait -n 2>/dev/null || wait
+        fi
+    fi
 done
+wait
 
 # 5. Compilar Modulos Karamelo (C++20)
-echo "[3/4] Compilando fontes C++ do Karamelo..."
+echo "[3/4] Verificando e compilando fontes C++ do Karamelo..."
 KARAMELO_SRCS=(
     src/karamelo_math.cpp
     src/input_map.cpp
@@ -96,11 +108,26 @@ KARAMELO_SRCS=(
     src/main_linux.cpp
 )
 
+LATEST_INC=$(ls -t include/*.h 2>/dev/null | head -n 1)
+
 for src in "${KARAMELO_SRCS[@]}"; do
-    echo "  Compilando $src..."
     obj="build/macos_obj/$(basename "$src" .cpp).o"
-    clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj"
+    need_build=0
+    if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+        need_build=1
+    elif [ -n "$LATEST_INC" ] && [ "$LATEST_INC" -nt "$obj" ]; then
+        need_build=1
+    fi
+
+    if [ "$need_build" -eq 1 ]; then
+        echo "  Compilando $src..."
+        clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj" &
+        if [ $(jobs -r -p | wc -l) -ge "$NCPU" ]; then
+            wait -n 2>/dev/null || wait
+        fi
+    fi
 done
+wait
 
 # 6. Linkar Executavel Principal
 echo "[4/4] Linkando app/Karamelo..."
