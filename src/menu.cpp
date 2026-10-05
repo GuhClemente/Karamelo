@@ -52,7 +52,9 @@ enum MenuState {
   STATE_ABOUT_CORES,
   STATE_SAVESTATES,
   STATE_SHADER_LIST,
-  STATE_DIAGNOSTICS
+  STATE_DIAGNOSTICS,
+  STATE_FAVORITES,
+  STATE_RECENT
 };
 
 struct MenuItem {
@@ -322,7 +324,132 @@ static void ApplyPersistedCoreOptions();
 static void ApplyMsxMachineTypeOption(const std::string &core_dll,
                                       const std::string &ext);
 
-static int setting_language = 0; // 0=Português, 1=English
+static int setting_language = 0; // 0=Portugues, 1=English
+
+const char* Tr(const char* pt, const char* en) {
+  return (setting_language == 1) ? en : pt;
+}
+
+static void MenuSaveSettings();
+
+void MenuSetLanguage(int lang) {
+  setting_language = (lang == 1) ? 1 : 0;
+  MenuSaveSettings();
+}
+
+// -------------------------------------------------------------
+// Favoritos e Recentes
+// -------------------------------------------------------------
+static std::vector<std::string> g_favorites;
+static std::vector<std::string> g_recent;
+static bool g_fav_recent_loaded = false;
+
+static void LoadFavoritesAndRecent() {
+  if (g_fav_recent_loaded) return;
+  g_fav_recent_loaded = true;
+  g_favorites.clear();
+  g_recent.clear();
+
+  FILE *f = fopen("Config/favorites.txt", "rb");
+  if (f) {
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+      size_t len = strlen(line);
+      while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n' || line[len - 1] == ' '))
+        line[--len] = '\0';
+      if (len > 0 && line[0] != '#')
+        g_favorites.push_back(line);
+    }
+    fclose(f);
+  }
+
+  f = fopen("Config/recent.txt", "rb");
+  if (f) {
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+      size_t len = strlen(line);
+      while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n' || line[len - 1] == ' '))
+        line[--len] = '\0';
+      if (len > 0 && line[0] != '#')
+        g_recent.push_back(line);
+    }
+    fclose(f);
+  }
+}
+
+static void SaveFavorites() {
+  std::error_code ec;
+  fs::create_directories("Config", ec);
+  FILE *f = fopen("Config/favorites.txt", "wb");
+  if (!f) return;
+  fprintf(f, "# Karamelo - Favorites\n");
+  for (const auto &p : g_favorites) {
+    fprintf(f, "%s\n", p.c_str());
+  }
+  fclose(f);
+}
+
+static void SaveRecent() {
+  std::error_code ec;
+  fs::create_directories("Config", ec);
+  FILE *f = fopen("Config/recent.txt", "wb");
+  if (!f) return;
+  fprintf(f, "# Karamelo - Recent Games\n");
+  for (const auto &p : g_recent) {
+    fprintf(f, "%s\n", p.c_str());
+  }
+  fclose(f);
+}
+
+bool MenuIsFavorite(const std::string &filepath) {
+  LoadFavoritesAndRecent();
+  for (const auto &fav : g_favorites) {
+    if (fav == filepath) return true;
+  }
+  return false;
+}
+
+void MenuToggleFavorite(const std::string &filepath) {
+  LoadFavoritesAndRecent();
+  auto it = std::find(g_favorites.begin(), g_favorites.end(), filepath);
+  if (it != g_favorites.end()) {
+    g_favorites.erase(it);
+    SaveFavorites();
+    CoreSetToast(Tr("REMOVIDO DOS FAVORITOS", "REMOVED FROM FAVORITES"), 90);
+  } else {
+    g_favorites.push_back(filepath);
+    SaveFavorites();
+    CoreSetToast(Tr("ADICIONADO AOS FAVORITOS", "ADDED TO FAVORITES"), 90);
+  }
+}
+
+void MenuAddRecent(const std::string &filepath) {
+  if (filepath.empty()) return;
+  LoadFavoritesAndRecent();
+  auto it = std::find(g_recent.begin(), g_recent.end(), filepath);
+  if (it != g_recent.end()) {
+    g_recent.erase(it);
+  }
+  g_recent.insert(g_recent.begin(), filepath);
+  if (g_recent.size() > 15) {
+    g_recent.resize(15);
+  }
+  SaveRecent();
+}
+
+std::vector<std::string> MenuGetFavorites() {
+  LoadFavoritesAndRecent();
+  return g_favorites;
+}
+
+std::vector<std::string> MenuGetRecent() {
+  LoadFavoritesAndRecent();
+  return g_recent;
+}
+
+void PopulateFavoritesMenu();
+void PopulateRecentMenu();
+
 static std::string join_ip_input = "127.0.0.1";
 
 static void MenuProcessKeyImpl(MenuKey key);
@@ -1020,13 +1147,13 @@ void PopulateMainMenu() {
     const char *aspects[] = {"Original", "4:3", "16:9"};
 
     // 1. Header: Load [Game Name] and Reset
-    std::string load_label = "Load";
+    std::string load_label = Tr("Carregar", "Load");
     std::string game_name = CoreGetGameName();
     if (game_name.length() > 16)
       game_name = game_name.substr(0, 14) + "..";
     items.push_back(
         {load_label, game_name.empty() ? ">" : game_name, false, true, 1});
-    items.push_back({"Reset", "", false, true, 6});
+    items.push_back({Tr("Reiniciar", "Reset"), "", false, true, 6});
     items.push_back({" ", "", false, false, 0});
 
     // 2. NeoGeo Authentic MiSTer Options
@@ -1134,18 +1261,23 @@ void PopulateMainMenu() {
 
     char slot_display[40];
     snprintf(slot_display, sizeof(slot_display), "< %d: %s >", cur_slot, slot_time);
-    items.push_back({"Slot de Save", slot_display, false, false, 5});
-    items.push_back({"Salvar Estado (F2)", "", false, true, 2});
-    items.push_back({"Carregar Estado (F4)", slot_has_state ? "OK" : "-", false, true, 3});
-    items.push_back({"Gerenciador Slots", ">", false, true, 4});
-    items.push_back({"Define Buttons", ">", false, true, 203});
-    items.push_back({"Screenshot (F9)", "", false, true, 8});
+    items.push_back({Tr("Slot de Save", "Save Slot"), slot_display, false, false, 5});
+    items.push_back({Tr("Salvar Estado (F2)", "Save State (F2)"), "", false, true, 2});
+    items.push_back({Tr("Carregar Estado (F4)", "Load State (F4)"), slot_has_state ? "OK" : "-", false, true, 3});
+    items.push_back({Tr("Gerenciador Slots", "State Slots"), ">", false, true, 4});
+    items.push_back({Tr("Definir Botoes", "Define Buttons"), ">", false, true, 203});
+    items.push_back({Tr("Screenshot (F9)", "Screenshot (F9)"), "", false, true, 8});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Close Game", "", false, true, 7});
+    items.push_back({Tr("Fechar Jogo", "Close Game"), "", false, true, 7});
 
     OsdSetSize((int)items.size());
   } else {
     OsdSetSize((int)items.size());
+    // Quick Launch: Favoritos & Recentes
+    items.push_back({Tr("Favoritos", "Favorites"), ">", true, true, 190});
+    items.push_back({Tr("Recentes", "Recent Games"), ">", true, true, 191});
+    items.push_back({" ", "", false, false, 0});
+
     // Main Systems Menu (Alphabetical)
     if (SystemHasCore(117))
       items.push_back({"Arcade", ">", true, true, 117});
@@ -1222,9 +1354,9 @@ void PopulateMainMenu() {
     // Blank row before the app entries, the way the MiSTer OSD separates the
     // system list from Settings / Update / Close.
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Settings", ">", false, true, 20});
-    items.push_back({"Update", ">", false, true, 30});
-    items.push_back({"Exit " APP_NAME, "", false, true, 99});
+    items.push_back({Tr("Configuracoes", "Settings"), ">", false, true, 20});
+    items.push_back({Tr("Atualizacao", "Update"), ">", false, true, 30});
+    items.push_back({std::string(Tr("Sair do ", "Exit ")) + APP_NAME, "", false, true, 99});
 
     // Counted here rather than written down somewhere else: this is the list.
     g_system_count = 0;
@@ -1254,7 +1386,7 @@ static void ControllerPageOnEnter() {
 
 void PopulateControllerSettings() {
   items.clear();
-  current_title = "Controller";
+  current_title = Tr("Controles", "Controller");
   OsdSetSize(16);
 
   int pads = 0;
@@ -1264,18 +1396,44 @@ void PopulateControllerSettings() {
       pads++;
   }
 
-  char pad_str[24];
-  snprintf(pad_str, sizeof(pad_str), "%d conectado%s", pads,
-           pads == 1 ? "" : "s");
-  items.push_back({"Gamepads", pad_str, false, false, 0});
+  char pad_str[48];
+  if (pads == 0) {
+    snprintf(pad_str, sizeof(pad_str), "%s", Tr("Nenhum", "None"));
+  } else {
+    const char *dtype = GamepadGetDeviceTypeName(0);
+    snprintf(pad_str, sizeof(pad_str), "%d (%s)", pads, dtype);
+  }
+  items.push_back({Tr("Gamepads", "Gamepads"), pad_str, false, false, 0});
 
-  const char *dev_names[] = {"Gamepad", "Teclado"};
+  const char *dev_names[] = {"Gamepad", Tr("Teclado", "Keyboard")};
   items.push_back(
-      {"Dispositivo", dev_names[setting_pad_device], false, false, 500});
+      {Tr("Dispositivo", "Device"), dev_names[setting_pad_device], false, false, 500});
+
+  // Presets de botoes
+  int current_preset_idx = InputBindGetPreset();
+  if (current_preset_idx < 0 || current_preset_idx >= 4) current_preset_idx = 0;
+  const char *preset_names[] = {
+    Tr("MiSTer/Nintendo", "MiSTer/Nintendo"),
+    Tr("Xbox Nativo", "Xbox Native"),
+    Tr("PlayStation", "PlayStation"),
+    Tr("Arcade 6-Botoes", "Arcade 6-Button")
+  };
+  items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
+
+  // Per-System Remap:
+  if (CoreIsRunning()) {
+    std::string sys_name = CoreGetCoreName();
+    bool has_prof = InputBindHasSystemProfile(sys_name.c_str());
+    items.push_back({Tr("Perfil Remap", "Remap Profile"), has_prof ? Tr("Personalizado", "Custom") : Tr("Padrao Global", "Default Global"), false, false, 0});
+    items.push_back({Tr("Salvar p/ Sistema", "Save for System"), sys_name.length() > 10 ? sys_name.substr(0, 10) + ".." : sys_name, false, true, 796});
+    if (has_prof) {
+      items.push_back({Tr("Apagar Perfil Sistema", "Delete System Profile"), "", false, true, 797});
+    }
+  }
 
   const char *deadzones[] = {"5%", "10%", "15%", "20%"};
-  items.push_back({"Deadzone", deadzones[setting_deadzone], false, false, 508});
-  items.push_back({"Mapear Tudo (Passo a Passo)", ">", false, true, 798});
+  items.push_back({Tr("Deadzone", "Deadzone"), deadzones[setting_deadzone], false, false, 508});
+  items.push_back({Tr("Mapear Tudo (Passo a Passo)", "Map All (Step by Step)"), ">", false, true, 798});
 
   // Labels come from the running core when it supplied them, so the page reads
   // in that system's own terms - "Cross" on PSP, not a generic "Botao B".
@@ -1390,17 +1548,18 @@ static void SelectByAction(int action_id, int fallback_idx);
 
 void PopulateSettings() {
   items.clear();
-  current_title = "Settings";
-  OsdSetSize(9);
+  current_title = Tr("Configuracoes", "Settings");
+  OsdSetSize(10);
 
-  items.push_back({"Video", ">", false, true, 201});
-  items.push_back({"Audio", ">", false, true, 202});
-  items.push_back({"Controller", ">", false, true, 203});
-  items.push_back({"Netplay (Online)", ">", false, true, 204});
+  items.push_back({Tr("Idioma", "Language"), setting_language == 0 ? "Portugues" : "English", false, false, 216});
+  items.push_back({Tr("Video", "Video"), ">", false, true, 201});
+  items.push_back({Tr("Audio", "Audio"), ">", false, true, 202});
+  items.push_back({Tr("Controles", "Controller"), ">", false, true, 203});
+  items.push_back({Tr("Netplay (Online)", "Netplay (Online)"), ">", false, true, 204});
   items.push_back({"RetroAchievements", ">", false, true, 206});
-  items.push_back({"Diagnostico & Falhas", ">", false, true, 215});
-  items.push_back({"About", ">", false, true, 205});
-  items.push_back({"Restaurar Padroes", ">", false, true, 210});
+  items.push_back({Tr("Diagnostico & Falhas", "Diagnostics & Crash"), ">", false, true, 215});
+  items.push_back({Tr("Sobre", "About"), ">", false, true, 205});
+  items.push_back({Tr("Restaurar Padroes", "Restore Defaults"), ">", false, true, 210});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -1977,6 +2136,83 @@ void PopulateUpdate() {
   if (selected_idx < 0) selected_idx = 0;
 }
 
+static std::vector<std::string> s_favorites_paths;
+static std::vector<std::string> s_recent_paths;
+
+void PopulateFavoritesMenu() {
+  items.clear();
+  current_title = Tr("Favoritos", "Favorites");
+  LoadFavoritesAndRecent();
+  s_favorites_paths.clear();
+
+  items.push_back({"<..>", "", true, false, 0});
+
+  for (size_t i = 0; i < g_favorites.size(); i++) {
+    const auto &fav = g_favorites[i];
+    if (fav.rfind("port:", 0) == 0) {
+      std::string pid = fav.substr(5);
+      auto plist = PortGetAvailableList();
+      std::string label = pid;
+      for (const auto &p : plist) {
+        if (p.id == pid) { label = p.name; break; }
+      }
+      s_favorites_paths.push_back(fav);
+      items.push_back({label, "[Port]", false, true, 850});
+    } else {
+      fs::path p(fav);
+      std::string fname = p.stem().string();
+      std::string sys = p.parent_path().filename().string();
+      s_favorites_paths.push_back(fav);
+      items.push_back({fname, sys, false, true, 850});
+    }
+  }
+
+  if (s_favorites_paths.empty()) {
+    items.push_back({Tr("[Nenhum Favorito]", "[No Favorites]"), "", false, false, 0});
+  }
+
+  OsdSetSize((int)items.size() > 12 ? 12 : (int)items.size());
+  selected_idx = s_favorites_paths.empty() ? 0 : 1;
+  scroll_top = 0;
+}
+
+void PopulateRecentMenu() {
+  items.clear();
+  current_title = Tr("Recentes", "Recent Games");
+  LoadFavoritesAndRecent();
+  s_recent_paths.clear();
+
+  items.push_back({"<..>", "", true, false, 0});
+
+  for (size_t i = 0; i < g_recent.size(); i++) {
+    const auto &rec = g_recent[i];
+    if (rec.rfind("port:", 0) == 0) {
+      std::string pid = rec.substr(5);
+      auto plist = PortGetAvailableList();
+      std::string label = pid;
+      for (const auto &p : plist) {
+        if (p.id == pid) { label = p.name; break; }
+      }
+      s_recent_paths.push_back(rec);
+      items.push_back({label, "[Port]", false, true, 870});
+    } else {
+      fs::path p(rec);
+      std::string fname = p.stem().string();
+      std::string sys = p.parent_path().filename().string();
+      s_recent_paths.push_back(rec);
+      items.push_back({fname, sys, false, true, 870});
+    }
+  }
+
+  if (s_recent_paths.empty()) {
+    items.push_back({Tr("[Nenhum Jogo Recente]", "[No Recent Games]"), "", false, false, 0});
+  }
+
+  OsdSetSize((int)items.size() > 12 ? 12 : (int)items.size());
+  selected_idx = s_recent_paths.empty() ? 0 : 1;
+  scroll_top = 0;
+}
+
 void PopulateBrowse(const std::string &dirpath) {
   items.clear();
 
@@ -1995,18 +2231,19 @@ void PopulateBrowse(const std::string &dirpath) {
   if (dirpath == "ports" || lower_dir == "ports") {
     current_title = "Ports & Recomp";
     items.push_back({"<..>", "", true, false, 0});
-    // PortGetAvailableList() only returns titles already resolved to a real
-    // executable on disk, so every row here is ready to play right now -
-    // no "[JOGAR]"/"[BAIXAR]" status needed, just the game name.
     auto plist = PortGetAvailableList();
     for (const auto& p : plist) {
-      items.push_back({p.name, "", false, true, 800});
+      std::string disp = p.name;
+      if (MenuIsFavorite("port:" + p.id)) {
+        disp = "* " + p.name;
+      }
+      items.push_back({disp, "", false, true, 800});
     }
     if (plist.empty()) {
       items.push_back({"[Nenhum Port Encontrado]", "", false, false, 0});
     }
     OsdSetSize((int)items.size());
-    SelectByAction(800, 1); // primeiro port, logo abaixo do "<..>"
+    SelectByAction(800, 1);
     scroll_top = 0;
     return;
   }
@@ -2148,7 +2385,12 @@ void PopulateBrowse(const std::string &dirpath) {
           }
           dirs.push_back({filename, ">", true, false, 0});
         } else {
-          files.push_back({filename, "", false, false, 0});
+          std::string full_rom = (fs::path(dirpath) / filename).string();
+          std::string disp = filename;
+          if (MenuIsFavorite(full_rom)) {
+            disp = "* " + filename;
+          }
+          files.push_back({disp, "", false, false, 0});
         }
       }
     }
@@ -2248,6 +2490,7 @@ static std::string SettingsSnapshot() {
   std::string out;
 
   AppendSetting(out, "aspect", setting_aspect);
+  AppendSetting(out, "language", setting_language);
   AppendSetting(out, "filter", setting_filter);
   AppendSetting(out, "pad_device", setting_pad_device);
   for (int i = 0; i < BIND_COUNT; i++) {
@@ -2354,6 +2597,8 @@ static void MenuLoadSettings() {
 
     if (!strcmp(key, "aspect"))
       setting_aspect = ClampInt(iv, 0, 2);
+    else if (!strcmp(key, "language"))
+      setting_language = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "filter"))
       setting_filter = MigrateFilter(ClampInt(iv, 0, 9));
     else if (!strcmp(key, "wallpaper"))
@@ -2457,6 +2702,7 @@ void MenuProcessKey(MenuKey key) {
 
 void MenuInit() {
   MenuLoadSettings();
+  LoadFavoritesAndRecent();
   NetplayInit();
   StarsInit(640, 360);
   current_state = STATE_MAIN;
@@ -3111,6 +3357,20 @@ static void MenuProcessKeyImpl(MenuKey key) {
       setting_deadzone = (setting_deadzone + delta + 4) % 4;
       PopulateControllerSettings();
       SelectByAction(item.action_id, 2);
+    } else if (item.action_id == 216) // Idioma
+    {
+      setting_language = (setting_language + delta + 2) % 2;
+      MenuSetLanguage(setting_language);
+      PopulateSettings();
+      SelectByAction(item.action_id, 0);
+    } else if (item.action_id == 530) // Preset Botoes
+    {
+      int cur_preset = InputBindGetPreset();
+      int next_preset = (cur_preset + delta + 4) % 4;
+      InputBindApplyPreset(next_preset);
+      MenuSaveSettings();
+      PopulateControllerSettings();
+      SelectByAction(item.action_id, 2);
     } else if (item.action_id == 520) // Toggle crash reporting
     {
       int cur = selected_idx;
@@ -3351,6 +3611,16 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_BROWSE;
         PopulateBrowse("ports");
       }
+      else if (item.action_id == 190) {
+        main_menu_saved_idx = selected_idx;
+        current_state = STATE_FAVORITES;
+        PopulateFavoritesMenu();
+      }
+      else if (item.action_id == 191) {
+        main_menu_saved_idx = selected_idx;
+        current_state = STATE_RECENT;
+        PopulateRecentMenu();
+      }
       // "Define Buttons" is on the in-game menu, but its handler only existed
       // under STATE_SETTINGS, so pressing it there did nothing at all.
       else if (item.action_id == 203) {
@@ -3363,7 +3633,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateCoreOptionsSettings();
       }
     } else if (current_state == STATE_SETTINGS) {
-      if (item.action_id == 201) {
+      if (item.action_id == 216) {
+        setting_language = (setting_language == 0) ? 1 : 0;
+        MenuSetLanguage(setting_language);
+        PopulateSettings();
+        SelectByAction(216, 0);
+      } else if (item.action_id == 201) {
         current_state = STATE_VIDEO;
         PopulateVideoSettings();
       } else if (item.action_id == 202) {
@@ -3419,7 +3694,32 @@ static void MenuProcessKeyImpl(MenuKey key) {
         CoreSetToast("CONFIGURACOES RESTAURADAS AO PADRAO", 180);
       }
     } else if (current_state == STATE_CONTROLLER) {
-      if (item.action_id == 500) {
+      if (item.action_id == 530) {
+        int cur_preset = InputBindGetPreset();
+        int next_preset = (cur_preset + 1) % 4;
+        InputBindApplyPreset(next_preset);
+        MenuSaveSettings();
+        PopulateControllerSettings();
+        SelectByAction(item.action_id, 2);
+      } else if (item.action_id == 796) {
+        if (CoreIsRunning()) {
+          std::string sys_name = CoreGetCoreName();
+          if (InputBindSaveSystemProfile(sys_name.c_str())) {
+            CoreSetToast(Tr("PERFIL SALVO PARA O SISTEMA", "REMAP SAVED FOR SYSTEM"), 90);
+          }
+          PopulateControllerSettings();
+          SelectByAction(item.action_id, 3);
+        }
+      } else if (item.action_id == 797) {
+        if (CoreIsRunning()) {
+          std::string sys_name = CoreGetCoreName();
+          if (InputBindDeleteSystemProfile(sys_name.c_str())) {
+            CoreSetToast(Tr("PERFIL REMOVIDO", "SYSTEM REMAP DELETED"), 90);
+          }
+          PopulateControllerSettings();
+          SelectByAction(530, 2);
+        }
+      } else if (item.action_id == 500) {
         setting_pad_device = (setting_pad_device + 1) % 2;
         PopulateControllerSettings();
         SelectByAction(item.action_id, 1);
@@ -3531,24 +3831,50 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateMainMenu();
         selected_idx = main_menu_saved_idx;
       }
+    } else if (current_state == STATE_FAVORITES) {
+      if (item.label == "<..>" || s_favorites_paths.empty() || selected_idx == 0) {
+        current_state = STATE_MAIN;
+        PopulateMainMenu();
+        selected_idx = main_menu_saved_idx;
+      } else {
+        size_t fidx = (size_t)(selected_idx - 1);
+        if (fidx < s_favorites_paths.size()) {
+          std::string path = s_favorites_paths[fidx];
+          if (path.rfind("port:", 0) == 0) {
+            MenuAddRecent(path);
+            PortLaunch(path.substr(5));
+          } else {
+            MenuLaunchGamePath(path);
+          }
+        }
+      }
+    } else if (current_state == STATE_RECENT) {
+      if (item.label == "<..>" || s_recent_paths.empty() || selected_idx == 0) {
+        current_state = STATE_MAIN;
+        PopulateMainMenu();
+        selected_idx = main_menu_saved_idx;
+      } else {
+        size_t ridx = (size_t)(selected_idx - 1);
+        if (ridx < s_recent_paths.size()) {
+          std::string path = s_recent_paths[ridx];
+          if (path.rfind("port:", 0) == 0) {
+            MenuAddRecent(path);
+            PortLaunch(path.substr(5));
+          } else {
+            MenuLaunchGamePath(path);
+          }
+        }
+      }
     } else if (current_state == STATE_BROWSE) {
       if (item.label == "<..>") {
         BrowseGoUp();
       } else if (current_dir == "ports") {
-        // Ports & Recomp entries are not filesystem paths under roms/ - the
-        // label is the port's display name, matched back against the same
-        // list PopulateBrowse built it from to find the launchable id.
-        //
-        // Every row here already resolved to a real executable (see
-        // PortGetAvailableList()), so this always takes PortLaunch()'s
-        // launch-directly path in practice. It is still called
-        // unconditionally rather than re-checking is_installed here too -
-        // PortLaunch() is the single place that decides download-then-launch
-        // vs. launch directly, and duplicating that check in the UI is how
-        // an earlier version of this handler ended up calling it wrong.
         auto plist = PortGetAvailableList();
+        std::string raw_lbl = item.label;
+        if (raw_lbl.rfind("* ", 0) == 0) raw_lbl = raw_lbl.substr(2);
         for (const auto &p : plist) {
-          if (p.name == item.label) {
+          if (p.name == raw_lbl) {
+            MenuAddRecent("port:" + p.id);
             PortLaunch(p.id);
             break;
           }
@@ -3557,24 +3883,69 @@ static void MenuProcessKeyImpl(MenuKey key) {
         fs::path next_p = fs::path(current_dir) / item.label;
         PopulateBrowse(next_p.string());
       } else {
+        std::string raw_fn = item.label;
+        if (raw_fn.rfind("* ", 0) == 0) raw_fn = raw_fn.substr(2);
         std::string full_rom_path =
-            (fs::path(current_dir) / item.label).string();
-        std::string ext = fs::path(item.label).extension().string();
+            (fs::path(current_dir) / raw_fn).string();
+        std::string ext = fs::path(raw_fn).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
         std::string target_rom_path = full_rom_path;
-
-        // Archives are extracted on the core thread now - doing it here
-        // blocked the message pump for as long as the extraction took.
-        // The core is resolved the same way for every entry point.
         std::string core_dll = MenuResolveCoreForPath(full_rom_path, current_dir);
         ApplyMsxMachineTypeOption(core_dll, ext);
 
-        // Returns immediately; the worker thread reports back through
-        // CoreIsLoading() / CoreIsRunning().
         if (CoreRequestLoad(target_rom_path.c_str(), core_dll.c_str())) {
+          MenuAddRecent(target_rom_path);
+          std::string sys_name = CoreGetCoreName();
+          if (sys_name.empty()) {
+            sys_name = fs::path(current_dir).filename().string();
+          }
+          if (!sys_name.empty() && InputBindHasSystemProfile(sys_name.c_str())) {
+            InputBindLoadSystemProfile(sys_name.c_str());
+          }
           OsdDisable();
         }
+      }
+    }
+    break;
+  }
+  case KEY_INFO: {
+    if (current_state == STATE_BROWSE) {
+      if (selected_idx >= 0 && selected_idx < (int)items.size()) {
+        const auto &it = items[selected_idx];
+        if (it.label != "<..>" && !it.is_folder) {
+          if (current_dir == "ports") {
+            std::string raw_lbl = it.label;
+            if (raw_lbl.rfind("* ", 0) == 0) raw_lbl = raw_lbl.substr(2);
+            auto plist = PortGetAvailableList();
+            for (const auto &p : plist) {
+              if (p.name == raw_lbl) {
+                MenuToggleFavorite("port:" + p.id);
+                int cur = selected_idx;
+                PopulateBrowse(current_dir);
+                selected_idx = cur;
+                break;
+              }
+            }
+          } else {
+            std::string raw_fn = it.label;
+            if (raw_fn.rfind("* ", 0) == 0) raw_fn = raw_fn.substr(2);
+            std::string full_rom = (fs::path(current_dir) / raw_fn).string();
+            MenuToggleFavorite(full_rom);
+            int cur = selected_idx;
+            PopulateBrowse(current_dir);
+            selected_idx = cur;
+          }
+        }
+      }
+    } else if (current_state == STATE_FAVORITES) {
+      if (selected_idx > 0 && (size_t)(selected_idx - 1) < s_favorites_paths.size()) {
+        std::string path = s_favorites_paths[selected_idx - 1];
+        MenuToggleFavorite(path);
+        int cur = selected_idx;
+        PopulateFavoritesMenu();
+        if (cur >= (int)items.size()) cur = (int)items.size() - 1;
+        selected_idx = cur;
       }
     }
     break;
@@ -3582,6 +3953,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
   case KEY_CANCEL:
     if (current_state == STATE_BROWSE) {
       BrowseGoUp();
+    } else if (current_state == STATE_FAVORITES || current_state == STATE_RECENT) {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
+      selected_idx = main_menu_saved_idx;
     } else if (current_state == STATE_ABOUT_CORES) {
       current_state = STATE_ABOUT;
       PopulateAbout();
@@ -3631,8 +4006,6 @@ static void MenuProcessKeyImpl(MenuKey key) {
 bool MenuLaunchGamePath(const std::string &full_rom_path) {
   fs::path p(full_rom_path);
   std::string path_str = full_rom_path;
-  // One resolver for the OSD and for the command line: the two used to carry
-  // separate copies of this and had already diverged.
   std::string core_dll = MenuResolveCoreForPath(full_rom_path, path_str);
 
   if (core_dll.empty())
@@ -3645,6 +4018,14 @@ bool MenuLaunchGamePath(const std::string &full_rom_path) {
   ApplyPersistedCoreOptions();
 
   if (CoreRequestLoad(full_rom_path.c_str(), core_dll.c_str())) {
+    MenuAddRecent(full_rom_path);
+    std::string sys_name = CoreGetCoreName();
+    if (sys_name.empty()) {
+      sys_name = p.parent_path().filename().string();
+    }
+    if (!sys_name.empty() && InputBindHasSystemProfile(sys_name.c_str())) {
+      InputBindLoadSystemProfile(sys_name.c_str());
+    }
     OsdDisable();
     return true;
   }

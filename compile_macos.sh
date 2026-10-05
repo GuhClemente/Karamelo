@@ -142,6 +142,9 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/macos_obj/archive_helper.o \
     build/macos_obj/updater.o \
     build/macos_obj/crash_reporter.o \
+    build/macos_obj/input_map.o \
+    build/macos_obj/gamepad_sdl.o \
+    $SDL3_LIBS \
     -lpthread -ldl \
     -o build/karamelo_tests
 

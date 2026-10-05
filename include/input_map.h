@@ -110,4 +110,24 @@ int InputCaptureScanKey();
 // Scans for any gamepad button pressed across all connected controllers.
 int InputCaptureScanPad();
 
+// Controller Presets / Layout Profiles
+enum InputPreset
+{
+	PRESET_MISTER_NINTENDO = 0,
+	PRESET_XBOX_NATIVE,
+	PRESET_PLAYSTATION,
+	PRESET_ARCADE_6BTN,
+	PRESET_COUNT
+};
+
+const char* InputPresetName(int preset);
+void InputBindApplyPreset(int preset);
+int InputBindGetPreset();
+
+// Per-System Remap Profiles (Config/remaps/<system_name>.cfg)
+bool InputBindSaveSystemProfile(const char* system_name);
+bool InputBindLoadSystemProfile(const char* system_name);
+bool InputBindHasSystemProfile(const char* system_name);
+bool InputBindDeleteSystemProfile(const char* system_name);
+
 #endif

@@ -618,9 +618,13 @@ static void PollGamepad()
 			{
 				MenuProcessKey(KEY_SELECT);
 			}
-			else if (wPressed & (XINPUT_GAMEPAD_B | XINPUT_GAMEPAD_Y))
+			else if (wPressed & XINPUT_GAMEPAD_B)
 			{
 				MenuProcessKey(KEY_CANCEL);
+			}
+			else if (wPressed & XINPUT_GAMEPAD_Y)
+			{
+				MenuProcessKey(KEY_INFO);
 			}
 			else if (wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK))
 			{
@@ -1220,6 +1224,8 @@ int main(int argc, char* argv[])
 					case SDL_SCANCODE_X:     MenuProcessKey(KEY_SELECT); break;
 					case SDL_SCANCODE_ESCAPE:
 					case SDL_SCANCODE_BACKSPACE: MenuProcessKey(KEY_CANCEL); break;
+					case SDL_SCANCODE_F:
+					case SDL_SCANCODE_I:     MenuProcessKey(KEY_INFO); break;
 					case SDL_SCANCODE_TAB:   MenuProcessKey(KEY_MENU_TOGGLE); break;
 					default: break;
 					}

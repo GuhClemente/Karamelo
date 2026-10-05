@@ -188,6 +188,50 @@ bool GamepadGetState(int slot, XINPUT_STATE* out_state)
 	return true;
 }
 
+const char* GamepadGetDeviceName(int slot)
+{
+	if (slot < 0 || slot >= 4) return nullptr;
+	AcquireSRWLockShared(&s_pads_lock);
+	SDL_Gamepad* gp = s_pads[slot];
+	const char* name = gp ? SDL_GetGamepadName(gp) : nullptr;
+	ReleaseSRWLockShared(&s_pads_lock);
+	return name;
+}
+
+int GamepadGetDeviceType(int slot)
+{
+	if (slot < 0 || slot >= 4) return 0;
+	AcquireSRWLockShared(&s_pads_lock);
+	SDL_Gamepad* gp = s_pads[slot];
+	int t = gp ? (int)SDL_GetGamepadType(gp) : 0;
+	ReleaseSRWLockShared(&s_pads_lock);
+	return t;
+}
+
+const char* GamepadGetDeviceTypeName(int slot)
+{
+	int t = GamepadGetDeviceType(slot);
+	switch (t)
+	{
+	case SDL_GAMEPAD_TYPE_PS5: return "DualSense (PS5)";
+	case SDL_GAMEPAD_TYPE_PS4: return "DualShock 4";
+	case SDL_GAMEPAD_TYPE_PS3: return "DualShock 3";
+	case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO: return "Switch Pro";
+	case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT: return "Joy-Con (E)";
+	case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT: return "Joy-Con (D)";
+	case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR: return "Joy-Con Par";
+	case SDL_GAMEPAD_TYPE_GAMECUBE: return "GameCube";
+	case SDL_GAMEPAD_TYPE_XBOXONE: return "Xbox One/Series";
+	case SDL_GAMEPAD_TYPE_XBOX360: return "Xbox 360";
+	case SDL_GAMEPAD_TYPE_STANDARD: return "Padrao";
+	default:
+	{
+		const char* name = GamepadGetDeviceName(slot);
+		return name ? name : "Gamepad";
+	}
+	}
+}
+
 void GamepadShutdown()
 {
 	AcquireSRWLockExclusive(&s_pads_lock);

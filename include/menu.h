@@ -71,8 +71,17 @@ void MenuSetVideoDriverForSelftest(int driver);
 int  MenuGetSyncMode();
 int  MenuGetVsync();
 int  MenuGetN64Core();
-int  MenuGetHwRender();
 int  MenuGetLanguage();
+void MenuSetLanguage(int lang);
+const char* Tr(const char* pt, const char* en);
+
+// Favorites and Recent games management
+bool MenuIsFavorite(const std::string& filepath);
+void MenuToggleFavorite(const std::string& filepath);
+std::vector<std::string> MenuGetFavorites();
+void MenuAddRecent(const std::string& filepath);
+std::vector<std::string> MenuGetRecent();
+
 std::string MenuResolveCoreForPath(const std::string& file_path, const std::string& dir_hint);
 bool MenuLaunchGamePath(const std::string& filepath);
 

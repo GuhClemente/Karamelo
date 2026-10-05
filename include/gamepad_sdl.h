@@ -25,6 +25,16 @@ union SDL_Event;
 // index than before. Same behavior SDL itself has everywhere else.
 bool GamepadGetState(int slot, XINPUT_STATE* out_state);
 
+// Returns the device name reported by SDL3 (e.g. "DualSense Wireless Controller"),
+// or nullptr if no device is connected in that slot.
+const char* GamepadGetDeviceName(int slot);
+
+// Returns the SDL_GamepadType enum value for the connected device, or 0 if none.
+int GamepadGetDeviceType(int slot);
+
+// Returns a user-friendly model name (e.g. "DualSense (PS5)", "Xbox One/Series", "Switch Pro").
+const char* GamepadGetDeviceTypeName(int slot);
+
 // Feed every SDL event from the main loop here - it only acts on
 // SDL_EVENT_GAMEPAD_ADDED/SDL_EVENT_GAMEPAD_REMOVED, ignoring the rest, so
 // slot assignment stays in sync with what is actually plugged in.

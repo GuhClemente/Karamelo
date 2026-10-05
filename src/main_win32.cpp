@@ -1115,9 +1115,13 @@ static void PollGamepad()
 			{
 				MenuProcessKey(KEY_SELECT);
 			}
-			else if (wPressed & (XINPUT_GAMEPAD_B | XINPUT_GAMEPAD_Y))
+			else if (wPressed & XINPUT_GAMEPAD_B)
 			{
 				MenuProcessKey(KEY_CANCEL);
+			}
+			else if (wPressed & XINPUT_GAMEPAD_Y)
+			{
+				MenuProcessKey(KEY_INFO);
 			}
 			else if (wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK))
 			{
@@ -1308,6 +1312,8 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 			case 'X': MenuProcessKey(KEY_SELECT); break;
 			case VK_ESCAPE:
 			case VK_BACK: MenuProcessKey(KEY_CANCEL); break;
+			case 'F':
+			case 'I': MenuProcessKey(KEY_INFO); break;
 			case VK_F12:
 			case VK_TAB: MenuProcessKey(KEY_MENU_TOGGLE); break;
 			default: break;

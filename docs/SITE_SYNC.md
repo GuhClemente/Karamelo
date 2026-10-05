@@ -1109,4 +1109,11 @@ Lançamento da versão **0.9.7** para **Windows (x64), Linux (x64) e macOS (Appl
    - Ícone oficial do Karamelo configurado no Dock e Finder do macOS, e no desktop/menu do Linux.
 4. **Manifesto de Download (`version.json`):**
    - Atualizado para a versão `0.9.7` com URLs, tamanhos e hashes SHA-256 de todas as plataformas.
+5. **Favoritos, Recentes, Presets de Controles e Localização (i18n):**
+   - Menus de acesso rápido de **Favoritos** e **Recentes** (últimos 15 jogos jogados) no menu principal.
+   - Marcação rápida de favoritos com tecla `F` / `I` ou botão `Y` no controle, exibindo indicador `* ` nos jogos favoritados.
+   - Detecção e exibição detalhada de modelos de controles Bluetooth (DualSense PS5, DualShock 4/3, Switch Pro, Joy-Cons, Xbox One/Series, Xbox 360).
+   - Presets rápidos de botões (MiSTer / Nintendo, Xbox Nativo, PlayStation, Arcade 6-Botões).
+   - Perfis de remap de botões persistidos por sistema (`Config/remaps/<Sistema>.cfg`).
+   - Opção de idioma alternável (Português / English) nas Configurações, persistido em `Config/karamelo.cfg`.
 

@@ -106,10 +106,15 @@ extern "C" SHORT GetAsyncKeyState(int vk)
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <string>
+#include <filesystem>
 
 #include "input_map.h"
 #include "libretro.h"
 #include "gamepad_sdl.h"
+
+namespace fs = std::filesystem;
 
 struct BindDef
 {
@@ -454,4 +459,162 @@ int InputCaptureScanPad()
 		if (st.Gamepad.bRightTrigger > 50) return PAD_BTN_RT;
 	}
 	return 0;
+}
+
+const char* InputPresetName(int preset)
+{
+	switch (preset)
+	{
+	case PRESET_MISTER_NINTENDO: return "MiSTer / Nintendo";
+	case PRESET_XBOX_NATIVE:     return "Xbox Nativo";
+	case PRESET_PLAYSTATION:     return "PlayStation";
+	case PRESET_ARCADE_6BTN:     return "Arcade 6-Botoes";
+	default: return "Custom";
+	}
+}
+
+static int s_current_preset = PRESET_MISTER_NINTENDO;
+
+int InputBindGetPreset()
+{
+	return s_current_preset;
+}
+
+void InputBindApplyPreset(int preset)
+{
+	s_current_preset = preset;
+	if (preset == PRESET_MISTER_NINTENDO)
+	{
+		// Padrao MiSTer: Xbox A->Retro B, Xbox B->Retro A, Xbox X->Retro Y, Xbox Y->Retro X
+		s_pads[BIND_B] = PAD_BTN_A;
+		s_pads[BIND_A] = PAD_BTN_B;
+		s_pads[BIND_Y] = PAD_BTN_X;
+		s_pads[BIND_X] = PAD_BTN_Y;
+		s_pads[BIND_L] = PAD_BTN_LB;
+		s_pads[BIND_R] = PAD_BTN_RB;
+		s_pads[BIND_L2] = PAD_BTN_LT;
+		s_pads[BIND_R2] = PAD_BTN_RT;
+	}
+	else if (preset == PRESET_XBOX_NATIVE)
+	{
+		// Xbox Nativo: A->A, B->B, X->X, Y->Y
+		s_pads[BIND_A] = PAD_BTN_A;
+		s_pads[BIND_B] = PAD_BTN_B;
+		s_pads[BIND_X] = PAD_BTN_X;
+		s_pads[BIND_Y] = PAD_BTN_Y;
+		s_pads[BIND_L] = PAD_BTN_LB;
+		s_pads[BIND_R] = PAD_BTN_RB;
+		s_pads[BIND_L2] = PAD_BTN_LT;
+		s_pads[BIND_R2] = PAD_BTN_RT;
+	}
+	else if (preset == PRESET_PLAYSTATION)
+	{
+		// PlayStation: X(Sul)->Retro B, O(Leste)->Retro A, Square(Oeste)->Retro Y, Triangle(Norte)->Retro X
+		s_pads[BIND_B] = PAD_BTN_A;
+		s_pads[BIND_A] = PAD_BTN_B;
+		s_pads[BIND_Y] = PAD_BTN_X;
+		s_pads[BIND_X] = PAD_BTN_Y;
+		s_pads[BIND_L] = PAD_BTN_LB;
+		s_pads[BIND_R] = PAD_BTN_RB;
+		s_pads[BIND_L2] = PAD_BTN_LT;
+		s_pads[BIND_R2] = PAD_BTN_RT;
+	}
+	else if (preset == PRESET_ARCADE_6BTN)
+	{
+		// Arcade 6-Botoes (Capcom / SNK):
+		// LP(X), MP(Y), HP(RB)
+		// LK(A), MK(B), HK(RT)
+		s_pads[BIND_Y] = PAD_BTN_X;
+		s_pads[BIND_X] = PAD_BTN_Y;
+		s_pads[BIND_L] = PAD_BTN_LB;
+		s_pads[BIND_R] = PAD_BTN_RB;
+		s_pads[BIND_B] = PAD_BTN_A;
+		s_pads[BIND_A] = PAD_BTN_B;
+		s_pads[BIND_R2] = PAD_BTN_RT;
+		s_pads[BIND_L2] = PAD_BTN_LT;
+	}
+}
+
+static std::string SanitizeSystemName(const char* name)
+{
+	if (!name) return "";
+	std::string s = name;
+	for (char& c : s)
+	{
+		if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|' || c == ' ')
+			c = '_';
+	}
+	return s;
+}
+
+static std::string GetProfilePath(const char* system_name)
+{
+	std::string clean = SanitizeSystemName(system_name);
+	if (clean.empty()) return "";
+	return "Config/remaps/" + clean + ".cfg";
+}
+
+bool InputBindSaveSystemProfile(const char* system_name)
+{
+	std::string path = GetProfilePath(system_name);
+	if (path.empty()) return false;
+
+	std::error_code ec;
+	fs::create_directories("Config/remaps", ec);
+
+	FILE* f = fopen(path.c_str(), "wb");
+	if (!f) return false;
+
+	fprintf(f, "# Karamelo - Controller Remap for %s\n", system_name);
+	for (int i = 0; i < BIND_COUNT; i++)
+	{
+		fprintf(f, "%s=%d\n", InputBindConfigKey(i), s_keys[i]);
+		fprintf(f, "%s=%d\n", InputBindPadConfigKey(i), s_pads[i]);
+	}
+	fclose(f);
+	return true;
+}
+
+bool InputBindLoadSystemProfile(const char* system_name)
+{
+	std::string path = GetProfilePath(system_name);
+	if (path.empty()) return false;
+
+	FILE* f = fopen(path.c_str(), "rb");
+	if (!f) return false;
+
+	char line[256];
+	while (fgets(line, sizeof(line), f))
+	{
+		if (line[0] == '#' || line[0] == '\r' || line[0] == '\n') continue;
+		char* eq = strchr(line, '=');
+		if (!eq) continue;
+		*eq = '\0';
+		const char* key = line;
+		int iv = atoi(eq + 1);
+
+		int bind_k = InputBindFromConfigKey(key);
+		if (bind_k >= 0) InputBindSetKey(bind_k, iv);
+
+		int bind_p = InputBindFromPadConfigKey(key);
+		if (bind_p >= 0) InputBindSetPad(bind_p, iv);
+	}
+	fclose(f);
+	return true;
+}
+
+bool InputBindHasSystemProfile(const char* system_name)
+{
+	std::string path = GetProfilePath(system_name);
+	if (path.empty()) return false;
+	std::error_code ec;
+	return fs::exists(path, ec);
+}
+
+bool InputBindDeleteSystemProfile(const char* system_name)
+{
+	std::string path = GetProfilePath(system_name);
+	if (path.empty()) return false;
+	std::error_code ec;
+	return fs::remove(path, ec);
 }
