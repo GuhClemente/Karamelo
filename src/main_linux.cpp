@@ -373,7 +373,8 @@ static void RenderFrame()
 					FILE* fw = fopen(wall_path, "rb");
 					if (fw)
 					{
-						fread(custom_wall, sizeof(uint32_t), CANVAS_WIDTH * CANVAS_HEIGHT, fw);
+						size_t read_bytes = fread(custom_wall, sizeof(uint32_t), CANVAS_WIDTH * CANVAS_HEIGHT, fw);
+						(void)read_bytes;
 						fclose(fw);
 					}
 				}
@@ -780,7 +781,7 @@ int main(int argc, char* argv[])
 			if (slash)
 			{
 				*slash = '\0';
-				chdir(exe_path);
+				if (chdir(exe_path) != 0) {}
 			}
 		}
 	}
@@ -788,7 +789,7 @@ int main(int argc, char* argv[])
 	// Fallback: If launched from the root repo and 'roms' is in 'app/roms'
 	if (!fs::exists("roms") && fs::exists("app/roms"))
 	{
-		chdir("app");
+		if (chdir("app") != 0) {}
 	}
 
 	// -------------------------------------------------------------

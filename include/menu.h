@@ -71,6 +71,7 @@ void MenuSetVideoDriverForSelftest(int driver);
 int  MenuGetSyncMode();
 int  MenuGetVsync();
 int  MenuGetN64Core();
+int  MenuGetHwRender();
 int  MenuGetLanguage();
 void MenuSetLanguage(int lang);
 const char* Tr(const char* pt, const char* en);

@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.7 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.71 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -373,16 +373,17 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 29/09/2026:** são **58** jogos de "Ports & Recomp" — 42 até
+**Atualizado em 12/10/2026:** são **61** jogos de "Ports & Recomp" — 42 até
 11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
 F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
 Soulcalibur II / Ring Out — ver seção 16), +1 em 27/09 (Super Smash Bros. Melee /
 Melee Unlocked — ver seção 18), +1 em 27/09 (Monster Hunter Portable 3rd /
 Yakumo — ver seção 20), +1 em 29/09 (Star Fox Adventures / Foxhollow — ver
-seção 21). The Darkness (Xbox 360) chegou a ser anunciado
+seção 23), +1 em 12/10 (Conker's Bad Fur Day / CBFD-Recompiled — ver seção 25),
++1 em 12/10 (Sly Cooper / ProjectCane — ver seção 26) e +1 em 12/10 (Castlevania: Legacy of Darkness / cvlod_recomp — ver seção 27). The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
-nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57) de outra página no futuro. É coincidência
+nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -477,8 +478,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **58** jogos de Ports & Recomp (atualizado em 29/09/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20 e 21),
+- Os **61** jogos de Ports & Recomp (atualizado em 12/10/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26 e 27),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -572,11 +573,11 @@ repositórios daquela data (+ Melee Unlocked e Yakumo, verificados em 27/09/2026
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 58 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 33 ports.
+- No **Windows**: todos os 61 ports possuem builds executáveis (.exe).
+- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 36 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
-  (montadas e extraídas transparentemente via `hdiutil`). Hoje 27 ports possuem
+  (montadas e extraídas transparentemente via `hdiutil`). Hoje 29 ports possuem
   releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
@@ -584,9 +585,9 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 58 jogos.
-   - **Filtro Linux (🐧)**: 33 jogos.
-   - **Filtro macOS (🍎)**: 27 jogos.
+   - **Filtro Windows (🪟)**: 61 jogos.
+   - **Filtro Linux (🐧)**: 36 jogos.
+   - **Filtro macOS (🍎)**: 29 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
@@ -596,20 +597,23 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (22 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (24 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Banjo 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
   Infinite Mario 64, Sonic 3 A.I.R., Valkyrie Profile, Pokemon Snap,
   Super Mario Strikers, Diablo (DevilutionX), Fallout (Community Edition),
   Monster Hunter Portable 3rd (Yakumo) — adicionado em 27/09/2026, ver seção 20,
-  Star Fox Adventures (Foxhollow) — adicionado em 29/09/2026, ver seção 22.
+  Star Fox Adventures (Foxhollow) — adicionado em 29/09/2026, ver seção 23,
+  Conker's Bad Fur Day (CBFD-Recompiled) — adicionado em 12/10/2026, ver seção 25,
+  Castlevania: Legacy of Darkness (cvlod_recomp) — adicionado em 12/10/2026, ver seção 27.
 - **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2,
   Space Station Silicon Valley, Wave Race 64, F-Zero X.
-- **🪟🐧 (11 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
+- **🪟🐧 (12 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
   Super Mario Bros. Remastered, Super Mario World, Body Harvest,
   Diddy Kong Racing, Pokemon Red and Blue (reblue), AeroGauge, Crash Bandicoot,
-  Pikmin (Open Nectar), Soulcalibur II (Ring Out).
+  Pikmin (Open Nectar), Soulcalibur II (Ring Out),
+  Sly Cooper (ProjectCane) — adicionado em 12/10/2026, ver seção 26.
 - **🪟 apenas (20 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
   Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
@@ -1116,4 +1120,161 @@ Lançamento da versão **0.9.7** para **Windows (x64), Linux (x64) e macOS (Appl
    - Presets rápidos de botões (MiSTer / Nintendo, Xbox Nativo, PlayStation, Arcade 6-Botões).
    - Perfis de remap de botões persistidos por sistema (`Config/remaps/<Sistema>.cfg`).
    - Opção de idioma alternável (Português / English) nas Configurações, persistido em `Config/karamelo.cfg`.
+
+---
+
+## 25. Adição de 12/10/2026 — Conker's Bad Fur Day (CBFD-Recompiled)
+
+O catálogo de "Ports & Recomp" vai de 58 para **59 títulos** (base: a revisão da seção 23 e release 0.9.7). Novos totais conferidos contra o `CREDITS.md` e o `src/port_runner.cpp`: **59 Windows 🪟, 34 Linux 🐧, 28 macOS 🍎** — o CBFD-Recompiled publica builds oficiais para os três sistemas. Na lista "rodam em todos" (seção 12) são agora **23 jogos**.
+
+### A entrada
+
+- **Conker's Bad Fur Day (CBFD-Recompiled)** — código em [sciaschi/CBFD-Recompiled](https://github.com/sciaschi/CBFD-Recompiled) — 🪟🐧🍎.
+- Recompilação estática nativa de Conker's Bad Fur Day (Nintendo 64, 2001) baseada no renderizador **RT64**. **Não é emulação.** Licença **GNU General Public License v3.0 (GPL-3.0)** (a mesma licença do Karamelo).
+- Criado por **sciaschi**, com porte nativo para macOS (Apple Silicon ARM64) por **nitrostemp**.
+- O projeto publica executáveis nativos pré-compilados em seus GitHub Releases oficiais:
+  - **Windows (🪟)**: zip x64 com binário `ConkerRecomp.exe`, suportando Direct3D 12 e Vulkan.
+  - **Linux (🐧)**: tarball `.tar.gz` x86_64 nativo com Vulkan, SDL2, GTK 3 e FreeType.
+  - **macOS (🍎)**: zip contendo bundle `.app` com binário Mach-O ARM64 (Apple Silicon nativo). Requer macOS 15 (Sequoia) ou mais recente.
+- **Filtragem de assets**: os lançamentos do upstream incluem um arquivo companheiro `ConkerRecompiled-V*-Mods.zip` com modificações opcionais (Skip Intro, Cheats, etc.). O subsistema do Karamelo filtra e ignora esse pacote companheiro automaticamente, garantindo que o download baixe o runtime completo do jogo.
+
+### O que o jogador precisa saber (use no card/modal)
+
+- **Precisa da ROM original americana (.z64)** de Conker's Bad Fur Day. O Karamelo e o projeto não distribuem nenhum arquivo proprietário de jogo.
+- O jogador só precisa colocar o arquivo `.z64` (ex.: `Conker's Bad Fur Day (USA).z64`) na pasta `roms/Nintendo64/`.
+- O Karamelo detecta a ROM automaticamente, passa o parâmetro `--rom` na inicialização e o port importa e salva os dados na pasta do usuário na primeira vez, permitindo jogar direto com controle ou teclado sem precisar de caixas de diálogo do sistema operacional.
+- Hacks de ROM que apenas alteram assets (como a versão sem censura / Uncensored) também são compatíveis.
+- **Gráficos e Controles**:
+  - Câmera livre no analógico direito (Free Camera) ou no mouse.
+  - FOV (campo de visão) ajustável em graus.
+  - Mira com suporte a mouse e giroscópio.
+  - Suporte a monitores widescreen (16:9) e ultrawide (21:9 e 32:9) com opção de barras pretas em cutscenes para preservar enquadramentos originais.
+  - Suporte a pacotes de textura RT64 (`.rtz`) e GLideN64 HD (`.htc`).
+
+Texto curto sugerido para o card/modal (pt-BR):
+
+> **Conker's Bad Fur Day — Recompiled** *(Nintendo 64)* — port nativo para PC
+> via recompilação estática com RT64, suporte a widescreen, câmera livre e 60 FPS.
+> Coloque sua ROM americana (.z64) em `roms/Nintendo64` e abra pelo menu.
+> Windows, Linux e macOS (Apple Silicon).
+
+### O que mudar no site
+
+1. Contagens: **60** jogos em Ports & Recomp; filtro **Windows = 60**, **Linux = 35**, **macOS = 28** (seção 12).
+2. Lista "rodam em todos" (🪟🐧🍎) da seção 12: **23 jogos**, adicionando Conker's Bad Fur Day.
+3. Sistemas (**35**) e motores (**40**) não mudam — CBFD-Recompiled é um port nativo, não um core.
+4. The Darkness continua fora (seção 19).
+
+---
+
+## 26. Adição de 12/10/2026 — Sly Cooper and the Thievius Raccoonus (ProjectCane)
+
+O catálogo de "Ports & Recomp" vai de 59 para **60 títulos** (base: release 0.9.7). Novos totais conferidos contra o `CREDITS.md` e o `src/port_runner.cpp`: **60 Windows 🪟, 35 Linux 🐧, 28 macOS 🍎**.
+
+### A entrada
+
+- **Sly Cooper (ProjectCane)** — código em [theclub654/ProjectCane](https://github.com/theclub654/ProjectCane) — 🪟🐧.
+- Port nativo para PC de *Sly Cooper and the Thievius Raccoonus* (PlayStation 2, NTSC `SCUS-97198`), totalmente reconstruído em C++ através de engenharia reversa. **Não é emulação.**
+- Autor: **theclub654**.
+- Compatibilidade por plataforma nos releases oficiais do GitHub:
+  - **Windows (🪟)**: pacote RAR com `Sly Cooper and the Thievius Raccoonus.exe` e o `File Extractor GUI` (.NET 9).
+  - **Linux (🐧)**: pacote RAR com `ProjectCane-x86_64.AppImage` (construído contra Ubuntu 22.04 / glibc 2.35, compatível com distribuições modernas e Steam Deck) e scripts `Run File Extractor.sh` e `Run ProjectCane.sh`.
+  - **macOS (🍎)**: **Não possui suporte upstream no momento.** O código de plataforma depende de chamadas Linux como `/proc/self/exe` e subsistema ALSA, sem backend Metal/macOS e sem presets CMake para Darwin. Por isso, a badge macOS **não** é exibida para este port.
+- **Suporte a arquivos RAR no Karamelo**: o subsistema de ports foi atualizado para reconhecer e descompactar arquivos `.rar` e `.7z` nativamente (usando `tar.exe` / libarchive no Windows e `7z` no Linux), garantindo download e extração 100% automáticos.
+
+### Extração de assets do jogo (File Extractor GUI)
+
+- **Requer a ISO original de PS2** do jogo (*Sly Cooper and the Thievius Raccoonus* NTSC, `SCUS-97198`). O Karamelo e o projeto não distribuem nenhum asset proprietário da Sony.
+- O jogo necessita das pastas de assets `Worlds` e `Cutscenes` extraídas ao lado do executável.
+- **Fluxo automatizado no Karamelo**:
+  - Quando o jogador seleciona o jogo pela primeira vez no menu e os assets ainda não foram extraídos, o Karamelo detecta a ausência da pasta `Worlds` e abre automaticamente a janela do **File Extractor GUI** (.NET 9), exibindo uma notificação amigável na tela: `"EXTRAIA SUA ISO NO FILE EXTRACTOR"`.
+  - O jogador simplesmente aponta para sua imagem ISO de PS2 no Extrator e confirma a extração na pasta do port.
+  - A partir da segunda inicialização (com `Worlds/` presente), o Karamelo abre diretamente o jogo pelo menu, sem nenhuma janela intermediária.
+
+### Gráficos e Jogabilidade
+
+- Renderizador OpenGL moderno com shaders embutidos no binário.
+- Suporte a monitores Widescreen 16:9 sem distorção na interface 2D.
+- Taxa de quadros alta / destravada (com física e tempos de mira de torretas corrigidos para taxas altas de FPS).
+- Detecção aprimorada de controles (DualShock, DualSense, Xbox, etc.).
+- Sincronização rítmica precisa no chefe Mz. Ruby e colisões fiéis à física original do PlayStation 2.
+
+Texto curto sugerido para o card/modal (pt-BR):
+
+> **Sly Cooper and the Thievius Raccoonus (ProjectCane)** *(PlayStation 2)* — port
+> nativo para PC reconstruído em C++ via engenharia reversa. Suporte a widescreen,
+> 60+ FPS, OpenGL e controles modernos. Requer extração de assets da ISO original
+> de PS2 (NTSC SCUS-97198) via File Extractor GUI embutido.
+> Windows e Linux (Steam Deck).
+
+### O que mudar no site
+
+1. Contagens: **61** jogos em Ports & Recomp; filtro **Windows = 61**, **Linux = 36**, **macOS = 29** (seção 12).
+2. Badge de SO no card: **🪟 Windows** e **🐧 Linux** (não adicionar 🍎 para este port).
+3. Na lista da seção 12: adicionado a **🪟🐧 (12 jogos, Windows e Linux)**.
+4. Sistemas (**35**) e motores (**40**) permanecem inalterados — ProjectCane é um port nativo, não um core.
+
+---
+
+## 27. Adição de 12/10/2026 — Castlevania: Legacy of Darkness (cvlod_recomp)
+
+O catálogo de "Ports & Recomp" vai de 60 para **61 títulos** (base: release 0.9.7). Novos totais conferidos contra o `CREDITS.md` e o `src/port_runner.cpp`: **61 Windows 🪟, 36 Linux 🐧, 29 macOS 🍎**. Na lista "rodam em todos" (seção 12) são agora **24 jogos**.
+
+### A entrada
+
+- **Castlevania: Legacy of Darkness (cvlod_recomp)** — código em [fliperama86/cvlod_recomp](https://github.com/fliperama86/cvlod_recomp) — 🪟🐧🍎.
+- Recompilação estática nativa de *Castlevania: Legacy of Darkness* (Nintendo 64, 1999) utilizando a tecnologia **N64Recomp** e renderizador **RT64**. **Não é emulação.**
+- Licença: **GNU General Public License v3.0 (GPL-3.0)** — exatamente a mesma licença do Karamelo.
+- Autor: **fliperama86**.
+- Suporte oficial aos 3 sistemas operacionais com binários pré-compilados em cada release do GitHub:
+  - **Windows (🪟)**: zip x64 com `LodRecomp.exe` e DLLs de runtime (DirectX 12 / Vulkan, SDL2).
+  - **Linux (🐧)**: tarball `.tar.gz` x86_64 nativo com executável `LodRecomp`.
+  - **macOS (🍎)**: zip contendo pacote `.app` com binário Mach-O ARM64 nativo para Apple Silicon (M1/M2/M3/M4).
+- O projeto conta com pipeline ativa e dezenas de releases de melhoria contínua de estabilidade e áudio.
+
+### O que o jogador precisa saber (use no card/modal)
+
+- **Requer a ROM original americana (.z64)** do jogo (*Castlevania: Legacy of Darkness* NTSC, código interno `CASTLEVANIA2`, ID `ND4E`).
+- O jogador só precisa colocar o arquivo da ROM em `roms/Nintendo64/` (ex.: `Castlevania - Legacy of Darkness (USA).z64`).
+- O Karamelo localiza a ROM automaticamente, copia e garante a presença de `rom.z64` na pasta do port e repassa o caminho como argumento posicional na inicialização do jogo, garantindo boot direto sem janelas modais de seleção.
+- **Gráficos, Áudio e Controles**:
+  - Renderizador RT64 com suporte a Widescreen 16:9 sem distorção.
+  - Taxa de quadros alta e fluida (60 FPS).
+  - Suporte completo a gamepads modernos via SDL GameController (Xbox, DualShock 4, DualSense, Switch Pro) e teclado.
+  - Áudio RSP nativo recompilado ativado por padrão (`LOD_USE_RECOMPILED_AUDIO_RSP=ON`).
+  - Menu de configurações acessível no jogo para ajustes de vídeo, áudio e controles.
+
+Texto curto sugerido para o card/modal (pt-BR):
+
+> **Castlevania: Legacy of Darkness (LodRecomp)** *(Nintendo 64)* — port nativo
+> para PC via recompilação estática com N64Recomp e RT64. 60 FPS, widescreen,
+> controles modernos e áudio RSP recompilado. Coloque sua ROM americana (.z64)
+> em `roms/Nintendo64` e jogue diretamente pelo menu.
+> Windows, Linux e macOS (Apple Silicon).
+
+### O que mudar no site
+
+1. Contagens: **61** jogos em Ports & Recomp; filtro **Windows = 61**, **Linux = 36**, **macOS = 29** (seção 12).
+2. Badge de SO no card: **🪟 Windows**, **🐧 Linux** e **🍎 macOS** (Apple Silicon).
+3. Na lista da seção 12: adicionado a **🪟🐧🍎 (24 jogos, rodam em todos)**.
+4. Sistemas (**35**) e motores (**40**) permanecem inalterados — LodRecomp é um port nativo, não um core.
+
+---
+
+## 28. Lançamento da Versão 0.9.71 (12/10/2026)
+
+Lançamento da versão **0.9.71** com foco na expansão expressiva do ecossistema de **PC Ports & Recompilados nativos** e aprimoramento no instalador e configurador automático de ROMs.
+
+### Principais Novidades da v0.9.71
+
+1. **Expansão do Catálogo de Ports & Recomp (61 Títulos Totais)**:
+   - **Castlevania: Legacy of Darkness (LodRecomp)** — N64 recompilado nativo a 60 FPS, Widescreen e áudio RSP nativo (🪟🐧🍎).
+   - **Sly Cooper and the Thievius Raccoonus (ProjectCane)** — PS2 recompilado nativo com extração automática da ISO via `File Extractor` (🪟🐧).
+   - **Conker's Bad Fur Day (CBFD-Recompiled)** — N64 recompilado com ray tracing / RT64, suporte a mouse & teclado e gamepads modernos (🪟🐧🍎).
+2. **Setup Transparente de ROMs e ISOs**:
+   - O instalador headless (`--install-port <id>`) e o launcher da interface agora localizam automaticamente as ROMs/ISOs na biblioteca do jogador (`roms/Nintendo64/`, `roms/PlayStation2/`) e preparam os arquivos necessários sem intervenção manual.
+3. **Pacotes e Manifesto**:
+   - Pacote de Windows atualizado para `Karamelo_v0.9.71_Win64.zip`.
+   - Manifesto `version.json` atualizado para a versão `0.9.71`.
+
 

@@ -122,7 +122,10 @@ g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/linux_obj/archive_helper.o \
     build/linux_obj/updater.o \
     build/linux_obj/crash_reporter.o \
-    -lpthread -ldl \
+    build/linux_obj/input_map.o \
+    build/linux_obj/gamepad_sdl.o \
+    build/sdl3_linux/libSDL3.a \
+    -lpthread -ldl -lm \
     -o build/karamelo_tests
 
 ./build/karamelo_tests

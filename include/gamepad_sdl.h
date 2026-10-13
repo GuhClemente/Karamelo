@@ -2,6 +2,10 @@
 #define GAMEPAD_SDL_H_INCLUDED
 
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
 #include <xinput.h>
 #else
 #include "compat_win32.h"

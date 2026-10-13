@@ -812,7 +812,8 @@ static void RenderFrame()
 					FILE* fw = fopen(wall_path, "rb");
 					if (fw)
 					{
-						fread(custom_wall, sizeof(uint32_t), CANVAS_WIDTH * CANVAS_HEIGHT, fw);
+						size_t read_bytes = fread(custom_wall, sizeof(uint32_t), CANVAS_WIDTH * CANVAS_HEIGHT, fw);
+						(void)read_bytes;
 						fclose(fw);
 					}
 				}

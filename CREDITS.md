@@ -176,12 +176,14 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Super Smash Bros. Melee (Melee Unlocked) | 🪟 | [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) |
 | Monster Hunter Portable 3rd (Yakumo) | 🪟🐧🍎 | [TeamGDB/Yakumo](https://github.com/TeamGDB/Yakumo) |
 | Star Fox Adventures (Foxhollow) | 🪟🐧🍎 | [JackPriceBurns/foxhollow](https://github.com/JackPriceBurns/foxhollow) |
+| Conker's Bad Fur Day | 🪟🐧🍎 | [sciaschi/CBFD-Recompiled](https://github.com/sciaschi/CBFD-Recompiled) |
+| Sly Cooper (ProjectCane) | 🪟🐧 | [theclub654/ProjectCane](https://github.com/theclub654/ProjectCane) |
+| Castlevania: Legacy of Darkness | 🪟🐧🍎 | [fliperama86/cvlod_recomp](https://github.com/fliperama86/cvlod_recomp) |
 
-**33 de 58 têm build Linux** e **27 de 58 têm build macOS** (Apple Silicon /
-Universal), verificado em 21/09/2026 contra a release mais recente de cada
-repositório (Melee Unlocked, adicionado em 27/09/2026, só publica Windows;
-Yakumo, adicionado em 27/09/2026, e Foxhollow, adicionado em 29/09/2026,
-publicam os três). Os outros publicam build utilizável apenas no Windows por este
+**36 de 61 têm build Linux** e **29 de 61 têm build macOS** (Apple Silicon /
+Universal), verificado em 12/10/2026 contra a release mais recente de cada
+repositório (Melee Unlocked só publica Windows; ProjectCane publica Windows
+e Linux; Yakumo, Foxhollow, Conker's Bad Fur Day e Castlevania: Legacy of Darkness publicam os três). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 27/09/2026: Super Metroid voltou a 🪟 apenas (a v0.3.9 só
 publica Windows; até a v0.3.8 havia Linux e macOS), Pokemon Snap ganhou 🍎
 (a v1.1.0 é a primeira com `macos-universal.zip`) e Sonic 3 A.I.R. ganhou 🍎
@@ -209,6 +211,35 @@ e só usa o que for `GALE01` revisão 2 — então ISOs 1.00, Training Mode ou
 20XX na mesma pasta são ignorados, e se só houver esses o aviso diz que o
 disco é o errado. O ISO é lido no lugar, não copiado. Jogo online exige conta
 Slippi (logada uma vez pelo Slippi Launcher); offline não.
+
+Um detalhe da linha do Conker's Bad Fur Day: é o port nativo de **Conker's Bad Fur
+Day** (Nintendo 64) via recompilação estática com RT64 (código por sciaschi,
+port macOS Apple Silicon por nitrostemp), sob licença GPL-3.0 (a mesma do
+Karamelo). Publica builds oficiais no GitHub Releases para Windows (zip x64, com
+suporte a Direct3D 12 e Vulkan), Linux (tar.gz x86_64 com Vulkan, SDL2, GTK 3 e
+FreeType) e macOS (zip com ConkerRecomp.app nativo Apple Silicon ARM64, macOS 15+).
+O jogador fornece o arquivo original da ROM americana (.z64) em
+`roms/Nintendo64/`; o Karamelo passa o caminho da ROM com `--rom`, que registra
+e importa os assets na primeira inicialização, iniciando o jogo diretamente.
+
+Um detalhe da linha do Sly Cooper (ProjectCane): é o port nativo de **Sly Cooper
+and the Thievius Raccoonus** (PlayStation 2) reconstruído em C++ através de engenharia
+reversa da versão NTSC (`SCUS-97198`), por theclub654. Publica releases oficiais para
+Windows (RAR contendo o executável do jogo e o File Extractor GUI) e Linux (RAR com
+AppImage portátil x86_64 e scripts de inicialização). Não possui build para macOS no
+momento. O pacote oficial inclui o `File Extractor GUI` (.NET 9) para extrair os dados
+do jogo (`Worlds` e `Cutscenes`) diretamente da imagem ISO do jogador. O Karamelo detecta
+automaticamente se a pasta `Worlds` ainda não existe e inicializa o File Extractor GUI no
+primeiro boot com um aviso na tela para que o jogador possa selecionar sua ISO de PS2.
+
+Um detalhe da linha do Castlevania: Legacy of Darkness: é a recompilação estática
+nativa de **Castlevania: Legacy of Darkness** (Nintendo 64) via N64Recomp e RT64,
+por fliperama86, sob licença GPL-3.0 (a mesma do Karamelo). Publica builds oficiais
+no GitHub Releases para Windows (zip x64 com LodRecomp.exe e DLLs de runtime), Linux
+(tar.gz x86_64 com LodRecomp) e macOS (zip com LodRecomp.app nativo Apple Silicon ARM64).
+O jogador coloca a ROM original americana (`.z64`, código `ND4E`) em `roms/Nintendo64/`;
+o Karamelo copia automaticamente o arquivo para a pasta do port como `rom.z64` e repassa
+o caminho via argumento de linha de comando, permitindo execução direta e imediata.
 
 Um detalhe da linha do Foxhollow: é um port nativo do **Star Fox Adventures**
 (GameCube) feito a partir da decompilação SFA-Decomp e do renderizador

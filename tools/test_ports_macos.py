@@ -53,6 +53,8 @@ MACOS_VERIFIED_PORTS = [
     ("MarioStrikers", "new-coke/strikers", "Super Mario Strikers (macOS ARM64)"),
     ("Snap64Recomp", "JackandBeans/Snap64Recomp", "Pokemon Snap (macOS Universal)"),
     ("Sonic3AIR", "Eukaryot/sonic3air", "Sonic 3 A.I.R. (macOS DMG)"),
+    ("CBFDRecomp", "sciaschi/CBFD-Recompiled", "Conker's Bad Fur Day (macOS Apple Silicon)"),
+    ("LodRecomp", "fliperama86/cvlod_recomp", "Castlevania: Legacy of Darkness (macOS ARM64)"),
 ]
 
 def run_test_port_filtering():

@@ -3972,7 +3972,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			rom_data = rom_size ? (uint8_t*)malloc(rom_size) : NULL;
 			if (rom_data)
 			{
-				fread(rom_data, 1, rom_size, f);
+				if (fread(rom_data, 1, rom_size, f) == rom_size) {}
 				game_info.data = rom_data;
 				game_info.size = rom_size;
 			}
@@ -4439,7 +4439,7 @@ static bool DoLoadState(int slot)
 		return false;
 	}
 
-	fread(buf, 1, sz, f);
+	if (fread(buf, 1, sz, f) == sz) {}
 	fclose(f);
 
 	bool ok = RetroUnserializeGuarded(buf, sz);

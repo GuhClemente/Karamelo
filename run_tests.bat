@@ -17,6 +17,7 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     /I include ^
     /I tests ^
     /I third_party\libmspack ^
+    /I third_party\SDL3\include ^
     /D_CRT_SECURE_NO_WARNINGS ^
     /Fobuild\ ^
     tests\test_main.cpp ^
@@ -33,8 +34,11 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     src\updater.cpp ^
     src\crash_reporter.cpp ^
     src\x360_dump.cpp ^
+    src\input_map.cpp ^
+    src\gamepad_sdl.cpp ^
     third_party\libmspack\lzxd.c ^
-    /link /OUT:build\karamelo_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib shell32.lib user32.lib bcrypt.lib
+    build\sdl3\SDL3-static.lib ^
+    /link /OUT:build\karamelo_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib shell32.lib user32.lib gdi32.lib winmm.lib bcrypt.lib ole32.lib oleaut32.lib imm32.lib setupapi.lib version.lib advapi32.lib
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Unit test compilation failed.

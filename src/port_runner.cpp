@@ -428,6 +428,34 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .iso_dirs = { "GameCube", "GC" },
           .iso_exts = { ".iso", ".rvz", ".gcm" },
           .downloads_json_url = "https://api.foxhollow.dev/releases" },
+        // Conker's Bad Fur Day static recomp (CBFD-Recompiled / RT64, GPL-3.0).
+        // Official releases publish Windows zip, Linux tar.gz and native macOS
+        // (Apple Silicon) zip with ConkerRecomp.app. Assets include a separate
+        // Mods zip (filtered out by LooksLikeCompanionTool). Requires the
+        // original US ROM (.z64); passing --rom registers it into the game's
+        // local storage on first run and boots immediately.
+        { .id = "CBFDRecomp", .display_name = "Conker's Bad Fur Day",
+          .repo = "sciaschi/CBFD-Recompiled", .exe_hint = "ConkerRecomp.exe",
+          .needs_rom = true, .rom_keywords = { "conker" },
+          .has_linux_build = true, .has_macos_build = true,
+          .launch_args = { "--rom", "{rom}" } },
+        // Sly Cooper and the Thievius Raccoonus native PC port (ProjectCane, PS2 reverse engineering).
+        // Official releases publish Windows RAR (with game exe + File Extractor GUI) and
+        // a Linux RAR (portable AppImage + File Extractor GUI). Upstream has no macOS build.
+        // Requires game assets from NTSC PS2 ISO (SCUS-97198) extracted via File Extractor GUI.
+        { .id = "ProjectCane", .display_name = "Sly Cooper (ProjectCane)",
+          .repo = "theclub654/ProjectCane", .exe_hint = "Sly Cooper and the Thievius Raccoonus.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = true, .has_macos_build = false },
+        // Castlevania: Legacy of Darkness static recomp (cvlod_recomp / N64Recomp, GPL-3.0).
+        // Official releases publish Windows zip, Linux tar.gz and native macOS (Apple Silicon arm64) zip.
+        // Requires stock Castlevania: Legacy of Darkness USA ROM (.z64, ND4E). Accepts {rom} positional argument
+        // and rom.z64 in the port directory.
+        { .id = "LodRecomp", .display_name = "Castlevania: Legacy of Darkness",
+          .repo = "fliperama86/cvlod_recomp", .exe_hint = "LodRecomp.exe",
+          .needs_rom = true, .rom_keywords = { "legacy" },
+          .has_linux_build = true, .has_macos_build = true,
+          .launch_args = { "{rom}" } },
     };
     return defs;
 }
@@ -825,7 +853,7 @@ static int ArchPreferenceRank(const std::string& lower_name) {
 static bool LooksLikeCompanionTool(const std::string& lower_name) {
     return ContainsAny(lower_name, { "assetbuilder", "asset-builder", "toolkit", "buildtools",
                                       "build-tools", "sdk", "debug-symbols", "debug_symbols",
-                                      "-pdb", "_pdb", "symbols" });
+                                      "-pdb", "_pdb", "symbols", "-mods", "_mods", "mods.zip" });
 }
 
 // Prefers an archive over a bare .exe/.msi when a release offers both -
@@ -837,13 +865,17 @@ static bool LooksLikeCompanionTool(const std::string& lower_name) {
 // build/dev tool, rather than just the first one found in whatever order the
 // API happened to list them.
 static GhAsset PickWindowsAsset(const std::vector<GhAsset>& assets) {
-    auto is_zip = [](const std::string& n) { return n.size() >= 4 && n.substr(n.size() - 4) == ".zip"; };
+    auto is_archive = [](const std::string& n) {
+        return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||
+               (n.size() >= 4 && n.substr(n.size() - 4) == ".rar") ||
+               (n.size() >= 3 && n.substr(n.size() - 3) == ".7z");
+    };
     auto is_exe = [](const std::string& n) { return n.size() >= 4 && n.substr(n.size() - 4) == ".exe"; };
 
     std::vector<GhAsset> zip_matches;
     for (const auto& a : assets) {
         std::string n = ToLowerStr(a.name);
-        if (is_zip(n) && IsWindowsAssetName(n) && !LooksLikeCompanionTool(n)) zip_matches.push_back(a);
+        if (is_archive(n) && IsWindowsAssetName(n) && !LooksLikeCompanionTool(n)) zip_matches.push_back(a);
     }
     if (!zip_matches.empty()) {
         const GhAsset* best = &zip_matches.front();
@@ -860,15 +892,19 @@ static GhAsset PickWindowsAsset(const std::vector<GhAsset>& assets) {
         if (IsWindowsAssetName(ToLowerStr(a.name))) return a;
     }
 
-    // Smaller single-platform projects sometimes ship one .zip with no OS
-    // marker anywhere in the name - untagged, not ambiguous. Chameleon Twist
-    // and Quest 64's recomps both do exactly this. Nothing to choose between,
-    // so take it rather than refuse outright.
-    if (assets.size() == 1) {
-        std::string n = ToLowerStr(assets[0].name);
+    // Untagged archive when all other assets are explicitly non-Windows/companion tools.
+    // E.g. Chameleon Twist / Quest 64 (single .zip), ProjectCane (0.4.0-beta.1.rar alongside a Linux rar).
+    std::vector<GhAsset> non_other;
+    for (const auto& a : assets) {
+        std::string n = ToLowerStr(a.name);
         bool other_os = ContainsAny(n, { "linux", "macos", "osx", "darwin", "apple", ".deb", ".rpm",
                                           ".appimage", ".dmg", ".pkg", "switch", "android" });
-        if (!other_os && (is_zip(n) || is_exe(n))) return assets[0];
+        if (!other_os && !LooksLikeCompanionTool(n) && (is_archive(n) || is_exe(n))) {
+            non_other.push_back(a);
+        }
+    }
+    if (non_other.size() == 1) {
+        return non_other[0];
     }
     return GhAsset{};
 }
@@ -908,6 +944,8 @@ static bool IsLinuxAssetName(const std::string& lower_name) {
 static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
     auto is_archive = [](const std::string& n) {
         return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||
+               (n.size() >= 4 && n.substr(n.size() - 4) == ".rar") ||
+               (n.size() >= 3 && n.substr(n.size() - 3) == ".7z") ||
                (n.size() >= 7 && (n.substr(n.size() - 7) == ".tar.gz" || n.substr(n.size() - 7) == ".tar.xz")) ||
                (n.size() >= 9 && n.substr(n.size() - 9) == ".appimage") ||
                (n.find("linux") != std::string::npos && !ContainsAny(n, { ".apk", ".deb", ".rpm", "flatpak" }));
@@ -1132,6 +1170,8 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         if (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".dmg") cache_ext = ".dmg";
         else if (lower_name.size() >= 7 && lower_name.substr(lower_name.size() - 7) == ".tar.gz") cache_ext = ".tar.gz";
         else if (lower_name.size() >= 7 && lower_name.substr(lower_name.size() - 7) == ".tar.xz") cache_ext = ".tar.xz";
+        else if (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".rar") cache_ext = ".rar";
+        else if (lower_name.size() >= 3 && lower_name.substr(lower_name.size() - 3) == ".7z") cache_ext = ".7z";
         std::string zip_path = "cache/" + def.id + "_download" + cache_ext;
         if (!UpdaterHttpDownloadToFile(asset.url, zip_path)) { out_error = "falha no download"; return false; }
 
@@ -1362,6 +1402,12 @@ bool PortAutoSetupRom(const std::string& port_id) {
                     if (cfg) cfg << f.path().filename().string() << "\n";
                 }
             }
+            if (port_id == "LodRecomp") {
+                fs::path rz = fs::path(target_dir) / "rom.z64";
+                if (!fs::exists(rz, ec)) {
+                    fs::copy_file(f.path(), rz, fs::copy_options::overwrite_existing, ec);
+                }
+            }
             return true;
         }
     }
@@ -1392,6 +1438,9 @@ bool PortAutoSetupRom(const std::string& port_id) {
             if (port_id == "PokemonStadiumRecomp") {
                 std::ofstream cfg(fs::path(target_dir) / "rom.cfg");
                 if (cfg) cfg << entry.path().filename().string() << "\n";
+            }
+            if (port_id == "LodRecomp") {
+                fs::copy_file(dest, fs::path(target_dir) / "rom.z64", fs::copy_options::overwrite_existing, ec);
             }
             return !ec;
         }
@@ -1470,6 +1519,41 @@ static std::string FindUserIso(const PortDefinition& def, const std::string& por
             if (!all) continue;
             if (IsoHeaderMatches(def, e.path())) return e.path().string();
             if (out_wrong_disc) *out_wrong_disc = true;
+        }
+    }
+    return "";
+}
+
+static std::string FindUserRom(const PortDefinition& def, const std::string& port_dir) {
+    if (def.rom_keywords.empty()) return "";
+    std::error_code ec;
+    // 1. In port folder itself (where PortAutoSetupRom copies it)
+    if (!port_dir.empty() && fs::is_directory(port_dir, ec)) {
+        for (const auto& e : fs::directory_iterator(port_dir, ec)) {
+            if (ec || !e.is_regular_file(ec)) continue;
+            std::string ext = ToLowerStr(e.path().extension().string());
+            if (ext == ".z64" || ext == ".n64" || ext == ".v64") {
+                return e.path().string();
+            }
+        }
+    }
+    // 2. In ROM folders
+    static const std::vector<std::string> search = {
+        "roms/Nintendo64", "roms/N64", "roms",
+        "app/roms/Nintendo64", "app/roms/N64", "app/roms"
+    };
+    for (const auto& d : search) {
+        if (!fs::is_directory(d, ec)) continue;
+        for (const auto& e : fs::directory_iterator(d, ec)) {
+            if (ec || !e.is_regular_file(ec)) continue;
+            std::string ext = ToLowerStr(e.path().extension().string());
+            if (ext != ".z64" && ext != ".n64" && ext != ".v64") continue;
+            std::string name = ToLowerStr(e.path().filename().string());
+            bool all = true;
+            for (const auto& kw : def.rom_keywords) {
+                if (name.find(kw) == std::string::npos) { all = false; break; }
+            }
+            if (all) return e.path().string();
         }
     }
     return "";
@@ -1656,6 +1740,42 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         a.replace(at, 5, fs::absolute(iso, aec).string());
     }
 
+    // 1c. Resolve "{rom}" in the launch arguments
+    for (auto& a : extra_args) {
+        size_t at = a.find("{rom}");
+        if (at == std::string::npos) continue;
+        std::string rom = FindUserRom(*def, ResolvePortDir(port_id));
+        if (rom.empty()) {
+            CoreSetToast(("COLOQUE A ROM DE " + (def ? def->display_name : port_id) + " EM roms/Nintendo64").c_str(), 300);
+            return false;
+        }
+        std::error_code rec;
+        a.replace(at, 5, fs::absolute(rom, rec).string());
+    }
+
+    // 1d. Special first-run helper for ProjectCane: if Worlds/ data directory does not
+    // exist yet, automatically launch the bundled File Extractor GUI so the user can
+    // pick their NTSC PS2 ISO and extract the required game assets.
+    if (def && def->id == "ProjectCane") {
+        std::error_code wec;
+        std::string port_dir = ResolvePortDir(def->id);
+        if (!port_dir.empty() && !fs::exists(port_dir + "/Worlds", wec)) {
+#ifdef _WIN32
+            std::string ext_exe = port_dir + "/File Extractor GUI/File Extractor GUI.exe";
+            if (fs::exists(ext_exe, wec)) {
+                CoreSetToast("EXTRAIA SUA ISO NO FILE EXTRACTOR", 360);
+                return LaunchResolvedExecutable(ext_exe, nullptr, port_id);
+            }
+#else
+            std::string ext_sh = port_dir + "/Run File Extractor.sh";
+            if (fs::exists(ext_sh, wec)) {
+                CoreSetToast("EXTRAIA SUA ISO NO FILE EXTRACTOR", 360);
+                return LaunchResolvedExecutable(ext_sh, nullptr, port_id);
+            }
+#endif
+        }
+    }
+
     // 2. Stop any active Libretro core. CoreIsRunning() alone is false while
     // a ROM/core is still on its way up (CORE_STATE_LOADING) - checking only
     // that let a native port launch alongside a core load still running on
@@ -1794,7 +1914,15 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
     std::vector<char*> argv;
     argv.push_back(const_cast<char*>(sexe.c_str()));
-    if (!rom_arg.empty()) {
+    bool has_custom_rom = false;
+    for (const auto& a : extra_args) {
+        std::string alow = ToLowerStr(a);
+        if (alow.find(".z64") != std::string::npos || alow.find(".n64") != std::string::npos || alow.find(".v64") != std::string::npos) {
+            has_custom_rom = true;
+            break;
+        }
+    }
+    if (!rom_arg.empty() && !has_custom_rom) {
         argv.push_back(const_cast<char*>(rom_arg.c_str()));
     }
     for (const auto& a : extra_args) argv.push_back(const_cast<char*>(a.c_str()));
@@ -1810,7 +1938,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         // Child: only async-signal-safe calls until exec, per fork()'s
         // contract in a multithreaded process. chdir, execv, and _exit
         // are strictly async-signal-safe and perform no heap allocations.
-        (void)chdir(sdir.c_str());
+        if (chdir(sdir.c_str()) != 0) {}
         execv(sexe.c_str(), argv.data());
         _exit(127); // exec itself failed (not found / not executable)
     }
