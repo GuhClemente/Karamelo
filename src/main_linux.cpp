@@ -1170,7 +1170,6 @@ int main(int argc, char* argv[])
 			}
 			else if (event.type == SDL_EVENT_KEY_DOWN)
 			{
-				SDL_Keycode key = event.key.key;
 				SDL_Scancode sc = event.key.scancode;
 
 				if (sc == SDL_SCANCODE_F12)

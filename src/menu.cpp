@@ -3893,6 +3893,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         std::string target_rom_path = full_rom_path;
         std::string core_dll = MenuResolveCoreForPath(full_rom_path, current_dir);
         ApplyMsxMachineTypeOption(core_dll, ext);
+        ApplyPersistedCoreOptions();
 
         if (CoreRequestLoad(target_rom_path.c_str(), core_dll.c_str())) {
           MenuAddRecent(target_rom_path);

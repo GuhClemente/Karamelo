@@ -50,7 +50,9 @@ namespace fs = std::filesystem;
 // http puro qualquer um no caminho poderia trocar a URL e o hash.
 static const char* UPDATE_MANIFEST_URL = "https://karamelo-emu.com/downloads/version.json";
 static const char* UPDATE_FALLBACK_URL = "https://raw.githubusercontent.com/GuhClemente/Karamelo/main/dist/version.json";
+#ifdef _WIN32
 static const wchar_t* USER_AGENT = L"Karamelo-Updater/1.0";
+#endif
 
 // Internal State
 static std::mutex              g_updater_lock;
@@ -113,7 +115,6 @@ static bool ExtractJsonBool(const std::string& json, const std::string& key)
 	if (pos == std::string::npos) return false;
 
 	size_t pos_true = json.find("true", pos);
-	size_t pos_false = json.find("false", pos);
 	size_t pos_comma = json.find_first_of(",}\n", pos);
 
 	if (pos_true != std::string::npos && (pos_comma == std::string::npos || pos_true < pos_comma))
@@ -588,7 +589,6 @@ static void UpdaterThreadProc()
 
 		bool do_check = false;
 		bool do_download = false;
-		bool manual = false;
 
 		{
 			std::lock_guard<std::mutex> lock(g_updater_lock);
@@ -596,7 +596,6 @@ static void UpdaterThreadProc()
 			{
 				do_check = true;
 				g_command_check = false;
-				manual = g_manual_check;
 			}
 			if (g_command_download)
 			{

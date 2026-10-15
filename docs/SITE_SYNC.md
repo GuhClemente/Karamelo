@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.71 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.72 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -1277,4 +1277,25 @@ Lançamento da versão **0.9.71** com foco na expansão expressiva do ecossistem
    - Pacote de Windows atualizado para `Karamelo_v0.9.71_Win64.zip`.
    - Manifesto `version.json` atualizado para a versão `0.9.71`.
 
+---
 
+## 29. Lançamento da Versão 0.9.72 (15/10/2026)
+
+Lançamento da versão **0.9.72** com foco em estabilidade profunda, correção de bugs de concorrência e eliminação de falhas sutis em todas as plataformas (Windows, Linux e macOS).
+
+### Principais Correções e Melhorias da v0.9.72
+
+1. **Ciclo de Vida de Threads POSIX & Eliminação de Use-After-Free**:
+   - Adicionada contagem de referências atômica (`refcount`) nos handles de thread da camada de compatibilidade Win32/POSIX (`compat_win32.h`).
+   - Elimina crash/SIGSEGV em encerramentos de cores com timeout ou chamadas a `TerminateThread` no macOS e Linux.
+2. **Aplicação Completa de Opções de Cores pelo Navegador**:
+   - Correção no fluxo de seleção de ROMs do menu (`menu.cpp`): a função `ApplyPersistedCoreOptions()` agora é chamada também ao iniciar jogos pelo navegador de arquivos (`STATE_BROWSE`), garantindo que opções de stylus/touch e telas do Nintendo DS (melonDS), layout do Nintendo 3DS (Citra), áudio FM do Master System, precache do Sega CD e dip-switches/regiões do NeoGeo sejam aplicadas corretamente.
+3. **Robustez no Monitoramento de PC Ports**:
+   - Proteção contra interrupções por sinais (`EINTR`) no loop de `waitpid` (`port_runner.cpp`), evitando que o Karamelo seja restaurado prematuramente sobre um jogo ainda em execução no Linux e macOS.
+4. **Correção no Cliente RetroAchievements (Linux/macOS)**:
+   - Eliminação de falso código HTTP 200 quando requisições `curl` falham sem saída.
+   - Envio correto do cabeçalho `User-Agent` oficial (`Karamelo/2.0 rcheevos/12.4.0`) em todas as requisições.
+5. **Prevenção de Timeout Excessivo no Descompactador**:
+   - Saída imediata de loops de espera do extrator transparente (`archive_helper.cpp`) em caso de erros não recuperáveis (`ECHILD`), prevenindo bloqueios de até 10 minutos.
+6. **Limpeza e Compilação Limpa**:
+   - Resolução de advertências do compilador com `-Wall -Wextra` e expansão da suíte de testes unitários para 31 testes.

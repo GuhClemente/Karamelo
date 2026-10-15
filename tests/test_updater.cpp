@@ -76,3 +76,32 @@ TEST_CASE(UpdaterManifestNeverFallsBackToWindowsExe)
 	UpdateInfo bad;
 	ASSERT_FALSE(UpdaterParseManifest("{ \"exe_url\": \"x\" }", "macos", bad));
 }
+
+#ifndef _WIN32
+#include "compat_win32.h"
+#endif
+#include <atomic>
+#include <thread>
+#include <chrono>
+
+static DWORD WINAPI DummyThreadProc(LPVOID param)
+{
+	std::atomic<bool>* flag = (std::atomic<bool>*)param;
+	if (flag) flag->store(true);
+	return 0;
+}
+
+TEST_CASE(ThreadHandleSafeCloseWhileRunning)
+{
+	std::atomic<bool> ran{ false };
+	HANDLE h = CreateThread(NULL, 0, DummyThreadProc, &ran, 0, NULL);
+	ASSERT_TRUE(h != NULL);
+	// Close immediately while thread is starting or running
+	ASSERT_TRUE(CloseHandle(h));
+	// Give thread a moment to finish its cleanup handler without crashing
+	int attempts = 0;
+	while (!ran.load() && attempts++ < 100) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+	}
+	ASSERT_TRUE(ran.load());
+}

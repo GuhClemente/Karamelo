@@ -108,6 +108,11 @@ static bool RunHiddenCommand(const std::vector<std::string>& argv, uint32_t time
 	{
 		pid_t r = waitpid(pid, &status, WNOHANG);
 		if (r == pid) break;
+		if (r == -1)
+		{
+			if (errno == EINTR) continue;
+			break;
+		}
 		if (elapsed_ms >= timeout_ms)
 		{
 			kill(pid, SIGKILL);
@@ -547,6 +552,11 @@ static int RunHiddenCommandCaptureOutput(const std::vector<std::string>& argv, u
 	{
 		pid_t r = waitpid(pid, &status, WNOHANG);
 		if (r == pid) break;
+		if (r == -1)
+		{
+			if (errno == EINTR) continue;
+			break;
+		}
 		if (elapsed_ms >= timeout_ms)
 		{
 			kill(pid, SIGKILL);

@@ -1,19 +1,19 @@
 {
-    "version": "0.9.71",
-    "title": "Karamelo v0.9.71",
-    "release_date": "2026-10-12",
+    "version": "0.9.72",
+    "title": "Karamelo v0.9.72",
+    "release_date": "2026-10-15",
     "notes": "Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.",
     "force_full_package": false,
     "linux_bin_url": "https://karamelo-emu.com/downloads/Karamelo_linux",
     "linux_bin_size": 5595280,
     "linux_bin_sha256": "1E652E192764025BE60AD8EDEEEE8A1C686372F8154A708F072B6C1E1B245B99",
-    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.71_Linux64.tar.gz",
+    "linux_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.72_Linux64.tar.gz",
     "exe_url": "https://karamelo-emu.com/downloads/Karamelo.exe",
     "exe_size": 4328448,
     "exe_sha256": "D479C7698A168553AFC3BFEEF4921B8A12F9F256A8C7822B7E766E2E0AEC6D73",
-    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.71_Win64.zip",
+    "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.72_Win64.zip",
     "macos_bin_url": "https://karamelo-emu.com/downloads/Karamelo_mac",
-    "macos_bin_size": 4262216,
-    "macos_bin_sha256": "EE0CB97A73D11E196827C361DF577825A9FCE029ECDF4146136CEA63B861861F",
-    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.7_macOS_arm64.tar.gz"
+    "macos_bin_size": 4298616,
+    "macos_bin_sha256": "C8EE9F8ABBB9163E27F622A0E5A9CD83B75C2AEB19CCA5E09518A5DC6E8F4432",
+    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.9.72_macOS_arm64.tar.gz"
 }

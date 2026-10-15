@@ -151,6 +151,7 @@ enum WinHandleType
 struct WinHandle
 {
 	WinHandleType type;
+	std::atomic<int> refcount;
 	union {
 		struct {
 			pthread_t th;
@@ -184,6 +185,13 @@ static inline void ThreadCleanupHandler(void* arg)
 		h->thread.finished = true;
 		pthread_cond_broadcast(&h->thread.cond);
 		pthread_mutex_unlock(&h->thread.mtx);
+
+		if (h->refcount.fetch_sub(1) == 1)
+		{
+			pthread_mutex_destroy(&h->thread.mtx);
+			pthread_cond_destroy(&h->thread.cond);
+			delete h;
+		}
 	}
 }
 
@@ -218,6 +226,7 @@ static inline HANDLE CreateThread(void* sec, size_t stack, LPTHREAD_START_ROUTIN
 	(void)sec; (void)stack; (void)flags; (void)id;
 	WinHandle* h = new WinHandle();
 	h->type = HANDLE_TYPE_THREAD;
+	h->refcount.store(2);
 	h->thread.joined = false;
 	h->thread.finished = false;
 	pthread_mutex_init(&h->thread.mtx, NULL);
@@ -391,6 +400,7 @@ static inline BOOL CloseHandle(HANDLE handle)
 	{
 		pthread_mutex_destroy(&h->event.mtx);
 		pthread_cond_destroy(&h->event.cond);
+		delete h;
 	}
 	else if (h->type == HANDLE_TYPE_THREAD)
 	{
@@ -398,10 +408,13 @@ static inline BOOL CloseHandle(HANDLE handle)
 		{
 			pthread_detach(h->thread.th);
 		}
-		pthread_mutex_destroy(&h->thread.mtx);
-		pthread_cond_destroy(&h->thread.cond);
+		if (h->refcount.fetch_sub(1) == 1)
+		{
+			pthread_mutex_destroy(&h->thread.mtx);
+			pthread_cond_destroy(&h->thread.cond);
+			delete h;
+		}
 	}
-	delete h;
 	return TRUE;
 }
 

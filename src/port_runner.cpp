@@ -1951,11 +1951,11 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     try {
     std::thread([
 #ifdef _WIN32
-        hProcess, hThread,
+        hProcess, hThread
 #else
-        pid,
+        pid
 #endif
-        window]() {
+        ]() {
         // The wait itself can run for as long as the user plays (hours) - it
         // is not counted in s_active_bg_threads, or PortShutdown() would
         // block app shutdown on the game still being open instead of just
@@ -1969,7 +1969,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         CloseHandle(hProcess);
 #else
         int status = 0;
-        waitpid(pid, &status, 0);
+        while (waitpid(pid, &status, 0) == -1 && errno == EINTR) {}
         s_active_bg_threads.fetch_add(1);
 #endif
 

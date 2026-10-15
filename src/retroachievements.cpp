@@ -86,6 +86,7 @@ static void SyncUsernameMirror()
 }
 
 static wchar_t g_user_agent[256] = L"";
+static std::string g_user_agent_str;
 
 static rc_libretro_memory_regions_t g_memory_regions;
 static bool g_memory_ready = false;
@@ -276,6 +277,11 @@ static void HttpPerform(HttpJob* job)
 	posix_spawn_file_actions_addclose(&actions, out_pipe[0]);
 
 	std::vector<std::string> args = { "curl", "-s", "-w", "\n%{http_code}" };
+	if (!g_user_agent_str.empty())
+	{
+		args.push_back("-A");
+		args.push_back(g_user_agent_str);
+	}
 	if (!job->post_data.empty())
 	{
 		args.push_back("-X");
@@ -331,7 +337,7 @@ static void HttpPerform(HttpJob* job)
 	close(out_pipe[0]);
 
 	int status = 0;
-	waitpid(pid, &status, 0);
+	while (waitpid(pid, &status, 0) == -1 && errno == EINTR) {}
 
 	size_t last_nl = output.find_last_of('\n');
 	if (last_nl != std::string::npos && last_nl + 1 < output.size())
@@ -343,7 +349,7 @@ static void HttpPerform(HttpJob* job)
 	else
 	{
 		job->body = output;
-		job->status = 200;
+		job->status = 0;
 	}
 }
 #endif
@@ -806,6 +812,7 @@ void RaInit()
 		char agent[256];
 		snprintf(agent, sizeof(agent), "Karamelo/2.0 %s", clause);
 		MultiByteToWideChar(CP_UTF8, 0, agent, -1, g_user_agent, 256);
+		g_user_agent_str = agent;
 	}
 	rc_client_set_hardcore_enabled(g_client, g_hardcore ? 1 : 0);
 
