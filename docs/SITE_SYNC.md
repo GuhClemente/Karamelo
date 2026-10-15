@@ -1298,4 +1298,4 @@ Lançamento da versão **0.9.72** com foco em estabilidade profunda, correção 
 5. **Prevenção de Timeout Excessivo no Descompactador**:
    - Saída imediata de loops de espera do extrator transparente (`archive_helper.cpp`) em caso de erros não recuperáveis (`ECHILD`), prevenindo bloqueios de até 10 minutos.
 6. **Limpeza e Compilação Limpa**:
-   - Resolução de advertências do compilador com `-Wall -Wextra` e expansão da suíte de testes unitários para 31 testes.
+   - Resolução de advertências do compilador com `-Wall -Wextra` e expansão da suíte de testes unitários para 37 testes.
