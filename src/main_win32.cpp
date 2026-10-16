@@ -1088,27 +1088,7 @@ static void PollGamepad()
 		WORD wPressed = wButtons & ~s_prev_pad_buttons;
 		s_prev_pad_buttons = wButtons;
 
-		if (CoreIsRunning() && !osd_now)
-		{
-			// Quick Save / Load via Gamepad: Select + R1 (Save), Select + L1 (Load)
-			if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_RIGHT_SHOULDER))
-			{
-				CoreSaveState(CoreGetSelectedSlot());
-			}
-			else if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_LEFT_SHOULDER))
-			{
-				CoreLoadState(CoreGetSelectedSlot());
-			}
-			// Toggle OSD with Start+Select
-			else if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
-			{
-				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
-				{
-					MenuProcessKey(KEY_MENU_TOGGLE);
-				}
-			}
-		}
-		else
+		if (osd_now)
 		{
 			// Menu Navigation:
 			// Action buttons (Edge-triggered on press down only, never repeating while held)
@@ -1160,6 +1140,37 @@ static void PollGamepad()
 				}
 			}
 			s_prev_dpad_dir = cur_dir;
+		}
+		else if (CoreIsRunning())
+		{
+			// Quick Save / Load via Gamepad: Select + R1 (Save), Select + L1 (Load)
+			if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_RIGHT_SHOULDER))
+			{
+				CoreSaveState(CoreGetSelectedSlot());
+			}
+			else if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_LEFT_SHOULDER))
+			{
+				CoreLoadState(CoreGetSelectedSlot());
+			}
+			// Toggle OSD with Start+Select
+			else if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
+			{
+				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
+				{
+					MenuProcessKey(KEY_MENU_TOGGLE);
+				}
+			}
+		}
+		else
+		{
+			// Dashboard with menu hidden: Start+Select toggles menu back on
+			if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
+			{
+				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
+				{
+					MenuProcessKey(KEY_MENU_TOGGLE);
+				}
+			}
 		}
 	}
 	else
@@ -1261,18 +1272,18 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 			return 0;
 		}
 
-		if (CoreIsRunning() && !OsdIsEnabled())
+		if (wParam == VK_F12)
+		{
+			MenuProcessKey(KEY_MENU_TOGGLE);
+		}
+		else if (CoreIsRunning() && !OsdIsEnabled())
 		{
 			// F12 only. Esc and Tab used to open the OSD here too, which meant a
 			// game never saw them: pressing Esc in Doom under DOSBox opened our
 			// menu instead of the game's. They are ordinary keys during play.
 			// Esc still closes the OSD once it is open - there the game is not
 			// reading input anyway.
-			if (wParam == VK_F12)
-			{
-				MenuProcessKey(KEY_MENU_TOGGLE);
-			}
-			else if (wParam == VK_F5 || wParam == VK_F2) // Quick Save State
+			if (wParam == VK_F5 || wParam == VK_F2) // Quick Save State
 			{
 				CoreSaveState(CoreGetSelectedSlot());
 			}
@@ -1295,7 +1306,7 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 				CoreTakeScreenshot();
 			}
 		}
-		else
+		else if (OsdIsEnabled())
 		{
 			switch (wParam)
 			{
@@ -1315,7 +1326,6 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 			case VK_BACK: MenuProcessKey(KEY_CANCEL); break;
 			case 'F':
 			case 'I': MenuProcessKey(KEY_INFO); break;
-			case VK_F12:
 			case VK_TAB: MenuProcessKey(KEY_MENU_TOGGLE); break;
 			default: break;
 			}

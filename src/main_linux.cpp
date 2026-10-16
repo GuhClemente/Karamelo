@@ -595,25 +595,7 @@ static void PollGamepad()
 		WORD wPressed = wButtons & ~s_prev_pad_buttons;
 		s_prev_pad_buttons = wButtons;
 
-		if (CoreIsRunning() && !osd_now)
-		{
-			if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_RIGHT_SHOULDER))
-			{
-				CoreSaveState(CoreGetSelectedSlot());
-			}
-			else if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_LEFT_SHOULDER))
-			{
-				CoreLoadState(CoreGetSelectedSlot());
-			}
-			else if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
-			{
-				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
-				{
-					MenuProcessKey(KEY_MENU_TOGGLE);
-				}
-			}
-		}
-		else
+		if (osd_now)
 		{
 			if (wPressed & (XINPUT_GAMEPAD_A | XINPUT_GAMEPAD_X))
 			{
@@ -662,6 +644,35 @@ static void PollGamepad()
 				}
 			}
 			s_prev_dpad_dir = cur_dir;
+		}
+		else if (CoreIsRunning())
+		{
+			if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_RIGHT_SHOULDER))
+			{
+				CoreSaveState(CoreGetSelectedSlot());
+			}
+			else if ((wButtons & XINPUT_GAMEPAD_BACK) && (wPressed & XINPUT_GAMEPAD_LEFT_SHOULDER))
+			{
+				CoreLoadState(CoreGetSelectedSlot());
+			}
+			else if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
+			{
+				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
+				{
+					MenuProcessKey(KEY_MENU_TOGGLE);
+				}
+			}
+		}
+		else
+		{
+			// Dashboard with menu hidden: Start+Select toggles menu back on
+			if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
+			{
+				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
+				{
+					MenuProcessKey(KEY_MENU_TOGGLE);
+				}
+			}
 		}
 	}
 	else

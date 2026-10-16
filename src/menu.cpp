@@ -113,6 +113,12 @@ static std::string current_title = "Karamelo";
 static std::string current_dir = "roms";
 static std::string status_msg = "Karamelo - karamelo-emu.com - @GuhClemente";
 
+static int setting_language = 0; // 0=Portugues, 1=English
+
+const char* Tr(const char* pt, const char* en) {
+  return (setting_language == 1) ? en : pt;
+}
+
 // Settings variables matching screenshots
 static int setting_aspect = 0; // 0=Original, 1=4:3, 2=16:9
 // The scanline / display-simulation modes, in menu order. The ids are the
@@ -129,13 +135,20 @@ static int setting_aspect = 0; // 0=Original, 1=4:3, 2=16:9
 // core_runner.cpp and each mode is tuned to the hardware it imitates.
 struct FilterChoice {
   int mode;
-  const char *label;
+  const char *label_pt;
+  const char *label_en;
 };
 static const FilterChoice kFilters[] = {
-    {0, "Off (Raw)"},       {8, "Scanlines Leve"}, {9, "CRT Suave (TV)"},
-    {4, "PVM Pro 600TVL"},  {1, "Sony Trinitron"}, {2, "Arcade Shadow"},
-    {5, "Scanlines 50%"},   {6, "NTSC Composite"}, {7, "LCD Matrix"},
-    {3, "Tubo Curvado 3D"},
+    {0, "Desligado (Raw)", "Off (Raw)"},
+    {8, "Scanlines Leve",  "Scanlines Light"},
+    {9, "CRT Suave (TV)",  "Soft CRT (TV)"},
+    {4, "PVM Pro 600TVL",  "PVM Pro 600TVL"},
+    {1, "Sony Trinitron",  "Sony Trinitron"},
+    {2, "Arcade Shadow",   "Arcade Shadow"},
+    {5, "Scanlines 50%",   "Scanlines 50%"},
+    {6, "NTSC Composto",   "NTSC Composite"},
+    {7, "Matriz LCD",      "LCD Matrix"},
+    {3, "Tubo Curvado 3D", "Curved CRT 3D"},
 };
 static const int kFilterCount = (int)(sizeof(kFilters) / sizeof(kFilters[0]));
 
@@ -146,7 +159,8 @@ static int FilterIndex(int mode) {
   return 0;
 }
 static const char *FilterLabel(int mode) {
-  return kFilters[FilterIndex(mode)].label;
+  int idx = FilterIndex(mode);
+  return (setting_language == 1) ? kFilters[idx].label_en : kFilters[idx].label_pt;
 }
 
 // Guards against a config naming a mode the renderer does not implement.
@@ -324,11 +338,6 @@ static void ApplyPersistedCoreOptions();
 static void ApplyMsxMachineTypeOption(const std::string &core_dll,
                                       const std::string &ext);
 
-static int setting_language = 0; // 0=Portugues, 1=English
-
-const char* Tr(const char* pt, const char* en) {
-  return (setting_language == 1) ? en : pt;
-}
 
 static void MenuSaveSettings();
 
@@ -526,10 +535,11 @@ const char *MenuGetWallpaperCustomPath(int index) {
 }
 
 static const char *WallpaperDisplayLabel(int mode) {
-  static const char *kBase[] = {"None", "Static Noise", "Parallax Stars", "Cyber Grid"};
-  if (mode >= 0 && mode < 4) return kBase[mode];
+  static const char *kBasePt[] = {"Nenhum", "Ruido Estatico", "Estrelas", "Grade Cyber"};
+  static const char *kBaseEn[] = {"None", "Static Noise", "Parallax Stars", "Cyber Grid"};
+  if (mode >= 0 && mode < 4) return (setting_language == 1) ? kBaseEn[mode] : kBasePt[mode];
   const char *path = MenuGetWallpaperCustomPath(mode - 4);
-  if (!path) return "None";
+  if (!path) return Tr("Nenhum", "None");
   static char buf[32];
   std::string stem = fs::path(path).stem().string();
   if (stem == "karamelo_chef") {
@@ -1161,68 +1171,76 @@ void PopulateMainMenu() {
       // Labels line up 1:1 with the value tables in the handlers below.
       // Geolith has no "CD" system type - a CD is selected by loading a
       // disc image, and its hardware is chosen through CD Type.
-      const char *sys_types[] = {"Console(AES)", "Arcade(MVS)", "UniBIOS"};
+      const char *sys_types_pt[] = {"Console(AES)", "Arcade(MVS)", "UniBIOS"};
+      const char *sys_types_en[] = {"Console(AES)", "Arcade(MVS)", "UniBIOS"};
       const char *bios_types[] = {"AES", "MVS"};
       const char *cd_types[] = {"CDZ", "Top-Loading", "Front-Loading",
                                 "CDZ UniBIOS"};
-      const char *regions[] = {"US", "Japan", "Asia", "Europe"};
-      const char *memcards[] = {"Plugged", "Unplugged"};
+      const char *regions_pt[] = {"EUA", "Japao", "Asia", "Europa"};
+      const char *regions_en[] = {"US", "Japan", "Asia", "Europe"};
+      const char *memcards_pt[] = {"Inserido", "Removido"};
+      const char *memcards_en[] = {"Plugged", "Unplugged"};
       const char *dip_states[] = {"OFF", "ON"};
 
-      items.push_back({"System Type", sys_types[neo_sys], false, false, 501});
-      items.push_back({"UniBIOS HW", bios_types[neo_bios], false, false, 502});
-      items.push_back({"CD Type", cd_types[neo_cd_type], false, false, 503});
-      items.push_back({"CD Region", regions[neo_cd_region], false, false, 504});
+      items.push_back({Tr("Tipo de Sistema", "System Type"), (setting_language == 1) ? sys_types_en[neo_sys] : sys_types_pt[neo_sys], false, false, 501});
+      items.push_back({Tr("Hardware UniBIOS", "UniBIOS HW"), bios_types[neo_bios], false, false, 502});
+      items.push_back({Tr("Tipo de CD", "CD Type"), cd_types[neo_cd_type], false, false, 503});
+      items.push_back({Tr("Regiao CD", "CD Region"), (setting_language == 1) ? regions_en[neo_cd_region] : regions_pt[neo_cd_region], false, false, 504});
       items.push_back(
-          {"Memory Card", memcards[neo_memcard], false, false, 505});
+          {Tr("Cartao Memoria", "Memory Card"), (setting_language == 1) ? memcards_en[neo_memcard] : memcards_pt[neo_memcard], false, false, 505});
       items.push_back(
-          {"[DIP] Settings", dip_states[neo_dip_settings], false, false, 506});
+          {Tr("[DIP] Ajustes", "[DIP] Settings"), dip_states[neo_dip_settings], false, false, 506});
       items.push_back(
-          {"[DIP] Freeplay", dip_states[neo_dip_freeplay], false, false, 507});
+          {Tr("[DIP] Freeplay", "[DIP] Freeplay"), dip_states[neo_dip_freeplay], false, false, 507});
     }
 
     // 3. Display & Shaders
+    const char *aspects_pt[] = {"Original", "4:3", "16:9"};
+    const char *aspects_en[] = {"Original", "4:3", "16:9"};
     items.push_back(
-        {"Aspect Ratio", aspects[setting_aspect], false, false, 301});
+        {Tr("Proporcao", "Aspect Ratio"), (setting_language == 1) ? aspects_en[setting_aspect] : aspects_pt[setting_aspect], false, false, 301});
     items.push_back(
-        {"CRT Shader", FilterLabel(setting_filter), false, true, 302});
+        {Tr("Shader CRT", "CRT Shader"), FilterLabel(setting_filter), false, true, 302});
 
     // Master System FM: the YM2413 sound chip a handful of Japanese games
     // use. Genesis Plus GX exposes it, but nothing here ever offered it.
     if (core_name.find("Master System") != std::string::npos) {
-      const char *fm[] = {"Auto", "Desligado", "Ligado"};
+      const char *fm_pt[] = {"Auto", "Desligado", "Ligado"};
+      const char *fm_en[] = {"Auto", "Disabled", "Enabled"};
       items.push_back(
-          {"FM Audio (YM2413)", fm[setting_sms_fm], false, false, 509});
+          {Tr("Audio FM SMS", "FM Audio (YM2413)"), (setting_language == 1) ? fm_en[setting_sms_fm] : fm_pt[setting_sms_fm], false, false, 509});
     }
 
     // The DS has two screens and how they sit is a player preference, not a
     // fixed one. melonDS exposes it; nothing here ever offered it.
     if (core_name.find("Nintendo DS") != std::string::npos) {
-      items.push_back({"Layout Telas", kNdsLayoutNames[setting_nds_layout],
+      items.push_back({Tr("Layout Telas", "Screen Layout"), kNdsLayoutNames[setting_nds_layout],
                        false, false, 510});
       items.push_back(
-          {"Espaco Telas", kNdsGapVals[setting_nds_gap], false, false, 511});
+          {Tr("Espaco Telas", "Screen Gap"), kNdsGapVals[setting_nds_gap], false, false, 511});
       if (setting_nds_layout >= 6)
-        items.push_back({"Tela Pequena", kNdsHybridNames[setting_nds_hybrid],
+        items.push_back({Tr("Tela Pequena", "Small Screen"), kNdsHybridNames[setting_nds_hybrid],
                          false, false, 512});
     }
 
     // Same deal as the DS: two screens, layout is a preference. Citra
     // exposes it as a hidden keyboard hotkey (C) with no menu entry at all.
     if (core_name.find("Nintendo 3DS") != std::string::npos) {
-      items.push_back({"Layout Telas", kCitraLayoutNames[setting_citra_layout],
+      items.push_back({Tr("Layout Telas", "Screen Layout"), kCitraLayoutNames[setting_citra_layout],
                        false, false, 515});
     }
 
     // Mega CD load times are long because the core emulates a 1x drive.
     // Only meaningful for a disc: the same core runs Genesis cartridges.
     if (core_name.find("Genesis") != std::string::npos && CoreIsDiscGame()) {
-      const char *od[] = {"Desligado", "Ligado"};
-      const char *acc[] = {"Real", "Rapido"};
+      const char *od_pt[] = {"Desligado", "Ligado"};
+      const char *od_en[] = {"Disabled", "Enabled"};
+      const char *acc_pt[] = {"Real", "Rapido"};
+      const char *acc_en[] = {"Real", "Fast"};
       items.push_back(
-          {"Cache do CD", od[setting_cd_precache], false, false, 513});
+          {Tr("Cache do CD", "CD Precache"), (setting_language == 1) ? od_en[setting_cd_precache] : od_pt[setting_cd_precache], false, false, 513});
       items.push_back(
-          {"Acesso do CD", acc[setting_cd_latency], false, false, 514});
+          {Tr("Acesso do CD", "CD Access"), (setting_language == 1) ? acc_en[setting_cd_latency] : acc_pt[setting_cd_latency], false, false, 514});
     }
 
     // 3b. Core Options: whatever the core itself declared via SET_VARIABLES
@@ -1230,7 +1248,7 @@ void PopulateMainMenu() {
     // there is actually something to show, same as every other conditional
     // block in this menu.
     if (CoreOptionCount() > 0) {
-      items.push_back({"Core Options", ">", false, true, 221});
+      items.push_back({Tr("Opcoes Core", "Core Options"), ">", false, true, 221});
     }
 
     // 4. RetroAchievements, if the integration is configured. None of this
@@ -1240,22 +1258,23 @@ void PopulateMainMenu() {
       char ra_val[40];
 
       if (!RaIsLoggedIn()) {
-        snprintf(ra_val, sizeof(ra_val), "Conectando...");
+        snprintf(ra_val, sizeof(ra_val), "%s", Tr("Conectando...", "Connecting..."));
       } else if (RaGetAchievementCount() > 0) {
         snprintf(ra_val, sizeof(ra_val), "%d/%d%s", RaGetAchievementsUnlocked(),
                  RaGetAchievementCount(), RaHasPendingUnlocks() ? " !" : "");
       } else {
-        snprintf(ra_val, sizeof(ra_val), "Sem conquistas");
+        snprintf(ra_val, sizeof(ra_val), "%s", Tr("Sem conquistas", "No achievements"));
       }
 
-      items.push_back({"Conquistas", ra_val, false, true, 207});
+      items.push_back({Tr("Conquistas", "Achievements"), ra_val, false, true, 207});
     }
 
     // 5. Savestates & Controls
     items.push_back({" ", "", false, false, 0});
     int cur_slot = CoreGetSelectedSlot();
     bool slot_has_state = false;
-    char slot_time[32] = "Vazio";
+    char slot_time[32];
+    snprintf(slot_time, sizeof(slot_time), "%s", Tr("Vazio", "Empty"));
     int64_t slot_sz = 0;
     CoreGetStateSlotInfo(cur_slot, &slot_has_state, slot_time, sizeof(slot_time), &slot_sz);
 
@@ -1443,7 +1462,7 @@ void PopulateControllerSettings() {
 
   for (int i = 0; i < BIND_COUNT; i++) {
     const char *val = (capture_bind == i)
-                          ? "<pressione>"
+                          ? Tr("<pressione>", "<press key>")
                           : (setting_pad_device == 0 ? InputBindPadName(i)
                                                      : InputBindKeyName(i));
 
@@ -1469,8 +1488,8 @@ void PopulateControllerSettings() {
         // still has to be spelled out or two rows would read identically.
         const int sign = InputBindAnalogSign(i);
         const int axis = InputBindAnalogAxis(i);
-        const char *dir = axis == 1 ? (sign > 0 ? "Cima" : "Baixo")
-                                    : (sign > 0 ? "Dir" : "Esq");
+        const char *dir = axis == 1 ? (sign > 0 ? Tr("Cima", "Up") : Tr("Baixo", "Down"))
+                                    : (sign > 0 ? Tr("Dir", "Right") : Tr("Esq", "Left"));
 
         // Cores name the axis, not the direction ("Left Analog X"). Appending
         // the direction to that gives "Left Analog X Dir", which is both
@@ -1491,7 +1510,7 @@ void PopulateControllerSettings() {
     items.push_back({label, val, false, true, 700 + i});
   }
 
-  items.push_back({"Restaurar", "Padrao", false, true, 799});
+  items.push_back({Tr("Restaurar", "Restore"), Tr("Padrao", "Default"), false, true, 799});
 
   if (capture_bind < 0 && selected_idx < 1)
     selected_idx = 1;
@@ -1567,16 +1586,16 @@ void PopulateSettings() {
 
 void PopulateDiagnostics() {
   items.clear();
-  current_title = "Diagnostico";
+  current_title = Tr("Diagnostico", "Diagnostics");
   OsdSetSize(6);
 
   bool enabled = CrashReporterIsEnabled();
-  items.push_back({"Relatorio de Falhas", enabled ? "Ativado" : "Desativado", false, false, 520});
-  items.push_back({"[INFO] Envia falhas para correcao", "", false, false, 0});
-  items.push_back({"[INFO] Se desligar, falhas nao sobem", "", false, false, 0});
-  items.push_back({"Testar Envio (Diagnostico)", ">", false, true, 521});
+  items.push_back({Tr("Relatorio de Falhas", "Crash Report"), enabled ? Tr("Ativado", "Enabled") : Tr("Desativado", "Disabled"), false, false, 520});
+  items.push_back({Tr("[INFO] Envia falhas p/ correcao", "[INFO] Sends crash reports"), "", false, false, 0});
+  items.push_back({Tr("[INFO] Se desligar nao envia", "[INFO] If disabled none sent"), "", false, false, 0});
+  items.push_back({Tr("Testar Envio (Diagnostico)", "Test Send (Diagnostics)"), ">", false, true, 521});
   items.push_back({" ", "", false, false, 0});
-  items.push_back({"Voltar", "<", false, true, 999});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -1584,13 +1603,13 @@ void PopulateDiagnostics() {
 
 void PopulateResetConfirm() {
   items.clear();
-  current_title = "Restaurar";
+  current_title = Tr("Restaurar", "Restore");
   OsdSetSize(5);
 
-  items.push_back({"Restaurar Padroes?", "", false, false, 0});
+  items.push_back({Tr("Restaurar Padroes?", "Restore Defaults?"), "", false, false, 0});
   items.push_back({" ", "", false, false, 0});
-  items.push_back({"Cancelar", ">", false, true, 211});
-  items.push_back({"Confirmar Restauracao", "", false, true, 212});
+  items.push_back({Tr("Cancelar", "Cancel"), ">", false, true, 211});
+  items.push_back({Tr("Confirmar Restauracao", "Confirm Restore"), "", false, true, 212});
 
   SelectByAction(211, 2); // "Cancelar" por seguranca: nunca o Confirmar
   scroll_top = 0;
@@ -1618,22 +1637,25 @@ static void SelectByAction(int action_id, int fallback_idx) {
 
 void PopulateVideoSettings() {
   items.clear();
-  current_title = "Video";
+  current_title = Tr("Video", "Video");
   OsdSetSize(13);
 
-  const char *aspects[] = {"Original", "4:3", "16:9"};
-  const char *displays[] = {"Windowed", "Fullscreen"};
-  const char *themes[] = {"Red", "Blue", "Green", "Amber", "Gray", "Dark"};
+  const char *aspects_pt[] = {"Original", "4:3", "16:9"};
+  const char *aspects_en[] = {"Original", "4:3", "16:9"};
+  const char *displays_pt[] = {"Janela", "Tela Cheia"};
+  const char *displays_en[] = {"Windowed", "Fullscreen"};
+  const char *themes_pt[] = {"Vermelho", "Azul", "Verde", "Ambar", "Cinza", "Escuro"};
+  const char *themes_en[] = {"Red", "Blue", "Green", "Amber", "Gray", "Dark"};
 
-  items.push_back({"Aspect Ratio", aspects[setting_aspect], false, false, 301});
+  items.push_back({Tr("Proporcao", "Aspect Ratio"), (setting_language == 1) ? aspects_en[setting_aspect] : aspects_pt[setting_aspect], false, false, 301});
   items.push_back(
-      {"CRT Shader", FilterLabel(setting_filter), false, true, 302});
+      {Tr("Shader CRT", "CRT Shader"), FilterLabel(setting_filter), false, true, 302});
   items.push_back(
-      {"Wallpaper", WallpaperDisplayLabel(setting_wallpaper), false, false, 303});
+      {Tr("Papel Parede", "Wallpaper"), WallpaperDisplayLabel(setting_wallpaper), false, false, 303});
   items.push_back(
-      {"Display", displays[setting_fullscreen ? 1 : 0], false, false, 304});
-  items.push_back({"OSD Color", themes[setting_theme], false, false, 305});
-  items.push_back({"Driver", GetCurrentDriverLabel(), false, false, 306});
+      {Tr("Modo de Tela", "Display"), (setting_language == 1) ? displays_en[setting_fullscreen ? 1 : 0] : displays_pt[setting_fullscreen ? 1 : 0], false, false, 304});
+  items.push_back({Tr("Cor do OSD", "OSD Color"), (setting_language == 1) ? themes_en[setting_theme] : themes_pt[setting_theme], false, false, 305});
+  items.push_back({Tr("Driver Video", "Video Driver"), GetCurrentDriverLabel(), false, false, 306});
 
   // Named after what each core reports through retro_get_system_info, not
   // after the filename. cores/n64.dll identifies itself only as "Nintendo 64"
@@ -1641,36 +1663,38 @@ void PopulateVideoSettings() {
   // is why it earns no achievements. Labels are kept under the 13 characters
   // the OSD value column shows.
   const char *n64_cores[] = {"ParaLLEl N64", "Mupen64+ Next", "Gopher64"};
-  items.push_back({"N64 Core", n64_cores[setting_n64_core], false, false, 309});
+  items.push_back({Tr("Core do N64", "N64 Core"), n64_cores[setting_n64_core], false, false, 309});
 
   char osd_to[16];
   if (kOsdTimeouts[setting_osd_timeout] == 0)
-    snprintf(osd_to, sizeof(osd_to), "Nunca");
+    snprintf(osd_to, sizeof(osd_to), "%s", Tr("Nunca", "Never"));
   else
     snprintf(osd_to, sizeof(osd_to), "%ds", kOsdTimeouts[setting_osd_timeout]);
-  items.push_back({"Ocultar Menu", osd_to, false, false, 312});
+  items.push_back({Tr("Ocultar Menu", "Hide Menu"), osd_to, false, false, 312});
 
-  const char *vsyncs[] = {"Disabled", "Enabled"};
-  items.push_back({"V-Sync", vsyncs[setting_vsync], false, false, 308});
+  const char *vsyncs_pt[] = {"Desativado", "Ativado"};
+  const char *vsyncs_en[] = {"Disabled", "Enabled"};
+  items.push_back({"V-Sync", (setting_language == 1) ? vsyncs_en[setting_vsync] : vsyncs_pt[setting_vsync], false, false, 308});
 
-  const char *syncs[] = {"Native (Game Rate)", "Sync to Display"};
-  items.push_back({"Display Sync", syncs[setting_sync], false, false, 307});
+  const char *syncs_pt[] = {"Nativo (Jogo)", "Sinc. Monitor"};
+  const char *syncs_en[] = {"Native (Game)", "Sync to Display"};
+  items.push_back({Tr("Sincronizacao", "Display Sync"), (setting_language == 1) ? syncs_en[setting_sync] : syncs_pt[setting_sync], false, false, 307});
 
   // Read-only: what the app actually detected, and whether the sync could be
   // applied. On a 144Hz panel there is no usable divisor for 60fps content.
   char hz[48];
   if (setting_sync == 1 && !CoreDisplaySyncActive())
-    snprintf(hz, sizeof(hz), "%.2fHz (no divisor)", CoreGetDisplayFps());
+    snprintf(hz, sizeof(hz), "%.2fHz (%s)", CoreGetDisplayFps(), Tr("sem divisor", "no divisor"));
   else
     snprintf(hz, sizeof(hz), "%.2f Hz", CoreGetDisplayFps());
-  items.push_back({"Monitor", hz, false, false, 0});
+  items.push_back({Tr("Monitor", "Display"), hz, false, false, 0});
 
   char scroll_lbl[16];
   if (kScrollDelays[setting_name_scroll] == 0)
-    snprintf(scroll_lbl, sizeof(scroll_lbl), "Desativado");
+    snprintf(scroll_lbl, sizeof(scroll_lbl), "%s", Tr("Desativado", "Disabled"));
   else
     snprintf(scroll_lbl, sizeof(scroll_lbl), "%ds", kScrollDelays[setting_name_scroll]);
-  items.push_back({"Rolagem Nome", scroll_lbl, false, false, 313});
+  items.push_back({Tr("Rolagem Nome", "Name Scroll"), scroll_lbl, false, false, 313});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -1678,26 +1702,27 @@ void PopulateVideoSettings() {
 
 void PopulateShaderList() {
   items.clear();
-  current_title = "Shaders CRT";
+  current_title = Tr("Shaders CRT", "CRT Shaders");
   OsdSetSize(12);
 
   for (int i = 0; i < kFilterCount; i++) {
     bool is_active = (kFilters[i].mode == setting_filter);
     char label_buf[32];
-    snprintf(label_buf, sizeof(label_buf), "%s%s", is_active ? "* " : "  ", kFilters[i].label);
+    const char *lbl = (setting_language == 1) ? kFilters[i].label_en : kFilters[i].label_pt;
+    snprintf(label_buf, sizeof(label_buf), "%s%s", is_active ? "* " : "  ", lbl);
 
     const char* desc = "";
     switch (kFilters[i].mode) {
-      case 0: desc = "Pixel Raw"; break;
+      case 0: desc = Tr("Pixel Puro", "Pixel Raw"); break;
       case 8: desc = "Scanlines"; break;
-      case 9: desc = "TV Tubo"; break;
+      case 9: desc = Tr("TV Tubo", "CRT TV"); break;
       case 4: desc = "PVM 600TVL"; break;
       case 1: desc = "Trinitron"; break;
       case 2: desc = "Shadow Mask"; break;
-      case 5: desc = "Grade 50%"; break;
-      case 6: desc = "Composite"; break;
-      case 7: desc = "LCD Matrix"; break;
-      case 3: desc = "Tubo Curvo"; break;
+      case 5: desc = Tr("Grade 50%", "50% Grid"); break;
+      case 6: desc = Tr("NTSC Composto", "Composite"); break;
+      case 7: desc = Tr("Matriz LCD", "LCD Matrix"); break;
+      case 3: desc = Tr("Tubo Curvo", "Curved CRT"); break;
       default: desc = ""; break;
     }
 
@@ -1705,7 +1730,7 @@ void PopulateShaderList() {
   }
 
   items.push_back({" ", "", false, false, 0});
-  items.push_back({"Voltar", "<", false, true, 699});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 699});
 
   selected_idx = FilterIndex(setting_filter);
   scroll_top = 0;
@@ -1713,14 +1738,15 @@ void PopulateShaderList() {
 
 void PopulateSaveStates() {
   items.clear();
-  current_title = "Save States";
+  current_title = Tr("Save States", "Save States");
   OsdSetSize(12);
 
   int active_slot = CoreGetSelectedSlot();
 
   for (int s = 0; s < 10; s++) {
     bool has_state = false;
-    char time_str[32] = "Vazio";
+    char time_str[32];
+    snprintf(time_str, sizeof(time_str), "%s", Tr("Vazio", "Empty"));
     int64_t bytes = 0;
     CoreGetStateSlotInfo(s, &has_state, time_str, sizeof(time_str), &bytes);
 
@@ -1736,14 +1762,14 @@ void PopulateSaveStates() {
       else
         snprintf(slot_val, sizeof(slot_val), "%s (%dB)", time_str, (int)bytes);
     } else {
-      snprintf(slot_val, sizeof(slot_val), "Vazio");
+      snprintf(slot_val, sizeof(slot_val), "%s", Tr("Vazio", "Empty"));
     }
 
     items.push_back({slot_label, slot_val, false, true, 850 + s});
   }
 
   items.push_back({" ", "", false, false, 0});
-  items.push_back({"Voltar", "<", false, true, 899});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 899});
 
   selected_idx = active_slot;
   scroll_top = 0;
@@ -1751,17 +1777,17 @@ void PopulateSaveStates() {
 
 void PopulateAudioSettings() {
   items.clear();
-  current_title = "Audio";
+  current_title = Tr("Audio", "Audio");
   OsdSetSize(5);
 
   const char *latencies[] = {"64 ms", "128 ms", "256 ms", "512 ms"};
 
-  items.push_back({"Mute", CoreGetMute() ? "On" : "Off", false, false, 401});
-  items.push_back({"Latency", latencies[setting_latency], false, false, 402});
+  items.push_back({Tr("Mudo", "Mute"), CoreGetMute() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 401});
+  items.push_back({Tr("Latencia", "Latency"), latencies[setting_latency], false, false, 402});
 
   char vol_str[32];
   snprintf(vol_str, sizeof(vol_str), "%d%%", CoreGetVolume());
-  items.push_back({"Volume", vol_str, false, false, 403});
+  items.push_back({Tr("Volume", "Volume"), vol_str, false, false, 403});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -1782,7 +1808,7 @@ void PopulateAudioSettings() {
 static const int kCoreOptionsMaxRows = 98;
 void PopulateCoreOptionsSettings() {
   items.clear();
-  current_title = "Core Options";
+  current_title = Tr("Opcoes Core", "Core Options");
 
   int n = CoreOptionCount();
   if (n > kCoreOptionsMaxRows) n = kCoreOptionsMaxRows;
@@ -1793,10 +1819,10 @@ void PopulateCoreOptionsSettings() {
     items.push_back({label, val, false, false, 800 + i});
   }
   if (n == 0)
-    items.push_back({"Este core nao declarou opcoes", "", false, false, 0});
+    items.push_back({Tr("Sem opcoes para este core", "No options for this core"), "", false, false, 0});
 
   items.push_back({" ", "", false, false, 0});
-  items.push_back({"Voltar", "", false, true, 898});
+  items.push_back({Tr("Voltar", "Back"), "", false, true, 898});
 
   OsdSetSize((int)items.size());
   selected_idx = 0;
@@ -1805,26 +1831,26 @@ void PopulateCoreOptionsSettings() {
 
 void PopulateNetplay() {
   items.clear();
-  current_title = "Netplay";
+  current_title = Tr("Netplay", "Netplay");
   OsdSetSize(9);
 
-  const char *role_str = "Disconnected";
+  const char *role_str = Tr("Desconectado", "Disconnected");
   if (NetplayGetState() == NETPLAY_LISTENING)
-    role_str = "Hosting...";
+    role_str = Tr("Hospedando...", "Hosting...");
   else if (NetplayGetState() == NETPLAY_CONNECTING)
-    role_str = "Connecting...";
+    role_str = Tr("Conectando...", "Connecting...");
   else if (NetplayGetState() == NETPLAY_CONNECTED) {
-    role_str = (NetplayGetRole() == NETPLAY_HOST) ? "Connected (Host)"
-                                                  : "Connected (Client)";
+    role_str = (NetplayGetRole() == NETPLAY_HOST) ? Tr("Conectado (Host)", "Connected (Host)")
+                                                  : Tr("Conectado (Cliente)", "Connected (Client)");
   }
 
-  items.push_back({"Network Status", role_str, false, false, 0});
-  items.push_back({"Local IP", NetplayGetLocalIp(), false, false, 0});
-  items.push_back({"Host Game", "Port 55435", false, true, 601});
-  items.push_back({"Connect to Host", join_ip_input.c_str(), false, true, 602});
-  items.push_back({"Disconnect Netplay", "", false, true, 603});
-  items.push_back({"Netplay Port", "55435", false, false, 0});
-  items.push_back({"Back", "", false, true, 999});
+  items.push_back({Tr("Status da Rede", "Network Status"), role_str, false, false, 0});
+  items.push_back({Tr("IP Local", "Local IP"), NetplayGetLocalIp(), false, false, 0});
+  items.push_back({Tr("Hospedar Jogo", "Host Game"), Tr("Porta 55435", "Port 55435"), false, true, 601});
+  items.push_back({Tr("Conectar a Host", "Connect to Host"), join_ip_input.c_str(), false, true, 602});
+  items.push_back({Tr("Desconectar Netplay", "Disconnect Netplay"), "", false, true, 603});
+  items.push_back({Tr("Porta Netplay", "Netplay Port"), "55435", false, false, 0});
+  items.push_back({Tr("Voltar", "Back"), "", false, true, 999});
 
   SelectByAction(601, 2); // "Host Game"
   scroll_top = 0;
@@ -1832,14 +1858,14 @@ void PopulateNetplay() {
 
 void PopulateAchievementList() {
   items.clear();
-  current_title = "Conquistas";
+  current_title = Tr("Conquistas", "Achievements");
 
   RaAchievementInfo list[64];
   int n = RaGetAchievements(list, 64);
 
   if (n <= 0) {
-    items.push_back({"Nenhuma conquista", "", false, false, 0});
-    items.push_back({"para este jogo", "", false, false, 0});
+    items.push_back({Tr("Nenhuma conquista", "No achievements"), "", false, false, 0});
+    items.push_back({Tr("para este jogo", "for this game"), "", false, false, 0});
   } else {
     for (int i = 0; i < n; i++) {
       // A locked achievement in progress shows its counter; an unlocked
@@ -1883,30 +1909,30 @@ void PopulateRetroAchievements() {
   // Os rotulos param em 22 caracteres porque e o que a linha do OSD comporta;
   // o "Config/retroachievements" que estava aqui chegava cortado na tela.
   auto PushLoginHint = [&]() {
-    items.push_back({"Editar em Config/", "", false, false, 0});
+    items.push_back({Tr("Editar em Config/", "Edit in Config/"), "", false, false, 0});
     items.push_back({"retroachievements.cfg", "", false, false, 0});
-    items.push_back({"Trocar conta: apague", "", false, false, 0});
-    items.push_back({"a linha token=", "", false, false, 0});
+    items.push_back({Tr("Trocar conta: apague", "Change acc: remove"), "", false, false, 0});
+    items.push_back({Tr("a linha token=", "token= line"), "", false, false, 0});
   };
 
   if (!RaIsEnabled()) {
-    items.push_back({"Estado", "Desativado", false, false, 0});
+    items.push_back({Tr("Estado", "Status"), Tr("Desativado", "Disabled"), false, false, 0});
     PushLoginHint();
   } else {
     items.push_back(
-        {"Usuario", RaIsLoggedIn() ? RaGetUserName() : "-", false, false, 0});
-    items.push_back({"Modo", RaIsHardcoreActive() ? "Hardcore" : "Softcore",
+        {Tr("Usuario", "User"), RaIsLoggedIn() ? RaGetUserName() : "-", false, false, 0});
+    items.push_back({Tr("Modo", "Mode"), RaIsHardcoreActive() ? "Hardcore" : "Softcore",
                      false, false, 0});
 
     if (RaGetAchievementCount() > 0) {
       char v[40];
       snprintf(v, sizeof(v), "%d/%d", RaGetAchievementsUnlocked(),
                RaGetAchievementCount());
-      items.push_back({"Conquistas", v, false, false, 0});
+      items.push_back({Tr("Conquistas", "Achievements"), v, false, false, 0});
     }
 
     if (RaHasPendingUnlocks())
-      items.push_back({"Pendentes", "sem conexao", false, false, 0});
+      items.push_back({Tr("Pendentes", "Pending"), Tr("sem conexao", "offline"), false, false, 0});
 
     items.push_back({" ", "", false, false, 0});
     PushLoginHint();
@@ -1933,7 +1959,7 @@ void PopulateRetroAchievements() {
 
 void PopulateAbout() {
   items.clear();
-  current_title = "About";
+  current_title = Tr("Sobre", "About");
   OsdSetSize(10);
 
   // The figures shown are the ones app_info.h publishes, which are the same
@@ -1964,25 +1990,25 @@ void PopulateAbout() {
   }
 
   char sys_str[32], core_str[32], ports_str[32];
-  snprintf(sys_str, sizeof(sys_str), "%d Sistemas", APP_SYSTEM_COUNT);
+  snprintf(sys_str, sizeof(sys_str), "%d %s", APP_SYSTEM_COUNT, Tr("Sistemas", "Systems"));
   snprintf(core_str, sizeof(core_str), "%d Cores", APP_CORE_ENGINES);
   // Counted the same way Systems/Cores are - queried for real rather than a
   // second hardcoded figure that this list would just as quietly outgrow.
-  snprintf(ports_str, sizeof(ports_str), "%d Jogos", (int)PortGetAvailableList().size());
+  snprintf(ports_str, sizeof(ports_str), "%d %s", (int)PortGetAvailableList().size(), Tr("Jogos", "Games"));
 
   items.push_back({APP_NAME, "v" APP_VERSION " " APP_ARCH, false, false, 0});
-  items.push_back({"Author", "Guh Clemente", false, false, 0});
+  items.push_back({Tr("Autor", "Author"), "Guh Clemente", false, false, 0});
   items.push_back({"YouTube", "@GuhClemente", false, false, 0});
   items.push_back({"Site", APP_SITE, false, false, 0});
-  items.push_back({"Engine", "Libretro", false, false, 0});
-  items.push_back({"Systems", sys_str, false, false, 0});
-  items.push_back({"Cores", std::string(core_str) + " >", false, true, 209});
+  items.push_back({Tr("Motor", "Engine"), "Libretro", false, false, 0});
+  items.push_back({Tr("Sistemas", "Systems"), sys_str, false, false, 0});
+  items.push_back({Tr("Cores", "Cores"), std::string(core_str) + " >", false, true, 209});
   items.push_back({"Ports & Recomp", std::string(ports_str) + " >", false, true, 140});
   items.push_back({"Netplay", "2P TCP/IP", false, false, 0});
-  items.push_back({"Conquistas", RaIsEnabled() ? "Ativado" : "Desativado",
+  items.push_back({Tr("Conquistas", "Achievements"), RaIsEnabled() ? Tr("Ativado", "Enabled") : Tr("Desativado", "Disabled"),
                    false, false, 0});
-  items.push_back({"License", "GPL-3.0", false, false, 0});
-  items.push_back({"Back", "", false, true, 999});
+  items.push_back({Tr("Licenca", "License"), "GPL-3.0", false, false, 0});
+  items.push_back({Tr("Voltar", "Back"), "", false, true, 999});
 
   SelectByAction(209, 6); // linha "Cores"
   scroll_top = 0;
@@ -1990,7 +2016,7 @@ void PopulateAbout() {
 
 void PopulateCoresList() {
   items.clear();
-  current_title = "Cores";
+  current_title = Tr("Cores", "Cores");
   OsdSetSize(15);
 
   struct CoreEntry {
@@ -2045,12 +2071,12 @@ void PopulateCoresList() {
   std::error_code ec;
   for (const auto& c : kAllCores) {
     bool present = fs::exists(c.dll, ec);
-    std::string status = present ? c.engine : "(Ausente)";
+    std::string status = present ? c.engine : Tr("(Ausente)", "(Missing)");
     items.push_back({c.system, status, false, false, 0});
   }
 
   items.push_back({" ", "", false, false, 0});
-  items.push_back({"Back", "", false, true, 997});
+  items.push_back({Tr("Voltar", "Back"), "", false, true, 997});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -2065,45 +2091,45 @@ void PopulateUpdate() {
   // Wallpaper and switch the screen to Video Settings out from under
   // STATE_UPDATE.
   items.clear();
-  current_title = "Update";
+  current_title = Tr("Atualizacao", "Update");
   OsdSetSize(10);
 
   UpdaterState state = UpdaterGetState();
   const UpdateInfo &info = UpdaterGetInfo();
 
-  items.push_back({"Versao Atual", "v" APP_VERSION, false, false, 0});
+  items.push_back({Tr("Versao Atual", "Current Version"), "v" APP_VERSION, false, false, 0});
 
   if (!info.version.empty()) {
-    items.push_back({"Versao Remota", "v" + info.version, false, false, 0});
+    items.push_back({Tr("Versao Remota", "Remote Version"), "v" + info.version, false, false, 0});
   } else {
-    items.push_back({"Versao Remota", "...", false, false, 0});
+    items.push_back({Tr("Versao Remota", "Remote Version"), "...", false, false, 0});
   }
 
   items.push_back({" ", "", false, false, 0});
 
   if (state == UPDATER_STATE_CHECKING) {
-    items.push_back({"Status", "Verificando...", false, false, 0});
-    items.push_back({"Consultando servidor", "Aguarde", false, false, 0});
+    items.push_back({Tr("Status", "Status"), Tr("Verificando...", "Checking..."), false, false, 0});
+    items.push_back({Tr("Consultando servidor", "Querying server"), Tr("Aguarde", "Please wait"), false, false, 0});
   } else if (state == UPDATER_STATE_UP_TO_DATE) {
-    items.push_back({"Status", "Atualizado!", false, false, 0});
-    items.push_back({"Voce ja possui a", "versao mais recente", false, false, 0});
+    items.push_back({Tr("Status", "Status"), Tr("Atualizado!", "Up to date!"), false, false, 0});
+    items.push_back({Tr("Voce ja possui a", "You already have the"), Tr("versao mais recente", "latest version"), false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Verificar Novamente", ">", false, true, 391});
+    items.push_back({Tr("Verificar Novamente", "Check Again"), ">", false, true, 391});
   } else if (state == UPDATER_STATE_AVAILABLE) {
-    items.push_back({"Status", "Nova Versao!", false, false, 0});
+    items.push_back({Tr("Status", "Status"), Tr("Nova Versao!", "New Version!"), false, false, 0});
     if (!info.notes.empty()) {
       std::string note = info.notes;
       if (note.length() > 24) note = note.substr(0, 22) + "..";
-      items.push_back({"Novidades", note, false, false, 0});
+      items.push_back({Tr("Novidades", "Changelog"), note, false, false, 0});
     }
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Baixar e Atualizar", ">", false, true, 392});
+    items.push_back({Tr("Baixar e Atualizar", "Download & Update"), ">", false, true, 392});
   } else if (state == UPDATER_STATE_DOWNLOADING) {
     int prog = UpdaterGetProgress();
     char prog_str[32];
     snprintf(prog_str, sizeof(prog_str), "%d%%", prog);
-    items.push_back({"Status", "Baixando...", false, false, 0});
-    items.push_back({"Progresso", prog_str, false, false, 0});
+    items.push_back({Tr("Status", "Status"), Tr("Baixando...", "Downloading..."), false, false, 0});
+    items.push_back({Tr("Progresso", "Progress"), prog_str, false, false, 0});
 
     char bar[26];
     int filled = (prog * 16) / 100;
@@ -2113,24 +2139,24 @@ void PopulateUpdate() {
     bar[18] = '\0';
     items.push_back({bar, prog_str, false, false, 0});
   } else if (state == UPDATER_STATE_READY) {
-    items.push_back({"Status", "Pronto!", false, false, 0});
-    items.push_back({"Download Concluido", "", false, false, 0});
+    items.push_back({Tr("Status", "Status"), Tr("Pronto!", "Ready!"), false, false, 0});
+    items.push_back({Tr("Download Concluido", "Download Complete"), "", false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Reiniciar Agora", ">", false, true, 393});
+    items.push_back({Tr("Reiniciar Agora", "Restart Now"), ">", false, true, 393});
   } else if (state == UPDATER_STATE_ERROR) {
-    items.push_back({"Status", "Erro de conexao", false, false, 0});
+    items.push_back({Tr("Status", "Status"), Tr("Erro de conexao", "Connection error"), false, false, 0});
     std::string err_msg = UpdaterGetStatusMessage();
     if (err_msg.length() > 24) err_msg = err_msg.substr(0, 22) + "..";
     items.push_back({err_msg, "", false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Tentar Novamente", ">", false, true, 391});
+    items.push_back({Tr("Tentar Novamente", "Try Again"), ">", false, true, 391});
   } else {
-    items.push_back({"Status", "Pronto", false, false, 0});
+    items.push_back({Tr("Status", "Status"), Tr("Pronto", "Ready"), false, false, 0});
     items.push_back({" ", "", false, false, 0});
-    items.push_back({"Verificar Atualizacoes", ">", false, true, 391});
+    items.push_back({Tr("Verificar Atualizacoes", "Check for Updates"), ">", false, true, 391});
   }
 
-  items.push_back({"Voltar", "", false, true, 399});
+  items.push_back({Tr("Voltar", "Back"), "", false, true, 399});
 
   if (selected_idx >= (int)items.size()) selected_idx = (int)items.size() - 1;
   if (selected_idx < 0) selected_idx = 0;
@@ -2240,7 +2266,7 @@ void PopulateBrowse(const std::string &dirpath) {
       items.push_back({disp, "", false, true, 800});
     }
     if (plist.empty()) {
-      items.push_back({"[Nenhum Port Encontrado]", "", false, false, 0});
+      items.push_back({Tr("[Nenhum Port Encontrado]", "[No Ports Found]"), "", false, false, 0});
     }
     OsdSetSize((int)items.size());
     SelectByAction(800, 1);
@@ -2407,11 +2433,11 @@ void PopulateBrowse(const std::string &dirpath) {
     for (const auto &f : files)
       items.push_back(f);
   } catch (...) {
-    items.push_back({"[Empty Directory]", "", false, false, 0});
+    items.push_back({Tr("[Diretorio Vazio]", "[Empty Directory]"), "", false, false, 0});
   }
 
   if (items.empty()) {
-    items.push_back({"[Empty Directory]", "", false, false, 0});
+    items.push_back({Tr("[Diretorio Vazio]", "[Empty Directory]"), "", false, false, 0});
   }
 
   selected_idx = 0;
@@ -2717,6 +2743,17 @@ void MenuSetStatus(const char *status) {
 void MenuRun() {
   NetplayUpdate();
 
+  bool core_running_now = CoreIsRunning();
+  static bool s_was_core_running = false;
+  if (s_was_core_running && !core_running_now) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    selected_idx = 0;
+    scroll_top = 0;
+    OsdEnable(0);
+  }
+  s_was_core_running = core_running_now;
+
   // Close the OSD after a spell of no input, so it does not sit over the game
   // forever if the player wandered off. Only while a game is actually running:
   // hiding it on the main menu would leave nothing on screen at all.
@@ -2751,7 +2788,7 @@ void MenuRun() {
         wizard_active = false;
         capture_bind = -1;
         PopulateControllerSettings();
-        CoreSetToast("CONFIGURACAO CANCELADA", 90);
+        CoreSetToast(Tr("CONFIGURACAO CANCELADA", "SETUP CANCELLED"), 90);
       } else if (pad != 0) {
         int target = capture_bind;
         InputBindSetPad(target, pad);
@@ -2763,8 +2800,8 @@ void MenuRun() {
             capture_bind = wizard_step;
             capture_armed = false;
             char toast_buf[64];
-            snprintf(toast_buf, sizeof(toast_buf), "[%d/%d] PRESSIONE: %s",
-                     wizard_step + 1, max_wizard_steps, InputBindLabel(wizard_step));
+            snprintf(toast_buf, sizeof(toast_buf), "[%d/%d] %s: %s",
+                     wizard_step + 1, max_wizard_steps, Tr("PRESSIONE", "PRESS"), InputBindLabel(wizard_step));
             CoreSetToast(toast_buf, 120);
             PopulateControllerSettings();
             selected_idx = kBindRow0 + wizard_step;
@@ -2773,7 +2810,7 @@ void MenuRun() {
             capture_bind = -1;
             PopulateControllerSettings();
             MenuSaveSettings();
-            CoreSetToast("CONTROLE MAPEADO COM SUCESSO!", 150);
+            CoreSetToast(Tr("CONTROLE MAPEADO COM SUCESSO!", "GAMEPAD MAPPED SUCCESSFULLY!"), 150);
           }
         } else {
           capture_bind = -1;
@@ -2793,8 +2830,8 @@ void MenuRun() {
               capture_bind = wizard_step;
               capture_armed = false;
               char toast_buf[64];
-              snprintf(toast_buf, sizeof(toast_buf), "[%d/%d] PRESSIONE: %s",
-                       wizard_step + 1, max_wizard_steps, InputBindLabel(wizard_step));
+              snprintf(toast_buf, sizeof(toast_buf), "[%d/%d] %s: %s",
+                       wizard_step + 1, max_wizard_steps, Tr("PRESSIONE", "PRESS"), InputBindLabel(wizard_step));
               CoreSetToast(toast_buf, 120);
               PopulateControllerSettings();
               selected_idx = kBindRow0 + wizard_step;
@@ -2803,7 +2840,7 @@ void MenuRun() {
               capture_bind = -1;
               PopulateControllerSettings();
               MenuSaveSettings();
-              CoreSetToast("TECLADO MAPEADO COM SUCESSO!", 150);
+              CoreSetToast(Tr("TECLADO MAPEADO COM SUCESSO!", "KEYBOARD MAPPED SUCCESSFULLY!"), 150);
             }
           } else {
             capture_bind = -1;
@@ -2812,7 +2849,7 @@ void MenuRun() {
             MenuSaveSettings();
           }
         } else {
-          CoreSetToast("ESSA TECLA E RESERVADA PARA O MENU", 120);
+          CoreSetToast(Tr("ESSA TECLA E RESERVADA PARA O MENU", "THIS KEY IS RESERVED FOR THE MENU"), 120);
         }
       }
     }
@@ -2974,27 +3011,29 @@ static void MenuProcessKeyImpl(MenuKey key) {
       wizard_active = false;
       capture_bind = -1;
       PopulateControllerSettings();
-      CoreSetToast("CONFIGURACAO CANCELADA", 90);
+      CoreSetToast(Tr("CONFIGURACAO CANCELADA", "SETUP CANCELLED"), 90);
     }
     return;
   }
 
   if (key == KEY_MENU_TOGGLE) {
     if (OsdIsEnabled()) {
-      if (CoreIsRunning())
-        OsdDisable();
+      OsdDisable();
     } else {
       OsdEnable(0);
-      current_state = STATE_MAIN;
-      PopulateMainMenu();
+      s_scroll_since = TickCountMs();
+      s_title_scroll_since = TickCountMs();
+      if (items.empty()) {
+        current_state = STATE_MAIN;
+        PopulateMainMenu();
+        selected_idx = 0;
+        scroll_top = 0;
+      }
     }
     return;
   }
 
   if (!OsdIsEnabled()) {
-    OsdEnable(0);
-    current_state = STATE_MAIN;
-    PopulateMainMenu();
     return;
   }
 
@@ -3195,8 +3234,8 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetOption("genesis_plus_gx_cd_precache",
                     setting_cd_precache ? "enabled" : "disabled");
       CoreSetToast(setting_cd_precache
-                       ? "CACHE DO CD: LIGADO (recarregue o jogo)"
-                       : "CACHE DO CD: DESLIGADO",
+                       ? Tr("CACHE DO CD: LIGADO (recarregue o jogo)", "CD PRECACHE: ON (reload game)")
+                       : Tr("CACHE DO CD: DESLIGADO", "CD PRECACHE: OFF"),
                    180);
       PopulateMainMenu();
       selected_idx = cur;
@@ -3209,8 +3248,8 @@ static void MenuProcessKeyImpl(MenuKey key) {
       // The core warns a few games crash when CD data arrives too early,
       // so this is offered, not defaulted.
       CoreSetToast(setting_cd_latency
-                       ? "ACESSO DO CD: RAPIDO (pode falhar em alguns jogos)"
-                       : "ACESSO DO CD: REAL",
+                       ? Tr("ACESSO DO CD: RAPIDO (pode falhar)", "CD ACCESS: FAST (may fail in games)")
+                       : Tr("ACESSO DO CD: REAL", "CD ACCESS: REAL"),
                    200);
       PopulateMainMenu();
       selected_idx = cur;
@@ -3231,10 +3270,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
           (setting_osd_timeout + delta + kOsdTimeoutCount) % kOsdTimeoutCount;
       char msg[64];
       if (kOsdTimeouts[setting_osd_timeout] == 0)
-        snprintf(msg, sizeof(msg), "MENU: NAO OCULTA SOZINHO");
+        snprintf(msg, sizeof(msg), "%s", Tr("MENU: NAO OCULTA SOZINHO", "MENU: NEVER HIDES"));
       else
-        snprintf(msg, sizeof(msg), "MENU OCULTA APOS %ds SEM USO",
-                 kOsdTimeouts[setting_osd_timeout]);
+        snprintf(msg, sizeof(msg), "%s %ds %s", Tr("MENU OCULTA APOS", "MENU HIDES AFTER"),
+                 kOsdTimeouts[setting_osd_timeout], Tr("SEM USO", "IDLE"));
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
       SelectByAction(item.action_id, 7);
@@ -3244,17 +3283,18 @@ static void MenuProcessKeyImpl(MenuKey key) {
           (setting_name_scroll + delta + kScrollDelayCount) % kScrollDelayCount;
       char msg[64];
       if (kScrollDelays[setting_name_scroll] == 0)
-        snprintf(msg, sizeof(msg), "ROLAGEM DE NOME: DESATIVADA");
+        snprintf(msg, sizeof(msg), "%s", Tr("ROLAGEM DE NOME: DESATIVADA", "NAME SCROLL: DISABLED"));
       else
-        snprintf(msg, sizeof(msg), "ROLAGEM DE NOME APOS %ds PARADO",
-                 kScrollDelays[setting_name_scroll]);
+        snprintf(msg, sizeof(msg), "%s %ds %s", Tr("ROLAGEM DE NOME APOS", "NAME SCROLL AFTER"),
+                 kScrollDelays[setting_name_scroll], Tr("PARADO", "IDLE"));
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
       SelectByAction(item.action_id, 11);
     } else if (item.action_id == 308) // V-Sync
     {
       setting_vsync = (setting_vsync + delta + 2) % 2;
-      CoreSetToast(setting_vsync == 1 ? "V-SYNC ENABLED" : "V-SYNC DISABLED",
+      CoreSetToast(setting_vsync == 1 ? Tr("V-SYNC: ATIVADO", "V-SYNC: ENABLED")
+                                      : Tr("V-SYNC: DESATIVADO", "V-SYNC: DISABLED"),
                    120);
       PopulateVideoSettings();
       SelectByAction(item.action_id, 8);
@@ -3262,7 +3302,8 @@ static void MenuProcessKeyImpl(MenuKey key) {
     {
       setting_sync = (setting_sync + delta + 2) % 2;
       CoreSetDisplaySync(setting_sync == 1, CoreGetDisplayFps());
-      CoreSetToast(setting_sync == 1 ? "SYNC: DISPLAY" : "SYNC: NATIVE", 120);
+      CoreSetToast(setting_sync == 1 ? Tr("SINCRONIZACAO: MONITOR", "SYNC: DISPLAY")
+                                     : Tr("SINCRONIZACAO: NATIVO", "SYNC: NATIVE"), 120);
       PopulateVideoSettings();
       SelectByAction(item.action_id, 9);
     } else if (item.action_id == 306) // Video Driver
@@ -3691,7 +3732,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_SETTINGS;
         PopulateSettings();
         SelectByAction(item.action_id, 6);
-        CoreSetToast("CONFIGURACOES RESTAURADAS AO PADRAO", 180);
+        CoreSetToast(Tr("CONFIGURACOES RESTAURADAS AO PADRAO", "SETTINGS RESTORED TO DEFAULT"), 180);
       }
     } else if (current_state == STATE_CONTROLLER) {
       if (item.action_id == 530) {
@@ -3729,8 +3770,9 @@ static void MenuProcessKeyImpl(MenuKey key) {
         capture_bind = wizard_step;
         capture_armed = false;
         char toast_buf[64];
-        snprintf(toast_buf, sizeof(toast_buf), "[1/%d] PRESSIONE: %s",
+        snprintf(toast_buf, sizeof(toast_buf), "[1/%d] %s: %s",
                  (setting_pad_device == 0 ? 16 : BIND_COUNT),
+                 Tr("PRESSIONE", "PRESS"),
                  InputBindLabel(wizard_step));
         CoreSetToast(toast_buf, 120);
         PopulateControllerSettings();
@@ -3744,7 +3786,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         InputBindResetDefaults();
         PopulateControllerSettings();
         MenuSaveSettings();
-        CoreSetToast("CONTROLES RESTAURADOS AO PADRAO", 120);
+        CoreSetToast(Tr("CONTROLES RESTAURADOS AO PADRAO", "CONTROLS RESTORED TO DEFAULT"), 120);
       }
     } else if (current_state == STATE_SAVESTATES) {
       if (item.action_id >= 850 && item.action_id <= 859) {
@@ -3824,7 +3866,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         UpdaterStartDownload();
         PopulateUpdate();
       } else if (item.action_id == 393) {
-        CoreSetToast("REINICIANDO PARA ATUALIZAR...", 300);
+        CoreSetToast(Tr("REINICIANDO PARA ATUALIZAR...", "RESTARTING TO UPDATE..."), 300);
         UpdaterApplyAndRestart();
       } else if (item.action_id == 399) {
         current_state = STATE_MAIN;
@@ -3905,6 +3947,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
             InputBindLoadSystemProfile(sys_name.c_str());
           }
           OsdDisable();
+          current_state = STATE_MAIN;
+          PopulateMainMenu();
+          selected_idx = 0;
+          scroll_top = 0;
         }
       }
     }
@@ -3979,7 +4025,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       wizard_active = false;
       capture_bind = -1;
       PopulateControllerSettings();
-      CoreSetToast("CONFIGURACAO CANCELADA", 90);
+      CoreSetToast(Tr("CONFIGURACAO CANCELADA", "SETUP CANCELLED"), 90);
     } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
                current_state == STATE_CONTROLLER ||
                current_state == STATE_NETPLAY || current_state == STATE_ABOUT ||
@@ -4028,6 +4074,10 @@ bool MenuLaunchGamePath(const std::string &full_rom_path) {
       InputBindLoadSystemProfile(sys_name.c_str());
     }
     OsdDisable();
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    selected_idx = 0;
+    scroll_top = 0;
     return true;
   }
   return false;
