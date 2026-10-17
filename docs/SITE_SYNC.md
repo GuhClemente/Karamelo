@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.72 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.73 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -373,14 +373,14 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 12/10/2026:** são **61** jogos de "Ports & Recomp" — 42 até
+**Atualizado em 17/10/2026:** são **62** jogos de "Ports & Recomp" — 42 até
 11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
 F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
 Soulcalibur II / Ring Out — ver seção 16), +1 em 27/09 (Super Smash Bros. Melee /
 Melee Unlocked — ver seção 18), +1 em 27/09 (Monster Hunter Portable 3rd /
 Yakumo — ver seção 20), +1 em 29/09 (Star Fox Adventures / Foxhollow — ver
 seção 23), +1 em 12/10 (Conker's Bad Fur Day / CBFD-Recompiled — ver seção 25),
-+1 em 12/10 (Sly Cooper / ProjectCane — ver seção 26) e +1 em 12/10 (Castlevania: Legacy of Darkness / cvlod_recomp — ver seção 27). The Darkness (Xbox 360) chegou a ser anunciado
++1 em 12/10 (Sly Cooper / ProjectCane — ver seção 26), +1 em 12/10 (Castlevania: Legacy of Darkness / cvlod_recomp — ver seção 27) e +1 em 17/10 (BLACK / BLACK-XBERecomp — ver seção 30). The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
 nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60) de outra página no futuro. É coincidência
@@ -478,8 +478,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **61** jogos de Ports & Recomp (atualizado em 12/10/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26 e 27),
+- Os **62** jogos de Ports & Recomp (atualizado em 17/10/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27 e 30),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -573,7 +573,7 @@ repositórios daquela data (+ Melee Unlocked e Yakumo, verificados em 27/09/2026
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 61 ports possuem builds executáveis (.exe).
+- No **Windows**: todos os 62 ports possuem builds executáveis (.exe).
 - No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 36 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
@@ -585,7 +585,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 61 jogos.
+   - **Filtro Windows (🪟)**: 62 jogos.
    - **Filtro Linux (🐧)**: 36 jogos.
    - **Filtro macOS (🍎)**: 29 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
@@ -593,7 +593,7 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
    derive-os da contagem dos ícones em `CREDITS.md`.
 
-### Resumo das compatibilidades (revisado em 27/09/2026 — ver seções 20, 21 e 22)
+### Resumo das compatibilidades (revisado em 17/10/2026 — ver seções 20, 21, 22, 27 e 30)
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
@@ -614,14 +614,14 @@ Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
   Diddy Kong Racing, Pokemon Red and Blue (reblue), AeroGauge, Crash Bandicoot,
   Pikmin (Open Nectar), Soulcalibur II (Ring Out),
   Sly Cooper (ProjectCane) — adicionado em 12/10/2026, ver seção 26.
-- **🪟 apenas (20 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟 apenas (21 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
   Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
   Jak & Daxter, LoD: Severed Chains, Castlevania: SotN, Sonic 1 Forever,
   Sonic Unleashed, Super Metroid, Viva Pinata, WipEout Phantom Edition,
-  Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey) e
-  Super Smash Bros. Melee (Melee Unlocked) — adicionado em 27/09/2026, ver
-  seção 18. (The Darkness **não** entra — ver seção 19.)
+  Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey),
+  Super Smash Bros. Melee (Melee Unlocked) — adicionado em 27/09/2026, ver seção 18, e
+  BLACK (BLACK-XBERecomp) — adicionado em 17/10/2026, ver seção 30. (The Darkness **não** entra — ver seção 19.)
 
 ---
 
@@ -1299,3 +1299,52 @@ Lançamento da versão **0.9.72** com foco em estabilidade profunda, correção 
    - Saída imediata de loops de espera do extrator transparente (`archive_helper.cpp`) em caso de erros não recuperáveis (`ECHILD`), prevenindo bloqueios de até 10 minutos.
 6. **Limpeza e Compilação Limpa**:
    - Resolução de advertências do compilador com `-Wall -Wextra` e expansão da suíte de testes unitários para 37 testes.
+
+---
+
+## 30. Adição de 17/10/2026 — BLACK (Xbox Recomp) em Ports & Recomp
+
+Mais uma linha em `CREDITS.md`: **BLACK** (original Xbox), via [TGP482/BLACK-XBERecomp](https://github.com/TGP482/BLACK-XBERecomp).
+
+> **Aviso para a IA do site:** o catálogo de "Ports & Recomp" vai de 61 para **62 títulos**. Novos totais conferidos contra o `CREDITS.md` e o `src/port_runner.cpp`: **62 Windows 🪟, 36 Linux 🐧, 29 macOS 🍎**. Na lista "rodam em todos" permanecem **24 jogos**.
+
+### O que o BLACK é
+
+É a primeira recompilação estática de um jogo do **Xbox Original** a entrar oficialmente no menu do Karamelo! Desenvolvido por **TGP482** utilizando o SDK `XboxXBE-Recomp`, o port roda o clássico FPS militar da Criterion Games nativamente em Direct3D 12 no Windows, com resolução 4K, taxa de quadros destravada (ultrapassando os 30 FPS do console original), suporte a HDR10, MSAA/SMAA, SSAO/GTAO, Widescreen e controles/mouse com raw input.
+
+### Como funciona para o jogador
+
+O executável oficial aceita diretamente o arquivo de imagem `.iso` do Xbox original (versões USA e Europe) dentro da pasta `assets/`, montando o sistema de arquivos FATX virtualmente sem necessidade de programas externos para extração.
+No Karamelo, o jogador coloca sua ISO de BLACK em `roms/Xbox/` (ou `roms/`) e o frontend cria automaticamente a ligação (hardlink/cópia) para `ports/BlackRecomp/assets/Black.iso` antes de iniciar.
+
+### Card para o site
+
+> **BLACK**
+> FPS frenético da Criterion Games (Xbox original) reconstruído para PC via recompilação estática (XboxXBE-Recomp). Taxa de quadros destravada (60+ FPS), 4K, HDR10, Widescreen e suporte a mouse e controles modernos. Coloque sua ISO do Xbox em `roms/Xbox` e jogue diretamente.
+> Windows (Direct3D 12).
+
+### O que mudar no site
+
+1. Contagens: **62** jogos em Ports & Recomp; filtro **Windows = 62**, **Linux = 36**, **macOS = 29** (seção 12).
+2. Badge de SO no card: **🪟 Windows** (Direct3D 12).
+3. Na lista da seção 12: adicionado a **🪟 apenas (21 jogos, somente Windows)**.
+4. Sistemas (**35**) e motores (**40**) permanecem inalterados — BLACK é um port nativo, não um core.
+
+---
+
+## 31. Lançamento da Versão 0.9.73 (17/10/2026)
+
+Lançamento da versão **0.9.73** trazendo suporte oficial ao PC port e recompilação estática de **BLACK** (original Xbox via `XboxXBE-Recomp`), elevando o catálogo de Ports & Recomp para **62 títulos**.
+
+### Principais Novidades da v0.9.73
+
+1. **Suporte Nativo a BLACK (Xbox Recomp)**:
+   - Resolução e download automático via GitHub Releases (`TGP482/BLACK-XBERecomp`).
+   - Leitor e vinculador transparente de ISO do Xbox: localiza o arquivo `.iso` em `roms/Xbox/` e cria hardlink instantâneo para `ports/BlackRecomp/assets/` sem duplicar espaço em disco.
+   - Mensagens claras de toast no OSD quando a imagem do jogo não for localizada.
+2. **Atualização de Versão e Manifestos**:
+   - `include/app_info.h` atualizado para `APP_VERSION "0.9.73"` e `Karamelo_v0.9.73.exe`.
+   - Manifesto `dist/version.json` atualizado para a versão `0.9.73`.
+   - Suíte de testes unitários do auto-atualizador expandida para validação da `0.9.73`.
+
+

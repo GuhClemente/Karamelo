@@ -456,6 +456,19 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .needs_rom = true, .rom_keywords = { "legacy" },
           .has_linux_build = true, .has_macos_build = true,
           .launch_args = { "{rom}" } },
+        // BLACK static recomp (original Xbox via XboxXBE-Recomp SDK), Direct3D 12.
+        // Official releases publish Windows zip (BLACK-XBERecomp.zip) containing
+        // BLACK.exe, d3dcompiler_47.dll and an assets/ directory.
+        // Game assets: the game reads default.xbe or an original Xbox .iso directly
+        // placed inside the assets/ directory (supports USA and Europe releases).
+        // Karamelo automatically resolves and links/copies the user's ISO from roms/Xbox/
+        // into ports/BlackRecomp/assets/ if not already present.
+        { .id = "BlackRecomp", .display_name = "BLACK",
+          .repo = "TGP482/BLACK-XBERecomp", .exe_hint = "BLACK.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = false, .has_macos_build = false,
+          .iso_keywords = { "black" },
+          .iso_dirs = { "Xbox", "OriginalXbox", "XboxOG" } },
     };
     return defs;
 }
@@ -1709,6 +1722,61 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
 #endif
 }
 
+// BLACK static recomp helper: checks if ports/BlackRecomp/assets/ already has
+// an extracted default.xbe or an original Xbox .iso. If not, searches roms/Xbox
+// (or roms/) for the user's ISO and links/copies it into assets/.
+static bool SetupBlackGame(const PortDefinition& def, const std::string& port_dir, std::string& out_error) {
+    if (port_dir.empty()) {
+        out_error = "diretorio do port invalido";
+        return false;
+    }
+    fs::path assets_dir = fs::path(port_dir) / "assets";
+    std::error_code aec;
+    fs::create_directories(assets_dir, aec);
+
+    // 1. Check if game files already exist in assets/ (extracted default.xbe or any .iso)
+    if (fs::exists(assets_dir / "default.xbe", aec)) {
+        out_error.clear();
+        return true;
+    }
+    if (fs::is_directory(assets_dir, aec)) {
+        for (const auto& e : fs::directory_iterator(assets_dir, aec)) {
+            if (aec || !e.is_regular_file(aec)) continue;
+            std::string ext = ToLowerStr(e.path().extension().string());
+            if (ext == ".iso") {
+                out_error.clear();
+                return true;
+            }
+        }
+    }
+
+    // 2. Look for user's ISO in roms/Xbox, roms/, etc.
+    std::string iso = FindUserIso(def, port_dir);
+    if (iso.empty()) {
+        out_error = "COLOQUE SEU ISO DE BLACK EM roms/Xbox";
+        return false;
+    }
+
+    // 3. Link or copy the ISO into assets/ so BLACK.exe finds it directly
+    fs::path target_iso = assets_dir / fs::path(iso).filename();
+    std::error_code link_ec;
+    fs::create_hard_link(iso, target_iso, link_ec);
+    if (link_ec) {
+        link_ec.clear();
+        fs::create_symlink(iso, target_iso, link_ec);
+        if (link_ec) {
+            link_ec.clear();
+            fs::copy_file(iso, target_iso, fs::copy_options::overwrite_existing, link_ec);
+            if (link_ec) {
+                out_error = "FALHA AO COPIAR ISO DE BLACK: " + link_ec.message();
+                return false;
+            }
+        }
+    }
+    out_error.clear();
+    return true;
+}
+
 // Does the actual OS-level work of launching an already-installed port:
 // ROM auto-copy, stopping any running libretro core, minimizing the window,
 // launching the process, and spawning the exit-monitor thread. Must only
@@ -1773,6 +1841,16 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
                 return LaunchResolvedExecutable(ext_sh, nullptr, port_id);
             }
 #endif
+        }
+    }
+
+    // 1e. Special helper for BlackRecomp: if assets/ does not contain an ISO or default.xbe,
+    // look for a BLACK Xbox ISO in roms/Xbox/ and link/copy it into assets/.
+    if (def && def->id == "BlackRecomp") {
+        std::string err;
+        if (!SetupBlackGame(*def, ResolvePortDir(def->id), err)) {
+            CoreSetToast(err.c_str(), 300);
+            return false;
         }
     }
 
@@ -2226,6 +2304,10 @@ bool PortPrepareOnly(const std::string& port_id, std::string& out_error) {
     const PortDefinition* def = FindPortDef(port_id);
     if (!def) { out_error = "id de port desconhecido: " + port_id; return false; }
     if (!PortInstallOnly(port_id, out_error)) return false;
+    if (def->id == "BlackRecomp") {
+        std::string dir = ResolvePortDir(port_id);
+        return SetupBlackGame(*def, dir, out_error);
+    }
     if (def->x360_game_dir.empty()) { out_error.clear(); return true; }
     std::string dir = ResolvePortDir(port_id);
     if (X360GameReady(*def, dir)) { out_error.clear(); return true; }

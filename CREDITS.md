@@ -179,10 +179,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Conker's Bad Fur Day | 🪟🐧🍎 | [sciaschi/CBFD-Recompiled](https://github.com/sciaschi/CBFD-Recompiled) |
 | Sly Cooper (ProjectCane) | 🪟🐧 | [theclub654/ProjectCane](https://github.com/theclub654/ProjectCane) |
 | Castlevania: Legacy of Darkness | 🪟🐧🍎 | [fliperama86/cvlod_recomp](https://github.com/fliperama86/cvlod_recomp) |
+| BLACK | 🪟 | [TGP482/BLACK-XBERecomp](https://github.com/TGP482/BLACK-XBERecomp) |
 
-**36 de 61 têm build Linux** e **29 de 61 têm build macOS** (Apple Silicon /
-Universal), verificado em 12/10/2026 contra a release mais recente de cada
-repositório (Melee Unlocked só publica Windows; ProjectCane publica Windows
+**36 de 62 têm build Linux** e **29 de 62 têm build macOS** (Apple Silicon /
+Universal), verificado em 17/10/2026 contra a release mais recente de cada
+repositório (BLACK e Melee Unlocked só publicam Windows; ProjectCane publica Windows
 e Linux; Yakumo, Foxhollow, Conker's Bad Fur Day e Castlevania: Legacy of Darkness publicam os três). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 27/09/2026: Super Metroid voltou a 🪟 apenas (a v0.3.9 só
 publica Windows; até a v0.3.8 havia Linux e macOS), Pokemon Snap ganhou 🍎
@@ -193,6 +194,16 @@ transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
 compilações ARM64.
 No Linux, o extrator abre `.zip`, `.tar.gz`, `.tar.xz` e pacotes `.AppImage`
 diretamente, reconhecendo também binários avulsos sem nenhum empacotamento.
+
+Um detalhe da linha do BLACK: é a recompilação estática nativa de **BLACK** (original
+Xbox) via XboxXBE-Recomp, por TGP482, lançado em outubro de 2026. Publica release oficial
+para Windows (zip x64 contendo BLACK.exe, d3dcompiler_47.dll e a pasta assets/) com suporte a
+Direct3D 12, taxa de quadros destravada (ultrapassando os 30 FPS do console), HDR10,
+MSAA/SMAA, SSAO/GTAO, Widescreen e controles/mouse. O executável aceita diretamente a
+imagem `.iso` do Xbox original (versões USA ou Europe com patch interno) dentro da pasta `assets/`,
+montando o disco FATX virtualmente sem necessidade de ferramentas externas de extração. O
+Karamelo localiza automaticamente o ISO em `roms/Xbox/` (ou `roms/`) e cria um hardlink/cópia
+transparente para `ports/BlackRecomp/assets/` antes da execução.
 
 Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
 tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que

@@ -24,7 +24,7 @@ Este documento é o guia de referência operacional e arquitetural para agentes 
 
 1. **Fontes Únicas da Verdade (Não Invente Números)**:
    - Contagem de Sistemas e Motores: Leia SEMPRE de `include/app_info.h` (`APP_SYSTEM_COUNT = 35`, `APP_CORE_ENGINES = 40`). Nunca use `APP_CORE_FILES` (41) pois conta duplicata técnica de N64.
-   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `CREDITS.md` e verifique em `src/port_runner.cpp` (61 ports totais: 61 Windows 🪟, 36 Linux 🐧, 29 macOS 🍎). The Darkness (Xbox 360) está no código com `hidden = true` — fora do menu, do site e de toda contagem.
+   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `CREDITS.md` e verifique em `src/port_runner.cpp` (62 ports totais: 62 Windows 🪟, 36 Linux 🐧, 29 macOS 🍎). The Darkness (Xbox 360) está no código com `hidden = true` — fora do menu, do site e de toda contagem.
    - Guia de BIOS: A fonte canônica é `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Higiene de Repositório**:
    - **NUNCA versione ROMs, BIOS, saves, estados ou caches**. O `.gitignore` cobre `roms/`, `bios/`, `saves/`, `cores/`, `cache/`.
@@ -63,13 +63,13 @@ src/
 ### macOS (Apple Silicon ARM64)
 - **Compilar**: `./compile_macos.sh` (Gera `app/Karamelo` e executa a suíte de testes).
 - **Testar Ports**: `./app/Karamelo --list-ports` (Lista todos os ports compatíveis com macOS).
-- **Empacotar**: `./package_macos.sh` (Gera `dist/Karamelo_v0.9.4_macOS_arm64.tar.gz` e `dist/Karamelo_mac`).
+- **Empacotar**: `./package_macos.sh` (Gera `dist/Karamelo_v<versão>_macOS_arm64.tar.gz` e `dist/Karamelo_mac`).
 - **Deploy**: `./deploy_macos.sh` (Gera artefatos, atualiza `dist/version.json` e envia via SCP para `187.127.59.127:/data/downloads/`).
 - **Baixar Cores**: `./download_cores_macos.sh` (Baixa os 39 cores `.dylib` ARM64 para `app/cores/`).
 
 ### Linux (x86_64)
 - **Compilar**: `./compile_linux.sh`
-- **Empacotar**: `./package_linux.sh` (Gera `dist/Karamelo_v0.9.4_Linux64.tar.gz`).
+- **Empacotar**: `./package_linux.sh` (Gera `dist/Karamelo_v<versão>_Linux64.tar.gz`).
 - **Deploy**: `./deploy_linux.sh`
 - **Baixar Cores**: `./download_cores_linux.sh`
 
@@ -82,7 +82,7 @@ src/
 
 ## 5. Subsistema de PC Ports & Recompilados (`port_runner.cpp`)
 
-- **Contagem total**: 61 ports no menu (61 Windows 🪟, 36 Linux 🐧, 29 macOS 🍎).
+- **Contagem total**: 62 ports no menu (62 Windows 🪟, 36 Linux 🐧, 29 macOS 🍎).
 - **Fonte de download fora do GitHub (Foxhollow)**: `downloads_json_url` faz o `DownloadAndInstall` ler o feed do próprio projeto (`{"releases":[{"downloads":{"windows","linux","macos"}}]}`, mais novo primeiro) em vez da API de Releases; `iso_exts` libera `.rvz`/`.gcm` além de `.iso`.
 - **Ports ocultos** (`PortDefinition::hidden`): continuam no código e instaláveis por `--install-port`/`--prepare-port` para teste, mas `PortGetAvailableList()` os pula — não aparecem no menu nem entram em contagem. Hoje: só The Darkness.
 - **Xbox 360 (The Darkness, oculto)**: o dump do jogador (`roms/Xbox360/*.iso`) é extraído e convertido nativamente por `src/x360_dump.cpp` antes do launch, com portão de SHA-256 lido do próprio executável do port. Ver `docs/XBOX360_RECOMP.md`.
@@ -92,7 +92,7 @@ src/
   - `FindBestExecutable()` prioriza binários com permissão de execução (`chmod +x`), descartando utilitários como `crashpad_handler` ou `make`.
   - Extração de `.app` bundles: detecta executáveis dentro de `Contents/MacOS/<nome>`.
   - Extração de formatos: suporta `.zip`, `.tar.gz`, `.tar.xz` e imagens `.dmg` (montadas e extraídas transparentemente via `hdiutil`).
-  - Flag de inspeção: `./app/Karamelo --list-ports` lista os ports disponíveis para o SO em que o binário foi compilado (29 no macOS, 36 no Linux, 61 no Windows).
+  - Flag de inspeção: `./app/Karamelo --list-ports` lista os ports disponíveis para o SO em que o binário foi compilado (29 no macOS, 36 no Linux, 62 no Windows).
 
 ---
 
