@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.73 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.74 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -1346,5 +1346,31 @@ Lançamento da versão **0.9.73** trazendo suporte oficial ao PC port e recompil
    - `include/app_info.h` atualizado para `APP_VERSION "0.9.73"` e `Karamelo_v0.9.73.exe`.
    - Manifesto `dist/version.json` atualizado para a versão `0.9.73`.
    - Suíte de testes unitários do auto-atualizador expandida para validação da `0.9.73`.
+
+---
+
+## 32. Lançamento da Versão 0.9.74 (18/10/2026)
+
+Lançamento da versão **0.9.74** com correções críticas no fluxo de navegação do menu OSD, retorno suave ao Menu do Core durante o jogo e correção definitiva no reinício de jogos de Nintendo 64.
+
+### Principais Novidades da v0.9.74
+
+1. **Correção no Toggle do Menu OSD (F12)**:
+   - Pressionar F12 com um jogo em execução agora sempre abre o **Menu In-Game do Core** (com *Carregar*, *Reiniciar*, *Proporção*, *Shader CRT*, *Opções Core*, etc.), corrigindo o comportamento onde o menu de sistemas era exibido incorretamente sobre o jogo.
+   - Adicionada a opção **"Navegar Sistemas"** no Menu do Core para permitir explorar outros consoles sem fechar o jogo atual.
+   - Navegar até o menu de sistemas enquanto um jogo está aberto agora exibe explicitamente a opção `< Voltar ao Core ([Nome do Core])` no topo da lista.
+   - Pressionar `Esc` ou selecionar `<..>` na raiz dos sistemas retorna diretamente para o Menu do Core.
+
+2. **Reboot Limpo no "Reiniciar" (N64 e demais plataformas)**:
+   - Corrigido travamento e congelamento de tela ao selecionar "Reiniciar" em jogos de Nintendo 64 (`mupen64plus-next`) e outros cores com pipeline gráfico avançado.
+   - O reinício agora realiza recarga limpa da ROM e dos contextos de hardware da GPU de forma transparente, garantindo boot limpo sem falhas.
+
+3. **Correção Visual no Menu de Atualização**:
+   - Corrigida a renderização truncada de texto que exibia `"Voc versao mais recente"` no status do OSD.
+
+4. **Atualização de Versão e Manifestos**:
+   - `include/app_info.h` atualizado para `APP_VERSION "0.9.74"` e `Karamelo_v0.9.74.exe`.
+   - Manifesto `dist/version.json` atualizado para a versão `0.9.74`.
+   - Suíte de testes unitários expandida para validar a versão `0.9.74`.
 
 

@@ -11,14 +11,16 @@ TEST_CASE(UpdaterVersionComparison)
 	ASSERT_TRUE(UpdaterIsNewerVersion("1.0-alpha", "1.1"));
 	ASSERT_TRUE(UpdaterIsNewerVersion("1.9.9", "2.0.0"));
 
-	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.7", "0.9.73"));
-	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.71", "0.9.73"));
-	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.72", "0.9.73"));
-	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.6", "0.9.73"));
-	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.73", "0.9.7"));
-	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.73", "0.9.71"));
-	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.73", "0.9.72"));
-	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.73", "0.9.73"));
+	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.7", "0.9.74"));
+	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.71", "0.9.74"));
+	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.72", "0.9.74"));
+	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.73", "0.9.74"));
+	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.6", "0.9.74"));
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.7"));
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.71"));
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.72"));
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.73"));
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.74"));
 
 	// Remote is equal
 	ASSERT_FALSE(UpdaterIsNewerVersion("1.0", "1.0"));

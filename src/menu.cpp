@@ -54,7 +54,8 @@ enum MenuState {
   STATE_SHADER_LIST,
   STATE_DIAGNOSTICS,
   STATE_FAVORITES,
-  STATE_RECENT
+  STATE_RECENT,
+  STATE_SYSTEMS
 };
 
 struct MenuItem {
@@ -721,6 +722,7 @@ bool MenuIsQuitRequested() { return s_menu_quit_requested; }
 void MenuRequestQuit() { s_menu_quit_requested = true; }
 
 void PopulateMainMenu();
+void PopulateSystemsMenu();
 // Picks the core DLL for a ROM, from its extension and from whatever the path
 // says about which system it belongs to.
 //
@@ -1156,13 +1158,14 @@ void PopulateMainMenu() {
 
     const char *aspects[] = {"Original", "4:3", "16:9"};
 
-    // 1. Header: Load [Game Name] and Reset
+    // 1. Header: Load [Game Name], Systems, and Reset
     std::string load_label = Tr("Carregar", "Load");
     std::string game_name = CoreGetGameName();
     if (game_name.length() > 16)
       game_name = game_name.substr(0, 14) + "..";
     items.push_back(
         {load_label, game_name.empty() ? ">" : game_name, false, true, 1});
+    items.push_back({Tr("Navegar Sistemas", "Browse Systems"), ">", true, true, 195});
     items.push_back({Tr("Reiniciar", "Reset"), "", false, true, 6});
     items.push_back({" ", "", false, false, 0});
 
@@ -1291,101 +1294,117 @@ void PopulateMainMenu() {
 
     OsdSetSize((int)items.size());
   } else {
-    OsdSetSize((int)items.size());
-    // Quick Launch: Favoritos & Recentes
-    items.push_back({Tr("Favoritos", "Favorites"), ">", true, true, 190});
-    items.push_back({Tr("Recentes", "Recent Games"), ">", true, true, 191});
-    items.push_back({" ", "", false, false, 0});
-
-    // Main Systems Menu (Alphabetical)
-    if (SystemHasCore(117))
-      items.push_back({"Arcade", ">", true, true, 117});
-    if (SystemHasCore(101))
-      items.push_back({"Atari 2600", ">", true, true, 101});
-    if (SystemHasCore(129))
-      items.push_back({"Atari 5200", ">", true, true, 129});
-    if (SystemHasCore(130))
-      items.push_back({"Atari 7800", ">", true, true, 130});
-    if (SystemHasCore(128))
-      items.push_back({"Atari Jaguar", ">", true, true, 128});
-    if (SystemHasCore(134))
-      items.push_back({"Atari Lynx", ">", true, true, 134});
-    if (SystemHasCore(131))
-      items.push_back({"ColecoVision", ">", true, true, 131});
-    if (SystemHasCore(124))
-      items.push_back({"Commodore 64", ">", true, true, 124});
-    if (SystemHasCore(123))
-      items.push_back({"Commodore Amiga", ">", true, true, 123});
-    if (SystemHasCore(112))
-      items.push_back({"Dreamcast", ">", true, true, 112});
-    if (SystemHasCore(119))
-      items.push_back({"Game Boy / Color", ">", true, true, 119});
-    if (SystemHasCore(118))
-      items.push_back({"Game Boy Advance", ">", true, true, 118});
-    if (SystemHasCore(113))
-      items.push_back({"GameCube", ">", true, true, 113});
-    if (SystemHasCore(102))
-      items.push_back({"Genesis / Mega Drive", ">", true, true, 102});
-    if (SystemHasCore(103))
-      items.push_back({"Master System", ">", true, true, 103});
-    if (SystemHasCore(104))
-      items.push_back({"Mega CD", ">", true, true, 104});
-    if (SystemHasCore(121))
-      items.push_back({"MS-DOS", ">", true, true, 121});
-    if (SystemHasCore(122))
-      items.push_back({"MSX / MSX2", ">", true, true, 122});
-    if (SystemHasCore(105))
-      items.push_back({"NES / Famicom", ">", true, true, 105});
-    if (SystemHasCore(132))
-      items.push_back({"Neo Geo Pocket", ">", true, true, 132});
-    if (SystemHasCore(106))
-      items.push_back({"NeoGeo / CD", ">", true, true, 106});
-    if (SystemHasCore(115))
-      items.push_back({"Nintendo 3DS", ">", true, true, 115});
-    if (SystemHasCore(107))
-      items.push_back({"Nintendo 64", ">", true, true, 107});
-    if (SystemHasCore(114))
-      items.push_back({"Nintendo DS", ">", true, true, 114});
-    if (SystemHasCore(127))
-      items.push_back({"Panasonic 3DO", ">", true, true, 127});
-    if (SystemHasCore(135))
-      items.push_back({"PC-FX", ">", true, true, 135});
-    if (SystemHasCore(108))
-      items.push_back({"PlayStation 1", ">", true, true, 108});
-    if (SystemHasCore(116))
-      items.push_back({"PlayStation 2 (PS2)", ">", true, true, 116});
-    if (SystemHasCore(120))
-      items.push_back({"PlayStation Portable (PSP)", ">", true, true, 120});
-    if (SystemHasCore(140))
-      items.push_back({"Ports & Recomp", ">", true, true, 140});
-    if (SystemHasCore(110))
-      items.push_back({"Saturn", ">", true, true, 110});
-    if (SystemHasCore(126))
-      items.push_back({"Sega 32X", ">", true, true, 126});
-    if (SystemHasCore(109))
-      items.push_back({"SNES / Super Famicom", ">", true, true, 109});
-    if (SystemHasCore(111))
-      items.push_back({"TurboGrafx 16 / PCE", ">", true, true, 111});
-    if (SystemHasCore(133))
-      items.push_back({"WonderSwan", ">", true, true, 133});
-    if (SystemHasCore(125))
-      items.push_back({"ZX Spectrum", ">", true, true, 125});
-    // Blank row before the app entries, the way the MiSTer OSD separates the
-    // system list from Settings / Update / Close.
-    items.push_back({" ", "", false, false, 0});
-    items.push_back({Tr("Configuracoes", "Settings"), ">", false, true, 20});
-    items.push_back({Tr("Atualizacao", "Update"), ">", false, true, 30});
-    items.push_back({std::string(Tr("Sair do ", "Exit ")) + APP_NAME, "", false, true, 99});
-
-    // Counted here rather than written down somewhere else: this is the list.
-    g_system_count = 0;
-    for (const auto &it : items)
-      if ((it.action_id >= 101 && it.action_id <= 135) || it.action_id == 140)
-        g_system_count++;
+    PopulateSystemsMenu();
   }
 
   selected_idx = 0;
   scroll_top = 0;
+}
+
+void PopulateSystemsMenu() {
+  items.clear();
+  current_title = APP_NAME;
+
+  if (CoreIsRunning()) {
+    std::string core_name = CoreGetCoreName();
+    std::string back_lbl = std::string("< ") + Tr("Voltar ao Core", "Back to Core");
+    if (!core_name.empty()) back_lbl += " (" + core_name + ")";
+    items.push_back({back_lbl, "", false, true, 196});
+    items.push_back({" ", "", false, false, 0});
+  }
+
+  // Quick Launch: Favoritos & Recentes
+  items.push_back({Tr("Favoritos", "Favorites"), ">", true, true, 190});
+  items.push_back({Tr("Recentes", "Recent Games"), ">", true, true, 191});
+  items.push_back({" ", "", false, false, 0});
+
+  // Main Systems Menu (Alphabetical)
+  if (SystemHasCore(117))
+    items.push_back({"Arcade", ">", true, true, 117});
+  if (SystemHasCore(101))
+    items.push_back({"Atari 2600", ">", true, true, 101});
+  if (SystemHasCore(129))
+    items.push_back({"Atari 5200", ">", true, true, 129});
+  if (SystemHasCore(130))
+    items.push_back({"Atari 7800", ">", true, true, 130});
+  if (SystemHasCore(128))
+    items.push_back({"Atari Jaguar", ">", true, true, 128});
+  if (SystemHasCore(134))
+    items.push_back({"Atari Lynx", ">", true, true, 134});
+  if (SystemHasCore(131))
+    items.push_back({"ColecoVision", ">", true, true, 131});
+  if (SystemHasCore(124))
+    items.push_back({"Commodore 64", ">", true, true, 124});
+  if (SystemHasCore(123))
+    items.push_back({"Commodore Amiga", ">", true, true, 123});
+  if (SystemHasCore(112))
+    items.push_back({"Dreamcast", ">", true, true, 112});
+  if (SystemHasCore(119))
+    items.push_back({"Game Boy / Color", ">", true, true, 119});
+  if (SystemHasCore(118))
+    items.push_back({"Game Boy Advance", ">", true, true, 118});
+  if (SystemHasCore(113))
+    items.push_back({"GameCube", ">", true, true, 113});
+  if (SystemHasCore(102))
+    items.push_back({"Genesis / Mega Drive", ">", true, true, 102});
+  if (SystemHasCore(103))
+    items.push_back({"Master System", ">", true, true, 103});
+  if (SystemHasCore(104))
+    items.push_back({"Mega CD", ">", true, true, 104});
+  if (SystemHasCore(121))
+    items.push_back({"MS-DOS", ">", true, true, 121});
+  if (SystemHasCore(122))
+    items.push_back({"MSX / MSX2", ">", true, true, 122});
+  if (SystemHasCore(105))
+    items.push_back({"NES / Famicom", ">", true, true, 105});
+  if (SystemHasCore(132))
+    items.push_back({"Neo Geo Pocket", ">", true, true, 132});
+  if (SystemHasCore(106))
+    items.push_back({"NeoGeo / CD", ">", true, true, 106});
+  if (SystemHasCore(115))
+    items.push_back({"Nintendo 3DS", ">", true, true, 115});
+  if (SystemHasCore(107))
+    items.push_back({"Nintendo 64", ">", true, true, 107});
+  if (SystemHasCore(114))
+    items.push_back({"Nintendo DS", ">", true, true, 114});
+  if (SystemHasCore(127))
+    items.push_back({"Panasonic 3DO", ">", true, true, 127});
+  if (SystemHasCore(135))
+    items.push_back({"PC-FX", ">", true, true, 135});
+  if (SystemHasCore(108))
+    items.push_back({"PlayStation 1", ">", true, true, 108});
+  if (SystemHasCore(116))
+    items.push_back({"PlayStation 2 (PS2)", ">", true, true, 116});
+  if (SystemHasCore(120))
+    items.push_back({"PlayStation Portable (PSP)", ">", true, true, 120});
+  if (SystemHasCore(140))
+    items.push_back({"Ports & Recomp", ">", true, true, 140});
+  if (SystemHasCore(110))
+    items.push_back({"Saturn", ">", true, true, 110});
+  if (SystemHasCore(126))
+    items.push_back({"Sega 32X", ">", true, true, 126});
+  if (SystemHasCore(109))
+    items.push_back({"SNES / Super Famicom", ">", true, true, 109});
+  if (SystemHasCore(111))
+    items.push_back({"TurboGrafx 16 / PCE", ">", true, true, 111});
+  if (SystemHasCore(133))
+    items.push_back({"WonderSwan", ">", true, true, 133});
+  if (SystemHasCore(125))
+    items.push_back({"ZX Spectrum", ">", true, true, 125});
+  // Blank row before the app entries, the way the MiSTer OSD separates the
+  // system list from Settings / Update / Close.
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Configuracoes", "Settings"), ">", false, true, 20});
+  items.push_back({Tr("Atualizacao", "Update"), ">", false, true, 30});
+  items.push_back({std::string(Tr("Sair do ", "Exit ")) + APP_NAME, "", false, true, 99});
+
+  // Counted here rather than written down somewhere else: this is the list.
+  g_system_count = 0;
+  for (const auto &it : items)
+    if ((it.action_id >= 101 && it.action_id <= 135) || it.action_id == 140)
+      g_system_count++;
+
+  OsdSetSize((int)items.size());
 }
 
 // Entering the page with no pad plugged in should show the keyboard bindings.
@@ -1753,7 +1772,7 @@ void PopulateSaveStates() {
     char slot_label[32];
     snprintf(slot_label, sizeof(slot_label), "%sSlot %d", (s == active_slot ? "> " : "  "), s);
 
-    char slot_val[40];
+    char slot_val[64];
     if (has_state) {
       if (bytes > 1024 * 1024)
         snprintf(slot_val, sizeof(slot_val), "%s (%.1fMB)", time_str, bytes / (1024.0 * 1024.0));
@@ -2109,10 +2128,9 @@ void PopulateUpdate() {
 
   if (state == UPDATER_STATE_CHECKING) {
     items.push_back({Tr("Status", "Status"), Tr("Verificando...", "Checking..."), false, false, 0});
-    items.push_back({Tr("Consultando servidor", "Querying server"), Tr("Aguarde", "Please wait"), false, false, 0});
+    items.push_back({" ", "", false, false, 0});
   } else if (state == UPDATER_STATE_UP_TO_DATE) {
     items.push_back({Tr("Status", "Status"), Tr("Atualizado!", "Up to date!"), false, false, 0});
-    items.push_back({Tr("Voce ja possui a", "You already have the"), Tr("versao mais recente", "latest version"), false, false, 0});
     items.push_back({" ", "", false, false, 0});
     items.push_back({Tr("Verificar Novamente", "Check Again"), ">", false, true, 391});
   } else if (state == UPDATER_STATE_AVAILABLE) {
@@ -2287,8 +2305,8 @@ void PopulateBrowse(const std::string &dirpath) {
 
   OsdSetSize(12);
 
-  if (dirpath != "roms" && dirpath != "." && dirpath != "/" &&
-      dirpath != "\\") {
+  if (CoreIsRunning() || (dirpath != "roms" && dirpath != "." && dirpath != "/" &&
+      dirpath != "\\")) {
     items.push_back({"<..>", "", true, false, 0});
   }
 
@@ -2463,7 +2481,7 @@ static void BrowseGoUp() {
       (lower_parent.find("roms") == std::string::npos && lower_parent.find("ports") == std::string::npos)) {
     current_state = STATE_MAIN;
     PopulateMainMenu();
-    selected_idx = main_menu_saved_idx;
+    selected_idx = CoreIsRunning() ? 0 : main_menu_saved_idx;
     if (selected_idx < 0 || selected_idx >= (int)items.size())
       selected_idx = 0;
     return;
@@ -3023,7 +3041,8 @@ static void MenuProcessKeyImpl(MenuKey key) {
       OsdEnable(0);
       s_scroll_since = TickCountMs();
       s_title_scroll_since = TickCountMs();
-      if (items.empty()) {
+      if (items.empty() || current_state == STATE_MAIN ||
+          (CoreIsRunning() && (current_state == STATE_BROWSE || current_state == STATE_SYSTEMS))) {
         current_state = STATE_MAIN;
         PopulateMainMenu();
         selected_idx = 0;
@@ -3461,8 +3480,20 @@ static void MenuProcessKeyImpl(MenuKey key) {
     {
       current_state = STATE_MAIN;
       PopulateMainMenu();
-    } else if (current_state == STATE_MAIN) {
-      if (item.action_id == 1) // Load another game from the same folder
+    } else if (current_state == STATE_MAIN || current_state == STATE_SYSTEMS) {
+      if (item.action_id == 195) // Browse Systems
+      {
+        current_state = STATE_SYSTEMS;
+        PopulateSystemsMenu();
+        selected_idx = 0;
+        scroll_top = 0;
+      } else if (item.action_id == 196) // Back to Core
+      {
+        current_state = STATE_MAIN;
+        PopulateMainMenu();
+        selected_idx = 0;
+        scroll_top = 0;
+      } else if (item.action_id == 1) // Load another game from the same folder
       {
         // The row is labelled "Load" and shows the game name, but it used to
         // just close the OSD - it was Resume wearing Load's label. It now
@@ -3948,7 +3979,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
           }
           OsdDisable();
           current_state = STATE_MAIN;
-          PopulateMainMenu();
+          items.clear();
           selected_idx = 0;
           scroll_top = 0;
         }
@@ -4000,10 +4031,15 @@ static void MenuProcessKeyImpl(MenuKey key) {
   case KEY_CANCEL:
     if (current_state == STATE_BROWSE) {
       BrowseGoUp();
+    } else if (current_state == STATE_SYSTEMS) {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
+      selected_idx = 0;
+      scroll_top = 0;
     } else if (current_state == STATE_FAVORITES || current_state == STATE_RECENT) {
       current_state = STATE_MAIN;
       PopulateMainMenu();
-      selected_idx = main_menu_saved_idx;
+      selected_idx = CoreIsRunning() ? 0 : main_menu_saved_idx;
     } else if (current_state == STATE_ABOUT_CORES) {
       current_state = STATE_ABOUT;
       PopulateAbout();
@@ -4075,7 +4111,7 @@ bool MenuLaunchGamePath(const std::string &full_rom_path) {
     }
     OsdDisable();
     current_state = STATE_MAIN;
-    PopulateMainMenu();
+    items.clear();
     selected_idx = 0;
     scroll_top = 0;
     return true;

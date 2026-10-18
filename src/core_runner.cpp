@@ -516,6 +516,9 @@ static volatile LONG g_baseline_wave_buffers = 12;
 static LONG s_clean_windows = 0;
 static bool          s_loaded_core_is_pcsx2 = false;
 static std::string   s_loaded_core_path = "";
+static std::string   s_active_rom_path = "";
+static std::string   s_active_core_path = "";
+static std::thread::id s_core_thread_id;
 
 
 
@@ -2893,6 +2896,7 @@ static const std::unordered_set<std::string>& NaomiAtomiswaveRomsets()
 static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 {
 	(void)lpParam;
+	s_core_thread_id = std::this_thread::get_id();
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
 	// --- Load phase (this is the part that used to freeze the window) ---
@@ -3228,6 +3232,11 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	RaOnGameLoad(rom_path.c_str(), loaded_core_name.c_str());
 
 	InterlockedExchange(&g_core_state, CORE_STATE_RUNNING);
+
+	EnterCriticalSection(&name_lock);
+	s_active_rom_path = original_rom_path;
+	s_active_core_path = core_dll;
+	LeaveCriticalSection(&name_lock);
 
 	// --- Run phase, paced at the core's OWN refresh rate ---
 	// A fixed 60Hz here is what detuned every core that is not exactly 60fps
@@ -4348,9 +4357,9 @@ static void DoReset()
 	if (CoreIsRunning() && p_retro_reset)
 	{
 		if (RetroResetGuarded())
-			CoreSetToast("CORE RESTARTED", 90);
+			CoreSetToast(Tr("JOGO REINICIADO", "GAME RESTARTED"), 90);
 		else
-			CoreSetToast("ERROR: CORE CRASHED ON RESET", 120);
+			CoreSetToast(Tr("ERRO AO REINICIAR", "ERROR RESTARTING GAME"), 120);
 	}
 }
 
@@ -4506,7 +4515,27 @@ static bool PostCoreCommand(LONG cmd, int slot)
 	return true;
 }
 
-void CoreReset()               { PostCoreCommand(CORE_CMD_RESET, 0); }
+void CoreReset()
+{
+	if (!CoreIsRunning()) return;
+
+	EnterCriticalSection(&name_lock);
+	std::string rom = s_active_rom_path;
+	std::string core = s_active_core_path;
+	LeaveCriticalSection(&name_lock);
+
+	// If invoked from UI thread and we know the ROM/core paths, perform a clean reload
+	// to avoid known core hangs (such as Mupen64Plus-Next on soft reset).
+	if (std::this_thread::get_id() != s_core_thread_id && !rom.empty() && !core.empty())
+	{
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreReset] Reiniciando limpo: %s com %s", rom.c_str(), core.c_str());
+		CoreRequestLoad(rom.c_str(), core.c_str());
+		CoreSetToast(Tr("JOGO REINICIADO", "GAME RESTARTED"), 90);
+		return;
+	}
+
+	PostCoreCommand(CORE_CMD_RESET, 0);
+}
 bool CoreSaveState(int slot)   { return PostCoreCommand(CORE_CMD_SAVE, slot); }
 bool CoreLoadState(int slot)   { return PostCoreCommand(CORE_CMD_LOAD, slot); }
 
