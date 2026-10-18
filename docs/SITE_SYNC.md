@@ -1373,4 +1373,9 @@ Lançamento da versão **0.9.74** com correções críticas no fluxo de navegaç
    - Manifesto `dist/version.json` atualizado para a versão `0.9.74`.
    - Suíte de testes unitários expandida para validar a versão `0.9.74`.
 
+5. **Artefatos e Hashes da Release macOS v0.9.74**:
+   - Binário Auto-Update (`dist/Karamelo_mac`): 4.316.392 bytes, SHA-256: `02ED9C89183E52C0A0284FAB802BA6DFC8E09F75039A0EB589894DF5555E915F`
+   - Pacote Completo (`dist/Karamelo_v0.9.74_macOS_arm64.tar.gz`): 123.040.652 bytes (123 MB)
+   - Deploy realizado com sucesso para `187.127.59.127:/data/downloads/` com validação HTTP 200 no Nginx / Coolify.
+
 
