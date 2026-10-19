@@ -168,6 +168,7 @@ cd "$SCRIPT_DIR"
 # 6. Preparar executavel avulso para Auto-Updater e atualizar version.json
 echo ""
 echo "[5/5] Atualizando dist/Karamelo_mac e dist/version.json..."
+rm -f "dist/Karamelo_mac"
 cp -a "app/Karamelo" "dist/Karamelo_mac"
 chmod 0755 "dist/Karamelo_mac"
 

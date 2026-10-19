@@ -1382,6 +1382,11 @@ Lançamento da versão **0.9.74** com correções críticas no fluxo de navegaç
    - Manifesto `dist/version.json` atualizado para a versão `0.9.74`.
    - Suíte de testes unitários expandida para validar a versão `0.9.74`.
 
+5. **Artefatos e Hashes da Release macOS v0.9.74**:
+   - Binário Auto-Update (`dist/Karamelo_mac`): 4.316.392 bytes, SHA-256: `02ED9C89183E52C0A0284FAB802BA6DFC8E09F75039A0EB589894DF5555E915F`
+   - Pacote Completo (`dist/Karamelo_v0.9.74_macOS_arm64.tar.gz`): 123.040.652 bytes (123 MB)
+   - Deploy realizado com sucesso para `187.127.59.127:/data/downloads/` com validação HTTP 200 no Nginx / Coolify.
+
 ---
 
 ## 33. Expansão de Catálogo: 8 Novos Ports e Atualização para 70 Ports (18/10/2026)
@@ -1443,7 +1448,7 @@ O catálogo de "Ports & Recomp" expande de 62 para **70 títulos** oficiais. Nov
    - **Repositório**: `GTTeancum/StarWars-RenegadeSquadron-PC`
    - **Plataformas**: 🪟 (Windows).
    - **Descrição**: Port nativo de PlayStation Portable (PSP) via recompilação estática com renderizador Direct3D 12, 60 FPS e suporte a controles analógicos duplos.
-   - **Como funciona**: O jogador coloca a imagem UMD (.iso/.cso) em `roms/PSP/`.
+   - **Como funciona**: O jogador coloca a imagem UMD (`.iso`, versão americana ULUS10292) em `roms/PSP/`; na primeira execução o Karamelo extrai a pasta `PSP_GAME` para `data/` do port automaticamente. Arquivos `.cso` (comprimidos) não são aceitos.
 
 ### Atualização Adicional
 - **F-Zero X (`craigshaw/FZeroRecomp`)**: Atualizado para incluir suporte oficial a **Linux** (🪟🐧🍎).
