@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.74 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.75 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -1452,5 +1452,36 @@ O catálogo de "Ports & Recomp" expande de 62 para **70 títulos** oficiais. Nov
 
 ### Atualização Adicional
 - **F-Zero X (`craigshaw/FZeroRecomp`)**: Atualizado para incluir suporte oficial a **Linux** (🪟🐧🍎).
+
+---
+
+## 34. Lançamento da Versão 0.9.75 (19/10/2026)
+
+Lançamento da versão **0.9.75** trazendo a expansão oficial do catálogo para **70 ports**, pipeline automático de extração para ports de PSP, e robustez na detecção de assets e correspondência de ROMs/ISOs.
+
+### Principais Novidades da v0.9.75
+
+1. **Expansão de Ports & Recomp (70 Títulos)**:
+   - Inclusão dos 8 novos ports: CPS-2 Recomp (Capcom Arcade), Wayne Gretzky's 3D Hockey, Rush 2: Extreme Racing USA, Automobili Lamborghini, Road Rash 64, Jungle Strike (SNES), ICO (PS2) e Star Wars Battlefront: Renegade Squadron (PSP).
+   - F-Zero X atualizado com build oficial para Linux (🪟🐧🍎).
+   - Totais atualizados: **70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎** (27 rodam em todos).
+
+2. **Pipeline de Extração PSP (`PSP_GAME`)**:
+   - Para ports que leem o sistema de arquivos do UMD descompactado (como Star Wars Battlefront: Renegade Squadron), o Karamelo agora realiza a extração automática da árvore `PSP_GAME` diretamente da imagem `.iso` do jogador para a pasta de dados do port (`data/`), com validação de `SYSDIR/BOOT.BIN`.
+   - Mensagens claras de toast orientando onde colocar o arquivo ISO caso ausente.
+
+3. **Refinamento na Detecção de ROMs e Imagens de Disco**:
+   - `rom_exclude_keywords`: impede conflitos entre edições do mesmo jogo (ex.: `Wayne Gretzky's 3D Hockey` não confunde mais com `Wayne Gretzky's 3D Hockey '98`).
+   - `iso_keywords_whole_word`: casamento de palavras inteiras para títulos com nomes curtos (ex.: `ICO` não dispara falsos-positivos em arquivos com `Unicorn`).
+   - Tratamento estrito de caracteres UTF-8 em `ToLowerStr` com `unsigned char` para evitar comportamento indefinido em caracteres não-ASCII.
+
+4. **Robustez no Download de Ports**:
+   - Fallback inteligente na API de Releases do GitHub quando a tag mais recente não possui assets binários ou foi publicada como pré-release (como a beta do CPS-2 Recomp).
+   - Filtragem de notas e arquivos de soma de verificação (`.txt`, `.sha256`, `.md5`) na identificação de binários Linux soltos.
+
+5. **Atualização de Versão e Manifestos**:
+   - `include/app_info.h` atualizado para `APP_VERSION "0.9.75"` e `Karamelo_v0.9.75.exe`.
+   - Manifesto `dist/version.json` atualizado para a versão `0.9.75`.
+   - Suíte de testes unitários expandida para validar a versão `0.9.75`.
 
 

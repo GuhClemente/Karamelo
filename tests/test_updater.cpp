@@ -15,12 +15,15 @@ TEST_CASE(UpdaterVersionComparison)
 	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.71", "0.9.74"));
 	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.72", "0.9.74"));
 	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.73", "0.9.74"));
+	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.74", "0.9.75"));
 	ASSERT_TRUE(UpdaterIsNewerVersion("0.9.6", "0.9.74"));
 	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.7"));
 	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.71"));
 	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.72"));
 	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.73"));
 	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.74", "0.9.74"));
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.75", "0.9.74"));
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.75", "0.9.75"));
 
 	// Remote is equal
 	ASSERT_FALSE(UpdaterIsNewerVersion("1.0", "1.0"));
