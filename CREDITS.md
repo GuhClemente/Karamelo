@@ -167,7 +167,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Fallout (Community Edition) | 🪟🐧🍎 | [alexbatalov/fallout1-ce](https://github.com/alexbatalov/fallout1-ce) |
 | Pokemon Red and Blue (reblue) | 🪟🐧 | [zolaware/reblue](https://github.com/zolaware/reblue) |
 | Spider-Man (OpenSpidey) | 🪟 | [GTTeancum/OpenSpideyPS1](https://github.com/GTTeancum/OpenSpideyPS1) |
-| F-Zero X | 🪟🍎 | [craigshaw/FZeroRecomp](https://github.com/craigshaw/FZeroRecomp) |
+| F-Zero X | 🪟🐧🍎 | [craigshaw/FZeroRecomp](https://github.com/craigshaw/FZeroRecomp) |
 | AeroGauge | 🪟🐧 | [alondero/aerogauge-recomp](https://github.com/alondero/aerogauge-recomp) |
 | Crash Bandicoot | 🪟🐧 | [Matteo842/CrashBandicoot-Launcher](https://github.com/Matteo842/CrashBandicoot-Launcher) |
 | Super Mario Strikers | 🪟🐧🍎 | [new-coke/strikers](https://github.com/new-coke/strikers) |
@@ -180,20 +180,58 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Sly Cooper (ProjectCane) | 🪟🐧 | [theclub654/ProjectCane](https://github.com/theclub654/ProjectCane) |
 | Castlevania: Legacy of Darkness | 🪟🐧🍎 | [fliperama86/cvlod_recomp](https://github.com/fliperama86/cvlod_recomp) |
 | BLACK | 🪟 | [TGP482/BLACK-XBERecomp](https://github.com/TGP482/BLACK-XBERecomp) |
+| CPS-2 Recomp (Capcom Arcade) | 🪟🐧🍎 | [tmcleroy/cps2recomp](https://github.com/tmcleroy/cps2recomp) |
+| Wayne Gretzky's 3D Hockey | 🪟 | [geno55/wg3d-recomp](https://github.com/geno55/wg3d-recomp) |
+| Rush 2: Extreme Racing USA | 🪟🐧 | [bryantmh/rush2recompiled](https://github.com/bryantmh/rush2recompiled) |
+| Automobili Lamborghini | 🪟🐧 | [alondero/automobililamborghini-recomp](https://github.com/alondero/automobililamborghini-recomp) |
+| Road Rash 64 | 🪟🐧 | [linkssy2/RoadRash64Recompiled](https://github.com/linkssy2/RoadRash64Recompiled) |
+| Jungle Strike | 🪟 | [Junior-Jones/Jungle-Strike-SNES-Static-Recomp](https://github.com/Junior-Jones/Jungle-Strike-SNES-Static-Recomp) |
+| ICO | 🪟🐧🍎 | [nathanialf/ico-pc](https://github.com/nathanialf/ico-pc) |
+| Star Wars Battlefront: Renegade Squadron | 🪟 | [GTTeancum/StarWars-RenegadeSquadron-PC](https://github.com/GTTeancum/StarWars-RenegadeSquadron-PC) |
 
-**36 de 62 têm build Linux** e **29 de 62 têm build macOS** (Apple Silicon /
-Universal), verificado em 17/10/2026 contra a release mais recente de cada
-repositório (BLACK e Melee Unlocked só publicam Windows; ProjectCane publica Windows
-e Linux; Yakumo, Foxhollow, Conker's Bad Fur Day e Castlevania: Legacy of Darkness publicam os três). Os outros publicam build utilizável apenas no Windows por este
-app. Revisado em 27/09/2026: Super Metroid voltou a 🪟 apenas (a v0.3.9 só
-publica Windows; até a v0.3.8 havia Linux e macOS), Pokemon Snap ganhou 🍎
-(a v1.1.0 é a primeira com `macos-universal.zip`) e Sonic 3 A.I.R. ganhou 🍎
-(o `.dmg` da release estável falhava na extração, corrigida nesta data). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
+**42 de 70 têm build Linux** e **31 de 70 têm build macOS** (Apple Silicon /
+Universal), verificado em 18/10/2026 contra a release mais recente de cada
+repositório (BLACK, Melee Unlocked, WG3D, Jungle Strike e Renegade Squadron só publicam Windows; Rush 2, Automobili Lamborghini, Road Rash 64 e ProjectCane publicam Windows
+e Linux; CPS-2 Recomp, ICO, Yakumo, Foxhollow, Conker's Bad Fur Day, Castlevania: Legacy of Darkness e F-Zero X publicam os três). Os outros publicam build utilizável apenas no Windows por este
+app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
 compilações ARM64.
 No Linux, o extrator abre `.zip`, `.tar.gz`, `.tar.xz` e pacotes `.AppImage`
 diretamente, reconhecendo também binários avulsos sem nenhum empacotamento.
+
+Um detalhe da linha do CPS-2 Recomp: é a recompilação estática de arcade CPS-1 e CPS-2
+por tmcleroy, com launcher próprio e suporte a Street Fighter Alpha 2, Cadillacs and Dinosaurs,
+Alien vs. Predator, Super Puzzle Fighter II Turbo, Vampire Savior 1/2 e Vampire Hunter 2. Publica
+builds para Windows (zip x64), Linux (tar.gz) e macOS (zip com CPS-2 Recomp.app). O Karamelo copia
+automaticamente os romsets MAME/arcade compatíveis (`sfa2u.zip`, `dino.zip`, `avspu.zip`, etc.) de
+`roms/Arcade/` diretamente para a pasta do port.
+
+Um detalhe da linha do Wayne Gretzky's 3D Hockey: port nativo de Nintendo 64 via N64Recomp
+com renderizador RT64 por geno55. Publica release oficial para Windows x64. O Karamelo localiza a ROM
+americana do jogo em `roms/Nintendo64/` e copia como `baserom.us.z64` na pasta do port.
+
+Um detalhe da linha do Rush 2: Extreme Racing USA: recompilação estática de N64 por bryantmh.
+Publica Windows zip e Linux AppImage. O Karamelo passa automaticamente o caminho da ROM via argumento.
+
+Um detalhe da linha do Automobili Lamborghini: port de N64 via N64Recomp e RT64 por alondero.
+Publica builds para Windows e Linux. Suporta Direct3D 12, Vulkan e widescreen com passagem da ROM via argumento.
+
+Um detalhe da linha do Road Rash 64: recompilação estática de N64 por linkssy2. Publica builds para
+Windows e Linux (AppImage experimental) com carregamento direto da ROM original.
+
+Um detalhe da linha do Jungle Strike: recompilação estática nativa de Super Nintendo por
+Junior-Jones, com Launcher.exe dedicado e suporte a taxas de quadros modernas. O Karamelo localiza
+a ROM de SNES e copia para a pasta do port e subpasta `Rom/`.
+
+Um detalhe da linha do ICO: port nativo de PlayStation 2 em C++ por nathanialf (decompilação
+da versão PAL SCES-50760). Publica builds oficiais para Windows (zip x64), Linux (tarball) e macOS
+(Apple Silicon arm64). Aceita imagem de disco PAL (.iso, .chd, .bin) passada pelo Karamelo via `{iso}`
+a partir de `roms/PS2/`.
+
+Um detalhe da linha do Star Wars Battlefront: Renegade Squadron: port nativo de PSP via recompilação
+estática por GTTeancum. Publica build para Windows com renderizador Direct3D 12, 60 FPS e suporte a duplo analógico.
+O jogador coloca a imagem original (.iso/.cso) em `roms/PSP/`.
 
 Um detalhe da linha do BLACK: é a recompilação estática nativa de **BLACK** (original
 Xbox) via XboxXBE-Recomp, por TGP482, lançado em outubro de 2026. Publica release oficial

@@ -14,7 +14,7 @@
 // declare the window unresponsive.
 bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint);
 bool CoreIsLoading();
-void CoreShutdown();
+void CoreShutdown(bool will_reload = false);
 
 // Recreates any of the frontend's internal locks (toast/name/options) that
 // the given thread ID currently owns. For use right before force-terminating

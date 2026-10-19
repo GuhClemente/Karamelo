@@ -68,4 +68,11 @@ TEST_CASE(ArchiveResolveCoreIntelligentRouting)
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/SNES/Chrono_Trigger.zip", "roms/SNES"), "cores/snes.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/MegaCD/Sonic_CD.7z", "roms/MegaCD"), "cores/genesis.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/PlayStation/Crash.zip", "roms/PlayStation"), "cores/psx.dll");
+
+	// 4. Nintendo 64 formats & archives
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/mario.z64", "roms/Nintendo64"), "cores/n64.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/zelda.n64", "roms/Nintendo64"), "cores/n64.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/starfox.v64", "roms/Nintendo64"), "cores/n64.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/game.zip", "roms/Nintendo64"), "cores/n64.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/game.7z", "roms/Nintendo64"), "cores/n64.dll");
 }

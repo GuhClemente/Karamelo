@@ -331,7 +331,7 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           true, { "spider", "man" }, false, false },
         { "FZeroRecomp", "F-Zero X",
           "craigshaw/FZeroRecomp", "FZeroRecomp.exe",
-          true, { "f-zero" }, false, true },
+          true, { "f-zero" }, true, true },
         { "AeroGaugeRecomp", "AeroGauge",
           "alondero/aerogauge-recomp", "aerogauge_modern.exe",
           true, { "aerogauge" }, true, false },
@@ -469,6 +469,76 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .has_linux_build = false, .has_macos_build = false,
           .iso_keywords = { "black" },
           .iso_dirs = { "Xbox", "OriginalXbox", "XboxOG" } },
+        // CPS-2 Recomp (Capcom CPS-1 and CPS-2 arcade static recompilation by tmcleroy).
+        // Official releases publish Windows zip (CPS2Recomp-windows-x64.zip),
+        // Linux tarball (CPS2Recomp-linux-x86_64.tar.gz), and macOS zip (CPS2Recomp-macOS.zip
+        // with CPS-2 Recomp.app).
+        // Includes Street Fighter Alpha 2, Cadillacs and Dinosaurs, Alien vs. Predator,
+        // Super Puzzle Fighter II Turbo, Vampire Savior 1/2, Vampire Hunter 2, and
+        // Vampire Savior Definitive.
+        // Karamelo automatically copies available ROM sets from roms/Arcade (sfa2u.zip,
+        // dino.zip, avspu.zip, etc.) into ports/CPS2Recomp/ before execution.
+        { .id = "CPS2Recomp", .display_name = "CPS-2 Recomp (Capcom Arcade)",
+          .repo = "tmcleroy/cps2recomp", .exe_hint = "cps2recomp-launcher.exe",
+          .needs_rom = true, .rom_keywords = { "sfa2", "dino", "avsp", "vsav" },
+          .has_linux_build = true, .has_macos_build = true },
+        // Wayne Gretzky's 3D Hockey static recomp (N64 USA v1.0 via N64Recomp + RT64 by geno55).
+        // Official releases publish Windows zip (wg3d-recomp-v<ver>-windows-x64.zip) containing
+        // wg3d.exe, RT64 D3D12/Vulkan backends and MSVC runtime DLLs.
+        // Accepts original USA N64 ROM (.z64/.v64/.n64) as argument or copied to port directory.
+        { .id = "WG3DRecomp", .display_name = "Wayne Gretzky's 3D Hockey",
+          .repo = "geno55/wg3d-recomp", .exe_hint = "wg3d.exe",
+          .needs_rom = true, .rom_keywords = { "gretzky" },
+          .has_linux_build = false, .has_macos_build = false,
+          .launch_args = { "{rom}" } },
+        // Rush 2: Extreme Racing USA static recomp (N64 via N64Recomp by bryantmh).
+        // Official releases publish Windows zip (Rush2Recompiled-<ver>.zip) and Linux AppImage.
+        { .id = "Rush2Recompiled", .display_name = "Rush 2: Extreme Racing USA",
+          .repo = "bryantmh/rush2recompiled", .exe_hint = "Rush2Recompiled.exe",
+          .needs_rom = true, .rom_keywords = { "rush 2", "extreme" },
+          .has_linux_build = true, .has_macos_build = false,
+          .launch_args = { "{rom}" } },
+        // Automobili Lamborghini static recomp (N64 USA via N64Recomp + RT64 by alondero).
+        // Official releases publish Windows zip and Linux zip (lamborghini_modern).
+        { .id = "AutomobiliLamborghini", .display_name = "Automobili Lamborghini",
+          .repo = "alondero/automobililamborghini-recomp", .exe_hint = "lamborghini_modern.exe",
+          .needs_rom = true, .rom_keywords = { "lamborghini" },
+          .has_linux_build = true, .has_macos_build = false,
+          .launch_args = { "{rom}" } },
+        // Road Rash 64 static recomp (N64 USA v1.0 via N64Recomp by linkssy2).
+        // Official releases publish Windows zip and Linux Experimental AppImage.
+        { .id = "RoadRash64", .display_name = "Road Rash 64",
+          .repo = "linkssy2/RoadRash64Recompiled", .exe_hint = "RoadRash64Recompiled.exe",
+          .needs_rom = true, .rom_keywords = { "road", "rash" },
+          .has_linux_build = true, .has_macos_build = false,
+          .launch_args = { "{rom}" } },
+        // Jungle Strike static recomp (SNES by Junior-Jones).
+        // Official releases publish Windows zip with Launcher.exe and Rom/ directory.
+        { .id = "JungleStrikeSNES", .display_name = "Jungle Strike",
+          .repo = "Junior-Jones/Jungle-Strike-SNES-Static-Recomp", .exe_hint = "Launcher.exe",
+          .needs_rom = true, .rom_keywords = { "jungle", "strike" },
+          .has_linux_build = false, .has_macos_build = false },
+        // ICO native PC port (PS2 PAL SCES-50760 decompilation by nathanialf).
+        // Official releases publish Windows zip, Linux tarball and macOS (Apple Silicon arm64) dmg/zip.
+        // Accepts user's PAL disc image (.iso, .chd, .bin).
+        { .id = "IcoPC", .display_name = "ICO",
+          .repo = "nathanialf/ico-pc", .exe_hint = "ico_pc_x64.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = true, .has_macos_build = true,
+          .launch_args = { "{iso}" },
+          .iso_keywords = { "ico" },
+          .iso_dirs = { "PlayStation2", "PS2" },
+          .iso_exts = { ".iso", ".chd", ".bin" } },
+        // Star Wars Battlefront: Renegade Squadron native PC port (PSP via static recomp by GTTeancum).
+        // Official releases publish Windows zip (RenegadeSquadronPC).
+        // Direct3D 12, 60 FPS, twin-stick controls.
+        { .id = "RenegadeSquadronPC", .display_name = "Star Wars Battlefront: Renegade Squadron",
+          .repo = "GTTeancum/StarWars-RenegadeSquadron-PC", .exe_hint = "RenegadeSquadron.exe",
+          .needs_rom = false, .rom_keywords = {},
+          .has_linux_build = false, .has_macos_build = false,
+          .iso_keywords = { "renegade", "squadron" },
+          .iso_dirs = { "PSP", "PlayStationPortable" },
+          .iso_exts = { ".iso", ".cso" } },
     };
     return defs;
 }
@@ -483,13 +553,35 @@ static std::string FindBestExecutable(const std::string& dir);
 
 // The executable a port folder resolves to: the exact exe_relpath when the
 // definition pins one (empty if that file is not there yet, so the port reads
-// as "not installed" and gets downloaded), otherwise the usual guess.
+// as "not installed" and gets downloaded), otherwise checks exe_hint if present,
+// falling back to the usual guess.
 static std::string ResolvePortExe(const PortDefinition* def, const std::string& dir) {
     if (dir.empty()) return "";
     if (def && !def->exe_relpath.empty()) {
         std::error_code ec;
         fs::path p = fs::path(dir) / def->exe_relpath;
         return fs::is_regular_file(p, ec) ? p.string() : "";
+    }
+    if (def && !def->exe_hint.empty()) {
+        std::error_code ec;
+        fs::path p = fs::path(dir) / def->exe_hint;
+        if (fs::is_regular_file(p, ec)) return p.string();
+#ifndef _WIN32
+        std::string hint = def->exe_hint;
+        if (hint.size() > 4 && hint.substr(hint.size() - 4) == ".exe") {
+            hint = hint.substr(0, hint.size() - 4);
+            fs::path p_unix = fs::path(dir) / hint;
+            if (fs::is_regular_file(p_unix, ec)) return p_unix.string();
+#ifdef __APPLE__
+            for (const auto& sdir : fs::directory_iterator(dir, ec)) {
+                if (ToLowerStr(sdir.path().extension().string()) == ".app") {
+                    fs::path app_exe = sdir.path() / "Contents" / "MacOS" / hint;
+                    if (fs::is_regular_file(app_exe, ec)) return app_exe.string();
+                }
+            }
+#endif
+        }
+#endif
     }
     return FindBestExecutable(dir);
 }
@@ -961,7 +1053,11 @@ static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
                (n.size() >= 3 && n.substr(n.size() - 3) == ".7z") ||
                (n.size() >= 7 && (n.substr(n.size() - 7) == ".tar.gz" || n.substr(n.size() - 7) == ".tar.xz")) ||
                (n.size() >= 9 && n.substr(n.size() - 9) == ".appimage") ||
-               (n.find("linux") != std::string::npos && !ContainsAny(n, { ".apk", ".deb", ".rpm", "flatpak" }));
+               // A bare "linux" name is a loose binary - but not a checksum or
+               // notes file that merely names the platform (CPS2Recomp ships
+               // update-linux-x86_64.txt, F-Zero X a .tar.gz.sha256 sidecar).
+               (n.find("linux") != std::string::npos && !ContainsAny(n, { ".apk", ".deb", ".rpm", "flatpak" }) &&
+                !ContainsAny(n, { ".txt", ".sha256", ".sha512", ".md5", ".sig", ".asc", ".json", ".md", ".yml" }));
     };
 
     std::vector<GhAsset> matches;
@@ -1094,19 +1190,18 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     } else {
     std::string releases_url = "https://api.github.com/repos/" + def.repo + "/releases/latest";
     std::string json;
-    if (!UpdaterHttpGetString(releases_url, json)) {
-        // /latest 404s whenever a repo's releases are all marked prerelease -
-        // GitHub excludes those from it by definition. Several actively
-        // developed recomp projects (Bomberman Hero among them) never cut a
-        // stable tag and only ever ship "nightly" prereleases, which are
-        // still real, downloadable builds. The plural endpoint returns every
-        // release with nothing excluded, newest first.
+    bool got_latest = UpdaterHttpGetString(releases_url, json);
+    if (!got_latest || ParseReleaseAssets(json).empty()) {
+        // /latest 404s whenever a repo's releases are all marked prerelease,
+        // or returns 200 with an empty assets list if the latest tag didn't attach binaries.
+        // The plural endpoint returns every release with nothing excluded, newest first.
         std::string list_json;
-        if (!UpdaterHttpGetString("https://api.github.com/repos/" + def.repo + "/releases", list_json)) {
+        if (UpdaterHttpGetString("https://api.github.com/repos/" + def.repo + "/releases", list_json)) {
+            json = FirstReleaseObjectOnly(list_json);
+        } else if (!got_latest) {
             out_error = "falha ao consultar o GitHub";
             return false;
         }
-        json = FirstReleaseObjectOnly(list_json);
     }
 
     if (json.find("\"assets\"") == std::string::npos && json.find("rate limit exceeded") != std::string::npos) {
@@ -1319,6 +1414,50 @@ bool PortAutoSetupRom(const std::string& port_id) {
     std::error_code ec;
     fs::create_directories(target_dir, ec);
 
+    // 0. Special case: CPS-2 Recomp (Capcom Arcade Collection)
+    // Copies available CPS-1/CPS-2 rom sets (sfa2u, dino, avspu, spf2t, vsavj, vsav2, vhunt2, etc.)
+    // from roms/Arcade (and other arcade folders) into ports/CPS2Recomp/ and ports/CPS2Recomp/rom/
+    if (port_id == "CPS2Recomp") {
+        static const std::vector<std::string> cps_roms = {
+            "sfa2u.zip", "sfa2.zip",
+            "dino.zip",
+            "avspu.zip", "avsp.zip",
+            "spf2t.zip", "spf2.zip",
+            "vsavj.zip", "vsav.zip",
+            "vsav2.zip",
+            "vhunt2.zip"
+        };
+        static const std::vector<std::string> arcade_dirs = {
+            "roms/Arcade", "app/roms/Arcade", "roms", "app/roms",
+            "roms/MAME", "app/roms/MAME", "roms/FBNeo", "app/roms/FBNeo",
+            "roms/CPS2", "app/roms/CPS2", "roms/CPS1", "app/roms/CPS1"
+        };
+
+        fs::path rom_sub = fs::path(target_dir) / "rom";
+        fs::create_directories(rom_sub, ec);
+
+        bool any_copied = false;
+        for (const auto& rom_name : cps_roms) {
+            fs::path target_file1 = fs::path(target_dir) / rom_name;
+            fs::path target_file2 = rom_sub / rom_name;
+            if (fs::exists(target_file1, ec) || fs::exists(target_file2, ec)) {
+                any_copied = true;
+                continue;
+            }
+            for (const auto& sdir : arcade_dirs) {
+                if (!fs::exists(sdir, ec)) continue;
+                fs::path src = fs::path(sdir) / rom_name;
+                if (fs::is_regular_file(src, ec)) {
+                    fs::copy_file(src, target_file1, fs::copy_options::overwrite_existing, ec);
+                    fs::copy_file(src, target_file2, fs::copy_options::overwrite_existing, ec);
+                    any_copied = true;
+                    break;
+                }
+            }
+        }
+        return any_copied;
+    }
+
     // 1. Special case: Cannonball DX (OutRun Arcade)
     // Cannonball DX reads MAME's merged outrun.zip inside ports/CannonballDX/roms/
     if (port_id == "CannonballDX") {
@@ -1348,10 +1487,11 @@ bool PortAutoSetupRom(const std::string& port_id) {
         return false;
     }
 
-    // 2. SNES Recomps (SuperMetroidRecomp, SuperMarioWorldRecomp, StarFoxEnhanced)
+    // 2. SNES Recomps (SuperMetroidRecomp, SuperMarioWorldRecomp, StarFoxEnhanced, JungleStrikeSNES)
     if (port_id.find("SuperMetroid") != std::string::npos ||
         port_id.find("SuperMarioWorld") != std::string::npos ||
-        port_id.find("StarFox") != std::string::npos) {
+        port_id.find("StarFox") != std::string::npos ||
+        port_id.find("JungleStrike") != std::string::npos) {
         for (const auto& f : fs::directory_iterator(target_dir, ec)) {
             std::string ext = ToLowerStr(f.path().extension().string());
             if (ext == ".sfc" || ext == ".smc") return true;
@@ -1372,6 +1512,11 @@ bool PortAutoSetupRom(const std::string& port_id) {
                 if (!all_match) continue;
                 fs::path dest = fs::path(target_dir) / entry.path().filename();
                 fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
+                if (port_id == "JungleStrikeSNES") {
+                    fs::path rom_dir = fs::path(target_dir) / "Rom";
+                    fs::create_directories(rom_dir, ec);
+                    fs::copy_file(entry.path(), rom_dir / entry.path().filename(), fs::copy_options::overwrite_existing, ec);
+                }
                 return !ec;
             }
         }
@@ -1421,6 +1566,12 @@ bool PortAutoSetupRom(const std::string& port_id) {
                     fs::copy_file(f.path(), rz, fs::copy_options::overwrite_existing, ec);
                 }
             }
+            if (port_id == "WG3DRecomp") {
+                fs::path rz = fs::path(target_dir) / "baserom.us.z64";
+                if (!fs::exists(rz, ec)) {
+                    fs::copy_file(f.path(), rz, fs::copy_options::overwrite_existing, ec);
+                }
+            }
             return true;
         }
     }
@@ -1454,6 +1605,9 @@ bool PortAutoSetupRom(const std::string& port_id) {
             }
             if (port_id == "LodRecomp") {
                 fs::copy_file(dest, fs::path(target_dir) / "rom.z64", fs::copy_options::overwrite_existing, ec);
+            }
+            if (port_id == "WG3DRecomp") {
+                fs::copy_file(dest, fs::path(target_dir) / "baserom.us.z64", fs::copy_options::overwrite_existing, ec);
             }
             return !ec;
         }

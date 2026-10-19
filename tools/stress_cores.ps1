@@ -65,70 +65,94 @@ Set-Content -Path $lock -Value $PID -Encoding ascii
 # Pasta em roms/ -> core que a atende. Espelha o roteamento do menu nos casos
 # obvios; para Arcade entrega o primeiro da cadeia e deixa o proprio app
 # decidir, que e justamente o caminho que se quer exercitar.
+# Pasta em roms/ -> core que a atende. Mapeia todos os 41 DLLs e 35 sistemas.
 $map = [ordered]@{
-    "Arcade"        = "cores/arcade_fbneo.dll"
-    "NES"           = "cores/nes.dll"
-    "SNES"          = "cores/snes.dll"
-    "Genesis"       = "cores/genesis.dll"
-    "MasterSystem"  = "cores/sms.dll"
-    "MegaCD"        = "cores/genesis.dll"
-    "32X"           = "cores/32x.dll"
-    "GameBoy"       = "cores/gb.dll"
-    "GBA"           = "cores/gba.dll"
-    "NDS"           = "cores/nds.dll"
-    "Nintendo64"    = "cores/n64_parallel.dll"
-    "PlayStation"   = "cores/psx.dll"
-    "Saturn"        = "cores/saturn.dll"
-    "Dreamcast"     = "cores/dreamcast.dll"
-    "TurboGrafx16"  = "cores/pce.dll"
-    "NeoGeo"        = "cores/neogeo.dll"
-    "MSX"           = "cores/msx.dll"
-    "Amiga"         = "cores/amiga.dll"
-    "C64"           = "cores/c64.dll"
-    "ZXSpectrum"    = "cores/spectrum.dll"
-    "Atari2600"     = "cores/atari2600.dll"
-    "Atari5200"     = "cores/atari5200.dll"
-    "Atari7800"     = "cores/atari7800.dll"
-    "Lynx"          = "cores/lynx.dll"
-    "Jaguar"        = "cores/jaguar.dll"
-    "ColecoVision"  = "cores/coleco.dll"
-    "WonderSwan"    = "cores/wswan.dll"
-    "NGP"           = "cores/ngp.dll"
-    "PCFX"          = "cores/pcfx.dll"
-    "3DO"           = "cores/3do.dll"
-    "PlayStation2"  = "cores/ps2.dll"
-    "PSP"           = "cores/psp.dll"
-    "GameCube"      = "cores/gamecube.dll"
-    "3DS"           = "cores/3ds.dll"
-    "DOS"           = "cores/dosbox_pure.dll"
+    "Arcade-FBNeo"  = @{ Dll = "cores/arcade_fbneo.dll"; Dir = "Arcade" }
+    "Arcade-MAME03" = @{ Dll = "cores/mame2003.dll";     Dir = "Arcade" }
+    "Arcade-MAME10" = @{ Dll = "cores/mame2010.dll";     Dir = "Arcade" }
+    "NES"           = @{ Dll = "cores/nes.dll";          Dir = "NES" }
+    "SNES"          = @{ Dll = "cores/snes.dll";         Dir = "SNES" }
+    "Genesis"       = @{ Dll = "cores/genesis.dll";      Dir = "Genesis" }
+    "MasterSystem"  = @{ Dll = "cores/sms.dll";          Dir = "MasterSystem" }
+    "MegaCD"        = @{ Dll = "cores/genesis.dll";      Dir = "MegaCD" }
+    "32X"           = @{ Dll = "cores/32x.dll";          Dir = "32X" }
+    "GameBoy"       = @{ Dll = "cores/gb.dll";           Dir = "GameBoy" }
+    "GBA"           = @{ Dll = "cores/gba.dll";          Dir = "GBA" }
+    "NDS"           = @{ Dll = "cores/nds.dll";          Dir = "NDS" }
+    "Nintendo64"    = @{ Dll = "cores/n64_gopher.dll";   Dir = "Nintendo64" }
+    "N64-Parallel"  = @{ Dll = "cores/n64_parallel.dll"; Dir = "Nintendo64" }
+    "N64-Mupen"     = @{ Dll = "cores/n64_mupen.dll";    Dir = "Nintendo64" }
+    "N64-Generic"   = @{ Dll = "cores/n64.dll";          Dir = "Nintendo64" }
+    "PlayStation"   = @{ Dll = "cores/psx.dll";          Dir = "PlayStation" }
+    "Saturn"        = @{ Dll = "cores/saturn.dll";       Dir = "Saturn" }
+    "Dreamcast"     = @{ Dll = "cores/dreamcast.dll";    Dir = "Dreamcast" }
+    "TurboGrafx16"  = @{ Dll = "cores/pce.dll";          Dir = "TurboGrafx16" }
+    "NeoGeo"        = @{ Dll = "cores/neogeo.dll";       Dir = "NeoGeo" }
+    "NeoGeo-CD"     = @{ Dll = "cores/neocd_alt.dll";    Dir = "NeoGeo" }
+    "MSX"           = @{ Dll = "cores/msx.dll";          Dir = "MSX" }
+    "Amiga"         = @{ Dll = "cores/amiga.dll";        Dir = "Amiga" }
+    "C64"           = @{ Dll = "cores/c64.dll";          Dir = "C64" }
+    "ZXSpectrum"    = @{ Dll = "cores/spectrum.dll";     Dir = "ZXSpectrum" }
+    "Atari2600"     = @{ Dll = "cores/atari2600.dll";    Dir = "Atari2600" }
+    "Atari5200"     = @{ Dll = "cores/atari5200.dll";    Dir = "Atari5200";     TestRom = "atari5200.a52" }
+    "Atari7800"     = @{ Dll = "cores/atari7800.dll";    Dir = "Atari7800" }
+    "Lynx"          = @{ Dll = "cores/lynx.dll";         Dir = "Lynx";          TestRom = "lynx.lnx" }
+    "Jaguar"        = @{ Dll = "cores/jaguar.dll";       Dir = "Jaguar" }
+    "ColecoVision"  = @{ Dll = "cores/coleco.dll";       Dir = "ColecoVision" }
+    "WonderSwan"    = @{ Dll = "cores/wswan.dll";        Dir = "WonderSwan";    TestRom = "wswan.ws" }
+    "NGP"           = @{ Dll = "cores/ngp.dll";          Dir = "NGP";           TestRom = "ngp.ngp" }
+    "PCFX"          = @{ Dll = "cores/pcfx.dll";         Dir = "PCFX";          TestRom = "pcfx.cue" }
+    "3DO"           = @{ Dll = "cores/3do.dll";          Dir = "3DO";           TestRom = "3do.iso" }
+    "PlayStation2"  = @{ Dll = "cores/ps2.dll";          Dir = "PlayStation2" }
+    "PS2-Play"      = @{ Dll = "cores/ps2_play.dll";     Dir = "PlayStation2" }
+    "PSP"           = @{ Dll = "cores/psp.dll";          Dir = "PSP" }
+    "GameCube"      = @{ Dll = "cores/gamecube.dll";     Dir = "GameCube" }
+    "3DS"           = @{ Dll = "cores/3ds.dll";          Dir = "3DS" }
+    "DOS"           = @{ Dll = "cores/dosbox_pure.dll";  Dir = "DOS" }
 }
 
-# O que NAO e ROM. A versao anterior usava lista branca de extensoes, e todo
-# formato fora dela fazia o sistema ser pulado sem aviso - a bateria testava 19
-# de 35 pastas e o relatorio dizia "tudo verde".
-# Sem ".md" aqui: e a extensao do Mega Drive, nao so a do Markdown. Excluir
-# ".md" fez o Genesis ser reportado como "pasta vazia" tendo ROM dentro.
-# Os guias LEIA-ME.txt de cada pasta caem no ".txt".
+# O que NAO e ROM.
 $naoRom = @(".txt",".nfo",".jpg",".png",".sav",".srm",".state",".bak",".log",".ini",".cfg",".xml",".dat")
 
 $targets = @()
 $pulados = @()
 foreach ($sys in $map.Keys) {
     if ($System -and $sys -ne $System) { continue }
-    $dll = Join-Path $app $map[$sys]
-    $romDir = Join-Path $app "roms\$sys"
-    if (-not (Test-Path $dll))    { $pulados += "$sys (core ausente: $($map[$sys]))"; continue }
-    if (-not (Test-Path $romDir)) { $pulados += "$sys (sem pasta roms/$sys)"; continue }
-    $rom = Get-ChildItem $romDir -File -ErrorAction SilentlyContinue |
-           Where-Object { $naoRom -notcontains $_.Extension.ToLower() -and $_.Extension -ne "" } |
-           Sort-Object Name | Select-Object -First 1
-    if (-not $rom) { $pulados += "$sys (pasta vazia)"; continue }
-    $targets += [pscustomobject]@{ Sys = $sys; Dll = $map[$sys]; Rom = "roms/$sys/$($rom.Name)" }
+    $cfg = $map[$sys]
+    $dll = Join-Path $app $cfg.Dll
+    $romDir = Join-Path $app "roms\$($cfg.Dir)"
+    if (-not (Test-Path $dll)) { $pulados += "$sys (core ausente: $($cfg.Dll))"; continue }
+
+    $romPath = $null
+    if (Test-Path $romDir) {
+        $rom = Get-ChildItem $romDir -File -ErrorAction SilentlyContinue |
+               Where-Object { $naoRom -notcontains $_.Extension.ToLower() -and $_.Extension -ne "" } |
+               Sort-Object Name | Select-Object -First 1
+        if ($rom) {
+            $romPath = "roms/$($cfg.Dir)/$($rom.Name)"
+        }
+    }
+    if (-not $romPath -and $cfg.TestRom) {
+        $testRomDir = Join-Path $root "test_roms"
+        $synthFile = Join-Path $testRomDir $cfg.TestRom
+        if (-not (Test-Path $synthFile)) {
+            $genPy = Join-Path $root "tools\generate_test_roms.py"
+            if (Test-Path $genPy) {
+                python $genPy 2>$null
+            }
+        }
+        if (Test-Path $synthFile) {
+            $romPath = "../test_roms/$($cfg.TestRom)"
+        }
+    }
+    if (-not $romPath) { $pulados += "$sys (sem ROM em roms/$($cfg.Dir))"; continue }
+    $targets += [pscustomobject]@{ Sys = $sys; Dll = $cfg.Dll; Rom = $romPath }
 }
 
 if (-not $System) {
+    $mappedDirs = @($map.Values | ForEach-Object { $_.Dir } | Select-Object -Unique)
     foreach ($d in (Get-ChildItem (Join-Path $app "roms") -Directory -ErrorAction SilentlyContinue)) {
-        if (-not $map.Contains($d.Name) -and (Get-ChildItem $d.FullName -File -ErrorAction SilentlyContinue)) {
+        if ($mappedDirs -notcontains $d.Name -and (Get-ChildItem $d.FullName -File -ErrorAction SilentlyContinue)) {
             $pulados += "$($d.Name) (sistema fora do mapa deste script)"
         }
     }
