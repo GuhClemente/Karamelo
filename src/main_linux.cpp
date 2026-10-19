@@ -1182,17 +1182,23 @@ int main(int argc, char* argv[])
 			else if (event.type == SDL_EVENT_KEY_DOWN)
 			{
 				SDL_Scancode sc = event.key.scancode;
+				// One-shot hotkeys ignore auto-repeat: holding F2 used to save
+				// over and over, F12 flickered the menu. Menu arrows still repeat.
+				const bool key_repeat = event.key.repeat;
 
 				if (sc == SDL_SCANCODE_F12)
 				{
-					MenuProcessKey(KEY_MENU_TOGGLE);
+					if (!key_repeat) MenuProcessKey(KEY_MENU_TOGGLE);
 				}
 				else if (sc == SDL_SCANCODE_F11 || (sc == SDL_SCANCODE_RETURN && (event.key.mod & SDL_KMOD_ALT)))
 				{
-					bool is_full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN) != 0;
-					SDL_SetWindowFullscreen(g_window, !is_full);
+					if (!key_repeat)
+					{
+						bool is_full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN) != 0;
+						SDL_SetWindowFullscreen(g_window, !is_full);
+					}
 				}
-				else if (CoreIsRunning() && !OsdIsEnabled())
+				else if (CoreIsRunning() && !OsdIsEnabled() && !key_repeat)
 				{
 					if (sc == SDL_SCANCODE_F5 || sc == SDL_SCANCODE_F2)
 					{

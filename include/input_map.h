@@ -125,9 +125,20 @@ void InputBindApplyPreset(int preset);
 int InputBindGetPreset();
 
 // Per-System Remap Profiles (Config/remaps/<system_name>.cfg)
+//
+// Loading a profile swaps it in over the global bindings, which are kept aside
+// until InputBindRestoreGlobal() puts them back - a profile is for the system
+// it was saved for, not for whatever runs after it. While one is active,
+// InputBindGetGlobalKey/Pad still answer with the global set, which is what
+// karamelo.cfg stores.
 bool InputBindSaveSystemProfile(const char* system_name);
 bool InputBindLoadSystemProfile(const char* system_name);
 bool InputBindHasSystemProfile(const char* system_name);
 bool InputBindDeleteSystemProfile(const char* system_name);
+void InputBindRestoreGlobal();
+// Name of the profile currently swapped in, or NULL for the global bindings.
+const char* InputBindActiveProfile();
+int InputBindGetGlobalKey(int bind);
+int InputBindGetGlobalPad(int bind);
 
 #endif

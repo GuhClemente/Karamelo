@@ -1334,13 +1334,18 @@ static volatile LONG g_options_dirty = 0;
 struct OptionsLockInit { OptionsLockInit() { InitializeCriticalSection(&options_lock); } };
 static OptionsLockInit g_options_lock_init;
 
-static char g_option_slots[8][128];
-static int  g_option_slot_next = 0;
+// Per thread: the UI thread fills these too (the Core Options page asks for
+// dozens of labels and choices a frame), and with one shared ring it wrapped
+// around and overwrote the value a core had just been handed by GET_VARIABLE
+// while the core thread was still comparing it.
+#define OPTION_SLOT_COUNT 64
+static thread_local char g_option_slots[OPTION_SLOT_COUNT][128];
+static thread_local int  g_option_slot_next = 0;
 
 static const char* StableOptionValue(const std::string& value)
 {
 	char* slot = g_option_slots[g_option_slot_next];
-	g_option_slot_next = (g_option_slot_next + 1) % 8;
+	g_option_slot_next = (g_option_slot_next + 1) % OPTION_SLOT_COUNT;
 	strncpy_s(slot, sizeof(g_option_slots[0]), value.c_str(), _TRUNCATE);
 	return slot;
 }
@@ -1790,8 +1795,11 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// loaded_system_dir is known, and a static would freeze the empty
 			// value for the rest of the session.
 			static std::string save_dir;
-			save_dir = fs::absolute("saves/" + loaded_system_dir).string();
-			fs::create_directories(save_dir);
+			std::error_code ec;
+			save_dir = fs::absolute("saves/" + loaded_system_dir, ec).string();
+			// The non-throwing overload: an exception here would unwind out of
+			// a C callback straight through the core's own frames.
+			fs::create_directories(save_dir, ec);
 			*dir = save_dir.c_str();
 			return true;
 		}
@@ -2067,6 +2075,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 		// handed to the core directly on its own retro_hw_render_callback
 		// instead). D3D11HwGetRenderInterface/VkHwGetRenderInterface each
 		// return NULL when their own backend isn't the active one.
+		if (!data) return false;
 		const void* iface = D3D11HwGetRenderInterface();
 		if (!iface) iface = VkHwGetRenderInterface();
 		if (!iface) return false;
@@ -3367,9 +3376,9 @@ static void ResetCoreFunctionPointers()
 // exists, wedging every future EnterCriticalSection on it forever with no
 // crash to explain why. OwningThread is part of the public CRITICAL_SECTION
 // layout and stable across Windows versions. Only a lock THIS thread
-// actually holds is recreated - blindly recreating all three the way
-// RecoverAfterKilledCore() does would corrupt one a different, still-running
-// thread legitimately holds at the same moment.
+// actually holds is recreated - blindly recreating all three would corrupt
+// one a different, still-running thread legitimately holds at the same
+// moment. RecoverAfterKilledCore() uses this for the killed core thread too.
 void CoreRecoverLocksHeldByThread(unsigned long thread_id)
 {
 #ifdef _WIN32
@@ -3397,7 +3406,7 @@ void CoreRecoverLocksHeldByThread(unsigned long thread_id)
 // Defined further down, next to the buffer it owns.
 static void FreeLoadedRomData();
 
-static void RecoverAfterKilledCore()
+static void RecoverAfterKilledCore(unsigned long killed_thread_id)
 {
 	// The core thread was killed, so RetroUnloadGameGuarded never ran and never
 	// got to release the game buffer. Nothing can still be reading it - the only
@@ -3405,14 +3414,21 @@ static void RecoverAfterKilledCore()
 	FreeLoadedRomData();
 
 	// A critical section owned by a dead thread is never released. Recreating it
-	// is the only way back; nothing else can be running against it here, because
-	// the only other user was the thread we just killed.
+	// is the only way back - but only one the killed thread actually held. The
+	// core thread is not the only user: a port's monitor thread or the
+	// updater can be inside CoreSetToast() at this moment, and recreating a
+	// lock another live thread holds corrupts it.
+#ifdef _WIN32
+	CoreRecoverLocksHeldByThread(killed_thread_id);
+#else
+	(void)killed_thread_id;
 	DeleteCriticalSection(&options_lock);
 	InitializeCriticalSection(&options_lock);
 	DeleteCriticalSection(&name_lock);
 	InitializeCriticalSection(&name_lock);
 	DeleteCriticalSection(&toast_lock);
 	InitializeCriticalSection(&toast_lock);
+#endif
 
 	// All three are safe to call unconditionally - each only acts if its own
 	// g_hw_active is set, and a given core only ever activates one of them.
@@ -3532,6 +3548,11 @@ void CoreShutdown(bool will_reload)
 				extra_waited_ms += 200;
 			}
 
+#ifdef _WIN32
+			unsigned long killed_tid = GetThreadId(h_core_thread);
+#else
+			unsigned long killed_tid = 0;
+#endif
 			if (WaitForSingleObject(h_core_thread, 0) == WAIT_TIMEOUT)
 			{
 				CoreLogPrintf(RETRO_LOG_ERROR, "[CoreShutdown] Matando core thread via TerminateThread...");
@@ -3539,7 +3560,7 @@ void CoreShutdown(bool will_reload)
 			}
 			CloseHandle(h_core_thread);
 			h_core_thread = NULL;
-			RecoverAfterKilledCore();
+			RecoverAfterKilledCore(killed_tid);
 			InterlockedExchange(&g_core_state, will_reload ? CORE_STATE_LOADING : CORE_STATE_IDLE);
 			CrashReporterSetLastGameInfo("Nenhum", "Nenhum");
 			CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Finalizado apos recuperacao forcada.");
@@ -4007,9 +4028,17 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			size_t rom_size = (rom_bytes > 0) ? (size_t)rom_bytes : 0;
 
 			rom_data = rom_size ? (uint8_t*)malloc(rom_size) : NULL;
+			if (rom_data && fread(rom_data, 1, rom_size, f) != rom_size)
+			{
+				// A short read (file still being copied, a flaky network share)
+				// used to go to the core anyway, with the tail of the buffer
+				// left uninitialised.
+				CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] leitura incompleta da ROM: %s", rom_path);
+				free(rom_data);
+				rom_data = nullptr;
+			}
 			if (rom_data)
 			{
-				if (fread(rom_data, 1, rom_size, f) == rom_size) {}
 				game_info.data = rom_data;
 				game_info.size = rom_size;
 			}
@@ -4416,14 +4445,20 @@ static bool DoSaveState(int slot)
 		return false;
 	}
 
-	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir);
-	fs::create_directories(save_dir);
+	std::error_code ec;
+	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir, ec);
+	fs::create_directories(save_dir, ec);
 
 	char slot_filename[512];
 	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", GetLoadedGameStemSafe().c_str(), slot);
 	fs::path save_file = save_dir / slot_filename;
 
-	FILE* f = fopen(save_file.string().c_str(), "wb");
+	// Written next to the slot and renamed over it only once complete: writing
+	// in place meant a full disk (or a crash mid-write) destroyed the state
+	// that was already in the slot and left a truncated one behind.
+	fs::path tmp_file = save_file;
+	tmp_file += ".tmp";
+	FILE* f = fopen(tmp_file.string().c_str(), "wb");
 	if (!f)
 	{
 		free(buf);
@@ -4431,9 +4466,20 @@ static bool DoSaveState(int slot)
 		return false;
 	}
 
-	fwrite(buf, 1, sz, f);
-	fclose(f);
+	bool written = fwrite(buf, 1, sz, f) == sz;
+	written = (fclose(f) == 0) && written;
 	free(buf);
+	if (written)
+	{
+		fs::rename(tmp_file, save_file, ec);
+		written = !ec;
+	}
+	if (!written)
+	{
+		fs::remove(tmp_file, ec);
+		CoreSetToast("DISK ERROR WHILE SAVING STATE", 120);
+		return false;
+	}
 
 	char toast_str[128];
 	snprintf(toast_str, sizeof(toast_str), "STATE SAVED [SLOT %d]", slot);
@@ -4476,8 +4522,14 @@ static bool DoLoadState(int slot)
 		return false;
 	}
 
-	if (fread(buf, 1, sz, f) == sz) {}
+	bool read_ok = fread(buf, 1, sz, f) == sz;
 	fclose(f);
+	if (!read_ok)
+	{
+		free(buf);
+		CoreSetToast("ERROR LOADING STATE", 120);
+		return false;
+	}
 
 	bool ok = RetroUnserializeGuarded(buf, sz);
 	free(buf);
@@ -4632,13 +4684,19 @@ bool CoreTakeScreenshot()
 {
 	if (!CoreIsRunning() || core_fb_width == 0 || core_fb_height == 0) return false;
 
-	fs::create_directories("screenshots");
+	std::error_code dir_ec;
+	fs::create_directories("screenshots", dir_ec);
 
 	time_t now = time(NULL);
-	struct tm* tm_now = localtime(&now);
+	struct tm tm_now{};
+#ifdef _WIN32
+	localtime_s(&tm_now, &now);
+#else
+	localtime_r(&now, &tm_now);
+#endif
 
 	char date_str[64];
-	strftime(date_str, sizeof(date_str), "%Y%m%d_%H%M%S", tm_now);
+	strftime(date_str, sizeof(date_str), "%Y%m%d_%H%M%S", &tm_now);
 
 	char filename[512];
 	snprintf(filename, sizeof(filename), "screenshots/%s_%s.bmp", GetLoadedGameStemSafe().c_str(), date_str);

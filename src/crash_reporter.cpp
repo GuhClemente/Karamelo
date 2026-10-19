@@ -159,12 +159,26 @@ void CrashReporterSetLastGameInfo(const char* core_name, const char* game_stem) 
 // -------------------------------------------------------------
 // Privacy & Sanitization Engine
 // -------------------------------------------------------------
+// Case-insensitive find for the path markers below: Windows paths reach the
+// stack trace as "C:\Users\...", "c:\users\..." or "C:/USERS/..." depending on
+// who formatted them, and a case-sensitive match let the lowercase forms
+// through with the user name intact.
+static size_t FindNoCase(const std::string& hay, const char* needle, size_t from) {
+    size_t n = strlen(needle);
+    for (size_t i = from; i + n <= hay.size(); i++) {
+        size_t k = 0;
+        while (k < n && tolower((unsigned char)hay[i + k]) == tolower((unsigned char)needle[k])) k++;
+        if (k == n) return i;
+    }
+    return std::string::npos;
+}
+
 std::string CrashReporterSanitizeString(const std::string& input) {
     std::string s = input;
 
     // 1. Sanitize Windows user directories: C:\Users\<Username>
     size_t pos = 0;
-    while ((pos = s.find("Users\\", pos)) != std::string::npos) {
+    while ((pos = FindNoCase(s, "Users\\", pos)) != std::string::npos) {
         size_t next_slash = s.find('\\', pos + 6);
         if (next_slash != std::string::npos) {
             s.replace(pos + 6, next_slash - (pos + 6), "[USER]");
@@ -176,7 +190,7 @@ std::string CrashReporterSanitizeString(const std::string& input) {
 
     // 2. Sanitize macOS / Linux user directories: /Users/<Username>/ or /home/<Username>/
     pos = 0;
-    while ((pos = s.find("/Users/", pos)) != std::string::npos) {
+    while ((pos = FindNoCase(s, "/Users/", pos)) != std::string::npos) {
         size_t next_slash = s.find('/', pos + 7);
         if (next_slash != std::string::npos) {
             s.replace(pos + 7, next_slash - (pos + 7), "[USER]");

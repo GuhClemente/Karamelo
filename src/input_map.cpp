@@ -554,6 +554,38 @@ static std::string GetProfilePath(const char* system_name)
 	return "Config/remaps/" + clean + ".cfg";
 }
 
+// The global bindings while a system profile is swapped in (see input_map.h).
+static int s_global_keys[BIND_COUNT];
+static int s_global_pads[BIND_COUNT];
+static bool s_profile_active = false;
+static std::string s_profile_name;
+
+void InputBindRestoreGlobal()
+{
+	if (!s_profile_active) return;
+	memcpy(s_keys, s_global_keys, sizeof(s_keys));
+	memcpy(s_pads, s_global_pads, sizeof(s_pads));
+	s_profile_active = false;
+	s_profile_name.clear();
+}
+
+const char* InputBindActiveProfile()
+{
+	return s_profile_active ? s_profile_name.c_str() : NULL;
+}
+
+int InputBindGetGlobalKey(int bind)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return 0;
+	return s_profile_active ? s_global_keys[bind] : s_keys[bind];
+}
+
+int InputBindGetGlobalPad(int bind)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return 0;
+	return s_profile_active ? s_global_pads[bind] : s_pads[bind];
+}
+
 bool InputBindSaveSystemProfile(const char* system_name)
 {
 	std::string path = GetProfilePath(system_name);
@@ -583,6 +615,19 @@ bool InputBindLoadSystemProfile(const char* system_name)
 	FILE* f = fopen(path.c_str(), "rb");
 	if (!f) return false;
 
+	// Built on top of the global set and copied in verbatim, not through
+	// InputBindSetKey/SetPad: those refuse 0, so a binding the profile left
+	// unassigned kept whatever the previous profile had put there, and their
+	// duplicate hand-over could move a key the profile placed on purpose.
+	if (!s_profile_active)
+	{
+		memcpy(s_global_keys, s_keys, sizeof(s_keys));
+		memcpy(s_global_pads, s_pads, sizeof(s_pads));
+	}
+	int keys[BIND_COUNT], pads[BIND_COUNT];
+	memcpy(keys, s_global_keys, sizeof(keys));
+	memcpy(pads, s_global_pads, sizeof(pads));
+
 	char line[256];
 	while (fgets(line, sizeof(line), f))
 	{
@@ -594,12 +639,17 @@ bool InputBindLoadSystemProfile(const char* system_name)
 		int iv = atoi(eq + 1);
 
 		int bind_k = InputBindFromConfigKey(key);
-		if (bind_k >= 0) InputBindSetKey(bind_k, iv);
+		if (bind_k >= 0 && iv >= 0 && iv <= 255 && !KeyIsReserved(iv)) keys[bind_k] = iv;
 
 		int bind_p = InputBindFromPadConfigKey(key);
-		if (bind_p >= 0) InputBindSetPad(bind_p, iv);
+		if (bind_p >= 0 && iv >= 0) pads[bind_p] = iv;
 	}
 	fclose(f);
+
+	memcpy(s_keys, keys, sizeof(s_keys));
+	memcpy(s_pads, pads, sizeof(s_pads));
+	s_profile_active = true;
+	s_profile_name = system_name;
 	return true;
 }
 
