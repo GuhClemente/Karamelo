@@ -1583,7 +1583,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		bool started = CoreRequestLoad(__argv[3], __argv[2]);
 
 		DWORD waited_ms = 0;
-		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 10000)
+		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 20000)
 		{
 			Sleep(50);
 			waited_ms += 50;
@@ -1635,7 +1635,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DWORD t1 = GetTickCount();
 			retry_started = CoreRequestLoad(__argv[5], __argv[4]);
 			DWORD waited2 = 0;
-			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 10000)
+			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 20000)
 			{
 				Sleep(50);
 				waited2 += 50;

@@ -2761,16 +2761,16 @@ void MenuSetStatus(const char *status) {
 void MenuRun() {
   NetplayUpdate();
 
-  bool core_running_now = CoreIsRunning();
-  static bool s_was_core_running = false;
-  if (s_was_core_running && !core_running_now) {
+  bool core_active_now = CoreIsRunning() || CoreIsLoading();
+  static bool s_was_core_active = false;
+  if (s_was_core_active && !core_active_now) {
     current_state = STATE_MAIN;
     PopulateMainMenu();
     selected_idx = 0;
     scroll_top = 0;
     OsdEnable(0);
   }
-  s_was_core_running = core_running_now;
+  s_was_core_active = core_active_now;
 
   // Close the OSD after a spell of no input, so it does not sit over the game
   // forever if the player wandered off. Only while a game is actually running:
@@ -2891,6 +2891,15 @@ void MenuRun() {
 
   if (!OsdIsEnabled()) {
     return;
+  }
+
+  // Safety: If OSD is enabled but items is empty, restore menu state immediately
+  // so the player is never trapped staring at an empty card.
+  if (items.empty()) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    selected_idx = 0;
+    scroll_top = 0;
   }
 
   OsdClear();
@@ -3054,6 +3063,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
 
   if (!OsdIsEnabled()) {
     return;
+  }
+
+  // Safety: If items is empty for any reason, repopulate immediately instead of silently dropping keys
+  if (items.empty()) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    selected_idx = 0;
+    scroll_top = 0;
   }
 
   int total = (int)items.size();
@@ -3539,6 +3556,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       {
         CoreReset();
         OsdDisable();
+        items.clear();
       } else if (item.action_id == 207) // Achievement list
       {
         current_state = STATE_ABOUT;

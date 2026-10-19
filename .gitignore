@@ -171,3 +171,7 @@ psx_last_run_report.json
 /app/Karamelo
 /app/karamelo
 /karamelo
+
+# Emulator save data (SRAM / FM-PAC battery)
+*.sav
+*.srm

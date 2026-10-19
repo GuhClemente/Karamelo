@@ -3321,7 +3321,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	}
 
 	CoreUnload();
-	InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+	InterlockedCompareExchange(&g_core_state, CORE_STATE_IDLE, CORE_STATE_RUNNING);
 	return 0;
 }
 
@@ -3488,15 +3488,38 @@ static void RecoverAfterKilledCore()
 		"[CoreRunner] o core nao encerrou sozinho; estado recuperado a forca");
 }
 
-void CoreShutdown()
+// Waits for the core thread without letting Windows mark the window "Not
+// Responding": CoreShutdown runs on the UI thread and can wait over 10s for a
+// slow core (N64) to unwind. PeekMessage with PM_NOREMOVE is what resets the
+// hung-window timer; it takes nothing off the queue, so no key or menu input
+// is dispatched (and no menu code re-entered) while the old core winds down.
+static bool WaitForCoreThread(HANDLE h, DWORD timeout_ms)
+{
+#ifdef _WIN32
+	DWORD waited = 0;
+	for (;;)
+	{
+		DWORD slice = (timeout_ms - waited < 100) ? timeout_ms - waited : 100;
+		if (WaitForSingleObject(h, slice) != WAIT_TIMEOUT) return true;
+		waited += slice;
+		if (waited >= timeout_ms) return false;
+		MSG msg;
+		PeekMessageA(&msg, NULL, 0, 0, PM_NOREMOVE);
+	}
+#else
+	return WaitForSingleObject(h, timeout_ms) != WAIT_TIMEOUT;
+#endif
+}
+
+void CoreShutdown(bool will_reload)
 {
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Inicio do shutdown...");
 	InterlockedExchange(&core_thread_running, 0);
 
 	if (h_core_thread)
 	{
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Aguardando core thread encerrar (3000ms)...");
-		if (WaitForSingleObject(h_core_thread, 3000) == WAIT_TIMEOUT)
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Aguardando core thread encerrar (8000ms)...");
+		if (!WaitForCoreThread(h_core_thread, 8000))
 		{
 			CoreLogPrintf(RETRO_LOG_WARN, "[CoreShutdown] Timeout aguardando core thread. Verificando module_op=%ld",
 				InterlockedCompareExchange(&g_core_in_module_op, 0, 0));
@@ -3504,7 +3527,7 @@ void CoreShutdown()
 			while (InterlockedCompareExchange(&g_core_in_module_op, 0, 0) &&
 				extra_waited_ms < 5000)
 			{
-				if (WaitForSingleObject(h_core_thread, 200) != WAIT_TIMEOUT)
+				if (WaitForCoreThread(h_core_thread, 200))
 					break;
 				extra_waited_ms += 200;
 			}
@@ -3517,7 +3540,7 @@ void CoreShutdown()
 			CloseHandle(h_core_thread);
 			h_core_thread = NULL;
 			RecoverAfterKilledCore();
-			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+			InterlockedExchange(&g_core_state, will_reload ? CORE_STATE_LOADING : CORE_STATE_IDLE);
 			CrashReporterSetLastGameInfo("Nenhum", "Nenhum");
 			CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Finalizado apos recuperacao forcada.");
 			return;
@@ -3527,7 +3550,7 @@ void CoreShutdown()
 		h_core_thread = NULL;
 	}
 
-	InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
+	InterlockedExchange(&g_core_state, will_reload ? CORE_STATE_LOADING : CORE_STATE_IDLE);
 	CrashReporterSetLastGameInfo("Nenhum", "Nenhum");
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Shutdown concluido com sucesso.");
 }
@@ -3536,7 +3559,8 @@ bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint)
 {
 	if (!rom_path) return false;
 
-	CoreShutdown();
+	InterlockedExchange(&g_core_state, CORE_STATE_LOADING);
+	CoreShutdown(true);
 
 	EnterCriticalSection(&name_lock);
 	g_pending_rom = rom_path;
@@ -3968,7 +3992,11 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 	if (!is_arcade_or_disc)
 	{
+#ifdef _WIN32
+		FILE* f = _wfopen(p.wstring().c_str(), L"rb");
+#else
 		FILE* f = fopen(rom_path, "rb");
+#endif
 		if (f)
 		{
 			// ftell returns a signed long and -1 on error; assigning that to a
@@ -4524,8 +4552,8 @@ void CoreReset()
 	std::string core = s_active_core_path;
 	LeaveCriticalSection(&name_lock);
 
-	// If invoked from UI thread and we know the ROM/core paths, perform a clean reload
-	// to avoid known core hangs (such as Mupen64Plus-Next on soft reset).
+	// Clean reload whenever invoked from UI thread, ensuring a pristine machine reset
+	// across all cores (avoiding black screens, freezes or memory corruptions on in-place retro_reset).
 	if (std::this_thread::get_id() != s_core_thread_id && !rom.empty() && !core.empty())
 	{
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreReset] Reiniciando limpo: %s com %s", rom.c_str(), core.c_str());

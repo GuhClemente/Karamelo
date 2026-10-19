@@ -533,7 +533,13 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 {
 	(void)known_total_size;
 	(void)track_progress;
-	std::string cmd = "curl -sL \"" + url + "\"";
+	// The URL is single-quoted: inside double quotes $(...) and backticks still
+	// expand, and port download URLs come from third-party feeds (Foxhollow's
+	// own JSON, GitHub asset names). --fail turns a 404 into a failure instead
+	// of an error page returned as the body - same contract as the WinHTTP
+	// path, which only accepts a 200.
+	std::string cmd = "curl -sSL --fail --proto =https --proto-redir =https --connect-timeout 15 "
+	                  "--speed-limit 1 --speed-time 60 " + ShellQuote(url) + " 2>/dev/null";
 	FILE* pipe = popen(cmd.c_str(), "r");
 	if (!pipe) return false;
 	std::vector<uint8_t> data;
@@ -543,7 +549,8 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 	{
 		data.insert(data.end(), chunk, chunk + n);
 	}
-	pclose(pipe);
+	int status = pclose(pipe);
+	if (status == -1 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) return false;
 	if (data.empty()) return false;
 	if (total_size_out) *total_size_out = data.size();
 	if (out_str)
@@ -673,8 +680,11 @@ static void UpdaterThreadProc()
 				dl_url = "https://karamelo-emu.com/downloads/Karamelo.exe";
 			}
 
+			// Same rule as below for macOS/Linux: never apply a binary there is
+			// no hash to check against.
 			size_t total_size = 0;
-			bool dl_ok = HttpFetchData(dl_url, NULL, NULL, &total_size, expected_size, true);
+			bool dl_ok = !expected_sha256.empty() &&
+			             HttpFetchData(dl_url, NULL, NULL, &total_size, expected_size, true);
 #else
 			// No default URL here: the only fallback that ever existed is the
 			// Windows .exe. And a binary is only ever applied with a hash to
@@ -854,6 +864,20 @@ bool UpdaterApplyAndRestart()
 
 	if (!fs::exists(new_exe))
 	{
+		return false;
+	}
+
+	// Checked again right before it replaces the running binary, as the
+	// macOS/Linux UpdaterApplyDownloaded() does - not only when the download
+	// finished.
+	std::string expected = UpdaterGetInfo().exe_sha256;
+	std::string actual = Sha256File(new_exe);
+	std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
+	std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
+	if (expected.empty() || actual != expected)
+	{
+		std::error_code ec;
+		fs::remove(new_exe, ec);
 		return false;
 	}
 

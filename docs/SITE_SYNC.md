@@ -373,17 +373,17 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 17/10/2026:** são **62** jogos de "Ports & Recomp" — 42 até
+**Atualizado em 18/10/2026:** são **70** jogos de "Ports & Recomp" — 42 até
 11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
 F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
 Soulcalibur II / Ring Out — ver seção 16), +1 em 27/09 (Super Smash Bros. Melee /
 Melee Unlocked — ver seção 18), +1 em 27/09 (Monster Hunter Portable 3rd /
 Yakumo — ver seção 20), +1 em 29/09 (Star Fox Adventures / Foxhollow — ver
 seção 23), +1 em 12/10 (Conker's Bad Fur Day / CBFD-Recompiled — ver seção 25),
-+1 em 12/10 (Sly Cooper / ProjectCane — ver seção 26), +1 em 12/10 (Castlevania: Legacy of Darkness / cvlod_recomp — ver seção 27) e +1 em 17/10 (BLACK / BLACK-XBERecomp — ver seção 30). The Darkness (Xbox 360) chegou a ser anunciado
++1 em 12/10 (Sly Cooper / ProjectCane — ver seção 26), +1 em 12/10 (Castlevania: Legacy of Darkness / cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK / BLACK-XBERecomp — ver seção 30), e +8 em 18/10 (CPS-2 Recomp, Wayne Gretzky's 3D Hockey, Rush 2, Automobili Lamborghini, Road Rash 64, Jungle Strike, ICO, Star Wars Battlefront: Renegade Squadron — ver seção 33). The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
-nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60) de outra página no futuro. É coincidência
+nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 61, 62) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -478,8 +478,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **62** jogos de Ports & Recomp (atualizado em 17/10/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27 e 30),
+- Os **70** jogos de Ports & Recomp (atualizado em 18/10/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30 e 33),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -573,11 +573,11 @@ repositórios daquela data (+ Melee Unlocked e Yakumo, verificados em 27/09/2026
 cada plataforma.** O Karamelo roda nativamente em Windows (x64), Linux (x64) e
 macOS (ARM64 Apple Silicon). O subsistema de ports (`src/port_runner.cpp`)
 filtra dinamicamente os jogos disponíveis para a plataforma em execução:
-- No **Windows**: todos os 62 ports possuem builds executáveis (.exe).
-- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 36 ports.
+- No **Windows**: todos os 70 ports possuem builds executáveis (.exe).
+- No **Linux**: requer um `.zip`, `.tar.xz`/`.tar.gz` ou pacote `.AppImage` com binário Linux executável nativo direto ou binário avulso (`CrashBandicoot-Linux`). Total: 42 ports.
 - No **macOS**: o app detecta e prioriza binários Mach-O nativos (ARM64 >
   Universal > Intel), extrai pacotes `.app` descompactados, zips, tarballs e imagens de disco `.dmg`
-  (montadas e extraídas transparentemente via `hdiutil`). Hoje 29 ports possuem
+  (montadas e extraídas transparentemente via `hdiutil`). Hoje 31 ports possuem
   releases comprovadas e utilizáveis para macOS.
 
 ### O que implementar no site
@@ -585,43 +585,52 @@ filtra dinamicamente os jogos disponíveis para a plataforma em execução:
 1. **Filtro por SO.** Se a página tiver seletor de plataforma (aba, toggle, ou
    detecção do SO do visitante via `navigator.userAgent`), a lista de Ports &
    Recomp exibida deve filtrar conforme o SO selecionado:
-   - **Filtro Windows (🪟)**: 62 jogos.
-   - **Filtro Linux (🐧)**: 36 jogos.
-   - **Filtro macOS (🍎)**: 29 jogos.
+   - **Filtro Windows (🪟)**: 70 jogos.
+   - **Filtro Linux (🐧)**: 42 jogos.
+   - **Filtro macOS (🍎)**: 31 jogos.
 2. **Ícones por jogo.** No card, tabela ou modal de cada jogo, exibir os ícones
    dos SOs suportados (🪟, 🐧, 🍎) conforme a tabela de `CREDITS.md`.
 3. **Contagem dinâmica.** Não fixe números mágicos no HTML; se exibir contadores,
    derive-os da contagem dos ícones em `CREDITS.md`.
 
-### Resumo das compatibilidades (revisado em 17/10/2026 — ver seções 20, 21, 22, 27 e 30)
+### Resumo das compatibilidades (revisado em 18/10/2026 — ver seções 20, 21, 22, 27, 30 e 33)
 
 Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
 
-- **🪟🐧🍎 (24 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
+- **🪟🐧🍎 (27 jogos, rodam em todos):** Zelda 64: Recompiled (OoT/MM), Goemon 64,
   Harvest Moon 64, Banjo 64, Bomberman 64, Mega Man 64, Bomberman Hero, Zelda OoT (Ship of
   Harkinian), Zelda MM (2 Ship 2 Harkinian), Star Fox (SNES, Enhanced), Mario
   Kart 64 (SpaghettiKart), Super Mario 64 (Ghostship), Super Mario 64 Coop Deluxe,
   Infinite Mario 64, Sonic 3 A.I.R., Valkyrie Profile, Pokemon Snap,
   Super Mario Strikers, Diablo (DevilutionX), Fallout (Community Edition),
+  F-Zero X (ganhou build Linux em 18/10),
   Monster Hunter Portable 3rd (Yakumo) — adicionado em 27/09/2026, ver seção 20,
   Star Fox Adventures (Foxhollow) — adicionado em 29/09/2026, ver seção 23,
   Conker's Bad Fur Day (CBFD-Recompiled) — adicionado em 12/10/2026, ver seção 25,
-  Castlevania: Legacy of Darkness (cvlod_recomp) — adicionado em 12/10/2026, ver seção 27.
-- **🪟🍎 (5 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2,
-  Space Station Silicon Valley, Wave Race 64, F-Zero X.
-- **🪟🐧 (12 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
+  Castlevania: Legacy of Darkness (cvlod_recomp) — adicionado em 12/10/2026, ver seção 27,
+  CPS-2 Recomp (Capcom Arcade) — adicionado em 18/10/2026, ver seção 33, e
+  ICO (PS2 PC Port) — adicionado em 18/10/2026, ver seção 33.
+- **🪟🍎 (4 jogos, Windows e macOS):** Perfect Dark, Snowboard Kids 2,
+  Space Station Silicon Valley, Wave Race 64.
+- **🪟🐧 (15 jogos, Windows e Linux):** Star Fox 64 (Starship), REDRIVER 2,
   Super Mario Bros. Remastered, Super Mario World, Body Harvest,
   Diddy Kong Racing, Pokemon Red and Blue (reblue), AeroGauge, Crash Bandicoot,
   Pikmin (Open Nectar), Soulcalibur II (Ring Out),
-  Sly Cooper (ProjectCane) — adicionado em 12/10/2026, ver seção 26.
-- **🪟 apenas (21 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+  Sly Cooper (ProjectCane) — adicionado em 12/10/2026, ver seção 26,
+  Rush 2: Extreme Racing USA — adicionado em 18/10/2026, ver seção 33,
+  Automobili Lamborghini — adicionado em 18/10/2026, ver seção 33, e
+  Road Rash 64 — adicionado em 18/10/2026, ver seção 33.
+- **🪟 apenas (24 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
   Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
   Jak & Daxter, LoD: Severed Chains, Castlevania: SotN, Sonic 1 Forever,
   Sonic Unleashed, Super Metroid, Viva Pinata, WipEout Phantom Edition,
   Star Wars: Dark Forces (TFE), Spider-Man (OpenSpidey),
-  Super Smash Bros. Melee (Melee Unlocked) — adicionado em 27/09/2026, ver seção 18, e
-  BLACK (BLACK-XBERecomp) — adicionado em 17/10/2026, ver seção 30. (The Darkness **não** entra — ver seção 19.)
+  Super Smash Bros. Melee (Melee Unlocked) — adicionado em 27/09/2026, ver seção 18,
+  BLACK (BLACK-XBERecomp) — adicionado em 17/10/2026, ver seção 30,
+  Wayne Gretzky's 3D Hockey — adicionado em 18/10/2026, ver seção 33,
+  Jungle Strike — adicionado em 18/10/2026, ver seção 33, e
+  Star Wars Battlefront: Renegade Squadron — adicionado em 18/10/2026, ver seção 33. (The Darkness **não** entra — ver seção 19.)
 
 ---
 
@@ -1372,5 +1381,71 @@ Lançamento da versão **0.9.74** com correções críticas no fluxo de navegaç
    - `include/app_info.h` atualizado para `APP_VERSION "0.9.74"` e `Karamelo_v0.9.74.exe`.
    - Manifesto `dist/version.json` atualizado para a versão `0.9.74`.
    - Suíte de testes unitários expandida para validar a versão `0.9.74`.
+
+---
+
+## 33. Expansão de Catálogo: 8 Novos Ports e Atualização para 70 Ports (18/10/2026)
+
+O catálogo de "Ports & Recomp" expande de 62 para **70 títulos** oficiais. Novos totais conferidos contra o `CREDITS.md` e o `src/port_runner.cpp`: **70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎**. A lista de jogos compatíveis com todos os três sistemas operacionais passa de 24 para **27 jogos**.
+
+> **Aviso para a IA do site:** Atualizar contadores em cards, cabeçalhos e seletores de SO:
+> - **Catálogo Geral**: 70 jogos em Ports & Recomp.
+> - **Filtro Windows (🪟)**: 70 jogos.
+> - **Filtro Linux (🐧)**: 42 jogos.
+> - **Filtro macOS (🍎)**: 31 jogos.
+> - **Compatibilidade Total (🪟🐧🍎)**: 27 jogos.
+
+### Os 8 Novos Ports Integrados
+
+1. **CPS-2 Recomp (Capcom Arcade)**:
+   - **Repositório**: `tmcleroy/cps2recomp`
+   - **Plataformas**: 🪟🐧🍎 (Windows, Linux, macOS).
+   - **Descrição**: Recompilação estática de arcade para jogos Capcom CPS-1 e CPS-2. Inclui suporte nativo a Street Fighter Alpha 2, Cadillacs and Dinosaurs, Alien vs. Predator, Super Puzzle Fighter II Turbo, Vampire Savior 1/2 e Vampire Hunter 2.
+   - **Como funciona**: O Karamelo copia automaticamente os romsets MAME/arcade compatíveis (`sfa2u.zip`, `dino.zip`, `avspu.zip`, etc.) de `roms/Arcade/` para a pasta do port antes da execução.
+
+2. **Wayne Gretzky's 3D Hockey**:
+   - **Repositório**: `geno55/wg3d-recomp`
+   - **Plataformas**: 🪟 (Windows).
+   - **Descrição**: Port nativo de Nintendo 64 via N64Recomp e RT64 (Direct3D 12 e Vulkan).
+   - **Como funciona**: O Karamelo copia a ROM americana original de `roms/Nintendo64/` como `baserom.us.z64` diretamente para a pasta do port.
+
+3. **Rush 2: Extreme Racing USA**:
+   - **Repositório**: `bryantmh/rush2recompiled`
+   - **Plataformas**: 🪟🐧 (Windows, Linux).
+   - **Descrição**: Recompilação estática de Nintendo 64 via N64Recomp com suporte a altas resoluções e taxas de quadros destravadas.
+   - **Como funciona**: O Karamelo passa automaticamente o caminho da ROM via argumento de inicialização.
+
+4. **Automobili Lamborghini**:
+   - **Repositório**: `alondero/automobililamborghini-recomp`
+   - **Plataformas**: 🪟🐧 (Windows, Linux).
+   - **Descrição**: Port nativo de Nintendo 64 via N64Recomp e RT64 com renderizador moderno, widescreen e 60 FPS.
+   - **Como funciona**: O Karamelo repassa a ROM de `roms/Nintendo64/` diretamente via argumento `{rom}`.
+
+5. **Road Rash 64**:
+   - **Repositório**: `linkssy2/RoadRash64Recompiled`
+   - **Plataformas**: 🪟🐧 (Windows, Linux).
+   - **Descrição**: Recompilação estática de Nintendo 64 com suporte a resoluções ultrawide e melhorias de taxa de quadros.
+   - **Como funciona**: Carregamento transparente da ROM original a partir de `roms/Nintendo64/`.
+
+6. **Jungle Strike**:
+   - **Repositório**: `Junior-Jones/Jungle-Strike-SNES-Static-Recomp`
+   - **Plataformas**: 🪟 (Windows).
+   - **Descrição**: Recompilação estática nativa do clássico de helicópteros do Super Nintendo com Launcher.exe dedicado.
+   - **Como funciona**: O Karamelo localiza a ROM de SNES em `roms/SNES/` e espelha para a raiz do port e pasta `Rom/`.
+
+7. **ICO**:
+   - **Repositório**: `nathanialf/ico-pc`
+   - **Plataformas**: 🪟🐧🍎 (Windows, Linux, macOS).
+   - **Descrição**: Port nativo de PlayStation 2 em C++ via engenharia reversa do disco PAL SCES-50760. Suporte a 60 FPS, resoluções modernas e controles analógicos.
+   - **Como funciona**: O jogador coloca a imagem original (.iso, .chd, .bin) em `roms/PS2/` e o Karamelo repassa via `{iso}` na linha de comando.
+
+8. **Star Wars Battlefront: Renegade Squadron**:
+   - **Repositório**: `GTTeancum/StarWars-RenegadeSquadron-PC`
+   - **Plataformas**: 🪟 (Windows).
+   - **Descrição**: Port nativo de PlayStation Portable (PSP) via recompilação estática com renderizador Direct3D 12, 60 FPS e suporte a controles analógicos duplos.
+   - **Como funciona**: O jogador coloca a imagem UMD (.iso/.cso) em `roms/PSP/`.
+
+### Atualização Adicional
+- **F-Zero X (`craigshaw/FZeroRecomp`)**: Atualizado para incluir suporte oficial a **Linux** (🪟🐧🍎).
 
 

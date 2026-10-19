@@ -916,7 +916,7 @@ int main(int argc, char* argv[])
 		bool started = CoreRequestLoad(argv[3], argv[2]);
 
 		DWORD waited_ms = 0;
-		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 10000)
+		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 20000)
 		{
 			Sleep(50);
 			waited_ms += 50;
@@ -953,7 +953,7 @@ int main(int argc, char* argv[])
 			DWORD t1 = GetTickCount();
 			retry_started = CoreRequestLoad(argv[5], argv[4]);
 			DWORD waited2 = 0;
-			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 10000)
+			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 20000)
 			{
 				Sleep(50);
 				waited2 += 50;
