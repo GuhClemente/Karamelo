@@ -11,6 +11,7 @@ extern char **environ;
 #include <SDL3/SDL.h>
 #include <filesystem>
 #include <algorithm>
+#include <cctype>
 #include <thread>
 #include <chrono>
 #include <system_error>
@@ -191,7 +192,40 @@ struct PortDefinition {
     // "linux":url,"macos":url}}, ...]}, newest first - and DownloadAndInstall
     // reads that instead of the GitHub API. `repo` stays for credits only.
     std::string downloads_json_url;
+    // A ROM whose lowercased file name contains any of these is never picked,
+    // even when every rom_keywords entry matches - Wayne Gretzky's 3D Hockey
+    // '98 shares every word of the original's name.
+    std::vector<std::string> rom_exclude_keywords;
+    // iso_keywords must match whole words (bounded by anything that is not a
+    // letter or digit) instead of anywhere in the name. For a keyword short
+    // enough to sit inside other titles: ICO's "ico" is in "Unicorn".
+    bool iso_keywords_whole_word = false;
+    // Non-empty: folder (relative to the port folder) that must hold the
+    // PSP disc's PSP_GAME/ tree before launch. Karamelo extracts it from the
+    // user's .iso (found by iso_keywords) - see PreparePspGame().
+    std::string psp_game_dir;
 };
+
+static bool NameHasKeyword(const std::string& lower_name, const std::string& kw, bool whole_word) {
+    if (!whole_word) return lower_name.find(kw) != std::string::npos;
+    auto is_word = [](char c) { return std::isalnum((unsigned char)c) != 0; };
+    for (size_t at = lower_name.find(kw); at != std::string::npos; at = lower_name.find(kw, at + 1)) {
+        bool starts = at == 0 || !is_word(lower_name[at - 1]);
+        size_t end = at + kw.size();
+        bool ends = end >= lower_name.size() || !is_word(lower_name[end]);
+        if (starts && ends) return true;
+    }
+    return false;
+}
+
+// Every rom_keywords entry present and no rom_exclude_keywords entry.
+static bool RomNameMatches(const PortDefinition& def, const std::string& lower_name) {
+    for (const auto& kw : def.rom_keywords)
+        if (lower_name.find(kw) == std::string::npos) return false;
+    for (const auto& kw : def.rom_exclude_keywords)
+        if (lower_name.find(kw) != std::string::npos) return false;
+    return true;
+}
 
 static const std::vector<PortDefinition>& KnownPortDefs() {
     static const std::vector<PortDefinition> defs = {
@@ -490,7 +524,8 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .repo = "geno55/wg3d-recomp", .exe_hint = "wg3d.exe",
           .needs_rom = true, .rom_keywords = { "gretzky" },
           .has_linux_build = false, .has_macos_build = false,
-          .launch_args = { "{rom}" } },
+          .launch_args = { "{rom}" },
+          .rom_exclude_keywords = { "98" } },
         // Rush 2: Extreme Racing USA static recomp (N64 via N64Recomp by bryantmh).
         // Official releases publish Windows zip (Rush2Recompiled-<ver>.zip) and Linux AppImage.
         { .id = "Rush2Recompiled", .display_name = "Rush 2: Extreme Racing USA",
@@ -528,17 +563,23 @@ static const std::vector<PortDefinition>& KnownPortDefs() {
           .launch_args = { "{iso}" },
           .iso_keywords = { "ico" },
           .iso_dirs = { "PlayStation2", "PS2" },
-          .iso_exts = { ".iso", ".chd", ".bin" } },
+          .iso_exts = { ".iso", ".chd", ".bin" },
+          .iso_keywords_whole_word = true },
         // Star Wars Battlefront: Renegade Squadron native PC port (PSP via static recomp by GTTeancum).
         // Official releases publish Windows zip (RenegadeSquadronPC).
         // Direct3D 12, 60 FPS, twin-stick controls.
+        // The game reads the disc's PSP_GAME folder from data/ - it takes no
+        // ISO argument. PreparePspGame() extracts the user's US ISO (ULUS10292)
+        // there before the first launch. Only a plain .iso: a .cso is
+        // compressed and nothing here can unpack it.
         { .id = "RenegadeSquadronPC", .display_name = "Star Wars Battlefront: Renegade Squadron",
           .repo = "GTTeancum/StarWars-RenegadeSquadron-PC", .exe_hint = "RenegadeSquadron.exe",
           .needs_rom = false, .rom_keywords = {},
           .has_linux_build = false, .has_macos_build = false,
           .iso_keywords = { "renegade", "squadron" },
           .iso_dirs = { "PSP", "PlayStationPortable" },
-          .iso_exts = { ".iso", ".cso" } },
+          .iso_exts = { ".iso" },
+          .psp_game_dir = "data" },
     };
     return defs;
 }
@@ -1506,10 +1547,7 @@ bool PortAutoSetupRom(const std::string& port_id) {
                 std::string fname = ToLowerStr(entry.path().filename().string());
                 std::string ext = ToLowerStr(entry.path().extension().string());
                 if (ext != ".sfc" && ext != ".smc") continue;
-                bool all_match = true;
-                for (const auto& kw : def->rom_keywords)
-                    if (fname.find(kw) == std::string::npos) { all_match = false; break; }
-                if (!all_match) continue;
+                if (!RomNameMatches(*def, fname)) continue;
                 fs::path dest = fs::path(target_dir) / entry.path().filename();
                 fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
                 if (port_id == "JungleStrikeSNES") {
@@ -1538,10 +1576,7 @@ bool PortAutoSetupRom(const std::string& port_id) {
                 std::string fname = ToLowerStr(entry.path().filename().string());
                 std::string ext = ToLowerStr(entry.path().extension().string());
                 if (ext != ".md" && ext != ".gen" && ext != ".bin") continue;
-                bool all_match = true;
-                for (const auto& kw : def->rom_keywords)
-                    if (fname.find(kw) == std::string::npos) { all_match = false; break; }
-                if (!all_match) continue;
+                if (!RomNameMatches(*def, fname)) continue;
                 fs::path dest = fs::path(target_dir) / entry.path().filename();
                 fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
                 return !ec;
@@ -1591,10 +1626,7 @@ bool PortAutoSetupRom(const std::string& port_id) {
 
             if (port_id == "PokemonStadiumRecomp" && fname.find("2") != std::string::npos) continue;
 
-            bool all_match = true;
-            for (const auto& kw : def->rom_keywords)
-                if (fname.find(kw) == std::string::npos) { all_match = false; break; }
-            if (!all_match) continue;
+            if (!RomNameMatches(*def, fname)) continue;
 
             fs::path dest = fs::path(target_dir) / entry.path().filename();
             fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
@@ -1682,7 +1714,7 @@ static std::string FindUserIso(const PortDefinition& def, const std::string& por
             std::string name = ToLowerStr(e.path().filename().string());
             bool all = true;
             for (const auto& kw : def.iso_keywords)
-                if (name.find(kw) == std::string::npos) { all = false; break; }
+                if (!NameHasKeyword(name, kw, def.iso_keywords_whole_word)) { all = false; break; }
             if (!all) continue;
             if (IsoHeaderMatches(def, e.path())) return e.path().string();
             if (out_wrong_disc) *out_wrong_disc = true;
@@ -1716,11 +1748,7 @@ static std::string FindUserRom(const PortDefinition& def, const std::string& por
             std::string ext = ToLowerStr(e.path().extension().string());
             if (ext != ".z64" && ext != ".n64" && ext != ".v64") continue;
             std::string name = ToLowerStr(e.path().filename().string());
-            bool all = true;
-            for (const auto& kw : def.rom_keywords) {
-                if (name.find(kw) == std::string::npos) { all = false; break; }
-            }
-            if (all) return e.path().string();
+            if (RomNameMatches(def, name)) return e.path().string();
         }
     }
     return "";
@@ -1879,6 +1907,54 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
 // BLACK static recomp helper: checks if ports/BlackRecomp/assets/ already has
 // an extracted default.xbe or an original Xbox .iso. If not, searches roms/Xbox
 // (or roms/) for the user's ISO and links/copies it into assets/.
+// -------------------------------------------------------------
+// PSP disc preparation (Renegade Squadron)
+// -------------------------------------------------------------
+// The recomp reads the disc's files, not the image: upstream tells each user
+// to extract PSP_GAME/ from their ISO by hand into data/. tar.exe (libarchive)
+// reads ISO9660, so ArchiveExtractAll does it. Extraction goes to a staging
+// folder and only a tree with SYSDIR/BOOT.BIN in it is moved into place, so a
+// half-finished extraction is never mistaken for a ready game.
+static bool PspGameReady(const PortDefinition& def, const std::string& port_dir) {
+    std::error_code ec;
+    return fs::is_regular_file(fs::path(port_dir) / def.psp_game_dir / "PSP_GAME" / "SYSDIR" / "BOOT.BIN", ec);
+}
+
+static bool PreparePspGame(const PortDefinition& def, const std::string& port_dir, std::string& out_error) {
+    if (PspGameReady(def, port_dir)) { out_error.clear(); return true; }
+    std::string iso = FindUserIso(def, port_dir);
+    if (iso.empty()) {
+        out_error = "COLOQUE SEU ISO DE " + def.display_name + " EM roms/" +
+                    (def.iso_dirs.empty() ? std::string("PSP") : def.iso_dirs.front());
+        return false;
+    }
+    std::error_code ec;
+    fs::path staging = fs::path(port_dir) / "_psp_extract";
+    fs::remove_all(staging, ec);
+    if (!ArchiveExtractAll(iso, staging.string())) {
+        fs::remove_all(staging, ec);
+        out_error = "FALHA AO EXTRAIR O ISO DE " + def.display_name;
+        return false;
+    }
+    fs::path extracted = staging / "PSP_GAME";
+    if (!fs::is_regular_file(extracted / "SYSDIR" / "BOOT.BIN", ec)) {
+        fs::remove_all(staging, ec);
+        out_error = "ISO SEM PSP_GAME/SYSDIR/BOOT.BIN - NAO E O DISCO DE " + def.display_name;
+        return false;
+    }
+    fs::path target = fs::path(port_dir) / def.psp_game_dir / "PSP_GAME";
+    fs::create_directories(target.parent_path(), ec);
+    fs::remove_all(target, ec);
+    fs::rename(extracted, target, ec);
+    fs::remove_all(staging, ec);
+    if (ec || !PspGameReady(def, port_dir)) {
+        out_error = "FALHA AO PREPARAR " + def.display_name;
+        return false;
+    }
+    out_error.clear();
+    return true;
+}
+
 static bool SetupBlackGame(const PortDefinition& def, const std::string& port_dir, std::string& out_error) {
     if (port_dir.empty()) {
         out_error = "diretorio do port invalido";
@@ -2280,12 +2356,20 @@ bool PortLaunch(const std::string& port_id) {
     // several GB) goes on the same background slot as a download.
     bool needs_x360_prep = def && !def->x360_game_dir.empty() &&
                            (exe_path.empty() || !X360GameReady(*def, dir));
+    // Same background slot for a PSP disc extraction - but with no ISO at all
+    // there is nothing to prepare, so say where it goes before downloading.
+    bool needs_psp_prep = def && !def->psp_game_dir.empty() && !PspGameReady(*def, dir);
+    if (needs_psp_prep && FindUserIso(*def, dir).empty()) {
+        CoreSetToast(("COLOQUE SEU ISO DE " + def->display_name + " EM roms/" +
+                      (def->iso_dirs.empty() ? std::string("PSP") : def->iso_dirs.front())).c_str(), 300);
+        return false;
+    }
 
     // Not installed yet: if this is a known port with a repository, fetch it
     // in the background and launch automatically once it lands. Anything
     // else (an unknown id, or a known one with no repo configured) has
     // nothing to download - say so and stop.
-    if (exe_path.empty() || needs_x360_prep) {
+    if (exe_path.empty() || needs_x360_prep || needs_psp_prep) {
         if (exe_path.empty() && (!def || def->repo.empty())) {
             CoreSetToast("PORT NAO INSTALADO EM ports/", 200);
             return false;
@@ -2333,6 +2417,22 @@ bool PortLaunch(const std::string& port_id) {
                         s_installing_verb = "PREPARANDO ";
                     }
                     if (!PrepareX360Game(def_copy, port_dir, error)) {
+                        s_installing.store(false);
+                        CoreSetToast(error.c_str(), 420);
+                        s_active_bg_threads.fetch_sub(1);
+                        return;
+                    }
+                }
+            }
+            if (!def_copy.psp_game_dir.empty()) {
+                std::string port_dir = ResolvePortDir(def_copy.id);
+                if (port_dir.empty()) port_dir = "ports/" + def_copy.id;
+                if (!PspGameReady(def_copy, port_dir)) {
+                    {
+                        std::lock_guard<std::mutex> lock(s_pending_lock);
+                        s_installing_verb = "PREPARANDO ";
+                    }
+                    if (!PreparePspGame(def_copy, port_dir, error)) {
                         s_installing.store(false);
                         CoreSetToast(error.c_str(), 420);
                         s_active_bg_threads.fetch_sub(1);
@@ -2461,6 +2561,10 @@ bool PortPrepareOnly(const std::string& port_id, std::string& out_error) {
     if (def->id == "BlackRecomp") {
         std::string dir = ResolvePortDir(port_id);
         return SetupBlackGame(*def, dir, out_error);
+    }
+    if (!def->psp_game_dir.empty()) {
+        std::string dir = ResolvePortDir(port_id);
+        return PreparePspGame(*def, dir, out_error);
     }
     if (def->x360_game_dir.empty()) { out_error.clear(); return true; }
     std::string dir = ResolvePortDir(port_id);

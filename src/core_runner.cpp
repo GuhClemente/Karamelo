@@ -3488,6 +3488,29 @@ static void RecoverAfterKilledCore()
 		"[CoreRunner] o core nao encerrou sozinho; estado recuperado a forca");
 }
 
+// Waits for the core thread without letting Windows mark the window "Not
+// Responding": CoreShutdown runs on the UI thread and can wait over 10s for a
+// slow core (N64) to unwind. PeekMessage with PM_NOREMOVE is what resets the
+// hung-window timer; it takes nothing off the queue, so no key or menu input
+// is dispatched (and no menu code re-entered) while the old core winds down.
+static bool WaitForCoreThread(HANDLE h, DWORD timeout_ms)
+{
+#ifdef _WIN32
+	DWORD waited = 0;
+	for (;;)
+	{
+		DWORD slice = (timeout_ms - waited < 100) ? timeout_ms - waited : 100;
+		if (WaitForSingleObject(h, slice) != WAIT_TIMEOUT) return true;
+		waited += slice;
+		if (waited >= timeout_ms) return false;
+		MSG msg;
+		PeekMessageA(&msg, NULL, 0, 0, PM_NOREMOVE);
+	}
+#else
+	return WaitForSingleObject(h, timeout_ms) != WAIT_TIMEOUT;
+#endif
+}
+
 void CoreShutdown(bool will_reload)
 {
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Inicio do shutdown...");
@@ -3496,7 +3519,7 @@ void CoreShutdown(bool will_reload)
 	if (h_core_thread)
 	{
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Aguardando core thread encerrar (8000ms)...");
-		if (WaitForSingleObject(h_core_thread, 8000) == WAIT_TIMEOUT)
+		if (!WaitForCoreThread(h_core_thread, 8000))
 		{
 			CoreLogPrintf(RETRO_LOG_WARN, "[CoreShutdown] Timeout aguardando core thread. Verificando module_op=%ld",
 				InterlockedCompareExchange(&g_core_in_module_op, 0, 0));
@@ -3504,7 +3527,7 @@ void CoreShutdown(bool will_reload)
 			while (InterlockedCompareExchange(&g_core_in_module_op, 0, 0) &&
 				extra_waited_ms < 5000)
 			{
-				if (WaitForSingleObject(h_core_thread, 200) != WAIT_TIMEOUT)
+				if (WaitForCoreThread(h_core_thread, 200))
 					break;
 				extra_waited_ms += 200;
 			}
