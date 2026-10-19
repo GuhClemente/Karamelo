@@ -500,8 +500,30 @@ static int RunHiddenCommandCaptureOutput(const std::vector<std::string>& argv, u
 	si.hStdError = write_pipe;
 	PROCESS_INFORMATION pi = { 0 };
 
-	bool started = CreateProcessA(NULL, cmd_buf.data(), NULL, NULL, TRUE,
-		CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+	// Only the pipe's write end is inherited. bInheritHandles alone hands the
+	// child every inheritable handle in the process - including the write end
+	// of another capture running at the same time on another thread (a port
+	// download and a ROM extraction), and while that copy stays open the other
+	// reader never sees end-of-file.
+	bool started = false;
+	SIZE_T attr_size = 0;
+	InitializeProcThreadAttributeList(NULL, 1, 0, &attr_size);
+	std::vector<uint8_t> attr_buf(attr_size);
+	auto* attrs = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attr_buf.data());
+	if (InitializeProcThreadAttributeList(attrs, 1, 0, &attr_size))
+	{
+		if (UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+			&write_pipe, sizeof(write_pipe), NULL, NULL))
+		{
+			STARTUPINFOEXA six = {};
+			six.StartupInfo = si;
+			six.StartupInfo.cb = sizeof(six);
+			six.lpAttributeList = attrs;
+			started = CreateProcessA(NULL, cmd_buf.data(), NULL, NULL, TRUE,
+				CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, NULL, NULL, &six.StartupInfo, &pi) != FALSE;
+		}
+		DeleteProcThreadAttributeList(attrs);
+	}
 	CloseHandle(write_pipe);
 
 	if (!started) { CloseHandle(read_pipe); return -1; }
@@ -646,9 +668,12 @@ static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
 
 bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_dir)
 {
-	if (!fs::exists(archive_path)) return false;
+	// Non-throwing overloads throughout: this runs on the core thread and on
+	// port worker threads, where an escaping filesystem_error ends the process.
+	std::error_code fs_ec;
+	if (!fs::exists(archive_path, fs_ec)) return false;
 	if (ArchiveHasUnsafeEntry(archive_path)) return false;
-	fs::create_directories(dest_dir);
+	fs::create_directories(dest_dir, fs_ec);
 
 #ifdef _WIN32
 	// 1. Try Windows tar.exe (fast native extractor)
@@ -734,13 +759,14 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 	if (!ok) return false;
 #endif
 
-	return fs::exists(dest_dir) && !fs::is_empty(dest_dir);
+	return fs::exists(dest_dir, fs_ec) && !fs::is_empty(dest_dir, fs_ec);
 }
 
 bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extracted_rom_path, std::string& out_core_dll)
 {
 	fs::path arch_path(archive_path);
-	if (!fs::exists(arch_path)) return false;
+	std::error_code fs_ec;
+	if (!fs::exists(arch_path, fs_ec)) return false;
 
 	std::string stem = arch_path.stem().string();
 	std::string ext = arch_path.extension().string();
@@ -754,7 +780,12 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 		return true;
 	}
 
-	std::string cache_dir = (fs::current_path() / "cache" / stem).string();
+	std::string cache_dir = (fs::current_path(fs_ec) / "cache" / stem).string();
+	// Emptied first. The folder is named after the archive's stem alone, so
+	// roms/SNES/Aladdin.zip and roms/Genesis/Aladdin.zip share it - and the
+	// scan below ranks .sfc above .md, so opening the Genesis one after the
+	// SNES one found the leftover .sfc and booted the wrong game.
+	fs::remove_all(cache_dir, fs_ec);
 	if (!ArchiveExtractAll(archive_path, cache_dir)) return false;
 
 	// 3. Scan the extracted directory. Ordered by priority, not by whatever the

@@ -182,8 +182,22 @@ static bool wizard_active = false;
 static int wizard_step = 0;
 static int setting_pad_device = 0; // 0=Gamepad, 1=Keyboard
 
-// Row index of the first key/pad binding on the Controller page.
-static const int kBindRow0 = 4;
+// The Controller page row of binding `bind`. Looked up by action id (700 +
+// bind) rather than counted from a fixed first row: the rows above the
+// bindings change with whether a game is running and has a remap profile,
+// and the old constant (4) was already one short with no game loaded, so
+// every capture left the cursor on the binding above the one just set.
+static void SelectByAction(int action_id, int fallback_idx);
+static void SelectBindRow(int bind) { SelectByAction(700 + bind, 0); }
+
+// Persists a rebind: karamelo.cfg for the global set, and the remap file
+// too when a system profile is the set being edited.
+static void MenuSaveSettings();
+static void SaveBindings() {
+  MenuSaveSettings();
+  if (const char *profile = InputBindActiveProfile())
+    InputBindSaveSystemProfile(profile);
+}
 
 static const int kOsdTimeouts[] = {0, 5, 10, 15, 30, 60};
 static const int kOsdTimeoutCount = 6;
@@ -387,28 +401,36 @@ static void LoadFavoritesAndRecent() {
   }
 }
 
-static void SaveFavorites() {
+// Writes next to the target and renames over it once the write succeeded.
+// Truncating the real file first meant a crash, a power cut or a full disk in
+// the middle of a save left it empty - every setting (or every favorite)
+// silently back to default on the next launch.
+static bool WriteFileAtomic(const char *path, const std::string &content) {
   std::error_code ec;
-  fs::create_directories("Config", ec);
-  FILE *f = fopen("Config/favorites.txt", "wb");
-  if (!f) return;
-  fprintf(f, "# Karamelo - Favorites\n");
-  for (const auto &p : g_favorites) {
-    fprintf(f, "%s\n", p.c_str());
+  fs::create_directories(fs::path(path).parent_path(), ec);
+  std::string tmp = std::string(path) + ".tmp";
+  FILE *f = fopen(tmp.c_str(), "wb");
+  if (!f) return false;
+  bool ok = fwrite(content.data(), 1, content.size(), f) == content.size();
+  ok = (fclose(f) == 0) && ok;
+  if (ok) {
+    fs::rename(tmp, path, ec);
+    ok = !ec;
   }
-  fclose(f);
+  if (!ok) fs::remove(tmp, ec);
+  return ok;
+}
+
+static void SaveFavorites() {
+  std::string out = "# Karamelo - Favorites\n";
+  for (const auto &p : g_favorites) out += p + "\n";
+  WriteFileAtomic("Config/favorites.txt", out);
 }
 
 static void SaveRecent() {
-  std::error_code ec;
-  fs::create_directories("Config", ec);
-  FILE *f = fopen("Config/recent.txt", "wb");
-  if (!f) return;
-  fprintf(f, "# Karamelo - Recent Games\n");
-  for (const auto &p : g_recent) {
-    fprintf(f, "%s\n", p.c_str());
-  }
-  fclose(f);
+  std::string out = "# Karamelo - Recent Games\n";
+  for (const auto &p : g_recent) out += p + "\n";
+  WriteFileAtomic("Config/recent.txt", out);
 }
 
 bool MenuIsFavorite(const std::string &filepath) {
@@ -1572,6 +1594,7 @@ static void ResetAllSettingsToDefault() {
   neo_dip_settings = 0;
   neo_dip_freeplay = 0;
 
+  InputBindRestoreGlobal();
   InputBindResetDefaults();
   CoreSetVolume(100);
   CoreSetMute(false);
@@ -2324,117 +2347,126 @@ void PopulateBrowse(const std::string &dirpath) {
 
       // Pass 1: Parse .cue, .m3u, .gdi, .toc to hide companion raw binary tracks
       for (const auto &entry : all_entries) {
-        if (entry.is_directory()) continue;
-        std::string ext = entry.path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        try {
+          if (entry.is_directory()) continue;
+          std::string ext = entry.path().extension().string();
+          std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-        if (ext == ".cue" || ext == ".gdi" || ext == ".toc") {
-          std::string stem = entry.path().stem().string();
-          std::string lower_stem = stem;
-          std::transform(lower_stem.begin(), lower_stem.end(), lower_stem.begin(), ::tolower);
+          if (ext == ".cue" || ext == ".gdi" || ext == ".toc") {
+            std::string stem = entry.path().stem().string();
+            std::string lower_stem = stem;
+            std::transform(lower_stem.begin(), lower_stem.end(), lower_stem.begin(), ::tolower);
 
-          // Read the descriptor file to find referenced tracks
-          FILE* f = fopen(entry.path().string().c_str(), "r");
-          if (f) {
-            char line[1024];
-            while (fgets(line, sizeof(line), f)) {
-              char* file_kw = strstr(line, "FILE ");
-              if (file_kw) {
-                char* p_start = file_kw + 5;
-                while (*p_start == ' ' || *p_start == '\t') p_start++;
-                if (*p_start == '\"') {
-                  p_start++;
-                  char* p_end = strchr(p_start, '\"');
-                  if (p_end) {
-                    std::string ref_fn(p_start, p_end);
-                    std::string lower_ref = fs::path(ref_fn).filename().string();
-                    std::transform(lower_ref.begin(), lower_ref.end(), lower_ref.begin(), ::tolower);
-                    hidden_companion_files.insert(lower_ref);
+            // Read the descriptor file to find referenced tracks
+            FILE* f = fopen(entry.path().string().c_str(), "r");
+            if (f) {
+              char line[1024];
+              while (fgets(line, sizeof(line), f)) {
+                char* file_kw = strstr(line, "FILE ");
+                if (file_kw) {
+                  char* p_start = file_kw + 5;
+                  while (*p_start == ' ' || *p_start == '\t') p_start++;
+                  if (*p_start == '\"') {
+                    p_start++;
+                    char* p_end = strchr(p_start, '\"');
+                    if (p_end) {
+                      std::string ref_fn(p_start, p_end);
+                      std::string lower_ref = fs::path(ref_fn).filename().string();
+                      std::transform(lower_ref.begin(), lower_ref.end(), lower_ref.begin(), ::tolower);
+                      hidden_companion_files.insert(lower_ref);
+                    }
                   }
                 }
               }
+              fclose(f);
             }
-            fclose(f);
-          }
 
-          // Also hide same-stem companion tracks
-          hidden_companion_files.insert(lower_stem + ".bin");
-          hidden_companion_files.insert(lower_stem + ".iso");
-          hidden_companion_files.insert(lower_stem + ".img");
-          hidden_companion_files.insert(lower_stem + ".raw");
-        }
-        else if (ext == ".m3u") {
-          FILE* f = fopen(entry.path().string().c_str(), "r");
-          if (f) {
-            char line[1024];
-            while (fgets(line, sizeof(line), f)) {
-              std::string l = line;
-              while (!l.empty() && (l.back() == '\r' || l.back() == '\n' || l.back() == ' ' || l.back() == '\t'))
-                l.pop_back();
-              size_t start = 0;
-              while (start < l.size() && (l[start] == ' ' || l[start] == '\t')) start++;
-              if (start < l.size() && l[start] != '#') {
-                std::string ref_fn = fs::path(l.substr(start)).filename().string();
-                std::transform(ref_fn.begin(), ref_fn.end(), ref_fn.begin(), ::tolower);
-                hidden_companion_files.insert(ref_fn);
-              }
-            }
-            fclose(f);
+            // Also hide same-stem companion tracks
+            hidden_companion_files.insert(lower_stem + ".bin");
+            hidden_companion_files.insert(lower_stem + ".iso");
+            hidden_companion_files.insert(lower_stem + ".img");
+            hidden_companion_files.insert(lower_stem + ".raw");
           }
-        }
+          else if (ext == ".m3u") {
+            FILE* f = fopen(entry.path().string().c_str(), "r");
+            if (f) {
+              char line[1024];
+              while (fgets(line, sizeof(line), f)) {
+                std::string l = line;
+                while (!l.empty() && (l.back() == '\r' || l.back() == '\n' || l.back() == ' ' || l.back() == '\t'))
+                  l.pop_back();
+                size_t start = 0;
+                while (start < l.size() && (l[start] == ' ' || l[start] == '\t')) start++;
+                if (start < l.size() && l[start] != '#') {
+                  std::string ref_fn = fs::path(l.substr(start)).filename().string();
+                  std::transform(ref_fn.begin(), ref_fn.end(), ref_fn.begin(), ::tolower);
+                  hidden_companion_files.insert(ref_fn);
+                }
+              }
+              fclose(f);
+            }
+          }
+        } catch (...) {}  // see the note on pass 2
       }
 
       // Pass 2: Populate list with directories and valid playable files only
       for (const auto &entry : all_entries) {
-        std::string filename = entry.path().filename().string();
-        if (filename.empty() || filename[0] == '.')
-          continue;
+        try {
+          std::string filename = entry.path().filename().string();
+          if (filename.empty() || filename[0] == '.')
+            continue;
 
-        std::string lower_fn = filename;
-        std::transform(lower_fn.begin(), lower_fn.end(), lower_fn.begin(), ::tolower);
+          std::string lower_fn = filename;
+          std::transform(lower_fn.begin(), lower_fn.end(), lower_fn.begin(), ::tolower);
 
-        if (hidden_companion_files.count(lower_fn)) {
-          continue;
-        }
+          if (hidden_companion_files.count(lower_fn)) {
+            continue;
+          }
 
-        if (lower_fn == "cache" || lower_fn == "config" || lower_fn == "scripts" ||
-            lower_fn == "wallpapers" || lower_fn == "bios" || lower_fn == "cores" ||
-            lower_fn == "saves" || lower_fn == "cheats" ||
-            lower_fn.ends_with(".exe") || lower_fn.ends_with(".pdb") ||
-            lower_fn.ends_with(".dll") || lower_fn.ends_with(".log") ||
-            lower_fn.ends_with(".txt") || lower_fn.ends_with(".nfo") ||
-            (lower_fn.ends_with(".md") && !IsMegaDriveRom(entry.path())) ||
-            lower_fn.ends_with(".ini") ||
-            lower_fn.ends_with(".cfg") || lower_fn.ends_with(".pdf") ||
-            lower_fn.ends_with(".doc") || lower_fn.ends_with(".docx") ||
-            lower_fn.ends_with(".png") || lower_fn.ends_with(".jpg") ||
-            lower_fn.ends_with(".jpeg") || lower_fn.ends_with(".url") ||
-            lower_fn.ends_with(".bat") || lower_fn.ends_with(".json") ||
-            lower_fn.ends_with(".xml")) {
-          continue;
-        }
+          if (lower_fn == "cache" || lower_fn == "config" || lower_fn == "scripts" ||
+              lower_fn == "wallpapers" || lower_fn == "bios" || lower_fn == "cores" ||
+              lower_fn == "saves" || lower_fn == "cheats" ||
+              lower_fn.ends_with(".exe") || lower_fn.ends_with(".pdb") ||
+              lower_fn.ends_with(".dll") || lower_fn.ends_with(".log") ||
+              lower_fn.ends_with(".txt") || lower_fn.ends_with(".nfo") ||
+              (lower_fn.ends_with(".md") && !IsMegaDriveRom(entry.path())) ||
+              lower_fn.ends_with(".ini") ||
+              lower_fn.ends_with(".cfg") || lower_fn.ends_with(".pdf") ||
+              lower_fn.ends_with(".doc") || lower_fn.ends_with(".docx") ||
+              lower_fn.ends_with(".png") || lower_fn.ends_with(".jpg") ||
+              lower_fn.ends_with(".jpeg") || lower_fn.ends_with(".url") ||
+              lower_fn.ends_with(".bat") || lower_fn.ends_with(".json") ||
+              lower_fn.ends_with(".xml")) {
+            continue;
+          }
 
-        if (entry.is_directory()) {
-          // Hide arcade CHD data folders (e.g. cvs2, cvs2mf, sfiii3) from the game list
-          if (dirpath.find("Arcade") != std::string::npos) {
-            bool has_chd = false;
-            std::error_code ec_sub;
-            for (const auto &sub : fs::directory_iterator(entry.path(), ec_sub)) {
-              if (sub.path().extension() == ".chd") {
-                has_chd = true;
-                break;
+          if (entry.is_directory()) {
+            // Hide arcade CHD data folders (e.g. cvs2, cvs2mf, sfiii3) from the game list
+            if (dirpath.find("Arcade") != std::string::npos) {
+              bool has_chd = false;
+              std::error_code ec_sub;
+              for (const auto &sub : fs::directory_iterator(entry.path(), ec_sub)) {
+                if (sub.path().extension() == ".chd") {
+                  has_chd = true;
+                  break;
+                }
               }
+              if (has_chd) continue;
             }
-            if (has_chd) continue;
+            dirs.push_back({filename, ">", true, false, 0});
+          } else {
+            std::string full_rom = (fs::path(dirpath) / filename).string();
+            std::string disp = filename;
+            if (MenuIsFavorite(full_rom)) {
+              disp = "* " + filename;
+            }
+            files.push_back({disp, "", false, false, 0});
           }
-          dirs.push_back({filename, ">", true, false, 0});
-        } else {
-          std::string full_rom = (fs::path(dirpath) / filename).string();
-          std::string disp = filename;
-          if (MenuIsFavorite(full_rom)) {
-            disp = "* " + filename;
-          }
-          files.push_back({disp, "", false, false, 0});
+        } catch (...) {
+          // On Windows a file name with characters outside the ANSI code page
+          // (a Japanese title, say) makes path::string() throw. One such file
+          // used to abort the whole listing and show the folder as empty;
+          // now only that entry is skipped.
         }
       }
     }
@@ -2538,8 +2570,8 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "filter", setting_filter);
   AppendSetting(out, "pad_device", setting_pad_device);
   for (int i = 0; i < BIND_COUNT; i++) {
-    AppendSetting(out, InputBindConfigKey(i), InputBindGetKey(i));
-    AppendSetting(out, InputBindPadConfigKey(i), InputBindGetPad(i));
+    AppendSetting(out, InputBindConfigKey(i), InputBindGetGlobalKey(i));
+    AppendSetting(out, InputBindPadConfigKey(i), InputBindGetGlobalPad(i));
   }
   AppendSetting(out, "wallpaper", setting_wallpaper);
   AppendSetting(out, "fullscreen", setting_fullscreen ? 1 : 0);
@@ -2593,17 +2625,7 @@ static std::string SettingsSnapshot() {
 }
 
 static void MenuSaveSettings() {
-  std::error_code ec;
-  fs::create_directories("Config", ec);
-
-  FILE *f = fopen(SETTINGS_PATH, "wb");
-  if (!f)
-    return;
-
-  fprintf(f, "# Karamelo - Configuration\n");
-  std::string snap = SettingsSnapshot();
-  fwrite(snap.data(), 1, snap.size(), f);
-  fclose(f);
+  WriteFileAtomic(SETTINGS_PATH, "# Karamelo - Configuration\n" + SettingsSnapshot());
 }
 
 static void MenuLoadSettings() {
@@ -2737,11 +2759,28 @@ static void MenuLoadSettings() {
     MenuSaveSettings();
 }
 
+static std::string CurrentBindingsSnapshot() {
+  std::string out;
+  for (int i = 0; i < BIND_COUNT; i++)
+    out += std::to_string(InputBindGetKey(i)) + "," + std::to_string(InputBindGetPad(i)) + ";";
+  return out;
+}
+
 void MenuProcessKey(MenuKey key) {
   std::string before = SettingsSnapshot();
+  std::string binds_before = CurrentBindingsSnapshot();
+  const char *profile_before = InputBindActiveProfile();
+  std::string profile_name = profile_before ? profile_before : "";
   MenuProcessKeyImpl(key);
   if (SettingsSnapshot() != before)
     MenuSaveSettings();
+  // karamelo.cfg only holds the global set, so a rebind made while a system
+  // profile is swapped in is written back to that profile instead of being
+  // lost when the game closes.
+  const char *profile_after = InputBindActiveProfile();
+  if (profile_after && profile_name == profile_after &&
+      CurrentBindingsSnapshot() != binds_before)
+    InputBindSaveSystemProfile(profile_after);
 }
 
 void MenuInit() {
@@ -2769,8 +2808,24 @@ void MenuRun() {
     selected_idx = 0;
     scroll_top = 0;
     OsdEnable(0);
+    InputBindRestoreGlobal();
   }
   s_was_core_active = core_active_now;
+
+  // A system's remap profile follows the core that is actually running. It
+  // used to be picked right after CoreRequestLoad(), which only queues the
+  // load - CoreGetCoreName() still named the PREVIOUS core there, so a PSX
+  // game got the SNES profile, and a system without one kept whatever the
+  // last profile had swapped in.
+  static bool s_was_core_running = false;
+  bool core_running_now = CoreIsRunning();
+  if (core_running_now && !s_was_core_running) {
+    InputBindRestoreGlobal();
+    std::string sys_name = CoreGetCoreName();
+    if (!sys_name.empty() && InputBindHasSystemProfile(sys_name.c_str()))
+      InputBindLoadSystemProfile(sys_name.c_str());
+  }
+  s_was_core_running = core_running_now;
 
   // Close the OSD after a spell of no input, so it does not sit over the game
   // forever if the player wandered off. Only while a game is actually running:
@@ -2822,19 +2877,19 @@ void MenuRun() {
                      wizard_step + 1, max_wizard_steps, Tr("PRESSIONE", "PRESS"), InputBindLabel(wizard_step));
             CoreSetToast(toast_buf, 120);
             PopulateControllerSettings();
-            selected_idx = kBindRow0 + wizard_step;
+            SelectBindRow(wizard_step);
           } else {
             wizard_active = false;
             capture_bind = -1;
             PopulateControllerSettings();
-            MenuSaveSettings();
+            SaveBindings();
             CoreSetToast(Tr("CONTROLE MAPEADO COM SUCESSO!", "GAMEPAD MAPPED SUCCESSFULLY!"), 150);
           }
         } else {
           capture_bind = -1;
           PopulateControllerSettings();
-          selected_idx = kBindRow0 + target;
-          MenuSaveSettings();
+          SelectBindRow(target);
+          SaveBindings();
         }
       } else if (vk != 0) {
         int target = capture_bind;
@@ -2852,19 +2907,19 @@ void MenuRun() {
                        wizard_step + 1, max_wizard_steps, Tr("PRESSIONE", "PRESS"), InputBindLabel(wizard_step));
               CoreSetToast(toast_buf, 120);
               PopulateControllerSettings();
-              selected_idx = kBindRow0 + wizard_step;
+              SelectBindRow(wizard_step);
             } else {
               wizard_active = false;
               capture_bind = -1;
               PopulateControllerSettings();
-              MenuSaveSettings();
+              SaveBindings();
               CoreSetToast(Tr("TECLADO MAPEADO COM SUCESSO!", "KEYBOARD MAPPED SUCCESSFULLY!"), 150);
             }
           } else {
             capture_bind = -1;
             PopulateControllerSettings();
-            selected_idx = kBindRow0 + target;
-            MenuSaveSettings();
+            SelectBindRow(target);
+            SaveBindings();
           }
         } else {
           CoreSetToast(Tr("ESSA TECLA E RESERVADA PARA O MENU", "THIS KEY IS RESERVED FOR THE MENU"), 120);
@@ -2936,6 +2991,12 @@ void MenuRun() {
   int max_visible = OsdGetSize();
   if (max_visible <= 0)
     max_visible = 8;
+
+  // Same guard as in MenuProcessKeyImpl: a stale index from a longer list
+  // would otherwise drag scroll_top past the end (or below zero).
+  selected_idx = ClampInt(selected_idx, 0, (int)items.size() - 1);
+  if (scroll_top < 0)
+    scroll_top = 0;
 
   if (selected_idx < scroll_top) {
     scroll_top = selected_idx;
@@ -3076,6 +3137,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
   int total = (int)items.size();
   if (total == 0)
     return;
+
+  // Several screens restore the previous row by number after rebuilding the
+  // list ("selected_idx = cur", a SelectByAction fallback). When the rebuilt
+  // list came out shorter, the index pointed past its end, and the
+  // items[selected_idx] copy in KEY_LEFT/KEY_RIGHT/KEY_SELECT read out of
+  // bounds.
+  selected_idx = ClampInt(selected_idx, 0, total - 1);
 
   switch (key) {
   case KEY_UP:
@@ -3804,6 +3872,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         if (CoreIsRunning()) {
           std::string sys_name = CoreGetCoreName();
           if (InputBindDeleteSystemProfile(sys_name.c_str())) {
+            InputBindRestoreGlobal();
             CoreSetToast(Tr("PERFIL REMOVIDO", "SYSTEM REMAP DELETED"), 90);
           }
           PopulateControllerSettings();
@@ -3825,12 +3894,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
                  InputBindLabel(wizard_step));
         CoreSetToast(toast_buf, 120);
         PopulateControllerSettings();
-        selected_idx = kBindRow0 + wizard_step;
+        SelectBindRow(wizard_step);
       } else if (item.action_id >= 700 && item.action_id < 700 + BIND_COUNT) {
         capture_bind = item.action_id - 700;
         capture_armed = false;
         PopulateControllerSettings();
-        selected_idx = kBindRow0 + capture_bind;
+        SelectBindRow(capture_bind);
       } else if (item.action_id == 799) {
         InputBindResetDefaults();
         PopulateControllerSettings();
@@ -3987,14 +4056,9 @@ static void MenuProcessKeyImpl(MenuKey key) {
         ApplyPersistedCoreOptions();
 
         if (CoreRequestLoad(target_rom_path.c_str(), core_dll.c_str())) {
+          // The system's remap profile is applied by MenuRun once the core
+          // is actually up - see ApplySystemProfileForRunningCore.
           MenuAddRecent(target_rom_path);
-          std::string sys_name = CoreGetCoreName();
-          if (sys_name.empty()) {
-            sys_name = fs::path(current_dir).filename().string();
-          }
-          if (!sys_name.empty() && InputBindHasSystemProfile(sys_name.c_str())) {
-            InputBindLoadSystemProfile(sys_name.c_str());
-          }
           OsdDisable();
           current_state = STATE_MAIN;
           items.clear();
@@ -4120,13 +4184,6 @@ bool MenuLaunchGamePath(const std::string &full_rom_path) {
 
   if (CoreRequestLoad(full_rom_path.c_str(), core_dll.c_str())) {
     MenuAddRecent(full_rom_path);
-    std::string sys_name = CoreGetCoreName();
-    if (sys_name.empty()) {
-      sys_name = p.parent_path().filename().string();
-    }
-    if (!sys_name.empty() && InputBindHasSystemProfile(sys_name.c_str())) {
-      InputBindLoadSystemProfile(sys_name.c_str());
-    }
     OsdDisable();
     current_state = STATE_MAIN;
     items.clear();

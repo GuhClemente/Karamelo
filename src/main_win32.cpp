@@ -1244,7 +1244,11 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 	UINT msg = msg_ptr->message;
 	WPARAM wParam = msg_ptr->wParam;
 	LPARAM lParam = msg_ptr->lParam;
-	(void)lParam;
+	// Bit 30: the key was already down - this WM_KEYDOWN is auto-repeat.
+	// Holding F2 used to save the state over and over (F4 kept reloading it,
+	// F9 filled screenshots/, F12 flickered the menu open and shut), so the
+	// one-shot hotkeys only act on the first press. Menu arrows still repeat.
+	const bool key_repeat = (lParam & (1 << 30)) != 0;
 
 	switch (msg)
 	{
@@ -1258,7 +1262,7 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 	// through to `return true` so Alt+F4, Alt+Space (system menu) and F10
 	// keep working exactly as Windows expects.
 	case WM_SYSKEYDOWN:
-		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000))
+		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000) && !key_repeat)
 		{
 			ToggleFullscreen(hwnd);
 			return false;
@@ -1268,15 +1272,15 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 	case WM_KEYDOWN:
 		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000))
 		{
-			ToggleFullscreen(hwnd);
+			if (!key_repeat) ToggleFullscreen(hwnd);
 			return 0;
 		}
 
 		if (wParam == VK_F12)
 		{
-			MenuProcessKey(KEY_MENU_TOGGLE);
+			if (!key_repeat) MenuProcessKey(KEY_MENU_TOGGLE);
 		}
-		else if (CoreIsRunning() && !OsdIsEnabled())
+		else if (CoreIsRunning() && !OsdIsEnabled() && !key_repeat)
 		{
 			// F12 only. Esc and Tab used to open the OSD here too, which meant a
 			// game never saw them: pressing Esc in Doom under DOSBox opened our

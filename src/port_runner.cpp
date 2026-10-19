@@ -90,7 +90,10 @@ static std::wstring QuoteWinArg(const std::wstring& arg) {
 
 static std::string ToLowerStr(const std::string& s) {
     std::string out = s;
-    std::transform(out.begin(), out.end(), out.begin(), ::tolower);
+    // unsigned char first: a UTF-8 byte is negative as a plain char, and
+    // tolower() of a negative value other than EOF is undefined.
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return (char)std::tolower(c); });
     return out;
 }
 
@@ -1904,9 +1907,6 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
 #endif
 }
 
-// BLACK static recomp helper: checks if ports/BlackRecomp/assets/ already has
-// an extracted default.xbe or an original Xbox .iso. If not, searches roms/Xbox
-// (or roms/) for the user's ISO and links/copies it into assets/.
 // -------------------------------------------------------------
 // PSP disc preparation (Renegade Squadron)
 // -------------------------------------------------------------
@@ -1955,6 +1955,9 @@ static bool PreparePspGame(const PortDefinition& def, const std::string& port_di
     return true;
 }
 
+// BLACK static recomp helper: checks if ports/BlackRecomp/assets/ already has
+// an extracted default.xbe or an original Xbox .iso. If not, searches roms/Xbox
+// (or roms/) for the user's ISO and links/copies it into assets/.
 static bool SetupBlackGame(const PortDefinition& def, const std::string& port_dir, std::string& out_error) {
     if (port_dir.empty()) {
         out_error = "diretorio do port invalido";
