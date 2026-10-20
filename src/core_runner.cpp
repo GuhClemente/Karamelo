@@ -3828,8 +3828,10 @@ static bool CoreLoad(const char* core_dll_path)
 	s_loaded_core_path = core_dll_path ? core_dll_path : "";
 	s_loaded_core_is_pcsx2 = (strstr(core_dll_path, "pcsx2") != NULL) ||
 	                         (strstr(core_dll_path, "ps2") != NULL && strstr(core_dll_path, "play") == NULL);
-	VkHwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
-	D3D11HwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
+	bool is_ps2_family = s_loaded_core_is_pcsx2 || (strstr(core_dll_path, "play") != NULL);
+	HwSetSkipContextDestroy(is_ps2_family);
+	VkHwSetSkipContextDestroy(is_ps2_family);
+	D3D11HwSetSkipContextDestroy(is_ps2_family);
 
 	p_retro_init = (retro_init_t)GetProcAddress(h_core_dll, "retro_init");
 	p_retro_deinit = (retro_deinit_t)GetProcAddress(h_core_dll, "retro_deinit");
@@ -4228,6 +4230,50 @@ static void CoreUnload()
 {
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Inicio: is_game_loaded=%d is_core_loaded=%d", is_game_loaded, is_core_loaded);
 
+	if (is_game_loaded)
+	{
+		RaOnGameUnload();
+		CoreReleaseMemoryMap();
+
+		EnterCriticalSection(&options_lock);
+		g_core_defaults.clear();
+		g_core_defaults_order.clear();
+		g_core_option_raw.clear();
+		LeaveCriticalSection(&options_lock);
+
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroUnloadGameGuarded...");
+		RetroUnloadGameGuarded();
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] RetroUnloadGameGuarded concluido.");
+		is_game_loaded = false;
+	}
+
+	// Uma linha por backend, e nao uma para os quatro juntos. Cada um destes
+	// chama de volta o context_destroy do core, que e codigo de terceiro e pode
+	// nao voltar: com um unico log antes do bloco, o que se via era "Chamando
+	// HwContextDestroy..." e silencio, sem dizer qual dos quatro prendeu.
+	bool is_ps2_family = s_loaded_core_is_pcsx2 || (s_loaded_core_path.find("play") != std::string::npos) || (loaded_core_name == "PlayStation 2");
+	HwSetSkipContextDestroy(is_ps2_family);
+	VkHwSetSkipContextDestroy(is_ps2_family);
+	D3D11HwSetSkipContextDestroy(is_ps2_family);
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy (GL)...");
+	HwContextDestroy();
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] VkHwContextDestroy...");
+	VkHwContextDestroy();
+	// Belt and suspenders alongside the CoreLoad() clear before the next
+	// LoadLibrary: this DLL's negotiation interface has no business surviving
+	// its own unload, whether or not another game gets loaded afterward.
+	VkHwClearNegotiationInterface();
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] D3D11HwContextDestroy...");
+	D3D11HwContextDestroy();
+
+	if (is_core_loaded)
+	{
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroDeinitGuarded...");
+		RetroDeinitGuarded();
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] RetroDeinitGuarded concluido.");
+		is_core_loaded = false;
+	}
+
 	if (audio_thread_running)
 	{
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Parando audio thread...");
@@ -4274,50 +4320,9 @@ static void CoreUnload()
 	InterlockedExchange(&g_ring_write_pos, 0);
 	InterlockedExchange(&g_ring_read_pos, 0);
 
-	if (is_game_loaded)
-	{
-		RaOnGameUnload();
-		CoreReleaseMemoryMap();
-
-		EnterCriticalSection(&options_lock);
-		g_core_defaults.clear();
-		g_core_defaults_order.clear();
-		g_core_option_raw.clear();
-		LeaveCriticalSection(&options_lock);
-
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroUnloadGameGuarded...");
-		RetroUnloadGameGuarded();
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] RetroUnloadGameGuarded concluido.");
-		is_game_loaded = false;
-	}
-
-	// Uma linha por backend, e nao uma para os quatro juntos. Cada um destes
-	// chama de volta o context_destroy do core, que e codigo de terceiro e pode
-	// nao voltar: com um unico log antes do bloco, o que se via era "Chamando
-	// HwContextDestroy..." e silencio, sem dizer qual dos quatro prendeu.
-	VkHwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
-	D3D11HwSetSkipContextDestroy(s_loaded_core_is_pcsx2);
-	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwContextDestroy (GL)...");
-	HwContextDestroy();
-	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] VkHwContextDestroy...");
-	VkHwContextDestroy();
-	// Belt and suspenders alongside the CoreLoad() clear before the next
-	// LoadLibrary: this DLL's negotiation interface has no business surviving
-	// its own unload, whether or not another game gets loaded afterward.
-	VkHwClearNegotiationInterface();
-	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] D3D11HwContextDestroy...");
-	D3D11HwContextDestroy();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] HwReleaseCurrent...");
 	HwReleaseCurrent();
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] teardown de video concluido.");
-
-	if (is_core_loaded)
-	{
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroDeinitGuarded...");
-		RetroDeinitGuarded();
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] RetroDeinitGuarded concluido.");
-		is_core_loaded = false;
-	}
 
 	EnterCriticalSection(&name_lock);
 	loaded_system_dir.clear();
@@ -4377,6 +4382,7 @@ static void CoreUnload()
 		    loaded_core_name == "PSP" ||
 		    loaded_core_name == "GameCube" ||
 		    lower_path.find("pcsx2") != std::string::npos ||
+		    lower_path.find("play") != std::string::npos ||
 		    lower_path.find("ppsspp") != std::string::npos ||
 		    lower_path.find("psp") != std::string::npos)
 		{

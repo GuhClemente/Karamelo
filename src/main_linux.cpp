@@ -779,6 +779,20 @@ int main(int argc, char* argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 
+	bool is_cli_mode = false;
+	for (int i = 1; i < argc; i++)
+	{
+		if (argv[i] && argv[i][0] == '-' && argv[i][1] == '-')
+		{
+			is_cli_mode = true;
+			break;
+		}
+	}
+	if (is_cli_mode)
+	{
+		CrashReporterSetTransientDisable(true);
+	}
+
 	// bios/, cores/, saves/, Wallpapers/, Config/, roms/ and the log are all opened
 	// by relative path, so the working directory has to be the executable's own folder
 	// (matching Win32 main_win32.cpp lines 1362-1377).
@@ -1146,7 +1160,10 @@ int main(int argc, char* argv[])
 	RaInit();
 	UpdaterInit();
 	PortInit();
-	CrashReporterCheckAndDispatch();
+	if (!is_cli_mode)
+	{
+		CrashReporterCheckAndDispatch();
+	}
 
 	if (argc > 1 && argv[1] && argv[1][0] != '\0' && argv[1][0] != '-')
 	{

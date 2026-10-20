@@ -482,11 +482,22 @@ static void HwSigHandler(int sig)
 }
 #endif
 
+static bool g_skip_context_destroy = false;
+
+void HwSetSkipContextDestroy(bool skip)
+{
+	g_skip_context_destroy = skip;
+}
+
 void HwContextDestroy()
 {
 	if (!g_hw_active) return;
 
-	if (g_context_live && HwMakeCurrentForTeardown())
+	if ((g_skip_context_destroy) && g_context_live && g_hw_cb.context_destroy)
+	{
+		HwLog("pulando context_destroy - core marcado para pular ou gerenciado externamente");
+	}
+	else if (g_context_live && HwMakeCurrentForTeardown())
 	{
 		if (g_hw_cb.context_destroy)
 		{

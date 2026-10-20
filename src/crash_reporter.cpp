@@ -42,6 +42,11 @@ static std::string g_last_core_name = "Nenhum";
 static std::string g_last_game_stem = "Nenhum";
 static bool g_crash_reporting_enabled = true;
 static bool g_settings_loaded = false;
+static bool g_transient_disabled = false;
+
+void CrashReporterSetTransientDisable(bool disable) {
+    g_transient_disabled = disable;
+}
 
 // -------------------------------------------------------------
 // Settings Management ([Diagnostics] in Config/karamelo.ini)
@@ -233,9 +238,6 @@ std::string CrashReporterSanitizeString(const std::string& input) {
 void CrashReporterWriteDump(const char* fault_type, unsigned long code,
                            const char* module_name, uintptr_t fault_addr,
                            const std::string& stack_trace_text) {
-    FILE* f = fopen(CRASH_DUMP_PATH, "w");
-    if (!f) return;
-
     std::string core_name = "Nenhum";
     std::string game_stem = "Nenhum";
     {
@@ -243,6 +245,20 @@ void CrashReporterWriteDump(const char* fault_type, unsigned long code,
         core_name = g_last_core_name;
         game_stem = g_last_game_stem;
     }
+
+    // Always record in karamelo.log
+    FILE* lf = fopen("karamelo.log", "a");
+    if (lf) {
+        fprintf(lf, "[ERROR] [CRASH-REPORTER] Falha detectada: tipo=%s codigo=0x%08lX core=%s game=%s%s\n",
+                fault_type ? fault_type : "UNKNOWN", code, core_name.c_str(), game_stem.c_str(),
+                g_transient_disabled ? " (ignorado para relatorio de crash por modo de teste/selftest)" : "");
+        fclose(lf);
+    }
+
+    if (g_transient_disabled) return;
+
+    FILE* f = fopen(CRASH_DUMP_PATH, "w");
+    if (!f) return;
 
     auto now = std::chrono::system_clock::now();
     std::time_t tt = std::chrono::system_clock::to_time_t(now);
@@ -271,14 +287,6 @@ void CrashReporterWriteDump(const char* fault_type, unsigned long code,
     fprintf(f, "stack_trace_end\n");
 
     fclose(f);
-
-    // Also record in karamelo.log
-    FILE* lf = fopen("karamelo.log", "a");
-    if (lf) {
-        fprintf(lf, "[ERROR] [CRASH-REPORTER] Falha gravada em %s: tipo=%s codigo=0x%08lX core=%s game=%s\n",
-                CRASH_DUMP_PATH, fault_type, code, core_name.c_str(), game_stem.c_str());
-        fclose(lf);
-    }
 }
 
 // -------------------------------------------------------------
@@ -449,6 +457,7 @@ static std::string EscapeJsonString(const std::string& str) {
 }
 
 void CrashReporterCheckAndDispatch() {
+    if (g_transient_disabled) return;
     LoadDiagnosticsSettings();
 
     if (!fs::exists(CRASH_DUMP_PATH)) {

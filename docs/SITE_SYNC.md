@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
 | `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.75 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.76 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -1483,5 +1483,31 @@ Lançamento da versão **0.9.75** trazendo a expansão oficial do catálogo para
    - `include/app_info.h` atualizado para `APP_VERSION "0.9.75"` e `Karamelo_v0.9.75.exe`.
    - Manifesto `dist/version.json` atualizado para a versão `0.9.75`.
    - Suíte de testes unitários expandida para validar a versão `0.9.75`.
+
+---
+
+## 35. Lançamento da Versão 0.9.76 (20/10/2026)
+
+Lançamento da versão **0.9.76** com foco em estabilidade e ciclo de vida de motores Libretro, correção crítica de encerramento no core Play! (PlayStation 2) e isolamento operacional de testes automatizados e Crash Reporter.
+
+### Principais Novidades da v0.9.76
+
+1. **Reordenação do Teardown de Motores Libretro (`core_runner`)**:
+   - `RetroDeinitGuarded()` agora é invocado enquanto os streams de áudio e os contextos gráficos de hardware do frontend ainda estão ativos e válidos. Cores que mantêm threads de VM e subsistemas próprios em execução (como o `Play!` de PS2) agora conseguem sincronizar e encerrar suas threads ordenadamente sem dereferenciar buffers já destruídos.
+   - Destruição de dispositivos de áudio SDL (`SDL_DestroyAudioStream`) e liberação de contextos gráficos (`HwReleaseCurrent`) passam a ocorrer estritamente após a conclusão de `retro_deinit`.
+
+2. **Estabilidade e Isolamento de DLLs (`skip_free`)**:
+   - O core `ps2_play.dll` foi adicionado à lista protegida de `skip_free` (junto a PCSX2, PPSSPP, GameCube e PSP), impedindo que o `FreeLibrary` desmapeie páginas de código com threads residuais da biblioteca em finalização ou force travamentos de *loader lock*.
+   - Tratamento de `HwSetSkipContextDestroy` estendido para toda a família PS2, prevenindo chamadas concorrentes inválidas ao destruir contexto gráfico.
+
+3. **Isolamento de Crash Reporter em CLI / Autotestes**:
+   - Implementado `CrashReporterSetTransientDisable`: execuções headless ou de linha de comando (`--core-selftest`, `--install-port`, etc.) continuam registrando detalhes em `karamelo.log`, mas não gravam `crash_dump.txt` nem disparam transmissões de telemetria aos canais de produção.
+
+4. **Sincronização de Versão e Baterias de Teste**:
+   - `APP_VERSION` atualizado para `0.9.76` em `include/app_info.h` e executável `Karamelo_v0.9.76.exe`.
+   - Manifesto `dist/version.json` atualizado para a versão `0.9.76`.
+   - Suíte de testes unitários (`tests/test_updater.cpp`) expandida com cobertura para a nova versão.
+   - Baterias de estresse `tools/stress_cores.ps1` executadas e validadas com 100% de aprovação (PCSX2 e Play!).
+
 
 

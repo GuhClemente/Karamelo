@@ -1417,9 +1417,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 	}
 
+	bool is_cli_mode = false;
+	for (int i = 1; i < __argc; i++)
+	{
+		if (__argv[i] && __argv[i][0] == '-' && __argv[i][1] == '-')
+		{
+			is_cli_mode = true;
+			break;
+		}
+	}
+	if (is_cli_mode)
+	{
+		CrashReporterSetTransientDisable(true);
+	}
+
 	CrashReporterInit();
 	CheckWindowsCrashReportsOnStartup();
-	CrashReporterCheckAndDispatch();
+	if (!is_cli_mode)
+	{
+		CrashReporterCheckAndDispatch();
+	}
 
 	// Root cause of a real crash: SDL_Init(SDL_INIT_VIDEO) registers a Win32
 	// window class named "SDL_app" (SDL's own hardcoded default) under

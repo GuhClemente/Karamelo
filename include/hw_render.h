@@ -53,6 +53,7 @@ bool HwEnsureSurface(unsigned width, unsigned height);
 // Tells the core its context is ready / going away.
 void HwContextReset();
 void HwContextDestroy();
+void HwSetSkipContextDestroy(bool skip);
 
 // Pulls the current FBO contents into a CPU buffer as 0x00RRGGBB, flipping to
 // top-down. Returns false if there is nothing to read.

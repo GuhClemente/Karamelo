@@ -38,4 +38,7 @@ void CrashReporterWriteDump(const char* fault_type, unsigned long code,
                            const char* module_name, uintptr_t fault_addr,
                            const std::string& stack_trace_text);
 
+// Transiently disables writing crash_dump.txt and dispatching to server (e.g. during CLI tests / selftests)
+void CrashReporterSetTransientDisable(bool disable);
+
 #endif // __cplusplus
