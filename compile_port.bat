@@ -130,7 +130,9 @@ if errorlevel 1 (
 
 echo.
 echo [BUILD SUCCESS] app\%APP_EXE%
-copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
+rem app\%APP_BASE%.exe (o que run_port.bat abre) so e atualizado no fim, depois
+rem dos testes de unidade e da bateria de cores. Um build que deixa algum core
+rem sem abrir nao substitui o executavel que estava funcionando.
 if not exist app\cores mkdir app\cores
 rem A pasta cores\ na raiz e um segundo deposito dos mesmos motores, e esta
 rem copia despeja ela por cima de app\cores\ a cada compilacao. Ela nunca
@@ -164,4 +166,32 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem Bateria de cores: cada core com uma ROM real do seu sistema, carregado,
+rem rodando ate entregar video, desligado e carregado de novo - pelo mesmo
+rem caminho do menu. Uma vez no driver padrao (Auto) e outra no driver que o
+rem jogador tem salvo em app\Config\karamelo.cfg, porque foi justamente num
+rem driver diferente do padrao que um core falhou sem nenhum teste acusar.
+rem O Nintendo 64 roda nos tres cores (ParaLLEl, Mupen64Plus, Gopher64).
+rem Qualquer core que recuse, trave ou derrube o processo reprova o build.
+echo.
+echo ==================================================
+echo [RUNNING CORE BATTERY]
+echo ==================================================
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\stress_cores.ps1" -Cycles 1 -Driver 0
+if errorlevel 1 (
+    echo [BUILD FAILED] Bateria de cores reprovou no driver Auto - veja a lista acima.
+    exit /b 1
+)
+set "USER_DRIVER="
+for /f "tokens=2 delims==" %%d in ('findstr /b /c:"driver=" app\Config\karamelo.cfg 2^>nul') do set "USER_DRIVER=%%d"
+if defined USER_DRIVER if not "%USER_DRIVER%"=="0" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\stress_cores.ps1" -Cycles 1 -Driver %USER_DRIVER%
+    if errorlevel 1 (
+        echo [BUILD FAILED] Bateria de cores reprovou no driver %USER_DRIVER% da sua configuracao.
+        exit /b 1
+    )
+)
+
+copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
+echo [BUILD OK] app\%APP_BASE%.exe atualizado - testes de unidade e bateria de cores passaram.
 exit /b 0

@@ -915,19 +915,41 @@ int main(int argc, char* argv[])
 			}
 		};
 
-		for (int i = 1; i + 1 < argc; i++)
+		// Same parsing as main_win32.cpp: "--driver N" is taken out of the
+		// positional list instead of being read as the recovery-check pair.
+		std::vector<const char*> pos;
+		for (int i = 2; i < argc; i++)
 		{
-			if (strcasecmp(argv[i], "--driver") == 0)
+			if (strcasecmp(argv[i], "--driver") == 0 && i + 1 < argc)
 			{
 				int drv = atoi(argv[i + 1]);
 				MenuSetVideoDriverForSelftest(drv);
 				log("driver forcado para %d", drv);
-				break;
+				i++;
+				continue;
 			}
+			pos.push_back(argv[i]);
 		}
+		if (pos.size() < 2)
+		{
+			log("uso: --core-selftest <core> <rom> [<core2> <rom2>] [--driver N]");
+			if (lf) fclose(lf);
+			return 2;
+		}
+		const char* sel_dll = pos[0];
+		const char* sel_rom = pos[1];
+		const bool has_retry = pos.size() >= 4;
+
+		// Same GPU probe the app runs at startup, on this (main) thread, so the
+		// hidden GL window belongs to the main thread as it does in the app
+		// instead of to whichever core thread happened to need it first. See
+		// the same block in main_win32.cpp for what that broke on Windows.
+		HwIsAvailable();
+		HwReleaseCurrent();
+		VkHwIsAvailable();
 
 		DWORD t0 = GetTickCount();
-		bool started = CoreRequestLoad(argv[3], argv[2]);
+		bool started = CoreRequestLoad(sel_rom, sel_dll);
 
 		DWORD waited_ms = 0;
 		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 20000)
@@ -937,12 +959,22 @@ int main(int argc, char* argv[])
 		}
 		bool running = CoreIsRunning();
 		log("load: dll=%s rom=%s started=%d running=%d load_ms=%u",
-			argv[2], argv[3], started ? 1 : 0, running ? 1 : 0, GetTickCount() - t0);
+			sel_dll, sel_rom, started ? 1 : 0, running ? 1 : 0, GetTickCount() - t0);
 
+		// See main_win32.cpp: a running core must also deliver video.
+		long frames = 0;
 		if (running)
 		{
-			Sleep(300);
+			DWORD fw = 0;
+			while ((frames = CoreGetVideoFrameCount()) < 5 && CoreIsRunning() && fw < 10000)
+			{
+				Sleep(50);
+				fw += 50;
+			}
+			running = CoreIsRunning();
+			log("video: frames=%ld running=%d", frames, running ? 1 : 0);
 		}
+		const bool produced_video = running && frames >= 5;
 
 		DWORD shutdown_t0 = GetTickCount();
 		CoreShutdown();
@@ -962,10 +994,10 @@ int main(int argc, char* argv[])
 		log("post-recovery lock check: toast_ok=%d (%ums)", toast_done->load() ? 1 : 0, toast_wait);
 
 		bool retry_started = false, retry_running = false;
-		if (argc > 5)
+		if (has_retry)
 		{
 			DWORD t1 = GetTickCount();
-			retry_started = CoreRequestLoad(argv[5], argv[4]);
+			retry_started = CoreRequestLoad(pos[3], pos[2]);
 			DWORD waited2 = 0;
 			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 20000)
 			{
@@ -974,7 +1006,20 @@ int main(int argc, char* argv[])
 			}
 			retry_running = CoreIsRunning();
 			log("recovery-check load: dll=%s rom=%s started=%d running=%d load_ms=%u",
-				argv[4], argv[5], retry_started ? 1 : 0, retry_running ? 1 : 0, GetTickCount() - t1);
+				pos[2], pos[3], retry_started ? 1 : 0, retry_running ? 1 : 0, GetTickCount() - t1);
+			// Same bar as the first load: the reloaded game has to deliver video.
+			if (retry_running)
+			{
+				long retry_frames = 0;
+				DWORD fw2 = 0;
+				while ((retry_frames = CoreGetVideoFrameCount()) < 5 && CoreIsRunning() && fw2 < 10000)
+				{
+					Sleep(50);
+					fw2 += 50;
+				}
+				retry_running = CoreIsRunning() && retry_frames >= 5;
+				log("recovery-check video: frames=%ld running=%d", retry_frames, retry_running ? 1 : 0);
+			}
 			if (retry_running)
 			{
 				DWORD t2 = GetTickCount();
@@ -983,7 +1028,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		bool pass = started && running && (argc <= 5 || (retry_started && retry_running));
+		bool pass = started && produced_video && (!has_retry || (retry_started && retry_running));
 		log("RESULT=%s", pass ? "PASS" : "FAIL");
 		if (lf) fclose(lf);
 		return pass ? 0 : 1;

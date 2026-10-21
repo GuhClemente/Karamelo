@@ -14,6 +14,10 @@
 // declare the window unresponsive.
 bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint);
 bool CoreIsLoading();
+// Video frames the current game has delivered since it loaded (reset on every
+// load). The self-test uses it to tell a game that runs from one that only
+// got past retro_load_game.
+long CoreGetVideoFrameCount();
 void CoreShutdown(bool will_reload = false);
 
 // Recreates any of the frontend's internal locks (toast/name/options) that

@@ -158,7 +158,13 @@ if (-not $System) {
     }
 }
 
-if ($targets.Count -eq 0) { throw "Nenhum par (core, rom) encontrado. Confira app\roms\ e app\cores\." }
+if ($targets.Count -eq 0) {
+    # Uma checkout limpa (sem cores nem ROMs, que nunca vao para o git) nao tem
+    # o que testar - isso nao e um core falhando, entao nao reprova o build.
+    Write-Host "  Nenhum par (core, rom) em app\cores\ + app\roms\ - bateria pulada." -ForegroundColor DarkYellow
+    Remove-Item $lock -Force -ErrorAction SilentlyContinue
+    exit 0
+}
 
 Write-Host ""
 Write-Host ("Bateria: {0} sistemas x {1} ciclos, cada ciclo = carrega, desliga, carrega de novo" -f $targets.Count, $Cycles) -ForegroundColor Cyan

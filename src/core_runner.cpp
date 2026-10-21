@@ -107,6 +107,8 @@ static retro_get_memory_size_t p_retro_get_memory_size = NULL;
 
 static bool is_core_loaded = false;
 static bool is_game_loaded = false;
+static DWORD s_game_loaded_tick = 0; // GetTickCount() when the current game finished loading
+static bool  s_core_faulted = false;   // retro_run raised an exception this session - never call it again
 static enum retro_pixel_format core_pixel_format = RETRO_PIXEL_FORMAT_RGB565;
 
 // Triple-Buffered Lock-Free Framebuffer System
@@ -367,9 +369,17 @@ static const uint32_t* AcquireFrame(int* out_w, int* out_h)
 	return g_triple_fb[g_fb_front];
 }
 
+static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...);
+
 void CoreSetToast(const char* message, int frames_duration)
 {
 	if (!message) return;
+
+	// Every message the player sees also lands in the log. A "FALHA AO
+	// CARREGAR - VEJA karamelo.log" whose cause never reached the log left
+	// nothing to investigate; with the toast itself recorded, at least the
+	// moment and the wording are there next to whatever ran before it.
+	CoreLogPrintf(RETRO_LOG_INFO, "[TOAST] %s", message);
 
 	// toast_message and toast_expires_ms must change together. Setting the timer
 	// after releasing toast_lock left a window where two threads calling
@@ -2902,6 +2912,17 @@ static const std::unordered_set<std::string>& NaomiAtomiswaveRomsets()
 	return s_names;
 }
 
+// "cores/n64_gopher.dll" -> "n64", "cores/ps2_play.dll" -> "ps2": the system
+// part of a core's file name, so two builds for the same console compare equal.
+static std::string CoreFamily(const std::string& core_path)
+{
+	std::string stem = fs::path(core_path).stem().string();
+	std::transform(stem.begin(), stem.end(), stem.begin(),
+		[](unsigned char c) { return (char)tolower(c); });
+	size_t cut = stem.find('_');
+	return cut == std::string::npos ? stem : stem.substr(0, cut);
+}
+
 static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 {
 	(void)lpParam;
@@ -2976,7 +2997,14 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		if (ArchiveExtractRom(rom_path, extracted_rom, extracted_core))
 		{
 			rom_path = extracted_rom;
-			if (!extracted_core.empty()) core_dll = extracted_core;
+			// The archive scan only knows "a .z64 means cores/n64.dll". When the
+			// menu already picked a core for that same system - the N64 core
+			// chosen in Settings > Video - that choice stands; replacing it sent
+			// every zipped N64 game to the generic build, whatever the player
+			// had selected.
+			if (!extracted_core.empty() &&
+			    (core_dll.empty() || CoreFamily(extracted_core) != CoreFamily(core_dll)))
+				core_dll = extracted_core;
 
 			// fMSX's fmsx_mode core option defaults to "MSX2+" (the first of
 			// MSX2+|MSX1|MSX2), and that specific default can fail to render in some builds.
@@ -3280,6 +3308,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		FrameRunResult run = RunOneFrameGuarded();
 		if (!run.ok)
 		{
+			s_core_faulted = true;
 			consecutive_crashes++;
 			// This is the line that turns the next "it crashed" report into
 			// something actionable instead of guesswork re-derived from PERF/
@@ -3580,6 +3609,12 @@ bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint)
 {
 	if (!rom_path) return false;
 
+	// Which game and which core were asked for, before anything can fail -
+	// several failure paths below (a core DLL that will not load, a core
+	// missing for the format) used to say nothing in the log at all.
+	CoreLogPrintf(RETRO_LOG_INFO, "[CoreRequestLoad] rom=%s core=%s", rom_path,
+		(core_dll_hint && core_dll_hint[0]) ? core_dll_hint : "(auto)");
+
 	InterlockedExchange(&g_core_state, CORE_STATE_LOADING);
 	CoreShutdown(true);
 
@@ -3608,6 +3643,8 @@ bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint)
 	}
 	return true;
 }
+
+long CoreGetVideoFrameCount() { return g_video_diag_frames; }
 
 bool CoreIsLoading()
 {
@@ -3818,9 +3855,9 @@ static bool CoreLoad(const char* core_dll_path)
 	{
 #ifndef _WIN32
 		const char* err = dlerror();
-		printf("[CoreRunner] Failed to load DLL: %s (error: %s)\n", core_dll_path, err ? err : "unknown");
+		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] falha ao carregar o core %s (%s)", core_dll_path, err ? err : "erro desconhecido");
 #else
-		printf("[CoreRunner] Failed to load DLL: %s\n", core_dll_path);
+		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] falha ao carregar o core %s (GetLastError=%lu)", core_dll_path, GetLastError());
 #endif
 		return false;
 	}
@@ -4223,12 +4260,43 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	}
 
 	is_game_loaded = true;
+	s_game_loaded_tick = GetTickCount();
+	s_core_faulted = false;
 	return true;
 }
 
 static void CoreUnload()
 {
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Inicio: is_game_loaded=%d is_core_loaded=%d", is_game_loaded, is_core_loaded);
+
+	// PPSSPP reads the game in on a loader thread of its own after
+	// retro_load_game returns. Unloaded while that thread is still working, it
+	// leaves it running (its log then shows "Failed to load module ...
+	// EBOOT.BIN"), and because the DLL stays mapped (see skip_free below) the
+	// next PSP game trips PPSSPP's own assert on that thread and the whole app
+	// dies - found by the core battery, reachable by closing a PSP game in its
+	// first second. Keep running frames until the game has been up for a few
+	// seconds so the loader has finished before the unload.
+	if (is_game_loaded && p_retro_run && !s_core_faulted)
+	{
+		std::string lower_core = s_loaded_core_path;
+		std::transform(lower_core.begin(), lower_core.end(), lower_core.begin(),
+			[](unsigned char c) { return (char)tolower(c); });
+		if (lower_core.find("psp") != std::string::npos || lower_core.find("ppsspp") != std::string::npos)
+		{
+			const DWORD kSettleMs = 3000;
+			DWORD up = GetTickCount() - s_game_loaded_tick;
+			if (up < kSettleMs)
+			{
+				CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] PPSSPP aberto ha %lums - aguardando o carregador terminar", up);
+				while (GetTickCount() - s_game_loaded_tick < kSettleMs)
+				{
+					if (!RunOneFrameGuarded().ok) break;
+					Sleep(16);
+				}
+			}
+		}
+	}
 
 	if (is_game_loaded)
 	{

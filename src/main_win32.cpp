@@ -1589,19 +1589,47 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		// 4=Software. Sem ele o autoteste roda no padrao Auto, que nao e o que
 		// o jogador tem configurado - e foi assim que a bateria passou meses
 		// sem nunca exercitar Vulkan nem DirectX 11 em core nenhum.
-		for (int i = 1; i + 1 < __argc; i++)
+		// The flag and its value are taken out of the positional list. They
+		// used to stay in it, so "--core-selftest core rom --driver 2" read
+		// "--driver"/"2" as the recovery-check core and ROM and reported FAIL
+		// for a load that had worked.
+		std::vector<const char*> pos;
+		for (int i = 2; i < __argc; i++)
 		{
-			if (_stricmp(__argv[i], "--driver") == 0)
+			if (_stricmp(__argv[i], "--driver") == 0 && i + 1 < __argc)
 			{
 				int drv = atoi(__argv[i + 1]);
 				MenuSetVideoDriverForSelftest(drv);
 				log("driver forcado para %d", drv);
-				break;
+				i++;
+				continue;
 			}
+			pos.push_back(__argv[i]);
 		}
+		if (pos.size() < 2)
+		{
+			log("uso: --core-selftest <core> <rom> [<core2> <rom2>] [--driver N]");
+			if (lf) fclose(lf);
+			TerminateProcess(GetCurrentProcess(), 2);
+			return 2;
+		}
+		const char* sel_dll = pos[0];
+		const char* sel_rom = pos[1];
+		const bool has_retry = pos.size() >= 4;
+
+		// Same GPU probe the app runs at startup, on this (main) thread. Without
+		// it the hidden GL window was created by the first core thread - and a
+		// Windows window dies with the thread that created it, so the second
+		// load in this test found no window: "SDL_GL_MakeCurrent falhou nesta
+		// thread" and "formato do pixel invalido", failing PSP/3DS/PS2 here
+		// while the same games load fine in the app.
+		HwIsAvailable();
+		HwReleaseCurrent();
+		VkHwIsAvailable();
+		D3D11HwIsAvailable();
 
 		DWORD t0 = GetTickCount();
-		bool started = CoreRequestLoad(__argv[3], __argv[2]);
+		bool started = CoreRequestLoad(sel_rom, sel_dll);
 
 		DWORD waited_ms = 0;
 		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 20000)
@@ -1611,12 +1639,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 		bool running = CoreIsRunning();
 		log("load: dll=%s rom=%s started=%d running=%d load_ms=%lu",
-			__argv[2], __argv[3], started ? 1 : 0, running ? 1 : 0, GetTickCount() - t0);
+			sel_dll, sel_rom, started ? 1 : 0, running ? 1 : 0, GetTickCount() - t0);
 
+		// "Running" only says retro_load_game accepted the file. A core can
+		// say yes and then never hand back a single frame, which on screen is
+		// the same dead game - so the core also has to deliver video.
+		long frames = 0;
 		if (running)
 		{
-			Sleep(300); // let several real frames run through retro_run()
+			DWORD fw = 0;
+			while ((frames = CoreGetVideoFrameCount()) < 5 && CoreIsRunning() && fw < 10000)
+			{
+				Sleep(50);
+				fw += 50;
+			}
+			running = CoreIsRunning();
+			log("video: frames=%ld running=%d", frames, running ? 1 : 0);
 		}
+		const bool produced_video = running && frames >= 5;
 
 		DWORD shutdown_t0 = GetTickCount();
 		CoreShutdown();
@@ -1651,10 +1691,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		// The real proof a hung core didn't leave the engine wedged: load a
 		// second, different core+ROM right after, with its own timeout.
 		bool retry_started = false, retry_running = false;
-		if (__argc > 5)
+		if (has_retry)
 		{
 			DWORD t1 = GetTickCount();
-			retry_started = CoreRequestLoad(__argv[5], __argv[4]);
+			retry_started = CoreRequestLoad(pos[3], pos[2]);
 			DWORD waited2 = 0;
 			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 20000)
 			{
@@ -1663,7 +1703,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			}
 			retry_running = CoreIsRunning();
 			log("recovery-check load: dll=%s rom=%s started=%d running=%d load_ms=%lu",
-				__argv[4], __argv[5], retry_started ? 1 : 0, retry_running ? 1 : 0, GetTickCount() - t1);
+				pos[2], pos[3], retry_started ? 1 : 0, retry_running ? 1 : 0, GetTickCount() - t1);
+			// Same bar as the first load: the reloaded game has to deliver video.
+			if (retry_running)
+			{
+				long retry_frames = 0;
+				DWORD fw2 = 0;
+				while ((retry_frames = CoreGetVideoFrameCount()) < 5 && CoreIsRunning() && fw2 < 10000)
+				{
+					Sleep(50);
+					fw2 += 50;
+				}
+				retry_running = CoreIsRunning() && retry_frames >= 5;
+				log("recovery-check video: frames=%ld running=%d", retry_frames, retry_running ? 1 : 0);
+			}
 			if (retry_running)
 			{
 				DWORD t2 = GetTickCount();
@@ -1672,7 +1725,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			}
 		}
 
-		bool pass = started && running && (__argc <= 5 || (retry_started && retry_running));
+		bool pass = started && produced_video && (!has_retry || (retry_started && retry_running));
 		log("RESULT=%s", pass ? "PASS" : "FAIL");
 		if (lf) fclose(lf);
 		// Mesmo motivo do fim do WinMain: a destruicao estatica da DLL do core
