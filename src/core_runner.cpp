@@ -1957,6 +1957,16 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "ppsspp_auto_frameskip") == 0) var->value = "disabled";
 			else if (strcmp(var->key, "ppsspp_frameskip") == 0) var->value = "disabled";
 
+			// FM Towns (Geartowns) core options:
+			// Mute buzzer volume by default so holding keyboard keys does not produce loud speaker clicks.
+			else if (strcmp(var->key, "geartowns_buzzer_volume") == 0) var->value = "0";
+
+			// NEC PC-98 (NP2kai) core options:
+			// Default joymode to "Keypad" so gamepads / joysticks map D-pad and analog stick
+			// to numeric keypad (8/2/4/6) and buttons to Z/X/Space, making action games
+			// (Rusty, Touhou, Popful Mail, etc.) immediately playable with any controller.
+			else if (strcmp(var->key, "np2kai_joymode") == 0) var->value = "Keypad";
+
 			// If no explicit override matched: hand back what the core itself declared as default.
 			else
 			{
@@ -2786,6 +2796,49 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 			else if (vk == VK_LMENU || vk == VK_RMENU)
 			{
 				if ((GetAsyncKeyState(vk) & 0x8000) || (GetAsyncKeyState(VK_MENU) & 0x8000)) return 1;
+			}
+			// Directional bridging between Arrows and Numeric Keypad:
+			// Japanese vintage computers (PC-98, FM Towns, etc.) predominantly map
+			// game movement to the Tenkey (Keypad 8/2/4/6) instead of cursor arrows.
+			// Users on laptops, TKL keyboards, or standard arrow setups expect Arrow
+			// keys to walk. This bidirectional bridge allows both Arrows and Keypad
+			// keys to trigger directional inputs seamlessly across all games.
+			else if (id == 260 || id == 276) // RETROK_KP4 or RETROK_LEFT
+			{
+				if ((GetAsyncKeyState(VK_LEFT) & 0x8000) || (GetAsyncKeyState(VK_NUMPAD4) & 0x8000)) return 1;
+			}
+			else if (id == 262 || id == 275) // RETROK_KP6 or RETROK_RIGHT
+			{
+				if ((GetAsyncKeyState(VK_RIGHT) & 0x8000) || (GetAsyncKeyState(VK_NUMPAD6) & 0x8000)) return 1;
+			}
+			else if (id == 264 || id == 273) // RETROK_KP8 or RETROK_UP
+			{
+				if ((GetAsyncKeyState(VK_UP) & 0x8000) || (GetAsyncKeyState(VK_NUMPAD8) & 0x8000)) return 1;
+			}
+			else if (id == 258 || id == 274) // RETROK_KP2 or RETROK_DOWN
+			{
+				if ((GetAsyncKeyState(VK_DOWN) & 0x8000) || (GetAsyncKeyState(VK_NUMPAD2) & 0x8000)) return 1;
+			}
+			// Keypad diagonals (used by PC-98 games like Rusty for running):
+			else if (id == 263) // RETROK_KP7 (Up-Left)
+			{
+				if ((GetAsyncKeyState(VK_NUMPAD7) & 0x8000) ||
+				    ((GetAsyncKeyState(VK_UP) & 0x8000) && (GetAsyncKeyState(VK_LEFT) & 0x8000))) return 1;
+			}
+			else if (id == 265) // RETROK_KP9 (Up-Right)
+			{
+				if ((GetAsyncKeyState(VK_NUMPAD9) & 0x8000) ||
+				    ((GetAsyncKeyState(VK_UP) & 0x8000) && (GetAsyncKeyState(VK_RIGHT) & 0x8000))) return 1;
+			}
+			else if (id == 257) // RETROK_KP1 (Down-Left)
+			{
+				if ((GetAsyncKeyState(VK_NUMPAD1) & 0x8000) ||
+				    ((GetAsyncKeyState(VK_DOWN) & 0x8000) && (GetAsyncKeyState(VK_LEFT) & 0x8000))) return 1;
+			}
+			else if (id == 259) // RETROK_KP3 (Down-Right)
+			{
+				if ((GetAsyncKeyState(VK_NUMPAD3) & 0x8000) ||
+				    ((GetAsyncKeyState(VK_DOWN) & 0x8000) && (GetAsyncKeyState(VK_RIGHT) & 0x8000))) return 1;
 			}
 			else
 			{
