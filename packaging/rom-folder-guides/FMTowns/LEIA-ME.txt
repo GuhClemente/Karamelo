@@ -1,0 +1,32 @@
+==========================================================================
+ Fujitsu FM Towns / FM Towns Marty - Geartowns
+==========================================================================
+
+Core usado: cores/fmtowns.dll (Windows), cores/fmtowns.so (Linux), cores/fmtowns.dylib (macOS)
+
+Formatos aceitos nesta pasta:
+  - Imagens de CD: .chd, .cue/.bin, .iso, .m3u
+  - Disquetes de boot: .d77, .d88, .hdm, .xdf, .bin, .img
+  - Compactados: .zip, .7z, .rar
+
+BIOS / firmware:
+  Devem ficar soltos em app/bios/
+  - FMT_SYS.ROM: OBRIGATORIO (524.288 bytes - BIOS de Sistema Towns OS)
+  - FMT_DOS.ROM: OBRIGATORIO (524.288 bytes - ROM de boot DOS Towns OS)
+  - FMT_FNT.ROM: OBRIGATORIO (ROM de fontes basicas 8/16-dot)
+  - FMT_DIC.ROM: OBRIGATORIO (524.288 bytes - Dicionario Kanji)
+  - FMT_F20.ROM: Opcional (1.253.376 bytes - Fonte Kanji 20/16-dot estendida)
+
+Observacoes de execucao:
+  - Jogos em CD-ROM (.chd/.cue/.iso) inicializam diretamente via Towns OS.
+  - Certos jogos antigos exigem disquete de boot (.d77/.d88) inserido no Drive 0
+    junto com a midia de CD-ROM.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

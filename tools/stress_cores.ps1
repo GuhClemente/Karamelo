@@ -109,6 +109,8 @@ $map = [ordered]@{
     "GameCube"      = @{ Dll = "cores/gamecube.dll";     Dir = "GameCube" }
     "3DS"           = @{ Dll = "cores/3ds.dll";          Dir = "3DS" }
     "DOS"           = @{ Dll = "cores/dosbox_pure.dll";  Dir = "DOS" }
+    "PC98"          = @{ Dll = "cores/pc98.dll";         Dir = "PC98" }
+    "FMTowns"       = @{ Dll = "cores/fmtowns.dll";      Dir = "FMTowns" }
 }
 
 # O que NAO e ROM.

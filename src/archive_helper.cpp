@@ -318,6 +318,11 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 	if (ext == ".tzx" || ext == ".tap" || ext == ".z80" || ext == ".sna") return "cores/spectrum.dll";
 	if (ext == ".pcfx") return "cores/pcfx.dll";
 	if (ext == ".cso") return "cores/psp.dll";
+	if (ext == ".hdi" || ext == ".d88" || ext == ".88d" || ext == ".d98" || ext == ".98d" ||
+		ext == ".fdi" || ext == ".fdd" || ext == ".2hd" || ext == ".tfd" || ext == ".nfd" ||
+		ext == ".dup" || ext == ".cmd" || ext == ".nhd") return "cores/pc98.dll";
+	if (ext == ".d77" || ext == ".h0" || ext == ".h1" || ext == ".h2" || ext == ".h3" ||
+		ext == ".h4" || ext == ".h5" || ext == ".h6" || ext == ".hdd") return "cores/fmtowns.dll";
 
 	if (ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" ||
 		ext == ".pbp" || ext == ".toc")
@@ -344,6 +349,8 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 		if (in("3DO")) return "cores/3do.dll";
 		if (in("Amiga") || in("CD32")) return "cores/amiga.dll";
 		if (in("PCFX") || in("PC-FX")) return "cores/pcfx.dll";
+		if (in("FMTowns") || in("FM-Towns") || in("Towns")) return "cores/fmtowns.dll";
+		if (in("PC98") || in("PC-98")) return "cores/pc98.dll";
 		return "cores/psx.dll";
 	}
 
@@ -459,6 +466,8 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 		if (in("3DO")) return "cores/3do.dll";
 		if (in("WonderSwan") || in("WSwan")) return "cores/wswan.dll";
 		if (in("PCFX") || in("PC-FX")) return "cores/pcfx.dll";
+		if (in("FMTowns") || in("FM-Towns") || in("Towns")) return "cores/fmtowns.dll";
+		if (in("PC98") || in("PC-98")) return "cores/pc98.dll";
 		if (in("Saturn")) return "cores/saturn.dll";
 		if (in("TurboGrafx")) return "cores/pce.dll";
 		if (in("Dreamcast")) return "cores/dreamcast.dll";
@@ -795,6 +804,8 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 	static const std::vector<std::string> KNOWN_EXTS = {
 		".m3u",                          // multi-disc playlist wins outright
 		".cue", ".chd", ".toc", ".iso", ".gdi", ".cdi", ".gcm", ".rvz", ".wbfs", ".cso", ".pbp",  // disc images
+		".hdi", ".d88", ".88d", ".d98", ".98d", ".fdi", ".fdd", ".2hd", ".tfd", ".nfd", ".dup", ".cmd", ".nhd",
+		".d77", ".h0", ".h1", ".h2", ".h3", ".h4", ".h5", ".h6", ".hdd", ".hdm", ".xdf",
 		".z64", ".n64", ".v64",
 		".sfc", ".smc",
 		".nes", ".fds",

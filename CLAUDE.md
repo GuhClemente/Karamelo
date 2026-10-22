@@ -23,7 +23,7 @@ This file provides project guidelines, architecture details, and essential comma
 ## 2. Core Rules & Single Sources of Truth
 
 1. **Never Invent Counts or Numbers**:
-   - Systems & Engines: Read from `include/app_info.h` (`APP_SYSTEM_COUNT = 35`, `APP_CORE_ENGINES = 40`). Never report `APP_CORE_FILES` (41) as an engine count.
+   - Systems & Engines: Read from `include/app_info.h` (`APP_SYSTEM_COUNT = 37`, `APP_CORE_ENGINES = 42`). Never report `APP_CORE_FILES` (43) as an engine count.
    - Ports & Recomp: Source of truth is `CREDITS.md` and `src/port_runner.cpp` (Total: 70 ports — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎). The Darkness (Xbox 360) is catalogued but `hidden` (out of the menu and the site) and is not counted.
    - BIOS Information: Source of truth is `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Repository Hygiene**:

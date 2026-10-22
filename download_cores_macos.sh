@@ -54,6 +54,8 @@ CORES_LIST=(
     "jaguar.dylib:virtualjaguar_libretro.dylib.zip"
     "msx.dylib:fmsx_libretro.dylib.zip"
     "dosbox_pure.dylib:dosbox_pure_libretro.dylib.zip"
+    "pc98.dylib:np2kai_libretro.dylib.zip"
+    "fmtowns.dylib:geartowns_libretro.dylib.zip"
 )
 
 echo "====================================================================="

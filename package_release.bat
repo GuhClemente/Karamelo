@@ -74,6 +74,7 @@ for %%S in (
     TurboGrafx16 PCFX
     3DO ColecoVision WonderSwan
     DOS MSX Amiga C64 ZXSpectrum
+    PC98 FMTowns
 ) do (
     mkdir "%ROMS_DIR%\%%S"
     copy /Y "%~dp0packaging\rom-folder-guides\%%S\LEIA-ME.txt" "%ROMS_DIR%\%%S\LEIA-ME.txt" >nul 2>&1

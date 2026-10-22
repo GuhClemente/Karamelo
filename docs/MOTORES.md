@@ -1,10 +1,10 @@
 # Motores de emulação — lista para publicação
 
-Número a publicar: **40 motores** em **35 sistemas**.
+Número a publicar: **42 motores** em **37 sistemas**.
 
-Conferido em 09/09/2026 por hash de cada `.dll` em `cores/`, não pelo nome do
-arquivo. São 41 arquivos e 40 conteúdos distintos — `n64_parallel.dll` é cópia
-byte a byte de `n64.dll`, então contam como um. Publicar 41 seria contar o
+Conferido por hash de cada `.dll` em `cores/`, não pelo nome do
+arquivo. São 43 arquivos e 42 conteúdos distintos — `n64_parallel.dll` é cópia
+byte a byte de `n64.dll`, então contam como um. Publicar 43 seria contar o
 mesmo emulador duas vezes.
 
 A fonte de verdade dos números continua sendo `include/app_info.h`
@@ -80,6 +80,8 @@ A fonte de verdade dos números continua sendo `include/app_info.h`
 | PUAE | Commodore Amiga |
 | Fuse | ZX Spectrum |
 | DOSBox Pure | MS-DOS |
+| NP2kai | NEC PC-9801 / PC-9821 |
+| Geartowns | Fujitsu FM Towns / Marty |
 
 ## Outros
 

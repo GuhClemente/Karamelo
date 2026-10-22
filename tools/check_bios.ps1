@@ -29,7 +29,7 @@ $expected = @(
     @{ n = "ATARIXL.ROM";        md5 = "06daac977823773a3eea3422fd26a703"; sys = "Atari 5200";        req = $true  },
     @{ n = "ATARIBAS.ROM";       md5 = "0bac0c6a50104045d902df4503a4c30b"; sys = "Atari 5200";        req = $true  },
     @{ n = "ATARIOSA.ROM";       md5 = "eb1f32f5d9f382db1bbfb8d7f9cb343a"; sys = "Atari 5200";        req = $true  },
-    @{ n = "ATARIOSB.ROM";       md5 = "a3e8d617c95d08031fe1b20d541434b2"; sys = "Atari 5200";        req = $true  },
+    @{ n = "ATARIOSB.ROM";       md5 = @("a3e8d617c95d08031fe1b20d541434b2", "4177f386a3bac989a981d3fe3388cb6c"); sys = "Atari 5200";        req = $true  },
     @{ n = "lynxboot.img";       md5 = "fcd403db69f54290b51035d82f835e7b"; sys = "Atari Lynx";        req = $true  },
     @{ n = "pcfx.rom";           md5 = "08e36edbea28a017f79f8d4f7ff9b6d7"; sys = "PC-FX";             req = $true  },
     @{ n = "scph5500.bin";       md5 = "8dd7d5296a650fac7319bce665a6a53c"; sys = "PlayStation NTSC-J";req = $true  },
@@ -39,7 +39,17 @@ $expected = @(
     @{ n = "bios_U.sms";         md5 = "";                                 sys = "Master System";     req = $false },
     @{ n = "bios_E.sms";         md5 = "";                                 sys = "Master System";     req = $false },
     @{ n = "bios_J.sms";         md5 = "";                                 sys = "Master System";     req = $false },
-    @{ n = "bios.gg";            md5 = "";                                 sys = "Game Gear";         req = $false }
+    @{ n = "bios.gg";            md5 = "";                                 sys = "Game Gear";         req = $false },
+    @{ n = "kick40068.A1200";    md5 = "";                                 sys = "Amiga A1200 AGA";   req = $false },
+    @{ n = "FMT_SYS.ROM";        md5 = @("3a4f31cbf48737db6f2df8ef036ab7d4", "86fb6f7280689259f0ca839dd3dd6cde"); sys = "FM Towns (System)"; req = $true  },
+    @{ n = "FMT_DOS.ROM";        md5 = @("fa0c98f5a6b0c61ee34f9a72138fc6b5", "0585b19930d4a7f4c71bcc8a33746588"); sys = "FM Towns (DOS)";    req = $true  },
+    @{ n = "FMT_FNT.ROM";        md5 = @("a35ee3364f26b5270be7f3f185ef3577", "b91300e55b70227ce98b59c5f02fa8dd"); sys = "FM Towns (Font)";   req = $true  },
+    @{ n = "FMT_DIC.ROM";        md5 = @("e28e67838634891b8d6505417ec651db", "8fa4e553f28cfc0c30a0a1e589799942"); sys = "FM Towns (Dic)";    req = $true  },
+    @{ n = "FMT_F20.ROM";        md5 = @("9559e2ab176041ec1eaae92795c6f671", "ac0c7021e9bf48ca84b51ab651169a88"); sys = "FM Towns (Font20)"; req = $false },
+    @{ n = "np2kai\font.bmp";    md5 = "";                                 sys = "PC-98 Font Bitmap";  req = $true  },
+    @{ n = "np2kai\bios.rom";    md5 = @("a4fc2355403063f9cfb403f56b50eec3", "cd237e16e7e77c06bb58540e9e9fca68"); sys = "PC-98 System BIOS"; req = $false },
+    @{ n = "np2kai\itf.rom";     md5 = @("185078a63503aa3ca8bb64b38d3ab16e", "72ea51443070f0e9212bfc9b793ee28e"); sys = "PC-98 ITF";         req = $false },
+    @{ n = "np2kai\sound.rom";   md5 = @("97800c7329524da5f6efb2e4d9c74567", "524473c1a5a03b17e21d86a0408ff827"); sys = "PC-98 Sound BIOS";  req = $false }
 )
 
 $ok = 0; $bad = 0; $missReq = 0; $missOpt = 0
@@ -94,13 +104,14 @@ foreach ($e in $expected) {
         continue
     }
 
+    $validHashes = @($e.md5) | Where-Object { -not [string]::IsNullOrEmpty($_) } | ForEach-Object { $_.ToLower() }
     $h = (Get-FileHash $path -Algorithm MD5).Hash.ToLower()
-    if ($h -eq $e.md5.ToLower()) {
+    if ($validHashes -contains $h) {
         Write-Host ("  OK        {0,-22} {1}" -f $e.n, $e.sys) -ForegroundColor Green
         $ok++
     } else {
         Write-Host ("  ERRADO    {0,-22} {1}" -f $e.n, $e.sys) -ForegroundColor Red
-        Write-Host ("            esperado {0}" -f $e.md5) -ForegroundColor DarkRed
+        Write-Host ("            esperado {0}" -f ($validHashes -join " | ")) -ForegroundColor DarkRed
         Write-Host ("            obtido   {0}" -f $h)     -ForegroundColor DarkRed
         $bad++
     }

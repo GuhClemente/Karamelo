@@ -9,7 +9,7 @@
 
 ## 🌟 Visão Geral
 
-O **Karamelo Emulador** é um frontend nativo em C++20 (64-bit) de alto desempenho para **Windows x86_64**, **Linux x64** e **macOS ARM64 (Apple Silicon)**. A interface e o OSD são inspirados no visual do MiSTer, mas são **implementação própria, escrita do zero** — nada aqui é porte de código do Main_MiSTer; o que foi preservado é a aparência e o contrato de dados, detalhado arquivo a arquivo em [docs/FRONTEND.md](docs/FRONTEND.md). O frontend é integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **35 sistemas** através de **40 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, Valkyrie Profile, Perfect Dark e dezenas de outros — total de 62 ports, sendo 36 com suporte nativo a Linux e 29 a macOS — ver [CREDITS.md](CREDITS.md)).
+O **Karamelo Emulador** é um frontend nativo em C++20 (64-bit) de alto desempenho para **Windows x86_64**, **Linux x64** e **macOS ARM64 (Apple Silicon)**. A interface e o OSD são inspirados no visual do MiSTer, mas são **implementação própria, escrita do zero** — nada aqui é porte de código do Main_MiSTer; o que foi preservado é a aparência e o contrato de dados, detalhado arquivo a arquivo em [docs/FRONTEND.md](docs/FRONTEND.md). O frontend é integrado a uma engine modular de execução de cores Libretro com escalonador de 60 FPS com correção de aspecto, filtros CRT, Ring Buffer de áudio estéreo de baixa latência e suporte nativo a **37 sistemas** através de **42 motores de emulação distintos** (lista completa e verificada em [CREDITS.md](CREDITS.md)). Também inclui uma categoria de "Ports & Recomp" com jogos recompilados nativamente (Zelda 64: Recompiled, Jak & Daxter, Super Mario 64, Valkyrie Profile, Perfect Dark e dezenas de outros — total de 70 ports, sendo 42 com suporte nativo a Linux e 31 a macOS — ver [CREDITS.md](CREDITS.md)).
 
 ---
 
@@ -54,6 +54,8 @@ A tabela abaixo é a mesma lógica usada pelo próprio app para decidir qual cor
 | ZX Spectrum | `spectrum.dll` | Fuse | `.tzx` `.tap` `.z80` `.sna`, `.zip` `.7z` `.rar` |
 | Panasonic 3DO | `3do.dll` | Opera | `.iso` `.cue` `.chd` `.m3u` `.toc`, `.zip` `.7z` `.rar` |
 | MS-DOS | `dosbox_pure.dll` | DOSBox Pure | `.zip` `.7z` `.rar` (pasta do jogo) |
+| NEC PC-98 | `pc98.dll` | NP2kai | `.hdi` `.nhd` `.fdi` `.fdd` `.d88` `.chd` `.iso`, `.zip` `.7z` `.rar` |
+| FM Towns / Marty | `fmtowns.dll` | Geartowns | `.iso` `.cue` `.chd` `.d77` `.d88` `.m3u`, `.zip` `.7z` `.rar` |
 | Arcade | `arcade_fbneo.dll` / `mame2003.dll` / `mame2010.dll` / `dreamcast.dll` (Naomi) | MAME 0.289 (apesar do nome do arquivo) / MAME 2003 / MAME 2010 / Flycast | `.zip` `.7z` `.rar` (romset completo) |
 
 Jogos de arcade passam por uma troca automática e silenciosa de core: o app tenta cada candidato em sequência (e, desde a versão atual, também detecta um core que "carrega com sucesso" mas trava logo em seguida, descartando e tentando o próximo sozinho). Romsets Naomi/Atomiswave conhecidos (~210 títulos catalogados em `app/gamedb/naomi_atomiswave.json`, extraído do código-fonte real do MAME) vão direto para o Flycast, sem passar pela tentativa nos cores MAME primeiro.

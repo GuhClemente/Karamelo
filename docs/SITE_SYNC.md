@@ -71,10 +71,10 @@ Leia de lá. Valores em 09/09/2026:
 
 | macro | valor | como publicar |
 |---|---|---|
-| `APP_SYSTEM_COUNT` | 35 | "35 sistemas" |
-| `APP_CORE_ENGINES` | 40 | "40 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
-| `APP_CORE_FILES` | 41 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.76 | prefira ler do `version.json` (seção 3) |
+| `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
+| `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
+| `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
+| `APP_VERSION` | 0.9.77 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -1508,6 +1508,61 @@ Lançamento da versão **0.9.76** com foco em estabilidade e ciclo de vida de mo
    - Manifesto `dist/version.json` atualizado para a versão `0.9.76`.
    - Suíte de testes unitários (`tests/test_updater.cpp`) expandida com cobertura para a nova versão.
    - Baterias de estresse `tools/stress_cores.ps1` executadas e validadas com 100% de aprovação (PCSX2 e Play!).
+
+---
+
+## 36. Lançamento da Versão 0.9.77 — Suporte a NEC PC-98, FM Towns / Marty, Descompactador Transparente e Auditoria Geral de BIOS (22/10/2026)
+
+Inclusão oficial de dois dos computadores mais icônicos do mercado japonês no catálogo nativo do Karamelo: **NEC PC-9800 Series (PC-9801 / PC-9821)** e **Fujitsu FM Towns / FM Towns Marty**, elevação da contagem de sistemas para **37 sistemas** e **42 motores de emulação**, e suporte transparente a arquivos compactados (`.zip`, `.7z`, `.rar`).
+
+### Especificação dos Novos Sistemas
+
+1. **NEC PC-9801 / PC-9821**:
+   - **Motor**: **NP2kai** (Neko Project II Kai) — `pc98.dll` (Windows), `pc98.so` (Linux), `pc98.dylib` (macOS).
+   - **Pasta de ROMs**: `roms/PC98/`
+   - **Formatos Aceitos**:
+     - Discos rígidos: `.hdi`, `.nhd`, `.thd`, `.hdd`
+     - Disquetes: `.fdi`, `.fdd`, `.d88`, `.88d`, `.2hd`, `.tfd`, `.hdm`, `.xdf`, `.dup`, `.cmd`
+     - Imagens de CD: `.cue`, `.iso`, `.chd`
+     - Compactados: `.zip`, `.7z`, `.rar`
+   - **BIOS e Arquivos de Sistema**: Subpasta obrigatória `app/bios/np2kai/`.
+     - `font.bmp` (ou `font.rom`): Obrigatório para desenhar kanji/kana legíveis nos jogos.
+     - `bios.rom` (98.304 bytes - MD5 `a4fc2355403063f9cfb403f56b50eec3`), `itf.rom` (8.192 bytes - MD5 `185078a63503aa3ca8bb64b38d3ab16e`), `sound.rom` (8.192 bytes - MD5 `97800c7329524da5f6efb2e4d9c74567`).
+
+2. **Fujitsu FM Towns / FM Towns Marty**:
+   - **Motor**: **Geartowns** (Ignacio Sanchez / drhelius) — `fmtowns.dll` (Windows), `fmtowns.so` (Linux), `fmtowns.dylib` (macOS).
+   - **Pasta de ROMs**: `roms/FMTowns/`
+   - **Formatos Aceitos**:
+     - Imagens de CD: `.chd`, `.cue/.bin`, `.iso`, `.m3u`
+     - Disquetes de boot: `.d77`, `.d88`, `.hdm`, `.xdf`, `.bin`, `.img`
+     - Compactados: `.zip`, `.7z`, `.rar`
+   - **BIOS e Arquivos de Sistema**: Soltos em `app/bios/` ou `app/bios/fmtowns/`.
+     - `FMT_SYS.ROM` (524.288 bytes - MD5 `3a4f31cbf48737db6f2df8ef036ab7d4`): BIOS de Sistema Towns OS.
+     - `FMT_DOS.ROM` (524.288 bytes - MD5 `fa0c98f5a6b0c61ee34f9a72138fc6b5`): Towns OS DOS Kernel.
+     - `FMT_FNT.ROM` (MD5 `a35ee3364f26b5270be7f3f185ef3577`): Fontes básicas.
+     - `FMT_DIC.ROM` (524.288 bytes - MD5 `e28e67838634891b8d6505417ec651db`): Dicionário Kanji.
+     - `FMT_F20.ROM` (1.253.376 bytes - MD5 `9559e2ab176041ec1eaae92795c6f671`): Fonte estendida 20-dot (opcional).
+
+3. **Descompactador Transparente (`src/archive_helper.cpp`)**:
+   - Resolução de formato estendida com suporte direto a `.hdi`, `.d88`, `.fdi`, `.nhd` e `.d77` dentro de zips.
+   - Detecção automática de subpastas `roms/PC98` e `roms/FMTowns` para roteamento correto aos respectivos cores `cores/pc98.dll` e `cores/fmtowns.dll`.
+
+4. **Auditoria e Instalação Completa de BIOS (100% de Conformidade)**:
+   - **FM Towns**: Todas as 5 ROMs oficiais do Towns OS instaladas em `app/bios/` e `app/bios/fmtowns/` (`FMT_SYS.ROM`, `FMT_DOS.ROM`, `FMT_FNT.ROM`, `FMT_DIC.ROM`, `FMT_F20.ROM`), com suporte tanto ao set Model 1/2 quanto ao set Marty/Fresh/UX.
+   - **NEC PC-98**: Conjunto completo de 17 arquivos de sistema instalado em `app/bios/np2kai/` (`font.bmp`, `font.rom`, `bios.rom`, `bios9821.rom`, `itf.rom`, `sound.rom`, `ide.rom`, `sasi.rom`, `scsi.rom`, `pci.rom`, `d8000.rom` e 6 samples WAV de percussão do chip FM YM2608).
+   - **Complementos em Outros Sistemas**:
+     - Atari 7800: `7800 BIOS (U).rom` instalado e conferido por MD5.
+     - Master System / Game Gear: `bios_U.sms`, `bios_E.sms`, `bios_J.sms` e `bios.gg` instalados.
+     - Commodore Amiga: Kickstart 3.1 AGA (`kick40068.A1200`) adicionado ao conjunto clássico A500 + CD32.
+   - **Validação de Integridade (`tools/check_bios.ps1`)**:
+     - 29/29 itens conferidos com 100% de sucesso (0 erros de hash, 0 obrigatórios faltando, 0 opcionais faltando).
+
+5. **Impacto em Contagens Oficiais**:
+   - `APP_VERSION`: 0.9.76 ➔ **0.9.77**.
+   - `APP_SYSTEM_COUNT`: 35 ➔ **37 sistemas**.
+   - `APP_CORE_ENGINES`: 40 ➔ **42 motores**.
+   - `APP_CORE_FILES`: 41 ➔ **43 arquivos** de core.
+
 
 
 

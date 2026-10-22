@@ -23,7 +23,7 @@ Este documento é o guia de referência operacional e arquitetural para agentes 
 ## 2. Regras de Ouro (Invioláveis)
 
 1. **Fontes Únicas da Verdade (Não Invente Números)**:
-   - Contagem de Sistemas e Motores: Leia SEMPRE de `include/app_info.h` (`APP_SYSTEM_COUNT = 35`, `APP_CORE_ENGINES = 40`). Nunca use `APP_CORE_FILES` (41) pois conta duplicata técnica de N64.
+   - Contagem de Sistemas e Motores: Leia SEMPRE de `include/app_info.h` (`APP_SYSTEM_COUNT = 37`, `APP_CORE_ENGINES = 42`). Nunca use `APP_CORE_FILES` (43) pois conta duplicata técnica de N64.
    - Contagem e Compatibilidade de Ports: Leia SEMPRE de `CREDITS.md` e verifique em `src/port_runner.cpp` (70 ports totais: 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎). The Darkness (Xbox 360) está no código com `hidden = true` — fora do menu, do site e de toda contagem.
    - Guia de BIOS: A fonte canônica é `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Higiene de Repositório**:

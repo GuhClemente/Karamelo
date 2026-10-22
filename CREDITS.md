@@ -64,11 +64,13 @@ o do log é sempre o real.
 | `spectrum.dll` | Fuse | ZX Spectrum |
 | `3do.dll` | Opera | Panasonic 3DO |
 | `dosbox_pure.dll` | DOSBox Pure | MS-DOS |
+| `pc98.dll` | NP2kai | NEC PC-9801 / PC-9821 |
+| `fmtowns.dll` | Geartowns | Fujitsu FM Towns / Marty |
 | `arcade_fbneo.dll` | **MAME 0.289** (o nome do arquivo mente) | Arcade |
 | `mame2003.dll` | MAME 2003 | Arcade (romset 0.78) |
 | `mame2010.dll` | MAME 2010 | Arcade (romset 0.139) |
 
-**40 motores distintos em 41 arquivos.** A diferença é uma só: `n64_parallel.dll`
+**42 motores distintos em 43 arquivos.** A diferença é uma só: `n64_parallel.dll`
 é cópia byte a byte de `n64.dll`, conferido por hash e não pelo nome. As duas
 são usadas — o menu carrega `n64_parallel.dll` pelo nome, e `n64.dll` é o
 último recurso genérico quando nenhum dos três cores de N64 existe em disco.

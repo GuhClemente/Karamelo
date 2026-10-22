@@ -1,0 +1,30 @@
+==========================================================================
+ NEC PC-9801 / PC-9821 - NP2kai
+==========================================================================
+
+Core usado: cores/pc98.dll (Windows), cores/pc98.so (Linux), cores/pc98.dylib (macOS)
+
+Formatos aceitos nesta pasta:
+  - Discos Rigidos: .hdi, .nhd, .thd, .hdd
+  - Disquetes: .fdi, .fdd, .d88, .88d, .2hd, .tfd, .hdm, .xdf, .dup, .cmd
+  - Imagens de CD: .cue, .iso, .chd
+  - Compactados: .zip, .7z, .rar
+
+BIOS / firmware:
+  Devem ficar na subpasta app/bios/np2kai/
+  - font.bmp (ou font.rom): OBRIGATORIO para renderizar caracteres japoneses (Kanji/Kana). Sem ele os textos dos jogos ficam invisiveis ou corrompidos.
+  - bios.rom, itf.rom, sound.rom: Recomendados para compatibilidade cycle-accurate de hardware e som FM YM2608.
+  - Arquivos opcionais de ritmo YM2608: 2608_BD.WAV, 2608_SD.WAV, etc.
+
+Controles e operacao:
+  - F12 ou Botao Central do Mouse abre o menu de configuracao interno do NP2kai.
+  - O emulador suporta teclado fisico completo e mouse, alem de mapeamento do controle para botao de acao e direcional.
+
+--------------------------------------------------------------------------
+Coloque seus jogos aqui. Arquivos .zip/.7z/.rar sao extraidos
+automaticamente pelo app quando necessario (o cache fica em app/cache/,
+pode ser apagado a qualquer momento sem perder nada).
+
+Referencia completa de BIOS de todos os sistemas:
+  app/bios/BIOS_NECESSARIOS.txt
+==========================================================================

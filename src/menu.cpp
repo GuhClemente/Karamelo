@@ -824,6 +824,14 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
     return "cores/psp.dll";
   if (ext == ".mx1" || ext == ".mx2")
     return "cores/msx.dll";
+  if (ext == ".hdi" || ext == ".nhd" || ext == ".thd" || ext == ".hdd" ||
+      ext == ".fdi" || ext == ".fdd" || ext == ".d88" || ext == ".88d" ||
+      ext == ".2hd" || ext == ".tfd" || ext == ".hdm" || ext == ".xdf" ||
+      ext == ".dup" || ext == ".cmd")
+    return "cores/pc98.dll";
+  if (ext == ".d77" || ext == ".h0" || ext == ".h1" || ext == ".h2" || ext == ".h3" ||
+      ext == ".h4" || ext == ".h5" || ext == ".h6" || ext == ".hdd")
+    return "cores/fmtowns.dll";
 
   // Disc images. The extension says nothing about the console, so the folder
   // decides. .iso lives here rather than with the GameCube extensions: it is
@@ -863,6 +871,10 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
       return "cores/amiga.dll";
     if (in("PCFX") || in("PC-FX"))
       return "cores/pcfx.dll";
+    if (in("PC98") || in("PC-98"))
+      return "cores/pc98.dll";
+    if (in("FMTowns") || in("Towns") || in("Marty"))
+      return "cores/fmtowns.dll";
     return "cores/psx.dll";
   }
 
@@ -898,6 +910,10 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
       return "cores/3do.dll";
     if (in("Coleco"))
       return "cores/coleco.dll";
+    if (in("PC98") || in("PC-98"))
+      return "cores/pc98.dll";
+    if (in("FMTowns") || in("Towns") || in("Marty"))
+      return "cores/fmtowns.dll";
     return "cores/genesis.dll";
   }
 
@@ -977,6 +993,10 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
       return "cores/ps2.dll";
     if (in("PlayStation"))
       return "cores/psx.dll";
+    if (in("PC98") || in("PC-98"))
+      return "cores/pc98.dll";
+    if (in("FMTowns") || in("Towns") || in("Marty"))
+      return "cores/fmtowns.dll";
     return GetArcadeCoreDll(file_path);
   }
 
@@ -1128,6 +1148,8 @@ static const SystemCore kSystemCores[] = {
     {133, "cores/wswan.dll"},
     {134, "cores/lynx.dll"},
     {135, "cores/pcfx.dll"},
+    {136, "cores/pc98.dll"},
+    {137, "cores/fmtowns.dll"}
 };
 
 // NULL above means the system has its own core selector; ask that instead.
@@ -1180,13 +1202,8 @@ void PopulateMainMenu() {
 
     const char *aspects[] = {"Original", "4:3", "16:9"};
 
-    // 1. Header: Load [Game Name], Systems, and Reset
-    std::string load_label = Tr("Carregar", "Load");
-    std::string game_name = CoreGetGameName();
-    if (game_name.length() > 16)
-      game_name = game_name.substr(0, 14) + "..";
-    items.push_back(
-        {load_label, game_name.empty() ? ">" : game_name, false, true, 1});
+    // 1. Header: Load Game, Systems, and Reset
+    items.push_back({Tr("Carregar Jogo", "Load Game"), ">", true, true, 1});
     items.push_back({Tr("Navegar Sistemas", "Browse Systems"), ">", true, true, 195});
     items.push_back({Tr("Reiniciar", "Reset"), "", false, true, 6});
     items.push_back({" ", "", false, false, 0});
@@ -1361,6 +1378,8 @@ void PopulateSystemsMenu() {
     items.push_back({"Commodore Amiga", ">", true, true, 123});
   if (SystemHasCore(112))
     items.push_back({"Dreamcast", ">", true, true, 112});
+  if (SystemHasCore(137))
+    items.push_back({"FM Towns / Marty", ">", true, true, 137});
   if (SystemHasCore(119))
     items.push_back({"Game Boy / Color", ">", true, true, 119});
   if (SystemHasCore(118))
@@ -1377,6 +1396,8 @@ void PopulateSystemsMenu() {
     items.push_back({"MS-DOS", ">", true, true, 121});
   if (SystemHasCore(122))
     items.push_back({"MSX / MSX2", ">", true, true, 122});
+  if (SystemHasCore(136))
+    items.push_back({"NEC PC-98", ">", true, true, 136});
   if (SystemHasCore(105))
     items.push_back({"NES / Famicom", ">", true, true, 105});
   if (SystemHasCore(132))
@@ -1423,7 +1444,7 @@ void PopulateSystemsMenu() {
   // Counted here rather than written down somewhere else: this is the list.
   g_system_count = 0;
   for (const auto &it : items)
-    if ((it.action_id >= 101 && it.action_id <= 135) || it.action_id == 140)
+    if ((it.action_id >= 101 && it.action_id <= 137) || it.action_id == 140)
       g_system_count++;
 
   OsdSetSize((int)items.size());
@@ -2106,6 +2127,8 @@ void PopulateCoresList() {
     {"Commodore Amiga", "PUAE", "cores/amiga.dll"},
     {"MS-DOS", "DOSBox-Pure", "cores/dosbox_pure.dll"},
     {"MSX / MSX2", "fMSX/BlueMSX", "cores/msx.dll"},
+    {"NEC PC-98", "NP2kai", "cores/pc98.dll"},
+    {"FM Towns", "Geartowns", "cores/fmtowns.dll"},
     {"ZX Spectrum", "Fuse", "cores/spectrum.dll"},
     {"WonderSwan", "Beetle Cygne", "cores/wswan.dll"}
   };
@@ -3649,7 +3672,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
           UpdaterCheckAsync(true);
         }
         PopulateUpdate();
-      } else if (item.action_id >= 101 && item.action_id <= 135) {
+      } else if (item.action_id >= 101 && item.action_id <= 137) {
         main_menu_saved_idx = selected_idx;
         if (item.action_id == 101) {
           current_state = STATE_BROWSE;
@@ -3756,6 +3779,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
         } else if (item.action_id == 135) {
           current_state = STATE_BROWSE;
           PopulateBrowse("roms/PCFX");
+        } else if (item.action_id == 136) {
+          current_state = STATE_BROWSE;
+          PopulateBrowse("roms/PC98");
+        } else if (item.action_id == 137) {
+          current_state = STATE_BROWSE;
+          PopulateBrowse("roms/FMTowns");
         }
       }
       // 140 (Ports & Recomp) is not in the 101-135 system range above, so it

@@ -56,6 +56,8 @@ declare -A CORES_MAP=(
     ["jaguar.so"]="virtualjaguar_libretro.so.zip"
     ["msx.so"]="fmsx_libretro.so.zip"
     ["dosbox_pure.so"]="dosbox_pure_libretro.so.zip"
+    ["pc98.so"]="np2kai_libretro.so.zip"
+    ["fmtowns.so"]="geartowns_libretro.so.zip"
 )
 
 echo "====================================================================="

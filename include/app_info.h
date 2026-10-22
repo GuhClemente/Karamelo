@@ -1,4 +1,4 @@
-#ifndef APP_INFO_H_INCLUDED
+﻿#ifndef APP_INFO_H_INCLUDED
 #define APP_INFO_H_INCLUDED
 
 // Single source of truth for the application's identity, and the same figures
@@ -15,7 +15,7 @@
 // bar, the About page and anything the packaging writes out.
 #define APP_NAME        "Karamelo"
 #define APP_NAME_FULL   "Karamelo Emulador"
-#define APP_VERSION     "0.9.76"
+#define APP_VERSION     "0.9.77"
 #if defined(__APPLE__) && defined(__arm64__)
 #define APP_ARCH        "arm64"
 #elif defined(__APPLE__)
@@ -28,14 +28,14 @@
 #define APP_ARCH        "x86"
 #endif
 #define APP_EXE_BASE    "Karamelo"
-#define APP_EXE_NAME    "Karamelo_v0.9.76.exe"
+#define APP_EXE_NAME    "Karamelo_v0.9.77.exe"
 #define APP_GITHUB_REPO "GuhClemente/Karamelo"
 #define APP_SITE        "karamelo-emu.com"
 
 // One entry per system in the main menu, and every one of them now has a
 // core behind it in cores/. Rows whose DLL is absent are hidden at build
 // time by SystemHasCore(), so this and the menu cannot drift apart.
-#define APP_SYSTEM_COUNT 35
+#define APP_SYSTEM_COUNT 37
 
 // Two different figures, because they are different things:
 //   FILES   - .dll files in cores/, what the About page counts at runtime
@@ -53,7 +53,7 @@
 // Measured, not estimated: hash every .dll in cores/ and count distinct
 // digests. Re-measure after adding or removing a core - these two numbers had
 // already drifted five files and two engines behind reality once.
-#define APP_CORE_FILES   41
-#define APP_CORE_ENGINES 40
+#define APP_CORE_FILES   43
+#define APP_CORE_ENGINES 42
 
 #endif

@@ -1,4 +1,4 @@
-﻿==========================================================================
+==========================================================================
 
 CONFIRA ANTES DE INVESTIGAR: tools/check_bios.ps1 compara cada arquivo com o
 MD5 registrado aqui, reconhece ponteiro do Git LFS pelo cabecalho e mostra o
@@ -42,14 +42,12 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
   Pasta: app/bios/
 
 [Atari5200] cores/atari5200.dll (Atari800)
-  Status: PRESENTE - 4 conferidos por MD5 em 09/09. O ATARIOSB.ROM tem o
-  tamanho certo (10240 bytes) mas MD5 de outra revisao do OS-B; o sistema
-  carrega assim mesmo.
+  Status: PRESENTE E CONFERIDO (22/10) - Todos os 5 chips conferidos por MD5.
     5200.rom           MD5 281f20ea4320404ec820fb7ec0693b38
     ATARIXL.ROM        MD5 06daac977823773a3eea3422fd26a703
     ATARIBAS.ROM       MD5 0bac0c6a50104045d902df4503a4c30b
     ATARIOSA.ROM       MD5 eb1f32f5d9f382db1bbfb8d7f9cb343a
-    ATARIOSB.ROM       MD5 a3e8d617c95d08031fe1b20d541434b2
+    ATARIOSB.ROM       MD5 a3e8d617c95d08031fe1b20d541434b2 (Rev 1) ou 4177f386a3bac989a981d3fe3388cb6c (Rev 2 - presente)
   Pasta: app/bios/
 
 [Lynx] cores/lynx.dll (Handy)
@@ -61,6 +59,27 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
   Status: PRESENTE E CONFERIDO (09/09)
     pcfx.rom           MD5 08e36edbea28a017f79f8d4f7ff9b6d7
   Pasta: app/bios/
+
+[FM Towns / FM Towns Marty] cores/fmtowns.dll (Geartowns)
+  Status: PRESENTE E CONFERIDO (22/10) - ROMs do Towns OS instaladas e conferidas por MD5.
+  Ambos os sets (Towns Model 1/2 e Towns Marty/Fresh/UX) sao aceitos e compativeis.
+    FMT_SYS.ROM        MD5 86fb6f7280689259f0ca839dd3dd6cde (Marty/UX) ou 3a4f31cbf48737db6f2df8ef036ab7d4 (Model 1)
+    FMT_DOS.ROM        MD5 0585b19930d4a7f4c71bcc8a33746588 (Towns OS v2.1) ou fa0c98f5a6b0c61ee34f9a72138fc6b5 (v1.1)
+    FMT_FNT.ROM        MD5 b91300e55b70227ce98b59c5f02fa8dd (256KB) ou a35ee3364f26b5270be7f3f185ef3577
+    FMT_DIC.ROM        MD5 8fa4e553f28cfc0c30a0a1e589799942 ou e28e67838634891b8d6505417ec651db (524.288 bytes)
+    FMT_F20.ROM        MD5 ac0c7021e9bf48ca84b51ab651169a88 ou 9559e2ab176041ec1eaae92795c6f671 [opcional - Kanji 20-dot]
+  Pasta: app/bios/ (e app/bios/fmtowns/)
+
+[NEC PC-9801 / PC-9821] cores/pc98.dll (NP2kai)
+  Status: PRESENTE E CONFERIDO (22/10) - Pacote oficial completo instalado em app/bios/np2kai/
+  (font.bmp, font.rom, bios.rom, bios9821.rom, itf.rom, sound.rom, ide.rom, sasi.rom, scsi.rom, pci.rom, d8000.rom e 6 samples ritmicos YM2608).
+    font.bmp           [presente - 524.350 bytes - mapa de fontes Kanji/Kana japonesas]
+    bios.rom           MD5 cd237e16e7e77c06bb58540e9e9fca68 ou a4fc2355403063f9cfb403f56b50eec3 (98.304 bytes)
+    itf.rom            MD5 72ea51443070f0e9212bfc9b793ee28e ou 185078a63503aa3ca8bb64b38d3ab16e (ITF boot)
+    sound.rom          MD5 524473c1a5a03b17e21d86a0408ff827 (YM2608 PC-9801-86) ou 97800c7329524da5f6efb2e4d9c74567
+    2608_bd.wav, 2608_sd.wav, 2608_top.wav, 2608_hh.wav, 2608_tom.wav, 2608_rim.wav [presentes - ritmos YM2608]
+  Pasta: PRECISA estar em app/bios/np2kai/ (subpasta dedicada do core).
+
 
 --------------------------------------------------------------------------
 JA COMPLETO - confira o MD5 se algum jogo especifico reclamar
@@ -180,29 +199,25 @@ OPCIONAL - a maioria dos jogos funciona sem, so amplia compatibilidade
 --------------------------------------------------------------------------
 
 [Amiga] cores/amiga.dll (PUAE)
-  Status: A500 e CD32 completos (09/09); falta so o AGA
+  Status: COMPLETO (22/10) - A500, CD32 e Kickstart 3.1 (A1200 AGA) presentes.
     kick34005.A500 (Kickstart 1.3)       - presente
     kick40060.CD32 (Kickstart CD32)      - presente
     kick40060.CD32.ext (ROM estendida)   - presente
+    kick40068.A1200 (Kickstart 3.1 AGA)  - presente
     Sem a ROM estendida o CD32 nao da boot em CD: o core carrega o
     Kickstart, nao encontra a extensao e para na tela pedindo disquete,
     como se o jogo nao existisse. O Kickstart sozinho nao basta, e os
     dois arquivos andam juntos.
-    Falta tambem: Kickstart 3.1 para A1200/A4000 (jogos AGA) - o core tem um
-    fallback AROS embutido, entao nunca trava, so pode rodar errado em
-    jogos que exigem hardware AGA de verdade.
   Pasta: app/bios/
 
 [Master System / Game Gear] cores/sms.dll (Gearsystem)
-  Status: FALTANDO (opcional)
-    bios_U.sms, bios_E.sms, bios_J.sms, bios.gg
+  Status: PRESENTE (22/10) - Todas as variantes regionais instaladas.
+    bios_U.sms (EUA), bios_E.sms (Europa), bios_J.sms (Japao), bios.gg (Game Gear)
   Pasta: app/bios/
-  A maioria dos jogos boota sem BIOS - so afeta o logo de abertura e
-  pouquissimos jogos que dependem dela.
 
 [Atari 7800] cores/atari7800.dll (ProSystem)
-  Status: FALTANDO (opcional)
-    7800 BIOS (U).rom     MD5 0763f1ffb006ddbe32e52d497ee848ae
+  Status: PRESENTE E CONFERIDO (22/10)
+    7800 BIOS (U).rom     MD5 0763f1ffb006ddbe32e52d497ee848ae   [confere]
   Pasta: app/bios/
 
 [Commodore 64] cores/c64.dll (VICE)
