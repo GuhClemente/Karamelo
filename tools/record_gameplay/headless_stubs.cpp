@@ -32,3 +32,6 @@ bool RaIsHardcoreActive() { return false; }
 const char* MenuGetPersistedCoreOption(const char*) { return nullptr; }
 int MenuGetVideoDriver() { return 0; }
 void CrashReporterSetLastGameInfo(const char*, const char*) {}
+
+int MenuGetLanguage() { return 0; }
+const char* Tr(const char* pt, const char* en) { return pt ? pt : en; }
