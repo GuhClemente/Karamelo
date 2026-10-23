@@ -2806,6 +2806,58 @@ void MenuProcessKey(MenuKey key) {
     InputBindSaveSystemProfile(profile_after);
 }
 
+void MenuJumpToLetter(char c) {
+  if (!OsdIsEnabled() || items.empty())
+    return;
+  if (capture_bind >= 0)
+    return;
+
+  c = (char)toupper((unsigned char)c);
+  if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')))
+    return;
+
+  int total = (int)items.size();
+  if (total <= 0)
+    return;
+
+  int start = (selected_idx + 1) % total;
+  for (int step = 0; step < total; ++step) {
+    int idx = (start + step) % total;
+    const auto &it = items[idx];
+    if (it.label.empty() || it.label == " " || it.label == "<..>")
+      continue;
+
+    // Skip favorite prefix "* " if present
+    size_t offset = 0;
+    if (it.label.rfind("* ", 0) == 0)
+      offset = 2;
+
+    // Skip leading punctuation, brackets or spaces (e.g. "[SNES] Mario", "(USA) Zelda")
+    while (offset < it.label.size() &&
+           (it.label[offset] == ' ' || it.label[offset] == '[' ||
+            it.label[offset] == '(' || it.label[offset] == '_' ||
+            it.label[offset] == '-' || it.label[offset] == '{')) {
+      offset++;
+    }
+    if (offset >= it.label.size())
+      continue;
+
+    char first = (char)toupper((unsigned char)it.label[offset]);
+    if (first == c) {
+      selected_idx = idx;
+      int max_visible = OsdGetSize();
+      if (max_visible <= 0)
+        max_visible = 8;
+      // Position the matched item nicely near the top with surrounding context
+      scroll_top = ClampInt(idx - 1, 0, total - max_visible);
+      g_last_input_tick = TickCountMs();
+      s_scroll_since = TickCountMs();
+      s_scroll_item_idx = -1;
+      return;
+    }
+  }
+}
+
 void MenuInit() {
   MenuLoadSettings();
   LoadFavoritesAndRecent();

@@ -2665,23 +2665,32 @@ static void CB_InputPoll(void)
 			if (pad0.Gamepad.bLeftTrigger > 50) w0 |= PAD_BTN_LT;
 			if (pad0.Gamepad.bRightTrigger > 50) w0 |= PAD_BTN_RT;
 
+			auto calc_stick_speed = [&](SHORT val) -> int {
+				int a = abs(val);
+				if (a <= deadzone_thresh) return 0;
+				float norm = (float)(a - deadzone_thresh) / (32767.0f - deadzone_thresh);
+				if (norm > 1.0f) norm = 1.0f;
+				// Progressive acceleration curve: pixel-level precision for gentle tilts,
+				// swift movement across retro 320x240 / 640x480 screens at full tilt.
+				float spd = norm * norm * 9.0f + norm * 3.0f;
+				int res = (int)(spd + 0.5f);
+				if (res < 1) res = 1;
+				return (val < 0) ? -res : res;
+			};
+
 			// Left Stick moves mouse cursor
-			if (abs(pad0.Gamepad.sThumbLX) > deadzone_thresh)
-				mouse_dx += (pad0.Gamepad.sThumbLX * 10) / 32768;
-			if (abs(pad0.Gamepad.sThumbLY) > deadzone_thresh)
-				mouse_dy -= (pad0.Gamepad.sThumbLY * 10) / 32768;
+			mouse_dx += calc_stick_speed(pad0.Gamepad.sThumbLX);
+			mouse_dy -= calc_stick_speed(pad0.Gamepad.sThumbLY);
 
 			// Right Stick also moves mouse
-			if (abs(pad0.Gamepad.sThumbRX) > deadzone_thresh)
-				mouse_dx += (pad0.Gamepad.sThumbRX * 10) / 32768;
-			if (abs(pad0.Gamepad.sThumbRY) > deadzone_thresh)
-				mouse_dy -= (pad0.Gamepad.sThumbRY * 10) / 32768;
+			mouse_dx += calc_stick_speed(pad0.Gamepad.sThumbRX);
+			mouse_dy -= calc_stick_speed(pad0.Gamepad.sThumbRY);
 
-			// D-Pad nudges mouse
-			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT)  mouse_dx -= 5;
-			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) mouse_dx += 5;
-			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP)    mouse_dy -= 5;
-			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN)  mouse_dy += 5;
+			// D-Pad nudges mouse for pixel-fine precision
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT)  mouse_dx -= 3;
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) mouse_dx += 3;
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP)    mouse_dy -= 3;
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN)  mouse_dy += 3;
 
 			// Button A or Right Trigger = Left Click
 			if ((w0 & PAD_BTN_A) || (pad0.Gamepad.bRightTrigger > 50))

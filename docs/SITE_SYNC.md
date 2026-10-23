@@ -1563,6 +1563,30 @@ Inclusão oficial de dois dos computadores mais icônicos do mercado japonês no
    - `APP_CORE_ENGINES`: 40 ➔ **42 motores**.
    - `APP_CORE_FILES`: 41 ➔ **43 arquivos** de core.
 
+6. **Navegação Rápida no Menu por Atalhos de Teclado (Jump to Letter / First-Letter Navigation)**:
+   - Em qualquer tela de menu que apresente listas (Menu Principal, Navegar Sistemas, navegador de ROMs de todas as pastas, catálogo de Ports, Favoritos, Recentes, Shaders, etc.):
+     - Pressionar qualquer caractere alfanumérico (**A a Z** ou **0 a 9**) salta imediatamente a seleção para o primeiro item cujo nome comece com aquela letra.
+     - Pressionar a mesma tecla repetidamente **cicla sequencialmente** por todos os itens com aquela letra (ex: apertar `'M'` pula para *Mario* ➔ aperta de novo vai para *Mega Man* ➔ *Metroid* ➔ *Mortal Kombat* ➔ dá a volta e retorna ao primeiro `'M'`).
+     - Tratamento inteligente de títulos: descarta marcadores de favoritos (`* `), tags de região/plataforma (`[SNES]`, `(USA)`), colchetes, underscores e espaços, lendo a verdadeira letra inicial do jogo.
+     - Posicionamento de visualização: ao saltar, a lista ajusta o scroll de modo que o item fique posicionado no topo com os próximos títulos visíveis abaixo.
+     - Mapeamento refinado de teclado no OSD: `Enter` ou `Espaço` seleciona/inicia, `Esc` ou `Backspace` volta/sobe pasta, `F2` ou `Insert` alterna favorito/info (no controle: botão `Y`), e `Tab` ou `F12` alterna o menu OSD.
+
+7. **Controle Híbrido de Mouse para Computadores Retro (FM Towns, PC-98, DOS)**:
+   - Implementação nativa de `RETRO_DEVICE_MOUSE` com suporte a movimento relativo X/Y e botões esquerdo, direito e central (`src/core_runner.cpp`).
+   - Mapeamento automático da porta 1 como mouse no FM Towns (`fmtowns.dll`), permitindo jogar aventuras gráficas clássicas (SCUMM engine, LucasArts como *Indiana Jones and the Fate of Atlantis*, *Monkey Island*, etc.).
+   - Suporte híbrido simultâneo:
+     - **Mouse Físico do PC**: Leitura 1:1 de deltas com auto-recentralização suave nas bordas para evitar que o ponteiro escape da janela.
+     - **Gamepad Analógico (Left/Right Stick)**: Curva progressiva não-linear — inclinação suave para mira milimétrica de 1 pixel (perfeito para botões e verbos pequenos de point-and-click); inclinação total para travessia ágil da tela.
+     - `Botão A` ou `RT`: Clique Esquerdo (Left Click).
+     - `Botão B` ou `LT`: Clique Direito (Right Click).
+     - `D-Pad` e `Setas do Teclado`: Ajustes finos de 3 pixels.
+   - Esclarecimento histórico para o site: em aventuras SCUMM v5 no FM Towns, o cursor é desenhado em software pela máquina virtual do jogo no clock clássico de 15 a 20 FPS (idêntico ao hardware original de 1992), mesmo com a saída de vídeo do emulador a 60 FPS cravados.
+
+8. **Otimização da Bateria de Testes do PlayStation 2 (Men in Black ➔ Phantasy Star Generation 1)**:
+   - Substituição da ROM de estresse em `app/roms/PlayStation2/`: conversão da imagem MODE2/2352 de *Sega Ages 2500 Series Vol. 1: Phantasy Star Generation: 1* para `.iso` padrão ISO9660 de **60 MB** (em substituição à imagem de 943 MB de *Men in Black II*).
+   - Redução drástica no tempo de teste do PS2 no pipeline de build (`compile_port.bat`, `package_release.bat`, `deploy_all.bat`), caindo de ~54s para ~36s por ciclo de driver e liberando quase 900 MB de espaço em disco.
+
+
 
 
 

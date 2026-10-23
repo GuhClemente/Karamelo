@@ -1323,15 +1323,22 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 			case VK_HOME: MenuProcessKey(KEY_HOME); break;
 			case VK_END: MenuProcessKey(KEY_END); break;
 			case VK_RETURN:
-			case VK_SPACE:
-			case 'Z':
-			case 'X': MenuProcessKey(KEY_SELECT); break;
+			case VK_SPACE: MenuProcessKey(KEY_SELECT); break;
 			case VK_ESCAPE:
 			case VK_BACK: MenuProcessKey(KEY_CANCEL); break;
-			case 'F':
-			case 'I': MenuProcessKey(KEY_INFO); break;
+			case VK_F2:
+			case VK_INSERT: MenuProcessKey(KEY_INFO); break;
 			case VK_TAB: MenuProcessKey(KEY_MENU_TOGGLE); break;
-			default: break;
+			default:
+				if ((wParam >= 'A' && wParam <= 'Z') || (wParam >= '0' && wParam <= '9'))
+				{
+					MenuJumpToLetter((char)wParam);
+				}
+				else if (wParam >= VK_NUMPAD0 && wParam <= VK_NUMPAD9)
+				{
+					MenuJumpToLetter((char)('0' + (wParam - VK_NUMPAD0)));
+				}
+				break;
 			}
 		}
 		InvalidateRect(hwnd, NULL, FALSE);

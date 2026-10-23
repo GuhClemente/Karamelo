@@ -25,6 +25,7 @@ enum MenuKey
 void MenuInit();
 void MenuRun();
 void MenuProcessKey(MenuKey key);
+void MenuJumpToLetter(char c);
 void MenuSetStatus(const char* status);
 const char* MenuGetStatus();
 const char* MenuGetTitle();

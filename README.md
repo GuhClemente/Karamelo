@@ -69,8 +69,17 @@ Jogos de arcade passam por uma troca automática e silenciosa de core: o app ten
   * 10 slots independentes por jogo (`0` a `9`).
   * Gravação persistente no disco em `saves/<Sistema>/<NomeDoJogo>.state<Slot>`.
   * Notificações HUD em tempo real na tela do jogo (*Toast Notifications*).
-* **Atalhos Rápidos de Teclado:**
-  * `F12`: Abrir o Menu OSD durante o jogo (`Esc` tambem fecha, mas nao abre - durante a partida `Esc` e `Tab` sao teclas do jogo).
+* **Navegação Rápida no Menu (Jump to Letter):**
+  * Pressione qualquer letra (`A` a `Z`) ou número (`0` a `9`) para saltar instantaneamente para o primeiro item com aquela inicial em qualquer lista (menu principal, sistemas, ROMs, ports, favoritos).
+  * Pressionar a mesma tecla repetidamente cicla sequencialmente entre todos os jogos/sistemas daquela letra (ex: `M` -> Mario -> Mega Man -> Metroid -> Mortal Kombat).
+  * Limpeza inteligente: ignora tags de região `[SNES]`, `(USA)`, colchetes e marcadores de favoritos `* `.
+* **Atalhos Rápidos de Teclado no Menu OSD:**
+  * `Enter` ou `Espaço`: Entrar / Confirmar / Iniciar jogo.
+  * `Esc` ou `Backspace`: Voltar / Subir de pasta.
+  * `F2` ou `Insert`: Alternar Favorito / Info (no controle: botão `Y`).
+  * `Tab` ou `F12`: Abrir / Fechar menu OSD.
+* **Atalhos Rápidos de Teclado em Jogo:**
+  * `F12`: Abrir o Menu OSD durante o jogo (`Esc` também fecha, mas não abre - durante a partida `Esc` e `Tab` são teclas do jogo).
   * `F5` ou `F2`: **Quick Save State** no slot ativo.
   * `F8` ou `F4`: **Quick Load State** do slot ativo.
   * `F6` / `F7`: Alternar Slot Anterior / Próximo (0 a 9).
@@ -80,6 +89,12 @@ Jogos de arcade passam por uma troca automática e silenciosa de core: o app ten
   * `Select + R1 (RB)`: Salvar Estado Rápido.
   * `Select + L1 (LB)`: Carregar Estado Rápido.
   * `Start + Select` ou `Guide`: Alternar o Menu OSD do Karamelo.
+* **Controle Híbrido de Mouse (FM Towns, PC-98, DOS):**
+  * **Mouse Físico:** Movimento 1:1 com auto-recentralização nas bordas da janela.
+  * **Analógico do Gamepad:** Curva progressiva não-linear para point-and-click (toque suave move 1 pixel para precisão de inventário e diálogos; empurrar tudo move o cursor velozmente pela tela).
+  * `Botão A` ou `RT`: Clique Esquerdo (Left Click).
+  * `Botão B` ou `LT`: Clique Direito (Right Click).
+  * `D-Pad` e `Setas do Teclado`: Toques milimétricos (3 pixels) para ajustes de mira.
 * **Mouse como caneta/stylus:** em sistemas com tela de toque (DS, 3DS), o botão esquerdo do mouse funciona como caneta sobre a imagem do jogo. O cursor do Windows some sozinho enquanto o app está em foco.
 * **Pipeline de Áudio em Ring Buffer:** buffers circulares com reciclagem `WHDR_DONE`, detecção automática da taxa nativa da placa de som (WASAPI), recalibração a cada jogo carregado e fila de latência que cresce sozinha se detectar underruns recorrentes numa máquina mais lenta.
 * **Ports & Recomp:** categoria própria no menu principal com jogos "recompilados" nativamente (tecnologia N64Recomp e afins) - baixa, extrai e abre a versão mais recente de cada projeto direto do GitHub, sem sair do app. Ver [CREDITS.md](CREDITS.md) para a lista completa e os repositórios de origem.
