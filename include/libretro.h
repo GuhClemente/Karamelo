@@ -45,6 +45,14 @@ extern "C" {
 #define RETRO_DEVICE_ANALOG       5
 #define RETRO_DEVICE_POINTER      6
 
+#define RETRO_DEVICE_ID_MOUSE_X         0
+#define RETRO_DEVICE_ID_MOUSE_Y         1
+#define RETRO_DEVICE_ID_MOUSE_LEFT      2
+#define RETRO_DEVICE_ID_MOUSE_RIGHT     3
+#define RETRO_DEVICE_ID_MOUSE_WHEELUP   4
+#define RETRO_DEVICE_ID_MOUSE_WHEELDOWN 5
+#define RETRO_DEVICE_ID_MOUSE_MIDDLE    6
+
 /* Pointer device ids. Coordinates are signed 16-bit, spanning the whole
  * emitted framebuffer: -0x7fff is left/top, 0x7fff is right/bottom. */
 #define RETRO_DEVICE_ID_POINTER_X       0

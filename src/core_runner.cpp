@@ -2435,6 +2435,11 @@ static size_t CB_AudioSampleBatch(const int16_t* data, size_t frames)
 	return frames;
 }
 
+// Libretro RETRO_DEVICE_MOUSE relative motion and buttons
+static volatile LONG g_mouse_rel_x = 0;
+static volatile LONG g_mouse_rel_y = 0;
+static volatile LONG g_mouse_buttons = 0; // bit 0 = Left, bit 1 = Right, bit 2 = Middle
+
 static void CB_InputPoll(void)
 {
 	// Must clear buttons every frame, otherwise any pressed button remains stuck
@@ -2607,7 +2612,99 @@ static void CB_InputPoll(void)
 		}
 	}
 
-	// 3. Netplay: ship this frame's local input and take the peer's as P2.
+	// 3. Mouse Polling (Physical mouse + Gamepad stick/buttons + Keyboard navigation)
+	int mouse_dx = 0;
+	int mouse_dy = 0;
+	int mouse_btns = 0;
+
+#ifdef _WIN32
+	static POINT s_last_mouse_pos = { 0, 0 };
+	static bool s_has_mouse_pos = false;
+
+	POINT cur_mouse_pt;
+	if (GetCursorPos(&cur_mouse_pt))
+	{
+		if (s_has_mouse_pos)
+		{
+			mouse_dx = (int)(cur_mouse_pt.x - s_last_mouse_pos.x);
+			mouse_dy = (int)(cur_mouse_pt.y - s_last_mouse_pos.y);
+		}
+		s_last_mouse_pos = cur_mouse_pt;
+		s_has_mouse_pos = true;
+
+		// When mouse moves near screen edge, re-center to prevent getting trapped at display borders
+		if (fg && (mouse_dx != 0 || mouse_dy != 0))
+		{
+			RECT rc;
+			if (GetWindowRect(fg, &rc))
+			{
+				if (cur_mouse_pt.x <= rc.left + 5 || cur_mouse_pt.x >= rc.right - 5 ||
+				    cur_mouse_pt.y <= rc.top + 5 || cur_mouse_pt.y >= rc.bottom - 5)
+				{
+					int cx = (rc.left + rc.right) / 2;
+					int cy = (rc.top + rc.bottom) / 2;
+					SetCursorPos(cx, cy);
+					s_last_mouse_pos.x = cx;
+					s_last_mouse_pos.y = cy;
+				}
+			}
+		}
+
+		if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) mouse_btns |= 1;
+		if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) mouse_btns |= 2;
+		if (GetAsyncKeyState(VK_MBUTTON) & 0x8000) mouse_btns |= 4;
+	}
+#endif
+
+	// Gamepad stick to mouse (for point-and-click / adventure games on FM Towns, PC-98, DOS, etc.)
+	{
+		XINPUT_STATE pad0;
+		if (GamepadGetState(0, &pad0))
+		{
+			WORD w0 = pad0.Gamepad.wButtons;
+			if (pad0.Gamepad.bLeftTrigger > 50) w0 |= PAD_BTN_LT;
+			if (pad0.Gamepad.bRightTrigger > 50) w0 |= PAD_BTN_RT;
+
+			// Left Stick moves mouse cursor
+			if (abs(pad0.Gamepad.sThumbLX) > deadzone_thresh)
+				mouse_dx += (pad0.Gamepad.sThumbLX * 10) / 32768;
+			if (abs(pad0.Gamepad.sThumbLY) > deadzone_thresh)
+				mouse_dy -= (pad0.Gamepad.sThumbLY * 10) / 32768;
+
+			// Right Stick also moves mouse
+			if (abs(pad0.Gamepad.sThumbRX) > deadzone_thresh)
+				mouse_dx += (pad0.Gamepad.sThumbRX * 10) / 32768;
+			if (abs(pad0.Gamepad.sThumbRY) > deadzone_thresh)
+				mouse_dy -= (pad0.Gamepad.sThumbRY * 10) / 32768;
+
+			// D-Pad nudges mouse
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT)  mouse_dx -= 5;
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) mouse_dx += 5;
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP)    mouse_dy -= 5;
+			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN)  mouse_dy += 5;
+
+			// Button A or Right Trigger = Left Click
+			if ((w0 & PAD_BTN_A) || (pad0.Gamepad.bRightTrigger > 50))
+				mouse_btns |= 1;
+			// Button B or Left Trigger = Right Click
+			if ((w0 & PAD_BTN_B) || (pad0.Gamepad.bLeftTrigger > 50))
+				mouse_btns |= 2;
+		}
+	}
+
+	// Keyboard arrows also nudge mouse for computer adventure games
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000)  mouse_dx -= 6;
+	if (GetAsyncKeyState(VK_RIGHT) & 0x8000) mouse_dx += 6;
+	if (GetAsyncKeyState(VK_UP) & 0x8000)    mouse_dy -= 6;
+	if (GetAsyncKeyState(VK_DOWN) & 0x8000)  mouse_dy += 6;
+	if ((GetAsyncKeyState(VK_RETURN) & 0x8000) || (GetAsyncKeyState(VK_SPACE) & 0x8000))
+		mouse_btns |= 1;
+
+	InterlockedExchange(&g_mouse_rel_x, (LONG)mouse_dx);
+	InterlockedExchange(&g_mouse_rel_y, (LONG)mouse_dy);
+	InterlockedExchange(&g_mouse_buttons, (LONG)mouse_btns);
+
+	// 4. Netplay: ship this frame's local input and take the peer's as P2.
 	//
 	// This call did not exist anywhere in the project. Sessions connected, said
 	// "Player 2 connected", and then exchanged nothing - the remote player's
@@ -2880,6 +2977,20 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 		case RETRO_DEVICE_ID_POINTER_Y:       return (int16_t)(xy & 0xFFFF);
 		case RETRO_DEVICE_ID_POINTER_PRESSED: return (int16_t)g_pointer_down;
 		case RETRO_DEVICE_ID_POINTER_COUNT:   return g_pointer_down ? 1 : 0;
+		default: return 0;
+		}
+	}
+	else if (device == RETRO_DEVICE_MOUSE)
+	{
+		if (OsdIsEnabled()) return 0;
+		LONG btns = g_mouse_buttons;
+		switch (id)
+		{
+		case RETRO_DEVICE_ID_MOUSE_X:      return (int16_t)g_mouse_rel_x;
+		case RETRO_DEVICE_ID_MOUSE_Y:      return (int16_t)g_mouse_rel_y;
+		case RETRO_DEVICE_ID_MOUSE_LEFT:   return (btns & 1) ? 1 : 0;
+		case RETRO_DEVICE_ID_MOUSE_RIGHT:  return (btns & 2) ? 1 : 0;
+		case RETRO_DEVICE_ID_MOUSE_MIDDLE: return (btns & 4) ? 1 : 0;
 		default: return 0;
 		}
 	}
@@ -3754,6 +3865,7 @@ static void SetPortDevicesGuarded()
 	__try
 	{
 		unsigned port0_device = RETRO_DEVICE_JOYPAD;
+		unsigned port1_device = RETRO_DEVICE_JOYPAD;
 		if (s_loaded_core_path.find("msx") != std::string::npos)
 		{
 			// fMSX requires port 0 device to be RETRO_DEVICE_KEYBOARD (3) so that
@@ -3761,8 +3873,16 @@ static void SetPortDevicesGuarded()
 			// simultaneously polling RETRO_DEVICE_JOYPAD on both ports for joystick/gamepad input.
 			port0_device = RETRO_DEVICE_KEYBOARD;
 		}
+		else if (s_loaded_core_path.find("fmtowns") != std::string::npos)
+		{
+			// Fujitsu FM Towns hardware standard configuration:
+			// Port 0 (Hardware Port 1) = Towns Pad / Joystick (Truxton II, Splatterhouse, SSF2, etc.)
+			// Port 1 (Hardware Port 2) = FM Towns Mouse (Indiana Jones, Monkey Island, Zak McKracken, etc.)
+			port0_device = RETRO_DEVICE_JOYPAD;
+			port1_device = RETRO_DEVICE_MOUSE;
+		}
 		p_retro_set_controller_port_device(0, port0_device);
-		p_retro_set_controller_port_device(1, RETRO_DEVICE_JOYPAD);
+		p_retro_set_controller_port_device(1, port1_device);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
