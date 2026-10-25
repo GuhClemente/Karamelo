@@ -30,6 +30,48 @@ set LOCAL_EXE=dist\Karamelo.exe
 set LOCAL_JSON=dist\version.json
 
 rem -------------------------------------------------------------
+rem PASSO 0: O que vai ser publicado tem que estar commitado e no GitHub
+rem -------------------------------------------------------------
+rem A release do GitHub (passo 4) aponta para o commit atual, e o site recebe
+rem um binario compilado desta arvore. Com alteracao nao commitada, o que o
+rem jogador baixa sai de um codigo que nao existe em lugar nenhum. Fica de fora
+rem so o dist\version.json, que o proprio empacotamento regrava e e commitado
+rem depois do deploy. Arquivos novos (nao rastreados) nao contam.
+for /f "tokens=3" %%v in ('findstr /c:"#define APP_VERSION " include\app_info.h') do set CUR_VER=%%~v
+if not "%~1"=="" if not "%~1"=="%CUR_VER%" (
+    echo [ERRO] deploy_all.bat %~1 mudaria a versao ^(hoje %CUR_VER%^) sem commit.
+    echo Antes, rode e commite a troca de versao:
+    echo     powershell -File bump_version.ps1 %~1
+    echo     git commit -am "chore: versao %~1" ^&^& git push
+    echo Depois rode deploy_all.bat sem argumento.
+    pause
+    exit /b 1
+)
+git diff --quiet HEAD -- . ":(exclude)dist/version.json"
+if errorlevel 1 (
+    echo [ERRO] Ha alteracoes nao commitadas - deploy cancelado:
+    git status --short --untracked-files=no -- . ":(exclude)dist/version.json"
+    echo Commite e faca push antes de publicar.
+    pause
+    exit /b 1
+)
+git fetch -q origin
+if errorlevel 1 (
+    echo [ERRO] Nao consegui falar com o GitHub ^(git fetch^) - deploy cancelado.
+    pause
+    exit /b 1
+)
+set PUSHED=
+for /f %%b in ('git branch -r --contains HEAD') do set PUSHED=1
+if not defined PUSHED (
+    echo [ERRO] O commit atual ainda nao esta no GitHub - rode git push antes.
+    pause
+    exit /b 1
+)
+echo [0/4] Tudo commitado e no GitHub ^(v%CUR_VER%^).
+echo.
+
+rem -------------------------------------------------------------
 rem PASSO 1: Compilacao, Testes e Empacotamento Windows
 rem -------------------------------------------------------------
 rem package_release.bat's own step [1/4] already calls compile_port.bat
