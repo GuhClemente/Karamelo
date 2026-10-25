@@ -368,6 +368,47 @@ static std::vector<std::string> g_favorites;
 static std::vector<std::string> g_recent;
 static bool g_fav_recent_loaded = false;
 
+// Favorites and recents written before the UTF-8 code page was switched on
+// hold paths in the old ANSI code page (cp1252 on a Portuguese Windows). Such
+// a line is not valid UTF-8; re-encode it so the path opens again. Valid
+// UTF-8 - including every plain ASCII path - is left as it is.
+static bool IsValidUtf8(const std::string &s) {
+  for (size_t i = 0; i < s.size();) {
+    unsigned char c = (unsigned char)s[i];
+    size_t len = c < 0x80 ? 1 : (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : (c & 0xF8) == 0xF0 ? 4 : 0;
+    if (!len || i + len > s.size()) return false;
+    for (size_t k = 1; k < len; k++)
+      if (((unsigned char)s[i + k] & 0xC0) != 0x80) return false;
+    i += len;
+  }
+  return true;
+}
+
+static std::string LegacyToUtf8(const std::string &s) {
+#ifdef _WIN32
+  if (IsValidUtf8(s)) return s;
+  // With the UTF-8 manifest GetACP() answers 65001, so the code page the file
+  // was written in has to come from where Windows keeps it.
+  UINT legacy_cp = 1252;
+  char buf[16] = {0};
+  DWORD sz = sizeof(buf);
+  if (RegGetValueA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage", "ACP",
+                   RRF_RT_REG_SZ, NULL, buf, &sz) == ERROR_SUCCESS && atoi(buf) > 0)
+    legacy_cp = (UINT)atoi(buf);
+  int wn = MultiByteToWideChar(legacy_cp, 0, s.c_str(), (int)s.size(), NULL, 0);
+  if (wn <= 0) return s;
+  std::wstring w(wn, L'\0');
+  MultiByteToWideChar(legacy_cp, 0, s.c_str(), (int)s.size(), &w[0], wn);
+  int un = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), wn, NULL, 0, NULL, NULL);
+  if (un <= 0) return s;
+  std::string u(un, '\0');
+  WideCharToMultiByte(CP_UTF8, 0, w.c_str(), wn, &u[0], un, NULL, NULL);
+  return u;
+#else
+  return s;
+#endif
+}
+
 static void LoadFavoritesAndRecent() {
   if (g_fav_recent_loaded) return;
   g_fav_recent_loaded = true;
@@ -382,7 +423,7 @@ static void LoadFavoritesAndRecent() {
       while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n' || line[len - 1] == ' '))
         line[--len] = '\0';
       if (len > 0 && line[0] != '#')
-        g_favorites.push_back(line);
+        g_favorites.push_back(LegacyToUtf8(line));
     }
     fclose(f);
   }
@@ -395,7 +436,7 @@ static void LoadFavoritesAndRecent() {
       while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n' || line[len - 1] == ' '))
         line[--len] = '\0';
       if (len > 0 && line[0] != '#')
-        g_recent.push_back(line);
+        g_recent.push_back(LegacyToUtf8(line));
     }
     fclose(f);
   }
@@ -3100,7 +3141,11 @@ void MenuRun() {
       continue;
     }
 
-    const auto &item = items[item_idx];
+    // Drawn through OsdDisplayText so accented names keep their column width
+    // (one letter per character, not two or three UTF-8 bytes).
+    MenuItem item = items[item_idx];
+    item.label = OsdDisplayText(item.label);
+    item.value = OsdDisplayText(item.value);
 
     bool is_selected = (item_idx == selected_idx);
 

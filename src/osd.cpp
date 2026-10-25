@@ -206,9 +206,11 @@ static int EmitTextGlyphCell(RowEncoder& row, const unsigned char* glyphRows, in
 
 // ---- title text --------------------------------------------------------------
 
-void OsdSetTitle(const char *s, int a)
+void OsdSetTitle(const char *raw, int a)
 {
 	s_arrowFlags = a;
+	const std::string display = OsdDisplayText(raw ? raw : "");
+	const char* s = display.c_str();
 
 	const uint stripHeight = (uint)s_visibleRows * 8;
 	uint written = 0;
@@ -392,4 +394,42 @@ const uint8_t* OsdGetInvertMap()
 bool OsdIsEnabled()
 {
 	return s_enabled;
+}
+
+// Latin-1 letters U+00C0..U+00FF, folded to ASCII.
+static const char kLatin1Fold[64 + 1] =
+    "AAAAAAACEEEEIIII"   // C0-CF
+    "DNOOOOOxOUUUUYTs"   // D0-DF
+    "aaaaaaaceeeeiiii"   // E0-EF
+    "dnooooo/ouuuuyty";  // F0-FF
+
+std::string OsdDisplayText(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size();)
+    {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x80) { out += (char)c; i++; continue; }
+
+        unsigned cp = 0;
+        size_t len = 0;
+        if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; len = 2; }
+        else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; len = 3; }
+        else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; len = 4; }
+        bool valid = len > 0 && i + len <= s.size();
+        for (size_t k = 1; valid && k < len; k++)
+        {
+            unsigned char cc = (unsigned char)s[i + k];
+            if ((cc & 0xC0) != 0x80) valid = false;
+            else cp = (cp << 6) | (cc & 0x3F);
+        }
+        if (!valid) { cp = c; len = 1; } // a legacy Latin-1 byte, not UTF-8
+
+        if (cp >= 0xC0 && cp <= 0xFF) out += kLatin1Fold[cp - 0xC0];
+        else if (cp == 0xA0) out += ' ';
+        else out += '?';
+        i += len;
+    }
+    return out;
 }

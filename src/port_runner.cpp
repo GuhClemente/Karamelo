@@ -824,8 +824,17 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         asset = PickFromDownloadsFeed(feed);
         if (asset.url.empty()) { out_error = Tr("nenhum build para este sistema no servidor do port", "no build for this system on the port's server"); return false; }
     } else {
-    std::string releases_url = "https://api.github.com/repos/" + def.repo + "/releases/latest";
     std::string json;
+    if (!def.release_tag.empty()) {
+        // A pinned release is read as is - no "latest", no fallback to some
+        // other release whose files the catalog never vouched for.
+        if (!UpdaterHttpGetString("https://api.github.com/repos/" + def.repo + "/releases/tags/" + def.release_tag, json) ||
+            ParseReleaseAssets(json).empty()) {
+            out_error = Tr("versao do catalogo nao encontrada no GitHub: ", "catalog version not found on GitHub: ") + def.release_tag;
+            return false;
+        }
+    } else {
+    std::string releases_url = "https://api.github.com/repos/" + def.repo + "/releases/latest";
     bool got_latest = UpdaterHttpGetString(releases_url, json);
     if (!got_latest || ParseReleaseAssets(json).empty()) {
         // /latest 404s whenever a repo's releases are all marked prerelease,
@@ -838,6 +847,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
             out_error = Tr("falha ao consultar o GitHub", "could not reach GitHub");
             return false;
         }
+    }
     }
 
     if (json.find("\"assets\"") == std::string::npos && json.find("rate limit exceeded") != std::string::npos) {
@@ -859,6 +869,27 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     }
 
     std::string lower_name = ToLowerStr(asset.name);
+
+    // The file the catalog vouches for. With hashes in the catalog, a file it
+    // does not list is not downloaded at all.
+    std::string expected_sha256;
+    for (const auto& h : def.asset_sha256)
+        if (h.first == asset.name) expected_sha256 = h.second;
+    if (!def.asset_sha256.empty() && expected_sha256.empty()) {
+        out_error = Tr("arquivo da release fora do catalogo: ", "release file not in the catalog: ") + asset.name;
+        return false;
+    }
+    auto verify_download = [&](const std::string& path) -> bool {
+        if (expected_sha256.empty()) return true;
+        std::string got = UpdaterSha256File(path);
+        std::transform(got.begin(), got.end(), got.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+        if (got == expected_sha256) return true;
+        std::error_code rm_ec;
+        fs::remove(path, rm_ec);
+        out_error = Tr("arquivo baixado nao confere com o catalogo (SHA-256) - nada foi instalado",
+                       "downloaded file does not match the catalog (SHA-256) - nothing was installed");
+        return false;
+    };
 
     // IsWindowsAssetName treats ".msi" as a valid Windows marker (some
     // releases have no other option), but nothing past this point can do
@@ -899,6 +930,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         std::string exe_name = safe_name.empty() ? (def.id + ".exe") : safe_name;
         std::string exe_path = dest_dir + "/" + exe_name;
         if (!UpdaterHttpDownloadToFile(asset.url, exe_path)) { out_error = Tr("falha no download", "download failed"); return false; }
+        if (!verify_download(exe_path)) return false;
 #ifndef _WIN32
         chmod(exe_path.c_str(), 0755);
 #endif
@@ -918,6 +950,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         else if (lower_name.size() >= 3 && lower_name.substr(lower_name.size() - 3) == ".7z") cache_ext = ".7z";
         std::string zip_path = "cache/" + def.id + "_download" + cache_ext;
         if (!UpdaterHttpDownloadToFile(asset.url, zip_path)) { out_error = Tr("falha no download", "download failed"); return false; }
+        if (!verify_download(zip_path)) return false;
 
         bool extracted = ArchiveExtractAll(zip_path, dest_dir);
         fs::remove(zip_path, ec);

@@ -54,6 +54,32 @@ bool GetList(const JsonValue& obj, const char* key, std::vector<std::string>& ou
     return true;
 }
 
+bool IsSha256Hex(const std::string& s)
+{
+    if (s.size() != 64) return false;
+    for (char c : s)
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+    return true;
+}
+
+bool GetHashes(const JsonValue& obj, const char* key, std::vector<std::pair<std::string, std::string>>& out,
+               std::string& error, const std::string& where)
+{
+    const JsonValue* v = obj.Find(key);
+    if (!v) return true;
+    if (v->type != JsonValue::Object) { error = where + ": '" + key + "' deve ser objeto {arquivo: sha256}"; return false; }
+    out.clear();
+    for (const auto& m : v->members) {
+        if (m.second.type != JsonValue::String || !IsSha256Hex(m.second.str) || m.first.empty() ||
+            m.first.find('/') != std::string::npos || m.first.find('\\') != std::string::npos) {
+            error = where + ": '" + key + "' tem entrada invalida (" + m.first + ")";
+            return false;
+        }
+        out.emplace_back(m.first, m.second.str);
+    }
+    return true;
+}
+
 // The id becomes a folder under ports/ and a path component on disk: nothing
 // that could climb out of it or mean something to the shell.
 bool IdIsSafe(const std::string& id)
@@ -153,6 +179,8 @@ bool PortCatalogParse(const std::string& json, PortCatalog& out, std::string& er
             !GetList(e, "rom_exclude_keywords", d.rom_exclude_keywords, error, where) ||
             !GetBool(e, "iso_keywords_whole_word", d.iso_keywords_whole_word, error, where) ||
             !GetString(e, "psp_game_dir", d.psp_game_dir, error, where) ||
+            !GetString(e, "release_tag", d.release_tag, error, where) ||
+            !GetHashes(e, "asset_sha256", d.asset_sha256, error, where) ||
             !GetString(e, "notes", d.notes, error, where))
             return false;
 
@@ -207,6 +235,16 @@ std::string PortCatalogToJson(const PortCatalog& catalog)
         PutList(o, first, "rom_exclude_keywords", d.rom_exclude_keywords);
         PutBool(o, first, "iso_keywords_whole_word", d.iso_keywords_whole_word, false);
         PutString(o, first, "psp_game_dir", d.psp_game_dir);
+        PutString(o, first, "release_tag", d.release_tag);
+        if (!d.asset_sha256.empty()) {
+            o += first ? "\n" : ",\n";
+            first = false;
+            o += "      \"asset_sha256\": {";
+            for (size_t k = 0; k < d.asset_sha256.size(); k++)
+                o += (k ? ",\n        " : "\n        ") + JsonQuote(d.asset_sha256[k].first) + ": " +
+                     JsonQuote(d.asset_sha256[k].second);
+            o += "\n      }";
+        }
         PutString(o, first, "notes", d.notes);
         o += "\n    }";
     }

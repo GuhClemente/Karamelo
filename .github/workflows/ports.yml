@@ -1,0 +1,98 @@
+# Ports & Recomp catalog automation (see docs/PORTS_CATALOG.md).
+#
+# - validate: a pull request that touches data/ports.json is built and
+#   unit-tested, and every port it adds or changes is really installed with
+#   "Karamelo.exe --install-port <id>" (tools/validate_ports.ps1) - which
+#   downloads the pinned release and refuses any file whose SHA-256 is not the
+#   one in the catalog. A port that does not install fails the check.
+# - update-pins: every Monday, tools/pin_ports.py --update looks for newer
+#   upstream releases, the same validation runs here (a pull request opened by
+#   GITHUB_TOKEN does not trigger other workflows), and a pull request is
+#   opened with the result in its description. Nothing reaches players until a
+#   person merges it and runs deploy_ports_catalog.bat.
+name: ports
+
+on:
+  pull_request:
+    paths:
+      - data/ports.json
+      - include/ports_catalog_json.h
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cache SDL3 build
+        uses: actions/cache@v4
+        with:
+          path: build/sdl3
+          key: sdl3-win-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_port.bat') }}
+      - name: Build and unit tests (catalog checks included)
+        shell: cmd
+        run: call compile_port.bat
+      - name: Install every changed port
+        shell: pwsh
+        run: ./tools/validate_ports.ps1 -BaseRef ${{ github.event.pull_request.base.sha }}
+
+  update-pins:
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Look for newer upstream releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/pin_ports.py --update
+      - name: Anything new?
+        id: diff
+        shell: pwsh
+        run: |
+          git diff --quiet -- data/ports.json
+          "changed=$(if ($LASTEXITCODE -ne 0) { 'true' } else { 'false' })" >> $env:GITHUB_OUTPUT
+      - name: Cache SDL3 build
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: build/sdl3
+          key: sdl3-win-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_port.bat') }}
+      - name: Build and unit tests
+        if: steps.diff.outputs.changed == 'true'
+        shell: cmd
+        run: call compile_port.bat
+      - name: Install every updated port
+        if: steps.diff.outputs.changed == 'true'
+        id: validate
+        continue-on-error: true
+        shell: pwsh
+        run: ./tools/validate_ports.ps1 -BaseRef HEAD -Report ports_report.md
+      - name: Pull request body
+        if: steps.diff.outputs.changed == 'true'
+        shell: pwsh
+        run: |
+          $status = if ("${{ steps.validate.outcome }}" -eq "success") { "Todos os ports atualizados instalaram com a versao e o hash novos." } else { "**Algum port nao instalou - nao faca merge sem olhar a tabela.**" }
+          $body = @("Versoes novas encontradas por ``tools/pin_ports.py --update``.", "", $status, "", (Get-Content ports_report.md -Raw), "", "Depois do merge: rode ``deploy_ports_catalog.bat`` para publicar.")
+          Set-Content -Path pr_body.md -Value ($body -join "`n") -Encoding UTF8
+      - name: Open the pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: bot/ports-update
+          commit-message: "ports: novas versoes upstream (tools/pin_ports.py --update)"
+          title: "Ports: novas versoes upstream"
+          body-path: pr_body.md
+          add-paths: |
+            data/ports.json
+            include/ports_catalog_json.h

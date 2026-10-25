@@ -41,7 +41,11 @@ static const char* CRASH_API_URL = "https://karamelo-emu.com/api/crash-report";
 static std::mutex g_crash_context_lock;
 static std::string g_last_core_name = "Nenhum";
 static std::string g_last_game_stem = "Nenhum";
-static bool g_crash_reporting_enabled = true;
+// Off until the player turns it on (Settings > Diagnostics). A report
+// carries the name of the game that was running and a stack trace; under the
+// LGPD that is the player's to agree to, not ours to assume. A choice saved
+// earlier in Config/karamelo.ini still wins over this default.
+static bool g_crash_reporting_enabled = false;
 static bool g_settings_loaded = false;
 static bool g_transient_disabled = false;
 
@@ -466,9 +470,12 @@ void CrashReporterCheckAndDispatch() {
     }
 
     if (!g_crash_reporting_enabled) {
-        // Silently remove dump without transmission
+        // Nothing is sent - but the player is told it happened and where the
+        // switch is, instead of the crash vanishing without a trace.
         std::error_code ec;
         fs::remove(CRASH_DUMP_PATH, ec);
+        CoreSetToast(Tr("O KARAMELO FECHOU SOZINHO - ATIVE CONFIGURACOES > DIAGNOSTICO PARA ENVIAR RELATORIOS",
+                        "KARAMELO CLOSED UNEXPECTEDLY - ENABLE SETTINGS > DIAGNOSTICS TO SEND REPORTS"), 420);
         return;
     }
 

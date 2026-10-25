@@ -17,6 +17,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 // Adding a new N64Recomp-style port is one entry: id (also the folder name
 // under ports/), display name, "owner/repo" for its GitHub releases, and - if
@@ -107,6 +108,16 @@ struct PortDefinition {
     // PSP disc's PSP_GAME/ tree before launch. Karamelo extracts it from the
     // user's .iso (found by iso_keywords) - see PreparePspGame().
     std::string psp_game_dir;
+    // The release this catalog vouches for. Empty = whatever GitHub calls the
+    // latest release at install time (the old behaviour). Set, the install
+    // reads exactly that tag - a new upstream release changes nothing until
+    // the catalog is updated (tools/pin_ports.py proposes the bump).
+    std::string release_tag;
+    // SHA-256 (lowercase hex) of each file of that release the launcher may
+    // download, by file name. Non-empty, a download whose name is not listed
+    // or whose hash differs is refused and deleted - a swapped release file
+    // or a hijacked repository never reaches the player's machine.
+    std::vector<std::pair<std::string, std::string>> asset_sha256;
     // Free text for whoever maintains the catalog - why a flag is what it is,
     // when a release was last checked. Never read by the launcher.
     std::string notes;

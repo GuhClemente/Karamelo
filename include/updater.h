@@ -69,6 +69,8 @@ bool UpdaterApplyDownloaded();
 // thread. No progress tracking; the update flow's own progress bar uses the
 // internal HttpFetchData directly for that.
 bool UpdaterHttpGetString(const std::string& url, std::string& out_body);
+// Lowercase hex SHA-256 of a file, or "" if it cannot be read.
+std::string UpdaterSha256File(const std::string& path);
 bool UpdaterHttpDownloadToFile(const std::string& url, const std::string& dest_path);
 
 #endif // UPDATER_H_INCLUDED

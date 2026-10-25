@@ -1601,3 +1601,22 @@ arquivo `data/ports.json` do repositório, publicado em
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
+
+---
+
+## Versão 0.9.78 (preparada em 25/10/2026)
+
+Sem mudança de contagens: **37 sistemas, 42 motores; 70 ports — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎**.
+
+Novidades para o jogador:
+
+- **Ports com versão e arquivo verificados**: cada port do catálogo instala uma versão
+  específica e o Karamelo confere o SHA-256 do arquivo baixado. Arquivo diferente do
+  esperado é recusado — proteção contra repositório invadido ou release adulterada.
+- **Novos ports sem atualizar o app**: o catálogo é baixado de
+  `karamelo-emu.com/downloads/ports.json` e vale a partir do próximo início.
+- **Nomes de jogos em qualquer idioma (Windows)**: ROMs com nome em japonês ou outros
+  alfabetos agora aparecem na lista e abrem; acentos são mostrados sem acento no menu.
+- **Relatório de falhas agora é opcional**: vem desligado; o jogador ativa em
+  Configurações > Diagnóstico. Se o app fechar sozinho, ele avisa onde ativar.
+- **Tradução completa**: todos os avisos seguem o idioma escolhido (português/inglês).

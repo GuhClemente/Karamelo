@@ -1,5 +1,5 @@
 {
-  "catalog_version": 1,
+  "catalog_version": 2,
   "ports": [
     {
       "id": "DrMario64",
@@ -8,6 +8,10 @@
       "exe_hint": "drmario64_recomp.exe",
       "needs_rom": true,
       "rom_keywords": ["dr", "mario"],
+      "release_tag": "1.0.0",
+      "asset_sha256": {
+        "Dr.Mario.64.Recompiled-v1.0.0-Windows.zip": "ba749f48725e23636845c9a79a89e17859172ac80fa7b98bf4523d12c1f0d2cf"
+      },
       "notes": "Verified against theboy181/drmario64_recomp_plus's actual release - the one entry here launched end-to-end (download, extract, ROM auto-copy, launch) rather than only checked against the API."
     },
     {
@@ -17,7 +21,15 @@
       "needs_rom": true,
       "rom_keywords": ["zelda", "majora"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.2.2",
+      "asset_sha256": {
+        "Zelda64Recompiled-v1.2.2-Linux-ARM64.zip": "2e49b96aced578363065e1764ca96eaa5590cb6f7e80efd10e8ce1a08462b933",
+        "Zelda64Recompiled-v1.2.2-Linux-Flatpak-X64.zip": "79efc38a5469d524b09c024f97509a3ff0c61466db4a74630c112f4901804e10",
+        "Zelda64Recompiled-v1.2.2-Linux-X64.zip": "de8b19cdb4e3ad0c10fd6d8127f7a6cc2a9eba106d89c753439178b718887c42",
+        "Zelda64Recompiled-v1.2.2-macOS.zip": "f369815d7ba2a1139a6fab8a0aa51c52e5f064dcfcce649eb888fdef9f648689",
+        "Zelda64Recompiled-v1.2.2-Windows.zip": "d02b95f1cf5e4d44d6587fa6136c6db521f61aa41ba8700c05f91bea8b0a26d0"
+      }
     },
     {
       "id": "Goemon64Recomp",
@@ -26,14 +38,31 @@
       "needs_rom": true,
       "rom_keywords": ["goemon"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v0.2.0-dev",
+      "asset_sha256": {
+        "Goemon64Recompiled-AppImage-ARM64-Release.zip": "ec12d77f2a0491cc3e680d1753a9a4dbd085a96170894102f7b5ff4d07795767",
+        "Goemon64Recompiled-AppImage-X64-Release.zip": "8d9d056ecea6b3d5805d12cc273238e6e8c9b0b9a62d919125dfaaa0737fdd9d",
+        "Goemon64Recompiled-Flatpak-X64-Release.zip": "cb0ea063f78e122586220673bb044bf166f4b3a360bbaa32277d16994345f3cc",
+        "Goemon64Recompiled-Linux-ARM64-Release.zip": "134fc51de50d8aba05fe9b13c069598030e9588d2b83304e1ace925c135f321b",
+        "Goemon64Recompiled-Linux-X64-Release.zip": "73e0deb9fab6deb40365708ca4c8ef5ef2d06e54160a9eb089655b063b361f0d",
+        "Goemon64Recompiled-macOS-Release.zip": "1c2e89a02580da024bdd2f18e2457aaaaf9864120745c04f67778794508717be",
+        "Goemon64Recompiled-PDB-RelWithDebInfo.zip": "a4e90b157b85215b3a72bb27dc0b9b2e73b8628dc6810c9db1f44277306c9d2c",
+        "Goemon64Recompiled-Windows-RelWithDebInfo.zip": "f74041842f059e65be3cc2ba3d51a82c543a3b16406189afe45951cb40ac5896"
+      }
     },
     {
       "id": "DinosaurPlanet",
       "display_name": "Dinosaur Planet",
       "repo": "DinosaurPlanetRecomp/dino-recomp",
       "needs_rom": true,
-      "rom_keywords": ["dinosaur"]
+      "rom_keywords": ["dinosaur"],
+      "release_tag": "v0.3.0",
+      "asset_sha256": {
+        "DinosaurPlanetRecompiled-v0.3.0-Linux-x64.AppImage": "b39d08cf89627ad8172945f1ed8d638d9df724fa2ab5cb87cd0e6cd8e4cba1d9",
+        "DinosaurPlanetRecompiled-v0.3.0-Linux-x64.tar.gz": "8a370cff9bfaacc4af0da9f729b5910f341d41942899cef4ce64aa7d8a4c03a2",
+        "DinosaurPlanetRecompiled-v0.3.0-Windows-x64.zip": "4a1ea0a9d41516f33a8d90aaa50a221d3a5be749b1864c8e1225207d663472a8"
+      }
     },
     {
       "id": "HarvestMoon64Recomp",
@@ -42,7 +71,15 @@
       "needs_rom": true,
       "rom_keywords": ["harvest", "moon"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.2.2",
+      "asset_sha256": {
+        "HarvestMoon64Recompiled-v1.2.2-Linux-ARM64.zip": "cd9c19f86bbb3df153de3f49d377d7120cc44f999499731843f281d455882f26",
+        "HarvestMoon64Recompiled-v1.2.2-Linux-Flatpak-X64.zip": "5c267f9647918ff76375de79adf261a5b9dc3a6389ead4eb591b27343b0031ba",
+        "HarvestMoon64Recompiled-v1.2.2-Linux-X64.zip": "ae0865eaa1092a88a9321e776ca71dcab86c69c4f74d1004dc4f2d6f2224685c",
+        "HarvestMoon64Recompiled-v1.2.2-macOS.zip": "9af5612942f0d40310ea83769fc8a5a221ab0e93a3e55532d5e3ece295cc0080",
+        "HarvestMoon64Recompiled-v1.2.2-Windows.zip": "bbea76c78256eb40da61ed951dbd2efdee9dfdcaffc501c24bab1ad39ac2c896"
+      }
     },
     {
       "id": "SnowboardKids2Recomp",
@@ -50,14 +87,25 @@
       "repo": "cdlewis/snowboardkids2-recomp",
       "needs_rom": true,
       "rom_keywords": ["snowboard", "kids", "2"],
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v2.0.2",
+      "asset_sha256": {
+        "SnowboardKids2Recompiled-Linux-ARM64.tar.gz": "735c5fa8fe2f7555d5553d94509eb6838a3cc4fe030df7c224bbda7e181aa487",
+        "SnowboardKids2Recompiled-Linux-X64.tar.gz": "be89a751c26e33f1d467d014bb784848402596ef4d219f262f7b9518f5b3690e",
+        "SnowboardKids2Recompiled-macOS.zip": "2ec1569977b767b6b5be618a25f984b3256a997c242c0137aad1775559f149f4",
+        "SnowboardKids2Recompiled-Windows.zip": "51b0c78e758d334eeab2f6aab0eec94daf75d30f7a430375d8bea5f5c26e2414"
+      }
     },
     {
       "id": "PokemonStadiumRecomp",
       "display_name": "Pokemon Stadium",
       "repo": "mstan/PokemonStadiumRecomp",
       "needs_rom": true,
-      "rom_keywords": ["pokemon", "stadium"]
+      "rom_keywords": ["pokemon", "stadium"],
+      "release_tag": "v0.4.7-beta",
+      "asset_sha256": {
+        "PokemonStadiumRecomp-v0.4.7-beta-win64.zip": "60b24bcc21d6ae1cc92bfd1796b1c36adbfd4481f4138da66d996bb40aeddbea"
+      }
     },
     {
       "id": "Banjo64Recomp",
@@ -66,7 +114,15 @@
       "needs_rom": true,
       "rom_keywords": ["banjo"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.0.2",
+      "asset_sha256": {
+        "BanjoRecompiled-v1.0.2-Linux-ARM64.tar.gz": "53515be8bc453bc32ed8cbc72e3cd06350ab4a28bd94b0aa6499d4b963a83757",
+        "BanjoRecompiled-v1.0.2-Linux-Flatpak-X64.zip": "8fe71cd8f28f3de2d02bcf4ad30194c01480306d53a12192b805b45c3ba5bb11",
+        "BanjoRecompiled-v1.0.2-Linux-X64.tar.gz": "a34a4d361221171ea638e0165301fff817c53b9cd46167c5affd37867cfc7ad0",
+        "BanjoRecompiled-v1.0.2-macOS.zip": "5e0bbcf671064f05d7bf61c39b9c8f9eb851b0f9de4545882a607b78de8f8072",
+        "BanjoRecompiled-v1.0.2-Windows.zip": "fc34aad48e06681878bedd13b88d5332a2f21f6a98cafc931c94d54892a4dd92"
+      }
     },
     {
       "id": "BM64Recomp",
@@ -75,14 +131,29 @@
       "needs_rom": true,
       "rom_keywords": ["bomberman"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.0.0",
+      "asset_sha256": {
+        "BM64Recompiled-AppImage-ARM64-Release.zip": "d637d062c2dafbefbebab882e2e4ed1fae33f078ee429feb819bba313952d91b",
+        "BM64Recompiled-AppImage-X64-Release.zip": "c01f7e1500d4f3cc6c0653e9092c15c3e0714a05f1e647271b549df507d92c73",
+        "BM64Recompiled-Flatpak-X64-Release.zip": "78b5df798c0f46963b928224b39e9506da469f00418f051db28e8a9c0daa6883",
+        "BM64Recompiled-Linux-ARM64-Release.zip": "63864cd71f9371eb5cf6a1cae4f49b821f046a59f29b82c6a8f8e57fbf1030ed",
+        "BM64Recompiled-Linux-X64-Release.zip": "0a8f1889295ca0e06802e37317862e1552e98f09022c111b145396f36ae20bba",
+        "BM64Recompiled-macOS-Release.zip": "da62f7659318e5183abf90fb7ebcffa259b7114082cfc41f7a085a4c99734bec",
+        "BM64Recompiled-PDB-RelWithDebInfo.zip": "3d4eea6cb5c7405ea4c75341f56794eeac96175bad4bde046a0a8a531f55342e",
+        "BM64Recompiled-Windows-RelWithDebInfo.zip": "c47a260901c45550b69380fa6dc9e9a0e3cbc8c0d6149be4a96fedf3283a1e96"
+      }
     },
     {
       "id": "ChameleonTwistRecomp",
       "display_name": "Chameleon Twist",
       "repo": "Rainchus/ChameleonTwist1-JP-Recomp",
       "needs_rom": true,
-      "rom_keywords": ["chameleon"]
+      "rom_keywords": ["chameleon"],
+      "release_tag": "v0.1",
+      "asset_sha256": {
+        "ChameleonTwistJPRecompiled.zip": "8e705d3826ab413afac92ea753d7f11dbc93be9ea507a3ef86bb6003019b5c56"
+      }
     },
     {
       "id": "MegaMan64Recomp",
@@ -91,14 +162,26 @@
       "needs_rom": true,
       "rom_keywords": ["mega", "man"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v0.9.1",
+      "asset_sha256": {
+        "MegaMan64Recompiled-v0.9.1-Flatpak-X64.zip": "d67a00df95eee121a3a6c9ad49a94664ba122db5d1c96a6c5093e36df697376f",
+        "MegaMan64Recompiled-v0.9.1-Linux-ARM64.zip": "c871d924fd257c6836283689b7e886b3c278c45f4cad87c0221b457ae21c4c19",
+        "MegaMan64Recompiled-v0.9.1-Linux-X64.zip": "231945f3b599acd49e7bb169ad3881c74eabcc02e014f61f3274a9e5f955ba20",
+        "MegaMan64Recompiled-v0.9.1-macOS.zip": "d29e9a35616e452eeae1a299b484afabafd164e2aa7d192eba3ee79f5c210a16",
+        "MegaMan64Recompiled-v0.9.1-Windows.zip": "21e31bda2cb09808c0ed18c63b89faa6c2328c082fd8880c4acbdf3c6390931a"
+      }
     },
     {
       "id": "Quest64Recomp",
       "display_name": "Quest 64",
       "repo": "Rainchus/Quest64-Recomp",
       "needs_rom": true,
-      "rom_keywords": ["quest"]
+      "rom_keywords": ["quest"],
+      "release_tag": "v0.1",
+      "asset_sha256": {
+        "Quest64Recompiledv0.1.zip": "7ad69b69c3d83d73edbaa3beb2e0a1cb8d66c022761fd7e61f6c3ed7c4d9fd30"
+      }
     },
     {
       "id": "BMHeroRecomp",
@@ -107,7 +190,18 @@
       "needs_rom": true,
       "rom_keywords": ["bomberman", "hero"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v0.7.1",
+      "asset_sha256": {
+        "BMHeroRecompiled-AppImage-ARM64-Release.zip": "0f7812d426853d278f15f1eec664a7b3efaa78541d492cd7f5390f98ed16a581",
+        "BMHeroRecompiled-AppImage-X64-Release.zip": "8798e5e7736051691bfc9a12f31cb57513de9e6e41056f76f878ae2d2a795866",
+        "BMHeroRecompiled-Flatpak-X64-Release.zip": "88224604286294bccb81c288b0b029af43c6a526e724b681d1468325c60b15d0",
+        "BMHeroRecompiled-Linux-ARM64-Release.zip": "7eb76ae6b9d3fcc1024418f5f225833868b6b106e075e76e8dd847c7feefe24c",
+        "BMHeroRecompiled-Linux-X64-Release.zip": "8ccf995307af9c35efdc99d2404029c8588da5c314f5ae771fed88d2dc0a568c",
+        "BMHeroRecompiled-macOS-Release.zip": "3b2f0f38313ec1fc38b5da24b5e10055bbd30de0189c6ecba1555ac11a00f42c",
+        "BMHeroRecompiled-PDB-RelWithDebInfo.zip": "99318df85169173fbf340b44963c835c9dfe0e79af1d81dc3aa0f11a8bbc1b4e",
+        "BMHeroRecompiled-Windows-RelWithDebInfo.zip": "d6a865b4e1adb17860ccc6faf15306ce4a7c885b4dc16b0989e01e1c7bbcb58d"
+      }
     },
     {
       "id": "ShipOfHarkinian",
@@ -116,7 +210,13 @@
       "needs_rom": true,
       "rom_keywords": ["zelda", "ocarina"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "9.3.1",
+      "asset_sha256": {
+        "SoH-Dewey-Bravo-Mac.zip": "6d9b69b7037d3af863c1767829af42666732c9f4651468a7e086c3e11268bd4b",
+        "SoH-Dewey-Bravo-Win64.zip": "429292a0bfbdfcda283b33c1538ecdc49163b9ed53e8702cac80b2489d9fe26c",
+        "SoH-Dewey-Bravo.appimage": "e4bb775c9a0c3629ebac57e4b6ccba6d0b621d71ab201e9105aceef9141ad1f4"
+      }
     },
     {
       "id": "2Ship2Harkinian",
@@ -125,7 +225,13 @@
       "needs_rom": true,
       "rom_keywords": ["zelda", "majora"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "5.0.1",
+      "asset_sha256": {
+        "2Ship-Battler-Bravo-Linux.zip": "6cdd4fe06f3f9b095e99c86fef70b9265cc921fb6faa7ba1e18e94e90ed0b345",
+        "2Ship-Battler-Bravo-Mac.zip": "b6019b4339d06ce0a476299a5be7b35629dff2fb779acb3da219da3cfcf1f84a",
+        "2Ship-Battler-Bravo-Win64.zip": "a46664a01623ad5d7cc82d29a9889699f6a98c9501c7a959a089f34380c1f078"
+      }
     },
     {
       "id": "Starship",
@@ -133,7 +239,13 @@
       "repo": "harbourmasters/starship",
       "needs_rom": true,
       "rom_keywords": ["star", "fox"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "v2.0.0",
+      "asset_sha256": {
+        "Starship-Barnard-Alfa-Linux.zip": "85dd03d3ad8abd881aa3aa2b49ded336627b44b8ac8333e3c41b5bf7c4336289",
+        "Starship-Barnard-Alfa-Switch.zip": "b64238ad35e5401229576baa98dbd8a517228eac996454f9d55d293888ec9fa9",
+        "Starship-Barnard-Alfa-Windows.zip": "42444eeccda0406cb40826ebce0b6f7a46338a9dc25c8e9d9a536807d504ae6a"
+      }
     },
     {
       "id": "StarFoxEnhanced",
@@ -150,7 +262,14 @@
       "needs_rom": true,
       "rom_keywords": ["mario", "kart"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "1.0.0",
+      "asset_sha256": {
+        "spaghetti-linux.zip": "54e249bd4aa71e55c63239c9c1c0eb522b07497d85f2ede193907059e4de250c",
+        "spaghetti-mac-arm64.zip": "d40314ed0cd8932c359239fb6dcd8554d4dd48e85be3c460c044004a88a03e80",
+        "spaghetti-mac-intel-x64.zip": "6ca0cf6747cf3081a65a7324a6c0c891be75465966fa4872fb57f9e58966cd90",
+        "spaghetti-windows.zip": "bf7bd7cdb5f412c7b370af92949b9431ce7503968631f8cacd607933fb32aff3"
+      }
     },
     {
       "id": "Ghostship",
@@ -158,7 +277,15 @@
       "repo": "harbourmasters/ghostship",
       "needs_rom": true,
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "3.0.0",
+      "asset_sha256": {
+        "Nautilus-Alfa-Android.zip": "f33904ab87c7a99c2465fc244baa43ebdf09d433ef60f63e2b1f8be77b5eafde",
+        "Nautilus-Alfa-iOS.zip": "422b0dc1ec146a04ee387e2629dccb23ed586207eb6078d6a49be80c23bc604d",
+        "Nautilus-Alfa-Linux.zip": "f295cb24bfd78660a9caa834e267cc009b4ccdb4ebe68005ab677dc5e4417e83",
+        "Nautilus-Alfa-Mac.zip": "f80a0d14ec6cc5dc1d26b8b231c625544fcf349a606d3cda9868be1997a13631",
+        "Nautilus-Alfa-Win64.zip": "49a0ab6c6624ccb20d29bb433f391d017f638f2b7db0601eae7808574a62aa18"
+      }
     },
     {
       "id": "PerfectDark",
@@ -166,7 +293,17 @@
       "repo": "perfect-dark-pc-port/perfect_dark",
       "needs_rom": true,
       "rom_keywords": ["perfect", "dark"],
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "ci-dev-build",
+      "asset_sha256": {
+        "pd-arm64-nswitch.zip": "59babcbaa81728b15110fbf40899ce34e41f3f4a6a1d49335b3817e0142cdfdb",
+        "pd-arm64-osx.tar.xz": "36a649bc011031286b65260a60bbb5317eb2d938371ff7ed63a3a40bef2ecbe2",
+        "pd-i686-linux.tar.gz": "46bf3ecd5f8394094aacb04d9e5182c3871ed01de19df28f6ff5c2afd3c66618",
+        "pd-i686-windows.zip": "685eb52755e4f71269a1af7ccc76f5f5921c211a4624572e3e0b91bd0afe4ab7",
+        "pd-x86_64-linux.tar.gz": "0f28fd59b488e0a919aae4350083059faebd462fce52df7bfdc9a4aec26f92ae",
+        "pd-x86_64-osx.tar.xz": "6f684e8946370d39e6d7bba2da693f695faa865789ee160848311211801fa9dd",
+        "pd-x86_64-windows.zip": "56e6a2f8bad36bd90f0d396c1d525b953adcc1a20157f594b90a7530d58258d3"
+      }
     },
     {
       "id": "SM64CoopDX",
@@ -174,7 +311,15 @@
       "repo": "coop-deluxe/sm64coopdx",
       "needs_rom": true,
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.5.1",
+      "asset_sha256": {
+        "sm64coopdx_Linux.zip": "4229f82fc4395e78faf192c910ffcfcc1d70f59a558cadf0f63ae548901fa5f5",
+        "sm64coopdx_macOS_ARM.zip": "bd1ce33b4886cbfab125095f4211889ca77628b8e481136b08f8148d7e415680",
+        "sm64coopdx_macOS_Intel.zip": "665e82a486b1477b22cb9d0320120a961d0cbf3904f188a0ab7bb8ab137343c7",
+        "sm64coopdx_SteamOS.zip": "9b18cb0ea54053dd5957d99481a136787821fba407566361bf75cf4b6fc76fac",
+        "sm64coopdx_Windows.zip": "2a98c40acb2a46d30cde89f3072c039b641dbdf977985f9e82a040615f1b2381"
+      }
     },
     {
       "id": "CannonballDX",
@@ -182,25 +327,42 @@
       "repo": "Endprodukt/cannonball-dx",
       "exe_hint": "cannonball-dx.exe",
       "needs_rom": true,
-      "rom_keywords": ["outrun"]
+      "rom_keywords": ["outrun"],
+      "release_tag": "1.04",
+      "asset_sha256": {
+        "CannonballDX_1.04.zip": "d5104e1a886213994fdcdd5dc781753145f7e9ac33e87b4ae15cde485dc9a362"
+      }
     },
     {
       "id": "AnimalCrossingGC",
       "display_name": "Animal Crossing",
       "repo": "flyngmt/ACGC-PC-Port",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "v0.9.3-playtest",
+      "asset_sha256": {
+        "ACGC-PC-Port0.9.3.zip": "4fe10763238596d8f1f278461cf3f3e49c7e99903b9fb4e1271e84e72e47976a"
+      }
     },
     {
       "id": "NutsAndBolts",
       "display_name": "Banjo-Kazooie: Nuts & Bolts",
       "repo": "masterspike52/reNut",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "beta11",
+      "asset_sha256": {
+        "renut-x86_64.AppImage": "94219ed754c4e1d610f1f4f2406d2d26deb05835cfa47f4ea98d466a26f01ee4",
+        "renut.zip": "8748df91de2ad87f7d5ee7210311d25e8ecb6381d66ea53ba415fe6631c5b8c4"
+      }
     },
     {
       "id": "DBZBudokai",
       "display_name": "Dragon Ball Z Budokai",
       "repo": "WistfulHopes/DBZ1",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "v0.0.2",
+      "asset_sha256": {
+        "dbz1.exe": "a2a5a42344b4da7b240911b12cdcba466c195f9f9579e9aba8017ee7772ef46e"
+      }
     },
     {
       "id": "InfiniteMario64",
@@ -208,38 +370,81 @@
       "repo": "Brawmario/infinite-mario-64-ever",
       "needs_rom": true,
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v0.1.5",
+      "asset_sha256": {
+        "infinite-mario-64-ever.v0.1.5.linux.zip": "bdec381b55f316c2d62f9788130844fd1c9ee6165e987bf3e302c1a671f21c8c",
+        "infinite-mario-64-ever.v0.1.5.mac.zip": "708e5b94a0c7e4af38d0e154a78dff222a7883dc90279420e8ad98296f54912e",
+        "infinite-mario-64-ever.v0.1.5.web.nothreads.zip": "6b305e26d464ef61dfc62d847db2db261b0998f5214b6f0b6ef00bb4beeb26fb",
+        "infinite-mario-64-ever.v0.1.5.web.pwa.zip": "c92bea1f153bbe79ccb258a8c47d1a7c732ff99152d21f9de02d7846ce338f86",
+        "infinite-mario-64-ever.v0.1.5.web.zip": "1b59efa35d1fa5525a54328349539f01d1db19cdb4e01a6b2eedfabddae40348",
+        "infinite-mario-64-ever.v0.1.5.windows.zip": "5bb8e4e694a4e3bcf236371751b7a101aad3230c42b6fada9f7dfb58d75135dd"
+      }
     },
     {
       "id": "JakAndDaxter",
       "display_name": "Jak & Daxter",
       "repo": "open-goal/jak-project",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "v0.3.9",
+      "asset_sha256": {
+        "opengoal-linux-v0.3.9.tar.gz": "acacd03896e09902503fee2ac98e8cb72228cfd221d8ff96b3e88a98ada04ee1",
+        "opengoal-lsp-windows-v0.3.9.exe": "4a56c5396d60c7601325c04cc1624059ad2ef374aab48182093ceea81d78c703",
+        "opengoal-macos-arm-v0.3.9.tar.gz": "613d7b2b2171fd1840c71b2928e1352ee1b5f2ec8df5a4ec76c1bfe91b926d42",
+        "opengoal-macos-intel-v0.3.9.tar.gz": "7388d3f2a42b8cde8e0e83e0fe202dc5eba05239e68c4fdbd49f632c871f31ab",
+        "opengoal-windows-v0.3.9.zip": "d2000d4d934313541ac38cb1a801838dac1447b623b4fae58638fd319864a162"
+      }
     },
     {
       "id": "SeveredChains",
       "display_name": "Severed Chains",
       "repo": "Legend-of-Dragoon-Modding/Severed-Chains",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "release-3.0.0",
+      "asset_sha256": {
+        "Severed_Chains_Linux.tar.gz": "c01a6401935f7a2120cbef47b1fc9a92724ff72068c7ce4366a00cd88bdb46ac",
+        "Severed_Chains_Linux_ARM64.tar.gz": "fce56f31c195dfab7274732a78c2cec36fb02b6b060ad88d86899e78bf06801b",
+        "Severed_Chains_MacOS_Intel.tar.gz": "dc4f896972bf65ce5547aee774f4bf86343d10d4a4f13cd8b970a216076134d4",
+        "Severed_Chains_MacOS_M1.tar.gz": "5ace3450cf08752a8100042a35dadf605319cfe1c55af1b869765fd36356cdc3",
+        "Severed_Chains_Steam_Deck.tar.gz": "15980e9d88ab49a44dfa6deb2bd243e180ef4b7aafd6188cf2aba67c9143bb3e",
+        "Severed_Chains_Windows.zip": "164716cba1899cadf834506636de8da56721d695457c3b53c93c533999ef9bb4"
+      }
     },
     {
       "id": "REDRIVER2",
       "display_name": "REDRIVER 2",
       "repo": "OpenDriver2/REDRIVER2",
       "needs_rom": true,
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "7.4-rc2",
+      "asset_sha256": {
+        "REDRIVER2_Linux_Release.tar.gz": "a94fc9eddd6747116010c17797a31b3426328cdedb028bdd972d6f3fc1f4b3d6",
+        "REDRIVER2_Linux_Release_dev.tar.gz": "485ab3d5daed2df545b99f49fd038db5873a65b8243ed5009d80d6acf6dae44c",
+        "REDRIVER2_Win32_Release.zip": "92c20bf6194af715a84c058783fa3095ed09d3aeeb4c41485b11c984d14d276c",
+        "REDRIVER2_Win32_Release_dev.zip": "1ab58ed04639a03a9d7f94025737526d0068e6a3c0aeb6750b7f5e210f003dec"
+      }
     },
     {
       "id": "SymphonyRecomp",
       "display_name": "Castlevania: Symphony of the Night",
       "repo": "GuhClemente/SymphonyRecomp",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "dev",
+      "asset_sha256": {
+        "SymphonyRecomp-v1.0.0-windows-x64.zip": "d4e16ab5947e78f3b7216f48bf26ac534405f8af14ce8232a802c215e478bf7d"
+      }
     },
     {
       "id": "Sonic1Forever",
       "display_name": "Sonic 1 Forever",
       "repo": "ElspethThePict/S1Forever",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "1.5.1",
+      "asset_sha256": {
+        "SonicForever_1.5.1_Android.zip": "342a300e6f424e7dadb37b0c186fe7f592b341a27e7a4d317a65345432628c9e",
+        "SonicForever_1.5.1_Switch.zip": "a96d15311ec67a4161a51500375ce14bc360e857ac4ad4d2de3feebaf22bd07f",
+        "SonicForever_1.5.1_Windows.zip": "6b6c514ed70767f48ce1905985029ceecb446a86c843dbf5d6c227ea8760810e"
+      }
     },
     {
       "id": "Sonic3AIR",
@@ -248,13 +453,27 @@
       "needs_rom": true,
       "has_linux_build": true,
       "has_macos_build": true,
+      "release_tag": "v26.03.28.0-stable",
+      "asset_sha256": {
+        "artifacts.7z": "61c6f17045f46303c0624f77d6fcb4e4c52c7e9194a063351f1fb74d284ebb46",
+        "sonic3air_game.tar.gz": "b8e268e09eb0bd8241f9e1b75be5b1ee42b8e7f1dbcea1181e54068fe5a8d7b0",
+        "sonic3air_game.zip": "f9b2151aafaa167b95f5f27c4bb5c7b53e694c54df3055369aad7f21f4538fbf",
+        "sonic3air_game_64bit.zip": "857f8608cf9ad930280dcd0ffd3ebd02a937180a37c78901c9adad882eaefbf7",
+        "sonic3air_mac_260328.dmg": "3631938e71df8c612bc9f5dc1a9b3ea12dce63d33f8160d122b6bea8d03fddaf",
+        "sonic3air_web_data.zip": "227ceb546388fe37051bb770fcfebcf2128cedc55646b27831f29f8b664b4b3c"
+      },
       "notes": "macOS flipped true 27/09/2026: the stable release's .dmg only failed to install because ArchiveExtractAll tripped over the volume's unreadable .Trashes - fixed there. Verified end to end with --install-port (universal Mach-O, Developer ID signed) and a launch that reaches the game's own ROM prompt."
     },
     {
       "id": "SonicUnleashedRecomp",
       "display_name": "Sonic Unleashed",
       "repo": "hedge-dev/UnleashedRecomp",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "v1.0.3",
+      "asset_sha256": {
+        "UnleashedRecomp-Flatpak.zip": "25aa11906b3f94e263ca629e37ea9d5fc445eb7d5f507550f3a1f0b90fe8126f",
+        "UnleashedRecomp-Windows.zip": "65793fbf3bfa392703275d3a1759bea20bc3d62f3bb39b066b85e5e7fb2d5d32"
+      }
     },
     {
       "id": "SpaceStationSiliconValley",
@@ -262,21 +481,37 @@
       "repo": "Cellenseres/SSSV_Recomp",
       "needs_rom": true,
       "rom_keywords": ["silicon", "valley"],
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v0.2.0",
+      "asset_sha256": {
+        "SSSVRecompiled_v0.2.0_Linux.tar.gz": "fd1dc25d490e3861ea6279a7dd2c28aa03ac7c506775be3c4817a6fe08b8201c",
+        "SSSVRecompiled_v0.2.0_macOS.zip": "e4e6a9ce61afa4058b054f38ee49884c41176f5e783d5bd4a53ef2c270d7b82b",
+        "SSSVRecompiled_v0.2.0_Windows.zip": "c5111d552c8440746a846d634d36c1249e250c0b4e06912aeb6248c7001d35f2"
+      }
     },
     {
       "id": "SMBRemastered",
       "display_name": "Super Mario Bros. Remastered",
       "repo": "JHDev2006/Super-Mario-Bros.-Remastered-Public",
       "needs_rom": true,
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "1.1-stable",
+      "asset_sha256": {
+        "Linux.zip": "12ec2413735b8fc83ce85084ec126852b1f922559cd013d27b109d2463b5bcd7",
+        "Windows.zip": "164f5160b7b73f161b956fa1470813c8e21fa92424f94c8889de46111a59c109"
+      }
     },
     {
       "id": "SuperMarioWorldRecomp",
       "display_name": "Super Mario World",
       "repo": "mstan/SuperMarioWorldRecomp",
       "needs_rom": true,
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "v0.15.1",
+      "asset_sha256": {
+        "SuperMarioWorldRecomp-linux-0.15.1-x86_64.AppImage": "6efc426be1629e5b6513cbbc5c4dd20174eb1c2c923003ea0867dbc6f66bac71",
+        "SuperMarioWorldRecomp-windows-x64-v0.15.1.zip": "d1c254308847a2391fc37b6c7ecd18c2622e9124774bb091d1d36196ab26608d"
+      }
     },
     {
       "id": "SuperMetroidRecomp",
@@ -285,19 +520,36 @@
       "exe_hint": "SuperMetroidSNESRecomp.exe",
       "needs_rom": true,
       "rom_keywords": ["metroid"],
+      "release_tag": "v0.3.15",
+      "asset_sha256": {
+        "supermetroid-0.3.15-linux-x64.zip": "c28551e285fc19e0ea12a01e20ceb973a31aa96de3ec3db327c0401d907bd0d1",
+        "supermetroid-0.3.15-macos-arm64.zip": "1dc100f7485f3cac44058beb88bffc6eebaf6ae5088da71ec102e1a66bce0be8",
+        "supermetroid-0.3.15-macos-x64.zip": "d9707b2105df89516eeb66c1eb7e18c056ceee3d1705f543e38f596682f22081",
+        "supermetroid-0.3.15-windows-x64.zip": "e4eb8935fa48479483620e2e1fbb68f493874b4b52de685e609714d726386866"
+      },
       "notes": "Linux and macOS flipped back to false 27/09/2026: v0.3.9 (22/09) ships only SuperMetroidSNESRecomp-windows-x64-v0.3.9.zip, where v0.3.4-v0.3.8 also had linux-x64 and macos-arm64/x64 zips. On a Mac --install-port now fails with \"nenhum build macOS na release deste port\"; Linux was not run here, but the one asset left has nothing PickLinuxAsset can match. Flip again if upstream brings them back."
     },
     {
       "id": "VivaPinataTiP",
       "display_name": "Viva Pinata: Trouble in Paradise",
       "repo": "SolarCookies/TiP-Recomp",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "1.14.0",
+      "asset_sha256": {
+        "retip_1.14.0_linux_amd64.tar.gz": "f45d05421c3d092c580b7b477277c4e127c64b7977e9e360b7bd765fc7affe4d",
+        "retip_1.14.0_macos_arm64.dmg": "bb6fd2f982b4705a5765e8ec662265caeec2e88bc4caec9a0ee815d4632af4ec",
+        "retip_1.14.0_windows_amd64.zip": "b7ca2843078de1e9b25b24ca2ccacc0809f8e816b44dc1b3e9eb4c1465d4135c"
+      }
     },
     {
       "id": "WipeoutPhantomEdition",
       "display_name": "WipEout Phantom Edition",
       "repo": "wipeout-phantom-edition/wipeout-phantom-edition",
-      "needs_rom": true
+      "needs_rom": true,
+      "release_tag": "v1.2.256",
+      "asset_sha256": {
+        "wipeout-x64-release.zip": "f63eca6d14ca4995083b2127fb8912d94a58437791da843e0899522c8664fb23"
+      }
     },
     {
       "id": "ValkyrieRecomp",
@@ -306,7 +558,14 @@
       "exe_hint": "ValkyrieRecomp.exe",
       "needs_rom": true,
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.0.1",
+      "asset_sha256": {
+        "ValkyrieRecomp-1.0.1-linux-x64.zip": "28ca159f8d6275982ed0839d3bd3122aead6dedc1d928c221e06d9e349a45a8b",
+        "ValkyrieRecomp-1.0.1-macos-arm64.zip": "ebb78cd4a5b0eee2e45f6fae0a03b81275cd697915900393f12bc84795bb1a36",
+        "ValkyrieRecomp-1.0.1-macos-x64.zip": "f2738974023c1a4135f89e2ad8de8f89b626a52e0761f644e3d90097bbcb078a",
+        "ValkyrieRecomp-1.0.1-windows-x64.zip": "0756a1e79eb7d2b40bac464f9ec24602c983bd3b68c09571d01589eae22c7072"
+      }
     },
     {
       "id": "WaveRace64Recomp",
@@ -315,7 +574,13 @@
       "exe_hint": "WaveRace64Recomp.exe",
       "needs_rom": true,
       "rom_keywords": ["wave", "race"],
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v0.4.0-macos.3",
+      "asset_sha256": {
+        "WaveRace64Recomp-0.4.0-macos.3-apple-silicon.zip": "e8d5139176849d56d6626926a90084e64e481772dad5b24c9f512b2b53703880",
+        "WaveRace64Recomp-0.4.0-windows-x64-debug-symbols.zip": "9712984ddc38a40ae5ea1035e1e8900e3939617e71bc486ed6b413f7ffbbb48c",
+        "WaveRace64Recomp-0.4.0-windows-x64.zip": "88b037d32fa7fc0de6a1b64c7e65db733771532c1840de935a9ceb9f92ecbb31"
+      }
     },
     {
       "id": "Snap64Recomp",
@@ -326,6 +591,13 @@
       "rom_keywords": ["pokemon", "snap"],
       "has_linux_build": true,
       "has_macos_build": true,
+      "release_tag": "v1.1.6",
+      "asset_sha256": {
+        "Snap64Recomp-1.1.6-linux-arm64.tar.gz": "7d1926fdc1204834a7478ec5fd67f5dda729ef2e8799ee70b3c78fb7f0f98dee",
+        "Snap64Recomp-1.1.6-linux-x86_64.tar.gz": "97bf3c48610f65f5dc7287b63d2418a1713ec992777b54e41eb660f500772ead",
+        "Snap64Recomp-1.1.6-macos-universal.zip": "58da51d88f1b2501575f182767f22f884cca2165351ddea01d3146d4877a5dd4",
+        "Snap64Recomp-1.1.6-win64.zip": "73bd4f7fae0f41670d9222af1f7287dfe60978997128a5926179e48d28ac351d"
+      },
       "notes": "Linux flipped true 21/09/2026: PickLinuxAsset now accepts .tar.gz directly (it didn't when this entry was first added, on 11/09 - see CREDITS.md's own note on this row, now stale) and the release still ships a real linux-x86_64.tar.gz. Verified end to end with --install-port, not just by re-reading the release assets. macOS flipped true 27/09/2026: v1.1.0 is the first release with a macos-universal.zip. Verified with --install-port (universal Mach-O .app, exe found inside Contents/MacOS) and a launch that reaches the game's own ROM prompt."
     },
     {
@@ -335,7 +607,14 @@
       "exe_hint": "body-harvest-recomp.exe",
       "needs_rom": true,
       "rom_keywords": ["body", "harvest"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "v0.1.0",
+      "asset_sha256": {
+        "body-harvest-recomp-0.1.0-linux-x86_64-debug-symbols.tar.gz": "3c1fa4c0b3a34fae8bce01df37f851379b5ed7e6b5b162ce22b41fd4e0d0fd53",
+        "body-harvest-recomp-0.1.0-linux-x86_64.tar.gz": "8dff5bd617f419e791d536fa0d84b9fbfbc4ac7faa543f458f6c86b30598499f",
+        "body-harvest-recomp-0.1.0-windows-x64-debug-symbols.zip": "590e402cf7ee409fafd3a23c90a346316d42622cd4d8925eaf776ea3f5bd0f2f",
+        "body-harvest-recomp-0.1.0-windows-x64.zip": "dd1ab059cb729f8657b2efb352e535b60fad0881eb93e11c1f7a1775c94e693b"
+      }
     },
     {
       "id": "DKRRecomp",
@@ -344,7 +623,14 @@
       "exe_hint": "DKR-R.exe",
       "needs_rom": true,
       "rom_keywords": ["diddy", "kong", "racing"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "Version1.0.10",
+      "asset_sha256": {
+        "DKR-R-1.0.10-Linux-aarch64.AppImage": "7425879ad86af2630ff330f2a32308f2d6386f9dc27f4ae9352fed5960aa1b3d",
+        "DKR-R-1.0.10-Linux-x86_64.AppImage": "d575929b03a43c3f945b93ca11e9143c3589eaa617d38d2a9da612edf76276d9",
+        "DKR-R-1.0.10-SteamDeck-x86_64.AppImage": "d575929b03a43c3f945b93ca11e9143c3589eaa617d38d2a9da612edf76276d9",
+        "DKR-R-1.0.10-Windows-x64.zip": "553a18ee9ad48eaa1b2d603875b83071a847a429e199135d3c5e393ab9821ffe"
+      }
     },
     {
       "id": "DevilutionX",
@@ -353,13 +639,35 @@
       "exe_hint": "devilutionx.exe",
       "has_linux_build": true,
       "has_macos_build": true,
+      "release_tag": "1.5.5",
+      "asset_sha256": {
+        "devilutionx-linux-aarch64.tar.xz": "71f34342cd750dc6dec1effefa250e90a5fe0f127e79d4c9c66f4d07706c3442",
+        "devilutionx-linux-i386.tar.xz": "a6a8aec11d09b85bbb6a98f59941da663e97da8065b55a82da9402e9d9cc9cea",
+        "devilutionx-linux-x86_64.appimage": "38a88b3e1f127ec8436949a1766937838ba6596a15686773c69c7e0482816c61",
+        "devilutionx-linux-x86_64.tar.xz": "3c0a79afad682054c4d11a91728887617b9f5dfbd8b6810dbb9226c380474432",
+        "devilutionx-macOS-10.4-tiger-ppc.dmg": "a047a5f78b21bb5716f958cdf97376faea26079d0dde6c1d4218a46ef0d3a722",
+        "devilutionx-macOS-intel-x86.dmg": "6a84fb71e5216d74f6d31bac536c63934580bd24f1010405f56d11a602fbd301",
+        "devilutionx-macOS-universal.dmg": "10ecd55caf4239d087bc91bce7538943705399b0b2abcff71c347ddbf01d30c6",
+        "devilutionx-miyoo-mini-miniui.zip": "a278fa67892e1d1835236ae4f4375800786bb876f483634ea946701e8694de2d",
+        "devilutionx-miyoo-mini-onion-os.zip": "ba701cf1142c80b3f39db97da35de4b698d8f3f5b064c780d97e132a6ec7d375",
+        "devilutionx-windows-i386.zip": "aa2c7051495cb53a8aaf7ac1f65d3537e6f52538f96797be38aa06a4aaa90d15",
+        "devilutionx-windows-x86_64.zip": "a20cfb62cd611f76aac78f9bf09a28f57794fbfe63ae6da9245deca446680b2b",
+        "devilutionx-windows-xp-32bit.zip": "fce6b3fd2fb381e101b5d8b72e08a47ef9dcfb372c7543ea6bd49318cec80e88",
+        "devilutionx-xbox-one-series.zip": "84adcc90a3f01064bddd85e7794244cee132321550fc54b67f4fc20d72a6a4e5",
+        "devilutionx-xbox.zip": "8d65637de7afe2be3543f9daa4b1d3b7d2d0b400e110a1c7cb448e47613c9ab3"
+      },
       "notes": "DevilutionX and Fallout1CE ship .dmg for macOS - native mounting via hdiutil in ArchiveExtractAll handles this seamlessly."
     },
     {
       "id": "TheForceEngine",
       "display_name": "Star Wars: Dark Forces (TFE)",
       "repo": "TheForceEngine/TheForceEngine",
-      "exe_hint": "TheForceEngine.exe"
+      "exe_hint": "TheForceEngine.exe",
+      "release_tag": "v1.22.420",
+      "asset_sha256": {
+        "TheForceEngine-PDB-v1.22.420.zip": "6aa1d8c847134588dbd4aeb67f21136435b1ab107ce0df2494e95bc654cc1d0f",
+        "TheForceEngine-v1.22.420.zip": "30ee44b296f18273842c50c2db5d5e5dccb2bba278d4909881273737f90c4eac"
+      }
     },
     {
       "id": "Fallout1CE",
@@ -367,7 +675,15 @@
       "repo": "alexbatalov/fallout1-ce",
       "exe_hint": "fallout-ce.exe",
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.1.0",
+      "asset_sha256": {
+        "fallout-ce-linux-x64.tar.gz": "54f89e43dc664df3357959eee3ee04f0e6ceeb9879be59a9b7beb918badf50ae",
+        "fallout-ce-linux-x86.tar.gz": "be9a8ad60f0a85fa6a52d8d20c3245994f2948ad1e9bb4aff8c98843d6cdad09",
+        "fallout-ce-macos.dmg": "db8833e4fe452e5cdff16a4c37893be0a4e5f6b473abe5ae4839a3ba61c11a2c",
+        "fallout-ce-windows-x64.zip": "131bc8b72b964afaf77633b45f33f56ce81e1ca732b1b4e90b1ca293f0d7d288",
+        "fallout-ce-windows-x86.zip": "a049d90b48f5b8838acb62b0cd8ac39d5a8688549aca845184c03e40601269b4"
+      }
     },
     {
       "id": "Reblue",
@@ -376,14 +692,26 @@
       "exe_hint": "reblue.exe",
       "needs_rom": true,
       "rom_keywords": ["pokemon"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "v1.3.1",
+      "asset_sha256": {
+        "reblue-1.3.1-aarch64.AppImage": "84d020c208a3120022b32743c33f5f7c6a169b2f8a58987330b506d3ffe76ec3",
+        "reblue-1.3.1-mac-arm64.zip": "0a4d6ba67c8b10b8d1c03b7c084d9bb689857146e079608eacfa58f406e74205",
+        "reblue-1.3.1-win-amd64-symbols.zip": "ee1c27e03b4b96a91a9621dfb0856713cd9ac6f1df0debae54979031baa185ab",
+        "reblue-1.3.1-win-amd64.zip": "bf638798c2bef5f0d380852022b2d30403b0851a5ab70395fcac74976cfba9b8",
+        "reblue-1.3.1-x86_64.AppImage": "0e39e46fcab6bc442b166ddeba3448a5311d893b96ca9c60e629261c65e62ca8"
+      }
     },
     {
       "id": "OpenSpideyPS1",
       "display_name": "Spider-Man (OpenSpidey)",
       "repo": "GTTeancum/OpenSpideyPS1",
       "needs_rom": true,
-      "rom_keywords": ["spider", "man"]
+      "rom_keywords": ["spider", "man"],
+      "release_tag": "sm2-v1.1",
+      "asset_sha256": {
+        "Spider-Man-2-1.1-Windows-x64.zip": "3c69a7701e467b15b5b6f2fa6f0aef1abc2b478075de8e2cec0b99e97f4f700c"
+      }
     },
     {
       "id": "FZeroRecomp",
@@ -393,7 +721,13 @@
       "needs_rom": true,
       "rom_keywords": ["f-zero"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v0.6.0",
+      "asset_sha256": {
+        "FZeroRecomp-v0.6.0-Linux-x64.tar.gz": "522dbff671e07b0e5fbfb16538fef2bd6993aeb2ed1dfea698bf55a460b405a5",
+        "FZeroRecomp-v0.6.0-macOS-arm64.zip": "3ba7dbc7483aeed91871e9d4e9f2ad6ccbd672413ae483770c3566396699ff6a",
+        "FZeroRecomp-v0.6.0-Windows-x64.zip": "f3f2fd443c90c097fc281464fbfef7182eef5c557c3ef135f4689f4161c1b47a"
+      }
     },
     {
       "id": "AeroGaugeRecomp",
@@ -402,7 +736,12 @@
       "exe_hint": "aerogauge_modern.exe",
       "needs_rom": true,
       "rom_keywords": ["aerogauge"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "v0.6.2",
+      "asset_sha256": {
+        "aerogauge-recomp-linux-x64.zip": "3c4f4f19a8d79b95884aea34446161442949a68d7a6aff190289be429ec557e3",
+        "aerogauge-recomp-windows-x64.zip": "ddd3b62999f4d6a5e0ca7c997dd2f319bdb60ba24bfcaffcc336bcced77f48e3"
+      }
     },
     {
       "id": "CrashBandicootLauncher",
@@ -411,7 +750,12 @@
       "exe_hint": "CrashBandicoot.exe",
       "needs_rom": true,
       "rom_keywords": ["crash"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "2.3.1",
+      "asset_sha256": {
+        "CrashBandicoot-arm64.exe": "58df51022f2877a82afd47aa00eb59358fb2fefdf550041e3d15e7be5d13391e",
+        "CrashBandicoot.exe": "283e93f9c24f3325982e8df57a3d5fc0957cfcdbe719731cb714abde210bf5d7"
+      }
     },
     {
       "id": "MarioStrikers",
@@ -421,7 +765,15 @@
       "needs_rom": true,
       "rom_keywords": ["strikers"],
       "has_linux_build": true,
-      "has_macos_build": true
+      "has_macos_build": true,
+      "release_tag": "v1.3.0",
+      "asset_sha256": {
+        "strikers-linux-arm64.tar.gz": "05dbccd7a43ab677d765ab9c330cbda24d5ab62be95fa65691ed41938bf5a2be",
+        "strikers-linux-x86_64.tar.gz": "196de1cfdeb47db3cffc643331a67db64064e19d3e0ad734d98b589c385d290d",
+        "strikers-macos-arm64.tar.gz": "caeb28642ab7eb6d49368b9201e68e70f7fc0bcce9423f84c9c6b2f9b65b9d50",
+        "strikers-switch.zip": "bb8d7d0142ffa6d46aaa06cffa14764808093d7d092d66013307cc02f4ad07ed",
+        "strikers-windows-x86_64.zip": "1f42a9e3c2eabe828311f706151b9efe170c2bb6410feb6a531780e89cd93f5c"
+      }
     },
     {
       "id": "OpenNectar",
@@ -430,7 +782,13 @@
       "exe_hint": "nectar.exe",
       "needs_rom": true,
       "rom_keywords": ["pikmin"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "1.0.8",
+      "asset_sha256": {
+        "nectar-linux.tar.gz": "d47e25ce501f71c24e46a2e8acf0ad36f77ceb064405f08ca36f8cefcdeca548",
+        "nectar-windows.zip": "0c7ea21e17a57245e1537fb3b294bebb013b5b093089e293e6f5a6a0cf534c18",
+        "Open_Nectar-x86_64.AppImage": "2f6a8bdc511d54e24e0d5995da117bcbe62e45fb78586e94d095386c92cf4d5b"
+      }
     },
     {
       "id": "RingOut",
@@ -439,7 +797,14 @@
       "exe_hint": "RingOut.exe",
       "needs_rom": true,
       "rom_keywords": ["soul"],
-      "has_linux_build": true
+      "has_linux_build": true,
+      "release_tag": "v1.6.10",
+      "asset_sha256": {
+        "RingOut-1.6.10-linux-x86_64.zip": "fff52205c3ecd486d2644dc476c3a1a623cc144abaaa73ad394df31a1ebe1dc3",
+        "RingOut-1.6.10-steamdeck-x86_64.zip": "02fa308f862e14c4d724aa4eedea8ceda012d3cd26524d685cded451d886f691",
+        "RingOut-1.6.10-windows-x64-setup.exe": "a6cb78a0cbdf48a3555c2c5479dec87fda28f2c93345a195a97f7f08424eedf7",
+        "RingOut-1.6.10-windows-x64.zip": "37ac3adc090a094e08bef5d5430a27c7c987f4339ade992fef6e204857913d86"
+      }
     },
     {
       "id": "TheDarknessRecomp",
@@ -453,6 +818,11 @@
       "iso_keywords": ["darkness"],
       "iso_dirs": ["Xbox360", "Xbox 360", "X360"],
       "hidden": true,
+      "release_tag": "v0.1.7",
+      "asset_sha256": {
+        "The-Darkness-Recomp-v0.1.7-diagnostic-launchers.zip": "931903a3b93483f802e6acdc2df9dfc80cdcbb8b351114cc18cf1c49b21c1be7",
+        "The-Darkness-Recomp-v0.1.7-windows-x64.zip": "438e3efdb0c214e08b7607de48a26921a4f6ade29984ec2877b22206c2466494"
+      },
       "notes": "Xbox 360 static recomp. Verified 27/09/2026 against the real v0.1.2 release (prerelease-only repo - /latest 404s, the /releases fallback in DownloadAndInstall picks it up): one \"-windows-x64.zip\" with Launch.cmd at the root and the game in build_native/Release/. Arguments mirror what upstream's own DarkRecompPreview.exe passes (\"play\" mode): without --timeout-ms 0 the runtime quits itself after 30 s, and --engine-preview is the playable engine path. --game-dir is left at its default (\"Darkness\", relative to the working directory, which exe_relpath makes the port folder). No Linux/macOS build. Hidden since 27/09/2026: the dump pipeline is validated against a real disc and the game boots, but upstream's runtime is still far too broken to offer - see docs/XBOX360_RECOMP.md."
     },
     {
@@ -467,6 +837,11 @@
       "iso_disc_id": "GALE01",
       "iso_disc_rev": 2,
       "iso_disc_label": "MELEE NTSC 1.02",
+      "release_tag": "v0.9.56",
+      "asset_sha256": {
+        "MeleeUnlocked-0.9.56-linux-x86_64.tar.gz": "aed308de9dd2cb1c7e51b41083f6bf8c6d80f3e5c7e92e47972707fe331c0b8b",
+        "MeleeUnlocked-0.9.56-win64.zip": "ce2dc5ad18793cff80ea5a49c4645b5cc74d6f250ac44710f4ec5393b23a1f20"
+      },
       "notes": "GameCube static recomp (PowerPC -> C++ plus Slippi's Gecko codes), D3D12/D3D11. Verified 27/09/2026 against the real v0.7.1 release: one \"-win64.zip\" wrapping a single MeleeUnlocked-<ver>/ folder (flattened on install). The pinned exe matters here: the alphabetical tie-break would pick MeleeUnlockedLauncher.exe, the project's optional launcher that updates itself into Versions/ - not something Karamelo should hand control to. Arguments are exactly MeleeUnlocked.bat's, with paths relative to the port folder (the working directory) and the ISO read in place from roms/GameCube/ rather than copied next to it as melee.iso. GUI subsystem, so no console to hide. Needs the NTSC 1.02 disc; the game itself checks the revision. No Linux/macOS build."
     },
     {
@@ -476,6 +851,15 @@
       "exe_hint": "Yakumo.exe",
       "has_linux_build": true,
       "has_macos_build": true,
+      "release_tag": "v0.7.5",
+      "asset_sha256": {
+        "ffmpeg-7.1.5.tar.xz": "de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f",
+        "yakumo-0.7.5-linux-x86_64.tar.gz": "9c867fe280657dae757ebe2a7c6aa3f8d1989a4bb74ff3a1c29df6531ee406af",
+        "yakumo-0.7.5-macos-arm64.dmg": "dddf9eec6e208324066c4a2075d7c2a8364f27ea2992cb481dce434c74f86092",
+        "yakumo-0.7.5-macos-arm64.zip": "28749ee93895a11d778107db74fc69818e474f409f4922f5c64009eec9c3641f",
+        "yakumo-0.7.5-windows-x86_64-portable.zip": "7927e3f1e30afcd6f908038ced4a9c99ca58c92510920ec9f36a7b2b1d2ed69c",
+        "yakumo-0.7.5-windows-x86_64.zip": "0b792af0fb627831da88a88d90c117fd15f59fb6d940e47054f6e83a703717dd"
+      },
       "notes": "PSP static recomp of Monster Hunter Portable 3rd HD Ver. (Vulkan, SDL3, MIT). Releases ship Windows zip, Linux tar.gz (+ a Flatpak the picker skips), macOS .dmg and an Android .apk, next to an ffmpeg source tarball. No ROM handling here: the game's own first-run setup asks for the NPJB-40001 image, checks it and prepares the executable itself, gamepad-friendly."
     },
     {
@@ -502,6 +886,13 @@
       "has_linux_build": true,
       "has_macos_build": true,
       "launch_args": ["--rom", "{rom}"],
+      "release_tag": "V0.1.6",
+      "asset_sha256": {
+        "ConkerRecompiled-V0.1.6-Linux.tar.gz": "4fc3b53bf422385c11eadea14415445ca5c72dd32795a22ce200c5713368a422",
+        "ConkerRecompiled-V0.1.6-macOS.zip": "e8f13c1c893fe38a844cdce3b84a752c63c02af930bebb2af760a45a133a41cf",
+        "ConkerRecompiled-V0.1.6-Mods.zip": "ca65fb99f8b2761bb89000d9e0a074af5dbd59f02fa37f5f5ec52366da483727",
+        "ConkerRecompiled-V0.1.6-Windows.zip": "0fcef307aff8f3632cddfecb4a1a6233af0afb0b77d5deaab6538be5c563115e"
+      },
       "notes": "Conker's Bad Fur Day static recomp (CBFD-Recompiled / RT64, GPL-3.0). Official releases publish Windows zip, Linux tar.gz and native macOS (Apple Silicon) zip with ConkerRecomp.app. Assets include a separate Mods zip (filtered out by LooksLikeCompanionTool). Requires the original US ROM (.z64); passing --rom registers it into the game's local storage on first run and boots immediately."
     },
     {
@@ -510,6 +901,11 @@
       "repo": "theclub654/ProjectCane",
       "exe_hint": "Sly Cooper and the Thievius Raccoonus.exe",
       "has_linux_build": true,
+      "release_tag": "decompilation",
+      "asset_sha256": {
+        "ProjectCane-Linux-x64.rar": "8af596c4212cb49b8b2e74986f43c1a3b86471734c2ab485999dc46fcc7a74ef",
+        "ProjectCane-Windows-x64.rar": "04329744b4aeb35dca35651e6dadec5972bfa023af4b48dfb026c018e7cb589d"
+      },
       "notes": "Sly Cooper and the Thievius Raccoonus native PC port (ProjectCane, PS2 reverse engineering). Official releases publish Windows RAR (with game exe + File Extractor GUI) and a Linux RAR (portable AppImage + File Extractor GUI). Upstream has no macOS build. Requires game assets from NTSC PS2 ISO (SCUS-97198) extracted via File Extractor GUI."
     },
     {
@@ -522,6 +918,12 @@
       "has_linux_build": true,
       "has_macos_build": true,
       "launch_args": ["{rom}"],
+      "release_tag": "v0.2.29",
+      "asset_sha256": {
+        "LodRecomp-v0.2.29-linux-x64.tar.gz": "0d9e54387efa82fa74ceaa588314596ac7ba77681e30b905dd89feb5f8943aad",
+        "LodRecomp-v0.2.29-macos-arm64.zip": "fdedea70286fff585ec671600ec3e863b8297b27281df44a1ff4b07c8798e1f8",
+        "LodRecomp-v0.2.29-windows-x64.zip": "68a2ae45bff297583a2e12d0beb41bf1212c98ff57105d6b4d1a31954d142b23"
+      },
       "notes": "Castlevania: Legacy of Darkness static recomp (cvlod_recomp / N64Recomp, GPL-3.0). Official releases publish Windows zip, Linux tar.gz and native macOS (Apple Silicon arm64) zip. Requires stock Castlevania: Legacy of Darkness USA ROM (.z64, ND4E). Accepts {rom} positional argument and rom.z64 in the port directory."
     },
     {
@@ -531,6 +933,10 @@
       "exe_hint": "BLACK.exe",
       "iso_keywords": ["black"],
       "iso_dirs": ["Xbox", "OriginalXbox", "XboxOG"],
+      "release_tag": "V2",
+      "asset_sha256": {
+        "BLACK-XBERecomp.zip": "da8c3c85308ba31665e29978aaa35587ce7988bb02f5129df90237ad35dd68f0"
+      },
       "notes": "BLACK static recomp (original Xbox via XboxXBE-Recomp SDK), Direct3D 12. Official releases publish Windows zip (BLACK-XBERecomp.zip) containing BLACK.exe, d3dcompiler_47.dll and an assets/ directory. Game assets: the game reads default.xbe or an original Xbox .iso directly placed inside the assets/ directory (supports USA and Europe releases). Karamelo automatically resolves and links/copies the user's ISO from roms/Xbox/ into ports/BlackRecomp/assets/ if not already present."
     },
     {
@@ -542,6 +948,12 @@
       "rom_keywords": ["sfa2", "dino", "avsp", "vsav"],
       "has_linux_build": true,
       "has_macos_build": true,
+      "release_tag": "v0.4.0-beta.5",
+      "asset_sha256": {
+        "CPS2Recomp-linux-x86_64.tar.gz": "06db052c622f706a03f82b9af46a57e87e47eab39e47c7b5e5571a6c2fb9b941",
+        "CPS2Recomp-macOS.zip": "2b1471d5d95fcca7652abdc18db7ca6a041e7a828de00b80dbddc16227b1b945",
+        "CPS2Recomp-windows-x64.zip": "1c584ca9b33442dfb02ec62c66bddd87c234fbe2f8bb7ecc0944e6c991dd5391"
+      },
       "notes": "CPS-2 Recomp (Capcom CPS-1 and CPS-2 arcade static recompilation by tmcleroy). Official releases publish Windows zip (CPS2Recomp-windows-x64.zip), Linux tarball (CPS2Recomp-linux-x86_64.tar.gz), and macOS zip (CPS2Recomp-macOS.zip with CPS-2 Recomp.app). Includes Street Fighter Alpha 2, Cadillacs and Dinosaurs, Alien vs. Predator, Super Puzzle Fighter II Turbo, Vampire Savior 1/2, Vampire Hunter 2, and Vampire Savior Definitive. Karamelo automatically copies available ROM sets from roms/Arcade (sfa2u.zip, dino.zip, avspu.zip, etc.) into ports/CPS2Recomp/ before execution."
     },
     {
@@ -553,6 +965,10 @@
       "rom_keywords": ["gretzky"],
       "launch_args": ["{rom}"],
       "rom_exclude_keywords": ["98"],
+      "release_tag": "v0.8.0",
+      "asset_sha256": {
+        "wg3d-recomp-v0.8.0-windows-x64.zip": "595485894c868684566aae8733aa68d5556760a7c4f1afeb818c71f3961cba47"
+      },
       "notes": "Wayne Gretzky's 3D Hockey static recomp (N64 USA v1.0 via N64Recomp + RT64 by geno55). Official releases publish Windows zip (wg3d-recomp-v<ver>-windows-x64.zip) containing wg3d.exe, RT64 D3D12/Vulkan backends and MSVC runtime DLLs. Accepts original USA N64 ROM (.z64/.v64/.n64) as argument or copied to port directory."
     },
     {
@@ -564,6 +980,11 @@
       "rom_keywords": ["rush 2", "extreme"],
       "has_linux_build": true,
       "launch_args": ["{rom}"],
+      "release_tag": "v1.0.34",
+      "asset_sha256": {
+        "Rush2Recompiled-1.0.34-x86_64.AppImage": "9a0381cf54ad84b17ac700d73789a2bee4461d611f130795f62e723174beff2f",
+        "Rush2Recompiled-1.0.34.zip": "2d17b1f5d7f93de8755e49d86853b3a6f34c7b1dfcefc867b225584d2d29b94c"
+      },
       "notes": "Rush 2: Extreme Racing USA static recomp (N64 via N64Recomp by bryantmh). Official releases publish Windows zip (Rush2Recompiled-<ver>.zip) and Linux AppImage."
     },
     {
@@ -575,6 +996,13 @@
       "rom_keywords": ["lamborghini"],
       "has_linux_build": true,
       "launch_args": ["{rom}"],
+      "release_tag": "v0.9.0",
+      "asset_sha256": {
+        "automobili-lamborghini-rt64-text-hud-metadata.zip": "56618df61bf37354cdad6e8bceabddbc50e95d2a8e435dc7c1f706af72635f0b",
+        "automobili-lamborghini-rt64-text-only-metadata.zip": "871569cf5c514b5169f0480d3297e1e14e7c164a6fbea0182d9d3945e9a8c2e0",
+        "lamborghini-recomp-linux-x64.zip": "e6957b0db91fa194a98aa8b38afa53e90c63fbb1e7dd90258e6acbe6827c12cd",
+        "lamborghini-recomp-windows-x64.zip": "044de907d834ddcf8ea1faa3265abbb82072160e4fadf717ac50dd11f1c713c5"
+      },
       "notes": "Automobili Lamborghini static recomp (N64 USA via N64Recomp + RT64 by alondero). Official releases publish Windows zip and Linux zip (lamborghini_modern)."
     },
     {
@@ -586,6 +1014,12 @@
       "rom_keywords": ["road", "rash"],
       "has_linux_build": true,
       "launch_args": ["{rom}"],
+      "release_tag": "v1.4.8",
+      "asset_sha256": {
+        "RoadRash64Recompiled-Optional-Texture-Mod.zip": "38cb3c6731ab55c64b8469668926d837be3fbe8ec8f0a2d9974e791bdf80b6f2",
+        "RoadRash64Recompiled-v1.4.8-Linux-Experimental.zip": "4ca6e103fc6dead44b325df5143e6af704a6516dd711edb63b9d9dcd19715c16",
+        "RoadRash64Recompiled-v1.4.8-Win64.zip": "70114da39d0311ca0698d6a7e6fd554507ac1add29173ab7b344408118697275"
+      },
       "notes": "Road Rash 64 static recomp (N64 USA v1.0 via N64Recomp by linkssy2). Official releases publish Windows zip and Linux Experimental AppImage."
     },
     {
@@ -595,6 +1029,10 @@
       "exe_hint": "Launcher.exe",
       "needs_rom": true,
       "rom_keywords": ["jungle", "strike"],
+      "release_tag": "v1.1.0",
+      "asset_sha256": {
+        "Jungle-Strike-SNES-Static-Recomp-1.1.0-Windows-x64.zip": "904ca3bdb6db427095e742fc4b3ade867d46f42c3042b60d6762f6bf30c3cf82"
+      },
       "notes": "Jungle Strike static recomp (SNES by Junior-Jones). Official releases publish Windows zip with Launcher.exe and Rom/ directory."
     },
     {
@@ -609,6 +1047,16 @@
       "iso_dirs": ["PlayStation2", "PS2"],
       "iso_exts": [".iso", ".chd", ".bin"],
       "iso_keywords_whole_word": true,
+      "release_tag": "v0.8.6",
+      "asset_sha256": {
+        "ico-pc-v0.8.6-linux-portable.tar.gz": "013ce661c69352501f5a36bcf134dc324116946c22d437acfe521a8553b32239",
+        "ico-pc-v0.8.6-linux-x86_64.AppImage": "33befa800b099212509290345af0679b07f68a2443cd9f4261eed616f00cebfa",
+        "ico-pc-v0.8.6-linux.tar.gz": "f14f5c64309e8a15bae2c9cf28511ce8c8bc634201dc3d359ba1cdfcfcf717fa",
+        "ico-pc-v0.8.6-macos-arm64.dmg": "f3da73e68d444e9a0a4ae71671b9721be645af5d38bd52a9c100750e134c8351",
+        "ico-pc-v0.8.6-macos-arm64.zip": "efe86fd72ed397e864386518675ca1dbdc8166c35a7b9242d6b277a038418872",
+        "ico-pc-v0.8.6-win-portable.zip": "e0c56f3c292e66c3766c016738642638a2282ebde4e2f3ef48c23a43d21134b8",
+        "ico-pc-v0.8.6-win.zip": "a63d864efc82c7c528c8f860b8a63b1475d01ad970307c78c705afc80da7c91c"
+      },
       "notes": "ICO native PC port (PS2 PAL SCES-50760 decompilation by nathanialf). Official releases publish Windows zip, Linux tarball and macOS (Apple Silicon arm64) dmg/zip. Accepts user's PAL disc image (.iso, .chd, .bin)."
     },
     {
@@ -620,6 +1068,11 @@
       "iso_dirs": ["PSP", "PlayStationPortable"],
       "iso_exts": [".iso"],
       "psp_game_dir": "data",
+      "release_tag": "v0.9b",
+      "asset_sha256": {
+        "HD.textures.7z": "e68a3bb3f6bb3a3b2775ddfc30486a3f2e6ffd78f6448695dde118b8a4831543",
+        "RenegadeSquadronPC-0.9b.zip": "756bdab2501b8f69736eb971654d32d6a299a8406d20e68743ced51128a17a6d"
+      },
       "notes": "Star Wars Battlefront: Renegade Squadron native PC port (PSP via static recomp by GTTeancum). Official releases publish Windows zip (RenegadeSquadronPC). Direct3D 12, 60 FPS, twin-stick controls. The game reads the disc's PSP_GAME folder from data/ - it takes no ISO argument. PreparePspGame() extracts the user's US ISO (ULUS10292) there before the first launch. Only a plain .iso: a .cso is compressed and nothing here can unpack it."
     }
   ]

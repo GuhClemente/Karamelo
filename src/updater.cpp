@@ -318,7 +318,21 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 			DWORD opt = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
 			WinHttpSetOption(request, WINHTTP_OPTION_REDIRECT_POLICY, &opt, sizeof(opt));
 
-			BOOL sent = WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+			// GITHUB_TOKEN, when the environment has one, authenticates calls to
+			// the GitHub API. Only CI sets it (the ports validation installs
+			// ports on shared runners, where the anonymous limit of 60 calls an
+			// hour runs out); a player's machine has none and nothing changes.
+			std::wstring extra_headers;
+			const char* gh_token = getenv("GITHUB_TOKEN");
+			if (gh_token && gh_token[0] && wcscmp(host, L"api.github.com") == 0)
+			{
+				extra_headers = L"Authorization: Bearer ";
+				for (const char* t = gh_token; *t; t++) extra_headers += (wchar_t)(unsigned char)*t;
+				extra_headers += L"\r\n";
+			}
+			BOOL sent = WinHttpSendRequest(request,
+				extra_headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : extra_headers.c_str(),
+				extra_headers.empty() ? 0 : (DWORD)-1L,
 				WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
 
 			if (sent && WinHttpReceiveResponse(request, NULL))
@@ -539,7 +553,12 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 	// of an error page returned as the body - same contract as the WinHTTP
 	// path, which only accepts a 200.
 	std::string cmd = "curl -sSL --fail --proto =https --proto-redir =https --connect-timeout 15 "
-	                  "--speed-limit 1 --speed-time 60 " + ShellQuote(url) + " 2>/dev/null";
+	                  "--speed-limit 1 --speed-time 60 ";
+	// Same as the WinHTTP path: GITHUB_TOKEN (CI only) authenticates GitHub API calls.
+	const char* gh_token = getenv("GITHUB_TOKEN");
+	if (gh_token && gh_token[0] && url.rfind("https://api.github.com/", 0) == 0)
+		cmd += "-H " + ShellQuote(std::string("Authorization: Bearer ") + gh_token) + " ";
+	cmd += ShellQuote(url) + " 2>/dev/null";
 	FILE* pipe = popen(cmd.c_str(), "r");
 	if (!pipe) return false;
 	std::vector<uint8_t> data;
@@ -1002,4 +1021,11 @@ std::string UpdaterGetStatusMessage()
 	// under the caller. Returning a copy closes that window.
 	std::lock_guard<std::mutex> lock(g_updater_lock);
 	return g_status_msg;
+}
+
+// The same SHA-256 the auto-update checks its download with, for anyone else
+// that has to vouch for a file on disk (the Ports & Recomp installer).
+std::string UpdaterSha256File(const std::string& path)
+{
+	return Sha256File(path);
 }

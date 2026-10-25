@@ -59,7 +59,9 @@ if ($content -match '#define\s+APP_VERSION\s+"([^"]+)"') {
     $content = $content -replace '#define\s+APP_VERSION\s+"[^"]+"', "#define APP_VERSION     `"$newVer`""
     $content = $content -replace '#define\s+APP_EXE_NAME\s+"[^"]+"', "#define APP_EXE_NAME    `"$newExeName`""
 
-    Set-Content -Path $appInfoPath -Value $content -NoNewline -Encoding UTF8
+    # UTF-8 sem BOM. Set-Content -Encoding UTF8 do PowerShell 5.1 sempre grava
+    # BOM, e foi assim que um BOM invisivel apareceu na primeira linha do app_info.h.
+    [System.IO.File]::WriteAllText($appInfoPath, $content, (New-Object System.Text.UTF8Encoding $false))
     Write-Host "[VERSION ATUALIZADA] $currentVer -> $newVer"
     Write-Output $newVer
 } else {

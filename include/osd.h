@@ -48,4 +48,13 @@ const StarPoint* OsdGetStars(int* count);
 
 #define OsdIsBig (OsdGetSize()>8)
 
+#ifdef __cplusplus
+#include <string>
+// Text as the 8-bit OSD font can draw it: UTF-8 (and stray legacy Latin-1
+// bytes) folded to plain ASCII - "Pokemon" for "Pok\xc3\xa9mon", "?" for a
+// script the font has no letters for. File names are UTF-8 now that the
+// Windows build runs with the UTF-8 code page.
+std::string OsdDisplayText(const std::string& s);
+#endif
+
 #endif

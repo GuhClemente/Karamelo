@@ -1,6 +1,6 @@
 # Catálogo de Ports & Recomp
 
-Desde a v0.9.77 a lista de ports nativos não está mais no código C++. Ela é um
+Desde a v0.9.78 a lista de ports nativos não está mais no código C++. Ela é um
 arquivo de dados:
 
 | Arquivo | Papel |
@@ -52,3 +52,46 @@ corrompido ou antigo é ignorado e o app segue com o embutido.
 Texto livre para quem mantém o catálogo (por que um flag está assim, quando a
 release foi conferida). O app nunca lê. As notas que existiam como comentário
 na antiga tabela C++ foram trazidas para este campo.
+
+## Versão e SHA-256 fixos
+
+Cada port com repositório no GitHub tem, no catálogo:
+
+- `release_tag`: a release exata que o app instala. Uma release nova do projeto
+  não muda nada para o jogador até o catálogo ser atualizado.
+- `asset_sha256`: o SHA-256 de cada arquivo daquela release que o app pode
+  baixar. Arquivo fora da lista ou com hash diferente é recusado e apagado -
+  um repositório invadido ou um arquivo trocado na release não chega ao PC
+  do jogador.
+
+Port sem esses campos (hoje: os que não publicam release com arquivos e o
+Foxhollow, que usa feed próprio) continua instalando a release mais nova, como
+antes.
+
+`tools/pin_ports.py` preenche e atualiza os dois campos (usa o `digest` que o
+GitHub publica; quando falta, baixa o arquivo e calcula):
+
+```
+python tools/pin_ports.py               # fixa os ports ainda sem versão
+python tools/pin_ports.py --update       # move todos para a release mais nova
+python tools/pin_ports.py --port ID --update
+python tools/pin_ports.py --check        # só lista quem tem versão nova
+```
+
+Ele sobe `catalog_version` e regera o cabeçalho embutido quando algo muda.
+
+## Automação (GitHub Actions)
+
+- `.github/workflows/build.yml`: build e testes no Windows, Linux e macOS em
+  todo push e pull request. Os testes incluem as checagens do catálogo.
+- `.github/workflows/ports.yml`:
+  - **PR que mexe no catálogo**: compila e instala de verdade cada port
+    novo ou alterado (`tools/validate_ports.ps1`, que roda
+    `Karamelo.exe --install-port`). Port que não instala reprova o PR.
+  - **Toda segunda-feira**: roda `pin_ports.py --update`, instala os ports
+    com versão nova e abre um PR com a tabela do resultado. Nada chega ao
+    jogador sem o merge e o `deploy_ports_catalog.bat`.
+
+Descoberta de ports novos (busca no GitHub, Discord, RSS) fica fora daqui: é o
+papel sugerido para o n8n - ele só precisa abrir uma issue ou um PR com a
+entrada nova, e o mesmo check acima valida.

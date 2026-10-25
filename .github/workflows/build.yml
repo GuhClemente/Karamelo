@@ -1,0 +1,81 @@
+# Build + unit tests on the three platforms, on every push and pull request.
+#
+# The core battery that compile_port.bat runs needs cores and ROMs, which are
+# never in the repository; on these runners it reports "bateria pulada" and
+# moves on. The unit tests still run everywhere - including the ports catalog
+# checks (tests/test_port_catalog.cpp).
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache SDL3 build
+        uses: actions/cache@v4
+        with:
+          path: build/sdl3
+          key: sdl3-win-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_port.bat') }}
+      - name: Build and test
+        shell: cmd
+        run: call compile_port.bat
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: karamelo-windows
+          path: app/Karamelo*.exe
+          if-no-files-found: ignore
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev \
+            libxfixes-dev libxtst-dev libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev \
+            libasound2-dev libpulse-dev libudev-dev libdbus-1-dev
+      - name: Cache SDL3 build
+        uses: actions/cache@v4
+        with:
+          path: build/sdl3_linux
+          key: sdl3-linux-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_linux.sh') }}
+      - name: Build and test
+        run: ./compile_linux.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: karamelo-linux
+          path: app/Karamelo
+          if-no-files-found: ignore
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: brew install ninja
+      - name: Cache SDL3 build
+        uses: actions/cache@v4
+        with:
+          path: build/sdl3_macos
+          key: sdl3-macos-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_macos.sh') }}
+      - name: Build and test
+        run: ./compile_macos.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: karamelo-macos
+          path: app/Karamelo
+          if-no-files-found: ignore
