@@ -2435,6 +2435,16 @@ static size_t CB_AudioSampleBatch(const int16_t* data, size_t frames)
 	return frames;
 }
 
+// Set the first time the loaded core asks for RETRO_DEVICE_MOUSE, cleared on
+// every core load. Only a core that actually reads the mouse gets the cursor
+// kept inside the window - see the re-centering below.
+static volatile LONG g_core_reads_mouse = 0;
+
+// Arrow keys and the numeric keypad answer for each other only on the Japanese
+// computers whose games walk on the keypad (PC-98, FM Towns). Decided once
+// per core load in CoreLoad().
+static bool s_keypad_arrow_bridge = false;
+
 // Libretro RETRO_DEVICE_MOUSE relative motion and buttons
 static volatile LONG g_mouse_rel_x = 0;
 static volatile LONG g_mouse_rel_y = 0;
@@ -2632,8 +2642,12 @@ static void CB_InputPoll(void)
 		s_last_mouse_pos = cur_mouse_pt;
 		s_has_mouse_pos = true;
 
-		// When mouse moves near screen edge, re-center to prevent getting trapped at display borders
-		if (fg && (mouse_dx != 0 || mouse_dy != 0))
+		// When mouse moves near screen edge, re-center to prevent getting trapped at display borders.
+		// Only for a core that reads the mouse: this ran for every core, so the
+		// Windows cursor was pulled back to the middle of the window during an
+		// SNES game the moment it neared an edge.
+		if (fg && (mouse_dx != 0 || mouse_dy != 0) &&
+		    InterlockedCompareExchange(&g_core_reads_mouse, 0, 0))
 		{
 			RECT rc;
 			if (GetWindowRect(fg, &rc))
@@ -2909,6 +2923,12 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 			// Users on laptops, TKL keyboards, or standard arrow setups expect Arrow
 			// keys to walk. This bidirectional bridge allows both Arrows and Keypad
 			// keys to trigger directional inputs seamlessly across all games.
+			else if (!s_keypad_arrow_bridge && ((id >= 257 && id <= 265) || (id >= 273 && id <= 276)))
+			{
+				// Everyone else keeps arrows and keypad apart (DOS, MSX, C64 and
+				// Amiga games give them different jobs).
+				if (GetAsyncKeyState(vk) & 0x8000) return 1;
+			}
 			else if (id == 260 || id == 276) // RETROK_KP4 or RETROK_LEFT
 			{
 				if ((GetAsyncKeyState(VK_LEFT) & 0x8000) || (GetAsyncKeyState(VK_NUMPAD4) & 0x8000)) return 1;
@@ -2991,6 +3011,7 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 	}
 	else if (device == RETRO_DEVICE_MOUSE)
 	{
+		InterlockedExchange(&g_core_reads_mouse, 1);
 		if (OsdIsEnabled()) return 0;
 		LONG btns = g_mouse_buttons;
 		switch (id)
@@ -3197,7 +3218,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			// Extraction usually works; what fails is recognising the contents.
 			// Saying "failed to extract" for an archive holding a format we do
 			// not support sent the user looking in the wrong place.
-			CoreSetToast("ARQUIVO SEM JOGO RECONHECIDO", 240);
+			CoreSetToast(Tr("ARQUIVO SEM JOGO RECONHECIDO", "NO RECOGNIZED GAME IN ARCHIVE"), 240);
 			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
 			return 0;
 		}
@@ -3386,8 +3407,8 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		if (core_dll.empty() || !fs::exists(core_dll))
 		{
 			char msg[160];
-			snprintf(msg, sizeof(msg), "CORE AUSENTE: %s",
-				core_dll.empty() ? "nenhum core para este formato" : core_dll.c_str());
+			snprintf(msg, sizeof(msg), Tr("CORE AUSENTE: %s", "CORE MISSING: %s"),
+				core_dll.empty() ? Tr("nenhum core para este formato", "no core for this format") : core_dll.c_str());
 			CoreSetToast(msg, 300);
 			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
 			return 0;
@@ -3492,10 +3513,10 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 				consecutive_crashes, kMaxConsecutiveCrashes);
 			if (consecutive_crashes >= kMaxConsecutiveCrashes)
 			{
-				CoreSetToast("ERROR: CORE TRAVOU REPETIDAMENTE - JOGO ENCERRADO", 300);
+				CoreSetToast(Tr("ERRO: O CORE TRAVOU - JOGO ENCERRADO", "ERROR: CORE CRASHED - GAME CLOSED"), 300);
 				break;
 			}
-			CoreSetToast("WARNING: RECOVERED FROM INTERNAL EXCEPTION", 180);
+			CoreSetToast(Tr("AVISO: RECUPERADO DE UMA EXCECAO INTERNA", "WARNING: RECOVERED FROM INTERNAL EXCEPTION"), 180);
 			Sleep(16);
 		}
 		else
@@ -4045,6 +4066,9 @@ static bool CoreLoad(const char* core_dll_path)
 	}
 
 	s_loaded_core_path = core_dll_path ? core_dll_path : "";
+	s_keypad_arrow_bridge = s_loaded_core_path.find("pc98") != std::string::npos ||
+	                        s_loaded_core_path.find("fmtowns") != std::string::npos;
+	InterlockedExchange(&g_core_reads_mouse, 0);
 	s_loaded_core_is_pcsx2 = (strstr(core_dll_path, "pcsx2") != NULL) ||
 	                         (strstr(core_dll_path, "ps2") != NULL && strstr(core_dll_path, "play") == NULL);
 	bool is_ps2_family = s_loaded_core_is_pcsx2 || (strstr(core_dll_path, "play") != NULL);
@@ -4289,11 +4313,11 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 			const char* sys = loaded_core_name.c_str();
 
 			if (strstr(sys, "Mega CD") || (strstr(sys, "Genesis") && ext != ".md" && ext != ".gen" && ext != ".bin"))
-				needed = "bios_CD_U.bin (ou _E/_J)";
+				needed = Tr("bios_CD_U.bin (ou _E/_J)", "bios_CD_U.bin (or _E/_J)");
 			else if (strstr(sys, "TurboGrafx") || strstr(sys, "PC Engine"))
 				needed = "syscard3.pce";
 			else if (strstr(sys, "PlayStation"))
-				needed = "scph5501.bin (ou 5500/5502)";
+				needed = Tr("scph5501.bin (ou 5500/5502)", "scph5501.bin (or 5500/5502)");
 			else if (strstr(sys, "Saturn"))
 				needed = "sega_101.bin / mpr-17933.bin";
 			else if (strstr(sys, "NeoGeo CD"))
@@ -4305,7 +4329,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 
 			if (strstr(sys, "Dreamcast") || strstr(sys, "GameCube"))
 			{
-				CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
+				CoreSetToast(Tr("MUDE O DRIVER DE VIDEO PARA OPENGL EM CONFIGURACOES > VIDEO", "SWITCH VIDEO DRIVER TO OPENGL IN SETTINGS > VIDEO"), 300);
 			}
 			else if (strstr(sys, "Nintendo 3DS"))
 			{
@@ -4321,22 +4345,22 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 				std::error_code kec;
 				if (!fs::exists("saves/3DS/Citra/sysdata/aes_keys.txt", kec))
 				{
-					CoreSetToast("3DS CIFRADO: falta saves/3DS/Citra/sysdata/aes_keys.txt", 360);
+					CoreSetToast(Tr("3DS CIFRADO: falta saves/3DS/Citra/sysdata/aes_keys.txt", "ENCRYPTED 3DS: missing saves/3DS/Citra/sysdata/aes_keys.txt"), 360);
 				}
 				else
 				{
-					CoreSetToast("3DS: FALHA AO CARREGAR (chaves presentes) - VEJA karamelo.log", 300);
+					CoreSetToast(Tr("3DS: FALHA AO CARREGAR (chaves presentes) - VEJA karamelo.log", "3DS: LOAD FAILED (keys present) - SEE karamelo.log"), 300);
 				}
 			}
 			else if (needed)
 			{
 				char msg[192];
-				snprintf(msg, sizeof(msg), "BIOS AUSENTE EM bios/: %s", needed);
+				snprintf(msg, sizeof(msg), Tr("BIOS AUSENTE EM bios/: %s", "MISSING BIOS IN bios/: %s"), needed);
 				CoreSetToast(msg, 360);
 			}
 			else
 			{
-				CoreSetToast("FALHA AO CARREGAR - VEJA karamelo.log", 240);
+				CoreSetToast(Tr("FALHA AO CARREGAR - VEJA karamelo.log", "LOAD FAILED - SEE karamelo.log"), 240);
 			}
 		}
 		// The core can have already called SET_MEMORY_MAPS from inside this
@@ -4360,7 +4384,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		CoreLogPrintf(RETRO_LOG_ERROR,
 			"[CoreRunner] Core faulted inside retro_get_system_av_info: %s", rom_path);
 		if (!suppress_toast)
-			CoreSetToast("FALHA AO CARREGAR - VEJA karamelo.log", 240);
+			CoreSetToast(Tr("FALHA AO CARREGAR - VEJA karamelo.log", "LOAD FAILED - SEE karamelo.log"), 240);
 		RetroUnloadGameGuarded();
 		// is_game_loaded is still false here, so CoreUnload()'s own
 		// CoreReleaseMemoryMap() call (gated on is_game_loaded) never runs -
@@ -4433,7 +4457,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 					"[HW] context_reset falhou/crashou para '%s'",
 					loaded_core_name.c_str());
 				if (!suppress_toast)
-					CoreSetToast("MUDE VIDEO DRIVER PARA OPENGL EM SETTINGS > VIDEO", 300);
+					CoreSetToast(Tr("MUDE O DRIVER DE VIDEO PARA OPENGL EM CONFIGURACOES > VIDEO", "SWITCH VIDEO DRIVER TO OPENGL IN SETTINGS > VIDEO"), 300);
 				RetroUnloadGameGuarded();
 				CoreReleaseMemoryMap();
 				return false;
@@ -4680,14 +4704,14 @@ static bool DoSaveState(int slot)
 {
 	if (!CoreIsRunning() || !p_retro_serialize || !p_retro_serialize_size)
 	{
-		CoreSetToast("SAVESTATE UNAVAILABLE ON THIS CORE", 120);
+		CoreSetToast(Tr("SAVESTATE INDISPONIVEL NESTE CORE", "SAVESTATE UNAVAILABLE ON THIS CORE"), 120);
 		return false;
 	}
 
 	size_t sz = RetroSerializeSizeGuarded();
 	if (sz == 0)
 	{
-		CoreSetToast("ERROR: INVALID STATE SIZE", 120);
+		CoreSetToast(Tr("ERRO: TAMANHO DE ESTADO INVALIDO", "ERROR: INVALID STATE SIZE"), 120);
 		return false;
 	}
 
@@ -4697,7 +4721,7 @@ static bool DoSaveState(int slot)
 	if (!RetroSerializeGuarded(buf, sz))
 	{
 		free(buf);
-		CoreSetToast("ERROR SAVING STATE", 120);
+		CoreSetToast(Tr("ERRO AO SALVAR ESTADO", "ERROR SAVING STATE"), 120);
 		return false;
 	}
 
@@ -4718,7 +4742,7 @@ static bool DoSaveState(int slot)
 	if (!f)
 	{
 		free(buf);
-		CoreSetToast("DISK ERROR WHILE SAVING STATE", 120);
+		CoreSetToast(Tr("ERRO DE DISCO AO SALVAR ESTADO", "DISK ERROR WHILE SAVING STATE"), 120);
 		return false;
 	}
 
@@ -4733,12 +4757,12 @@ static bool DoSaveState(int slot)
 	if (!written)
 	{
 		fs::remove(tmp_file, ec);
-		CoreSetToast("DISK ERROR WHILE SAVING STATE", 120);
+		CoreSetToast(Tr("ERRO DE DISCO AO SALVAR ESTADO", "DISK ERROR WHILE SAVING STATE"), 120);
 		return false;
 	}
 
 	char toast_str[128];
-	snprintf(toast_str, sizeof(toast_str), "STATE SAVED [SLOT %d]", slot);
+	snprintf(toast_str, sizeof(toast_str), Tr("ESTADO SALVO [SLOT %d]", "STATE SAVED [SLOT %d]"), slot);
 	CoreSetToast(toast_str, 120);
 	return true;
 }
@@ -4747,7 +4771,7 @@ static bool DoLoadState(int slot)
 {
 	if (!CoreIsRunning() || !p_retro_unserialize || !p_retro_serialize_size)
 	{
-		CoreSetToast("LOADSTATE UNAVAILABLE ON THIS CORE", 120);
+		CoreSetToast(Tr("CARREGAR ESTADO INDISPONIVEL NESTE CORE", "LOADSTATE UNAVAILABLE ON THIS CORE"), 120);
 		return false;
 	}
 
@@ -4760,7 +4784,7 @@ static bool DoLoadState(int slot)
 	if (!f)
 	{
 		char toast_str[128];
-		snprintf(toast_str, sizeof(toast_str), "SLOT %d EMPTY (NO SAVE FOUND)", slot);
+		snprintf(toast_str, sizeof(toast_str), Tr("SLOT %d VAZIO (NENHUM SAVE)", "SLOT %d EMPTY (NO SAVE FOUND)"), slot);
 		CoreSetToast(toast_str, 120);
 		return false;
 	}
@@ -4783,7 +4807,7 @@ static bool DoLoadState(int slot)
 	if (!read_ok)
 	{
 		free(buf);
-		CoreSetToast("ERROR LOADING STATE", 120);
+		CoreSetToast(Tr("ERRO AO CARREGAR ESTADO", "ERROR LOADING STATE"), 120);
 		return false;
 	}
 
@@ -4793,13 +4817,13 @@ static bool DoLoadState(int slot)
 	if (ok)
 	{
 		char toast_str[128];
-		snprintf(toast_str, sizeof(toast_str), "STATE LOADED [SLOT %d]", slot);
+		snprintf(toast_str, sizeof(toast_str), Tr("ESTADO CARREGADO [SLOT %d]", "STATE LOADED [SLOT %d]"), slot);
 		CoreSetToast(toast_str, 120);
 		return true;
 	}
 	else
 	{
-		CoreSetToast("ERROR LOADING STATE", 120);
+		CoreSetToast(Tr("ERRO AO CARREGAR ESTADO", "ERROR LOADING STATE"), 120);
 		return false;
 	}
 }
@@ -4844,7 +4868,7 @@ static bool PostCoreCommand(LONG cmd, int slot)
 	// get the player's account flagged, so refuse and say why.
 	if ((cmd == CORE_CMD_SAVE || cmd == CORE_CMD_LOAD) && RaIsHardcoreActive())
 	{
-		CoreSetToast("SAVESTATE LOCKED (RA HARDCORE)", 200);
+		CoreSetToast(Tr("SAVESTATE BLOQUEADO (RA HARDCORE)", "SAVESTATE LOCKED (RA HARDCORE)"), 200);
 		return false;
 	}
 	InterlockedExchange(&g_pending_cmd_packed, (cmd & 0xFF) | ((slot & 0xFF) << 8));
@@ -4882,7 +4906,7 @@ void CoreSetSelectedSlot(int slot)
 	{
 		selected_state_slot = slot;
 		char toast_str[64];
-		snprintf(toast_str, sizeof(toast_str), "ACTIVE SLOT: %d", slot);
+		snprintf(toast_str, sizeof(toast_str), Tr("SLOT ATIVO: %d", "ACTIVE SLOT: %d"), slot);
 		CoreSetToast(toast_str, 90);
 	}
 }
@@ -4904,7 +4928,7 @@ bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t
 	if (!fs::exists(save_file, ec) || !fs::is_regular_file(save_file, ec))
 	{
 		if (out_time_str && max_time_len > 0)
-			snprintf(out_time_str, max_time_len, "Vazio");
+			snprintf(out_time_str, max_time_len, Tr("Vazio", "Empty"));
 		return true;
 	}
 
@@ -4930,7 +4954,7 @@ bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t
 		}
 		else
 		{
-			snprintf(out_time_str, max_time_len, "Salvo");
+			snprintf(out_time_str, max_time_len, Tr("Salvo", "Saved"));
 		}
 	}
 	return true;
@@ -5008,7 +5032,7 @@ bool CoreTakeScreenshot()
 	}
 
 	fclose(f);
-	CoreSetToast("SCREENSHOT SAVED", 120);
+	CoreSetToast(Tr("CAPTURA DE TELA SALVA", "SCREENSHOT SAVED"), 120);
 	return true;
 }
 

@@ -318,11 +318,15 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 	if (ext == ".tzx" || ext == ".tap" || ext == ".z80" || ext == ".sna") return "cores/spectrum.dll";
 	if (ext == ".pcfx") return "cores/pcfx.dll";
 	if (ext == ".cso") return "cores/psp.dll";
+	// Same table as MenuResolveCoreForPath in menu.cpp - .hdd is decided by the
+	// folder there too, so a game resolves to one core however it is opened.
+	if (ext == ".hdd") return (in("FMTowns") || in("Towns") || in("Marty")) ? "cores/fmtowns.dll" : "cores/pc98.dll";
 	if (ext == ".hdi" || ext == ".d88" || ext == ".88d" || ext == ".d98" || ext == ".98d" ||
 		ext == ".fdi" || ext == ".fdd" || ext == ".2hd" || ext == ".tfd" || ext == ".nfd" ||
-		ext == ".dup" || ext == ".cmd" || ext == ".nhd") return "cores/pc98.dll";
+		ext == ".dup" || ext == ".cmd" || ext == ".nhd" || ext == ".thd" || ext == ".hdm" ||
+		ext == ".xdf") return "cores/pc98.dll";
 	if (ext == ".d77" || ext == ".h0" || ext == ".h1" || ext == ".h2" || ext == ".h3" ||
-		ext == ".h4" || ext == ".h5" || ext == ".h6" || ext == ".hdd") return "cores/fmtowns.dll";
+		ext == ".h4" || ext == ".h5" || ext == ".h6") return "cores/fmtowns.dll";
 
 	if (ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" ||
 		ext == ".pbp" || ext == ".toc")

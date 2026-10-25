@@ -824,13 +824,19 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
     return "cores/psp.dll";
   if (ext == ".mx1" || ext == ".mx2")
     return "cores/msx.dll";
-  if (ext == ".hdi" || ext == ".nhd" || ext == ".thd" || ext == ".hdd" ||
+  // .hdd is a hard-disk image on both Japanese computers, so the folder
+  // decides it. It used to sit in both lists below: the PC-98 one matched
+  // first, so an FM Towns .hdd opened in the PC-98 core from the menu and in
+  // the FM Towns core when it came out of a .zip.
+  if (ext == ".hdd")
+    return (in("FMTowns") || in("Towns") || in("Marty")) ? "cores/fmtowns.dll" : "cores/pc98.dll";
+  if (ext == ".hdi" || ext == ".nhd" || ext == ".thd" ||
       ext == ".fdi" || ext == ".fdd" || ext == ".d88" || ext == ".88d" ||
       ext == ".2hd" || ext == ".tfd" || ext == ".hdm" || ext == ".xdf" ||
-      ext == ".dup" || ext == ".cmd")
+      ext == ".dup" || ext == ".cmd" || ext == ".d98" || ext == ".98d" || ext == ".nfd")
     return "cores/pc98.dll";
   if (ext == ".d77" || ext == ".h0" || ext == ".h1" || ext == ".h2" || ext == ".h3" ||
-      ext == ".h4" || ext == ".h5" || ext == ".h6" || ext == ".hdd")
+      ext == ".h4" || ext == ".h5" || ext == ".h6")
     return "cores/fmtowns.dll";
 
   // Disc images. The extension says nothing about the console, so the folder
@@ -2849,7 +2855,7 @@ void MenuJumpToLetter(char c) {
       if (max_visible <= 0)
         max_visible = 8;
       // Position the matched item nicely near the top with surrounding context
-      scroll_top = ClampInt(idx - 1, 0, total - max_visible);
+      scroll_top = ClampInt(idx - 1, 0, total > max_visible ? total - max_visible : 0);
       g_last_input_tick = TickCountMs();
       s_scroll_since = TickCountMs();
       s_scroll_item_idx = -1;
@@ -3353,7 +3359,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
 
       const char *names[] = {"AUTO", "DESLIGADO", "LIGADO"};
       char msg[64];
-      snprintf(msg, sizeof(msg), "FM AUDIO: %s (recarregue o jogo)",
+      snprintf(msg, sizeof(msg), Tr("FM AUDIO: %s (recarregue o jogo)", "FM AUDIO: %s (reload the game)"),
                names[setting_sms_fm]);
       CoreSetToast(msg, 120);
       PopulateMainMenu();
@@ -3377,7 +3383,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       setting_nds_gap = (setting_nds_gap + delta + kNdsGapCount) % kNdsGapCount;
       CoreSetOption("melonds_screen_gap", kNdsGapVals[setting_nds_gap]);
       char msg[64];
-      snprintf(msg, sizeof(msg), "ESPACO: %s", kNdsGapVals[setting_nds_gap]);
+      snprintf(msg, sizeof(msg), Tr("ESPACO: %s", "GAP: %s"), kNdsGapVals[setting_nds_gap]);
       CoreSetToast(msg, 120);
       PopulateMainMenu();
       selected_idx = cur;
@@ -3389,7 +3395,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetOption("melonds_hybrid_small_screen",
                     kNdsHybridVals[setting_nds_hybrid]);
       char msg[64];
-      snprintf(msg, sizeof(msg), "TELA PEQUENA: %s",
+      snprintf(msg, sizeof(msg), Tr("TELA PEQUENA: %s", "SMALL SCREEN: %s"),
                kNdsHybridNames[setting_nds_hybrid]);
       CoreSetToast(msg, 120);
       PopulateMainMenu();
@@ -3492,9 +3498,9 @@ static void MenuProcessKeyImpl(MenuKey key) {
       if (setting_driver == VIDEO_DRIVER_SOFTWARE) {
         snprintf(msg, sizeof(msg), "DRIVER: SOFTWARE (CPU)");
       } else if (setting_driver == VIDEO_DRIVER_AUTO) {
-        snprintf(msg, sizeof(msg), "DRIVER: AUTO (DETECTA GPU CONFORME O JOGO)");
+        snprintf(msg, sizeof(msg), Tr("DRIVER: AUTO (DETECTA GPU CONFORME O JOGO)", "DRIVER: AUTO (PICKS THE GPU PER GAME)"));
       } else {
-        snprintf(msg, sizeof(msg), "DRIVER: %s (3D GPU ATIVADO)", GetCurrentDriverToast());
+        snprintf(msg, sizeof(msg), Tr("DRIVER: %s (3D GPU ATIVADO)", "DRIVER: %s (3D GPU ENABLED)"), GetCurrentDriverToast());
       }
       CoreSetToast(msg, 90);
       PopulateVideoSettings();

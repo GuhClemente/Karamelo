@@ -20,6 +20,7 @@
 #include <chrono>
 
 #include "retroachievements.h"
+#include "menu.h" // Tr(): every message on screen follows the language setting
 #include "core_runner.h"
 #include "chd_reader.h"
 
@@ -575,25 +576,25 @@ static void RC_CCONV RaEventHandler(const rc_client_event_t* event, rc_client_t*
 	case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
 	{
 		char msg[160];
-		snprintf(msg, sizeof(msg), "CONQUISTA: %s",
+		snprintf(msg, sizeof(msg), Tr("CONQUISTA: %s", "ACHIEVEMENT: %s"),
 			event->achievement && event->achievement->title ? event->achievement->title : "?");
 		CoreSetToast(msg, 300);
 		RaRefreshCounts();
 		break;
 	}
 	case RC_CLIENT_EVENT_GAME_COMPLETED:
-		CoreSetToast("JOGO 100% COMPLETO!", 420);
+		CoreSetToast(Tr("JOGO 100% COMPLETO!", "GAME 100% COMPLETE!"), 420);
 		break;
 
 	case RC_CLIENT_EVENT_SUBSET_COMPLETED:
-		CoreSetToast("CONJUNTO COMPLETO!", 360);
+		CoreSetToast(Tr("CONJUNTO COMPLETO!", "SET COMPLETE!"), 360);
 		break;
 
 	case RC_CLIENT_EVENT_RESET:
 		// Not cosmetic: rcheevos requires the machine to be reset when hardcore
 		// is turned on mid-session, otherwise the run is not valid. Ignoring
 		// this left the client and the emulator disagreeing about the state.
-		CoreSetToast("RA: RESET EXIGIDO (HARDCORE)", 240);
+		CoreSetToast(Tr("RA: RESET EXIGIDO (HARDCORE)", "RA: RESET REQUIRED (HARDCORE)"), 240);
 		CoreReset();
 		break;
 
@@ -602,14 +603,14 @@ static void RC_CCONV RaEventHandler(const rc_client_event_t* event, rc_client_t*
 		// player needs to know, or they will think a hard-won achievement was
 		// registered when it was not.
 		g_server_pending = true;
-		SetStatus("RA: sem conexao - desbloqueios pendentes");
-		CoreSetToast("RA: SEM CONEXAO (PENDENTES)", 300);
+		SetStatus(Tr("RA: sem conexao - desbloqueios pendentes", "RA: offline - unlocks pending"));
+		CoreSetToast(Tr("RA: SEM CONEXAO (PENDENTES)", "RA: OFFLINE (PENDING)"), 300);
 		break;
 
 	case RC_CLIENT_EVENT_RECONNECTED:
 		g_server_pending = false;
-		SetStatus("RA: reconectado, pendencias enviadas");
-		CoreSetToast("RA: RECONECTADO", 180);
+		SetStatus(Tr("RA: reconectado, pendencias enviadas", "RA: reconnected, pending unlocks sent"));
+		CoreSetToast(Tr("RA: RECONECTADO", "RA: RECONNECTED"), 180);
 		break;
 
 	case RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_SHOW:
@@ -633,7 +634,7 @@ static void RC_CCONV RaEventHandler(const rc_client_event_t* event, rc_client_t*
 		break;
 
 	case RC_CLIENT_EVENT_SERVER_ERROR:
-		CoreSetToast("RETROACHIEVEMENTS: ERRO NO SERVIDOR", 240);
+		CoreSetToast(Tr("RETROACHIEVEMENTS: ERRO NO SERVIDOR", "RETROACHIEVEMENTS: SERVER ERROR"), 240);
 		if (event->server_error && event->server_error->error_message)
 		{
 			char buf[192];
@@ -664,10 +665,10 @@ static void RC_CCONV RaLoginCallback(int result, const char* error_message,
 	if (result != RC_OK)
 	{
 		char buf[256];
-		snprintf(buf, sizeof(buf), "RA: falha no login (%s)",
+		snprintf(buf, sizeof(buf), Tr("RA: falha no login (%s)", "RA: login failed (%s)"),
 			error_message ? error_message : "erro desconhecido");
 		SetStatus(buf);
-		CoreSetToast("RETROACHIEVEMENTS: LOGIN FALHOU", 300);
+		CoreSetToast(Tr("RETROACHIEVEMENTS: LOGIN FALHOU", "RETROACHIEVEMENTS: LOGIN FAILED"), 300);
 		return;
 	}
 
@@ -688,15 +689,15 @@ static void RC_CCONV RaLoginCallback(int result, const char* error_message,
 		}
 
 		char buf[256];
-		snprintf(buf, sizeof(buf), "RA: %s (%u pontos)", g_username.c_str(), user->score);
+		snprintf(buf, sizeof(buf), Tr("RA: %s (%u pontos)", "RA: %s (%u points)"), g_username.c_str(), user->score);
 		SetStatus(buf);
 	}
 	else
 	{
-		SetStatus("RA: conectado");
+		SetStatus(Tr("RA: conectado", "RA: connected"));
 	}
 
-	CoreSetToast("RETROACHIEVEMENTS CONECTADO", 240);
+	CoreSetToast(Tr("RETROACHIEVEMENTS CONECTADO", "RETROACHIEVEMENTS CONNECTED"), 240);
 }
 
 static void RC_CCONV RaLoadGameCallback(int result, const char* error_message,
@@ -713,19 +714,19 @@ static void RC_CCONV RaLoadGameCallback(int result, const char* error_message,
 		{
 			// Normal for translations, hacks and repacks: identification is by
 			// hash of the original content.
-			SetStatus("RA: jogo fora do banco de dados");
-			CoreSetToast("SEM CONQUISTAS: JOGO NAO RECONHECIDO", 240);
+			SetStatus(Tr("RA: jogo fora do banco de dados", "RA: game not in the database"));
+			CoreSetToast(Tr("SEM CONQUISTAS: JOGO NAO RECONHECIDO", "NO ACHIEVEMENTS: GAME NOT RECOGNIZED"), 240);
 		}
 		else
 		{
 			char buf[192];
 			snprintf(buf, sizeof(buf), "RA: %s",
-				error_message ? error_message : "falha ao carregar");
+				error_message ? error_message : Tr("falha ao carregar", "load failed"));
 			SetStatus(buf);
 
 			char toast[192];
 			snprintf(toast, sizeof(toast), "RA: %s",
-				error_message ? error_message : "FALHA AO CONSULTAR O JOGO");
+				error_message ? error_message : Tr("FALHA AO CONSULTAR O JOGO", "GAME LOOKUP FAILED"));
 			CoreSetToast(toast, 300);
 		}
 		return;
@@ -749,7 +750,7 @@ static void RC_CCONV RaLoadGameCallback(int result, const char* error_message,
 	char toast[192];
 	if (g_ach_total > 0)
 	{
-		snprintf(toast, sizeof(toast), "CONQUISTAS: %d/%d - %s",
+		snprintf(toast, sizeof(toast), Tr("CONQUISTAS: %d/%d - %s", "ACHIEVEMENTS: %d/%d - %s"),
 			g_ach_unlocked, g_ach_total, game->title ? game->title : "?");
 
 		// The memory map is what makes unlocks possible. A core that does not
@@ -757,16 +758,16 @@ static void RC_CCONV RaLoadGameCallback(int result, const char* error_message,
 		// identified and then silently never unlocks anything.
 		if (!g_memory_ready)
 		{
-			SetStatus("RA: core nao expoe memoria - sem conquistas");
-			CoreSetToast("RA: ESTE CORE NAO SUPORTA CONQUISTAS", 300);
+			SetStatus(Tr("RA: core nao expoe memoria - sem conquistas", "RA: core exposes no memory - no achievements"));
+			CoreSetToast(Tr("RA: ESTE CORE NAO SUPORTA CONQUISTAS", "RA: THIS CORE DOES NOT SUPPORT ACHIEVEMENTS"), 300);
 			return;
 		}
 	}
 	else
 	{
 		// Recognised, but nobody has authored a set for it yet.
-		snprintf(toast, sizeof(toast), "RA: %s SEM CONQUISTAS PUBLICADAS",
-			game->title ? game->title : "JOGO");
+		snprintf(toast, sizeof(toast), Tr("RA: %s SEM CONQUISTAS PUBLICADAS", "RA: %s HAS NO PUBLISHED ACHIEVEMENTS"),
+			game->title ? game->title : Tr("JOGO", "GAME"));
 	}
 
 	CoreSetToast(toast, 240);
@@ -787,7 +788,7 @@ void RaInit()
 		// Nothing configured: write a commented template so the user can see
 		// exactly what to fill in, and stay out of the way.
 		if (!fs::exists(RA_CONFIG_PATH)) RaSaveConfig();
-		SetStatus("RA: sem credenciais em Config/retroachievements.cfg");
+		SetStatus(Tr("RA: sem credenciais em Config/retroachievements.cfg", "RA: no credentials in Config/retroachievements.cfg"));
 		return;
 	}
 
@@ -797,7 +798,7 @@ void RaInit()
 	g_client = rc_client_create(RaReadMemory, RaServerCall);
 	if (!g_client)
 	{
-		SetStatus("RA: falha ao criar o cliente");
+		SetStatus(Tr("RA: falha ao criar o cliente", "RA: failed to create the client"));
 		return;
 	}
 
@@ -817,7 +818,7 @@ void RaInit()
 	rc_client_set_hardcore_enabled(g_client, g_hardcore ? 1 : 0);
 
 	g_enabled = true;
-	SetStatus("RA: conectando...");
+	SetStatus(Tr("RA: conectando...", "RA: connecting..."));
 
 	if (!g_token.empty())
 		rc_client_begin_login_with_token(g_client, g_username.c_str(), g_token.c_str(),
@@ -934,7 +935,7 @@ void RaOnGameLoad(const char* rom_path, const char* core_name)
 
 	g_ach_total = 0;
 	g_ach_unlocked = 0;
-	SetStatus("RA: identificando o jogo...");
+	SetStatus(Tr("RA: identificando o jogo...", "RA: identifying the game..."));
 
 	// Map memory now, from the core we are running. rc_client checks every
 	// achievement's addresses during the load, long before it calls us back,

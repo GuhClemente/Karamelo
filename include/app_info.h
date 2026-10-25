@@ -1,4 +1,4 @@
-﻿#ifndef APP_INFO_H_INCLUDED
+#ifndef APP_INFO_H_INCLUDED
 #define APP_INFO_H_INCLUDED
 
 // Single source of truth for the application's identity, and the same figures

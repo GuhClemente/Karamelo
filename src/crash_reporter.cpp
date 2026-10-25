@@ -1,4 +1,5 @@
 #include "crash_reporter.h"
+#include "menu.h" // Tr(): every message on screen follows the language setting
 #include "app_info.h"
 #include "core_runner.h"
 
@@ -555,7 +556,7 @@ void CrashReporterCheckAndDispatch() {
         }
     }).detach();
 
-    CoreSetToast("RELATORIO DE FALHA ENVIADO A EQUIPE", 150);
+    CoreSetToast(Tr("RELATORIO DE FALHA ENVIADO A EQUIPE", "CRASH REPORT SENT TO THE TEAM"), 150);
 }
 
 bool CrashReporterSendTest() {
@@ -607,6 +608,6 @@ bool CrashReporterSendTest() {
         }
     }).detach();
 
-    CoreSetToast("TESTE DE DIAGNOSTICO ENVIADO!", 120);
+    CoreSetToast(Tr("TESTE DE DIAGNOSTICO ENVIADO!", "DIAGNOSTIC TEST SENT!"), 120);
     return true;
 }

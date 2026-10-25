@@ -56,6 +56,7 @@ static inline void strncpy_s(char* dst, size_t dst_size, const char* src, size_t
 #include <chrono>
 
 #include "netplay.h"
+#include "menu.h" // Tr(): every message on screen follows the language setting
 #include "core_runner.h"
 #include "netplay_protocol.h"
 
@@ -251,7 +252,7 @@ bool NetplayStartHost(int port)
 		net_state = NETPLAY_LISTENING;
 		status_str = "Hosting (Waiting for Player 2 on port " + std::to_string(port) + ")...";
 	}
-	CoreSetToast("NETPLAY: HOSTING SESSION", 120);
+	CoreSetToast(Tr("NETPLAY: HOSPEDANDO SESSAO", "NETPLAY: HOSTING SESSION"), 120);
 	return true;
 }
 
@@ -279,7 +280,7 @@ bool NetplayStartClient(const char* host_ip, int port)
 		net_state = NETPLAY_CONNECTING;
 		status_str = "Connecting to Host (" + std::string(host_ip) + ")...";
 	}
-	CoreSetToast("NETPLAY: CONNECTING TO HOST...", 120);
+	CoreSetToast(Tr("NETPLAY: CONECTANDO AO HOST...", "NETPLAY: CONNECTING TO HOST..."), 120);
 	return true;
 }
 
@@ -329,7 +330,7 @@ void NetplayUpdate()
 
 			net_state = NETPLAY_CONNECTED;
 			status_str = "Connected with Player 2 (" + std::string(inet_ntoa(client_addr.sin_addr)) + ")";
-			CoreSetToast("PLAYER 2 CONNECTED VIA NETPLAY!", 180);
+			CoreSetToast(Tr("JOGADOR 2 CONECTADO VIA NETPLAY!", "PLAYER 2 CONNECTED VIA NETPLAY!"), 180);
 		}
 	}
 	else if (net_role == NETPLAY_CLIENT && net_state == NETPLAY_CONNECTING)
@@ -356,13 +357,13 @@ void NetplayUpdate()
 			{
 				net_state = NETPLAY_CONNECTED;
 				status_str = "Connected to Host as Player 2!";
-				CoreSetToast("CONNECTED TO HOST VIA NETPLAY!", 180);
+				CoreSetToast(Tr("CONECTADO AO HOST VIA NETPLAY!", "CONNECTED TO HOST VIA NETPLAY!"), 180);
 			}
 			else
 			{
 				NetplayDisconnect();
 				status_str = "Connection refused";
-				CoreSetToast("NETPLAY: CONNECTION REFUSED", 180);
+				CoreSetToast(Tr("NETPLAY: CONEXAO RECUSADA", "NETPLAY: CONNECTION REFUSED"), 180);
 			}
 		}
 	}
@@ -388,7 +389,7 @@ void NetplayUpdate()
 			if (bytes == 0)
 			{
 				NetplayDisconnect();
-				CoreSetToast("NETPLAY: PEER DISCONNECTED", 120);
+				CoreSetToast(Tr("NETPLAY: O OUTRO JOGADOR DESCONECTOU", "NETPLAY: PEER DISCONNECTED"), 120);
 				return;
 			}
 
@@ -399,7 +400,7 @@ void NetplayUpdate()
 			if (err != WSAEWOULDBLOCK)
 			{
 				NetplayDisconnect();
-				CoreSetToast("NETPLAY: CONNECTION LOST", 120);
+				CoreSetToast(Tr("NETPLAY: CONEXAO PERDIDA", "NETPLAY: CONNECTION LOST"), 120);
 				return;
 			}
 			break;
@@ -480,13 +481,13 @@ void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][
 			if (remaining != (int)sizeof(NetPacket))
 			{
 				NetplayDisconnect();
-				CoreSetToast("NETPLAY: LINK DESYNCHRONISED", 150);
+				CoreSetToast(Tr("NETPLAY: CONEXAO DESSINCRONIZADA", "NETPLAY: LINK DESYNCHRONISED"), 150);
 			}
 			break;
 		}
 
 		NetplayDisconnect();
-		CoreSetToast("NETPLAY: CONNECTION LOST", 120);
+		CoreSetToast(Tr("NETPLAY: CONEXAO PERDIDA", "NETPLAY: CONNECTION LOST"), 120);
 		break;
 	}
 

@@ -68,7 +68,7 @@ static std::atomic<bool> s_port_needs_restore(false);
 // PortPumpPendingLaunch). Protegido pelo mesmo s_pending_lock.
 static std::string      s_installing_name;
 // "BAIXANDO " or "PREPARANDO " (Xbox 360 dump preparation) - same lock.
-static std::string      s_installing_verb = "BAIXANDO ";
+static std::string      s_installing_verb = Tr("BAIXANDO ", "DOWNLOADING ");
 
 #ifdef _WIN32
 // One argument quoted per the CommandLineToArgvW / MSVC CRT rules, trailing
@@ -1220,17 +1220,17 @@ static GhAsset PickFromDownloadsFeed(const std::string& json) {
 }
 
 static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error) {
-    if (def.repo.empty() && def.downloads_json_url.empty()) { out_error = "sem repositorio configurado"; return false; }
+    if (def.repo.empty() && def.downloads_json_url.empty()) { out_error = Tr("sem repositorio configurado", "no repository configured"); return false; }
 
     GhAsset asset;
     if (!def.downloads_json_url.empty()) {
         std::string feed;
         if (!UpdaterHttpGetString(def.downloads_json_url, feed)) {
-            out_error = "falha ao consultar o servidor do port";
+            out_error = Tr("falha ao consultar o servidor do port", "could not reach the port's server");
             return false;
         }
         asset = PickFromDownloadsFeed(feed);
-        if (asset.url.empty()) { out_error = "nenhum build para este sistema no servidor do port"; return false; }
+        if (asset.url.empty()) { out_error = Tr("nenhum build para este sistema no servidor do port", "no build for this system on the port's server"); return false; }
     } else {
     std::string releases_url = "https://api.github.com/repos/" + def.repo + "/releases/latest";
     std::string json;
@@ -1243,26 +1243,26 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         if (UpdaterHttpGetString("https://api.github.com/repos/" + def.repo + "/releases", list_json)) {
             json = FirstReleaseObjectOnly(list_json);
         } else if (!got_latest) {
-            out_error = "falha ao consultar o GitHub";
+            out_error = Tr("falha ao consultar o GitHub", "could not reach GitHub");
             return false;
         }
     }
 
     if (json.find("\"assets\"") == std::string::npos && json.find("rate limit exceeded") != std::string::npos) {
-        out_error = "limite de requisicoes da API do GitHub atingido (tente mais tarde)";
+        out_error = Tr("limite de requisicoes da API do GitHub atingido (tente mais tarde)", "GitHub API rate limit reached (try again later)");
         return false;
     }
 
     std::vector<GhAsset> assets = ParseReleaseAssets(json);
 #ifdef _WIN32
     asset = PickWindowsAsset(assets);
-    if (asset.url.empty()) { out_error = "nenhum build Windows na release"; return false; }
+    if (asset.url.empty()) { out_error = Tr("nenhum build Windows na release", "no Windows build in the release"); return false; }
 #elif defined(__APPLE__)
     asset = PickMacOsAsset(assets);
-    if (asset.url.empty()) { out_error = "nenhum build macOS na release deste port"; return false; }
+    if (asset.url.empty()) { out_error = Tr("nenhum build macOS na release deste port", "no macOS build in this port's release"); return false; }
 #else
     asset = PickLinuxAsset(assets);
-    if (asset.url.empty()) { out_error = "nenhum build Linux na release deste port"; return false; }
+    if (asset.url.empty()) { out_error = Tr("nenhum build Linux na release deste port", "no Linux build in this port's release"); return false; }
 #endif
     }
 
@@ -1279,7 +1279,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     // an error that says what is actually true, instead of pretending to
     // extract it.
     if (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".msi") {
-        out_error = "release so oferece instalador (.msi), sem suporte";
+        out_error = Tr("release so oferece instalador (.msi), sem suporte", "release only offers an installer (.msi), not supported");
         return false;
     }
 
@@ -1306,7 +1306,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         std::string safe_name = fs::path(asset.name).filename().string();
         std::string exe_name = safe_name.empty() ? (def.id + ".exe") : safe_name;
         std::string exe_path = dest_dir + "/" + exe_name;
-        if (!UpdaterHttpDownloadToFile(asset.url, exe_path)) { out_error = "falha no download"; return false; }
+        if (!UpdaterHttpDownloadToFile(asset.url, exe_path)) { out_error = Tr("falha no download", "download failed"); return false; }
 #ifndef _WIN32
         chmod(exe_path.c_str(), 0755);
 #endif
@@ -1325,11 +1325,11 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         else if (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".rar") cache_ext = ".rar";
         else if (lower_name.size() >= 3 && lower_name.substr(lower_name.size() - 3) == ".7z") cache_ext = ".7z";
         std::string zip_path = "cache/" + def.id + "_download" + cache_ext;
-        if (!UpdaterHttpDownloadToFile(asset.url, zip_path)) { out_error = "falha no download"; return false; }
+        if (!UpdaterHttpDownloadToFile(asset.url, zip_path)) { out_error = Tr("falha no download", "download failed"); return false; }
 
         bool extracted = ArchiveExtractAll(zip_path, dest_dir);
         fs::remove(zip_path, ec);
-        if (!extracted) { out_error = "falha ao extrair o pacote"; return false; }
+        if (!extracted) { out_error = Tr("falha ao extrair o pacote", "could not extract the package"); return false; }
 
         FlattenSingleSubfolder(dest_dir);
 
@@ -1360,7 +1360,7 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
         }
     }
 
-    if (ResolvePortExe(&def, dest_dir).empty()) { out_error = "pacote instalado sem executavel"; return false; }
+    if (ResolvePortExe(&def, dest_dir).empty()) { out_error = Tr("pacote instalado sem executavel", "installed package has no executable"); return false; }
 
     return true;
 }
@@ -1813,7 +1813,7 @@ static bool RunXexTool(const fs::path& xextool, const fs::path& game_dir, const 
 static bool PrepareX360Game(const PortDefinition& def, const std::string& port_dir, std::string& out_error) {
 #ifndef _WIN32
     (void)def; (void)port_dir;
-    out_error = "PREPARO DE DUMP XBOX 360 SO EXISTE NO WINDOWS";
+    out_error = Tr("PREPARO DE DUMP XBOX 360 SO EXISTE NO WINDOWS", "XBOX 360 DUMP PREPARATION IS WINDOWS ONLY");
     return false;
 #else
     std::error_code ec;
@@ -1825,7 +1825,7 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
     if (!fs::is_regular_file(game / "default.xex", ec)) {
         std::string iso = FindUserIso(def, port_dir);
         if (iso.empty()) {
-            out_error = "COLOQUE SEU ISO DE " + def.display_name + " EM roms/Xbox360";
+            out_error = Tr("COLOQUE SEU ISO DE ", "PUT YOUR ISO OF ") + def.display_name + Tr(" EM roms/Xbox360", " IN roms/Xbox360");
             PortLog(def.id + ": nenhum .iso com o nome contendo as palavras-chave do port");
             return false;
         }
@@ -1836,16 +1836,16 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
             int pct = total ? int(done * 100 / total) : 100;
             if (pct != last_pct) {
                 last_pct = pct;
-                CoreSetToast(("EXTRAINDO ISO... " + std::to_string(pct) + "%").c_str(), 600);
+                CoreSetToast((Tr("EXTRAINDO ISO... ", "EXTRACTING ISO... ") + std::to_string(pct) + "%").c_str(), 600);
             }
         });
         if (!ok) {
-            out_error = "FALHA AO EXTRAIR O ISO - VEJA karamelo.log";
+            out_error = Tr("FALHA AO EXTRAIR O ISO - VEJA karamelo.log", "ISO EXTRACTION FAILED - SEE karamelo.log");
             PortLog(def.id + ": extracao falhou: " + x_err);
             return false;
         }
         if (!fs::is_regular_file(game / "default.xex", ec)) {
-            out_error = "ISO SEM default.xex - E O JOGO CERTO?";
+            out_error = Tr("ISO SEM default.xex - E O JOGO CERTO?", "ISO HAS NO default.xex - IS IT THE RIGHT GAME?");
             PortLog(def.id + ": ISO extraido, mas sem default.xex na raiz");
             return false;
         }
@@ -1856,16 +1856,16 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
     if (!def.exe_relpath.empty())
         accepted = x360::FindEmbeddedSha256((fs::path(port_dir) / def.exe_relpath).string());
     if (accepted.empty()) {
-        out_error = "NAO FOI POSSIVEL LER OS HASHES DO PORT";
+        out_error = Tr("NAO FOI POSSIVEL LER OS HASHES DO PORT", "COULD NOT READ THE PORT'S HASHES");
         PortLog(def.id + ": nenhum SHA-256 embutido em " + def.exe_relpath);
         return false;
     }
 
     // 3. basefile.exe + _uncrypted.xex from default.xex.
-    CoreSetToast("GERANDO ARQUIVOS DO JOGO...", 600);
+    CoreSetToast(Tr("GERANDO ARQUIVOS DO JOGO...", "GENERATING GAME FILES..."), 600);
     std::vector<uint8_t> xex, basefile, uncrypted;
     if (!ReadWholeFile(game / "default.xex", xex)) {
-        out_error = "default.xex ILEGIVEL";
+        out_error = Tr("default.xex ILEGIVEL", "default.xex UNREADABLE");
         return false;
     }
     std::string report, b_err;
@@ -1874,7 +1874,7 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
     if (built) {
         if (!WriteWholeFile(game / "basefile.exe", basefile) ||
             !WriteWholeFile(game / "_uncrypted.xex", uncrypted)) {
-            out_error = "FALHA AO GRAVAR OS ARQUIVOS DO JOGO (DISCO CHEIO?)";
+            out_error = Tr("FALHA AO GRAVAR OS ARQUIVOS DO JOGO (DISCO CHEIO?)", "COULD NOT WRITE THE GAME FILES (DISK FULL?)");
             return false;
         }
         return true;
@@ -1902,7 +1902,7 @@ static bool PrepareX360Game(const PortDefinition& def, const std::string& port_d
         PortLog(def.id + ": saida do XexTool nao confere com o port");
     }
 
-    out_error = "DUMP NAO CONFERE COM O PORT (REVISAO DIFERENTE?) - VEJA karamelo.log";
+    out_error = Tr("DUMP NAO CONFERE COM O PORT (REVISAO DIFERENTE?) - VEJA karamelo.log", "DUMP DOES NOT MATCH THE PORT (DIFFERENT REVISION?) - SEE karamelo.log");
     return false;
 #endif
 }
@@ -1924,7 +1924,7 @@ static bool PreparePspGame(const PortDefinition& def, const std::string& port_di
     if (PspGameReady(def, port_dir)) { out_error.clear(); return true; }
     std::string iso = FindUserIso(def, port_dir);
     if (iso.empty()) {
-        out_error = "COLOQUE SEU ISO DE " + def.display_name + " EM roms/" +
+        out_error = Tr("COLOQUE SEU ISO DE ", "PUT YOUR ISO OF ") + def.display_name + Tr(" EM roms/", " IN roms/") +
                     (def.iso_dirs.empty() ? std::string("PSP") : def.iso_dirs.front());
         return false;
     }
@@ -1933,13 +1933,13 @@ static bool PreparePspGame(const PortDefinition& def, const std::string& port_di
     fs::remove_all(staging, ec);
     if (!ArchiveExtractAll(iso, staging.string())) {
         fs::remove_all(staging, ec);
-        out_error = "FALHA AO EXTRAIR O ISO DE " + def.display_name;
+        out_error = Tr("FALHA AO EXTRAIR O ISO DE ", "COULD NOT EXTRACT THE ISO OF ") + def.display_name;
         return false;
     }
     fs::path extracted = staging / "PSP_GAME";
     if (!fs::is_regular_file(extracted / "SYSDIR" / "BOOT.BIN", ec)) {
         fs::remove_all(staging, ec);
-        out_error = "ISO SEM PSP_GAME/SYSDIR/BOOT.BIN - NAO E O DISCO DE " + def.display_name;
+        out_error = Tr("ISO SEM PSP_GAME/SYSDIR/BOOT.BIN - NAO E O DISCO DE ", "ISO HAS NO PSP_GAME/SYSDIR/BOOT.BIN - NOT THE DISC OF ") + def.display_name;
         return false;
     }
     fs::path target = fs::path(port_dir) / def.psp_game_dir / "PSP_GAME";
@@ -1948,7 +1948,7 @@ static bool PreparePspGame(const PortDefinition& def, const std::string& port_di
     fs::rename(extracted, target, ec);
     fs::remove_all(staging, ec);
     if (ec || !PspGameReady(def, port_dir)) {
-        out_error = "FALHA AO PREPARAR " + def.display_name;
+        out_error = Tr("FALHA AO PREPARAR ", "COULD NOT PREPARE ") + def.display_name;
         return false;
     }
     out_error.clear();
@@ -1960,7 +1960,7 @@ static bool PreparePspGame(const PortDefinition& def, const std::string& port_di
 // (or roms/) for the user's ISO and links/copies it into assets/.
 static bool SetupBlackGame(const PortDefinition& def, const std::string& port_dir, std::string& out_error) {
     if (port_dir.empty()) {
-        out_error = "diretorio do port invalido";
+        out_error = Tr("diretorio do port invalido", "invalid port folder");
         return false;
     }
     fs::path assets_dir = fs::path(port_dir) / "assets";
@@ -1986,7 +1986,7 @@ static bool SetupBlackGame(const PortDefinition& def, const std::string& port_di
     // 2. Look for user's ISO in roms/Xbox, roms/, etc.
     std::string iso = FindUserIso(def, port_dir);
     if (iso.empty()) {
-        out_error = "COLOQUE SEU ISO DE BLACK EM roms/Xbox";
+        out_error = Tr("COLOQUE SEU ISO DE BLACK EM roms/Xbox", "PUT YOUR BLACK ISO IN roms/Xbox");
         return false;
     }
 
@@ -2001,7 +2001,7 @@ static bool SetupBlackGame(const PortDefinition& def, const std::string& port_di
             link_ec.clear();
             fs::copy_file(iso, target_iso, fs::copy_options::overwrite_existing, link_ec);
             if (link_ec) {
-                out_error = "FALHA AO COPIAR ISO DE BLACK: " + link_ec.message();
+                out_error = Tr("FALHA AO COPIAR ISO DE BLACK: ", "COULD NOT COPY THE BLACK ISO: ") + link_ec.message();
                 return false;
             }
         }
@@ -2032,9 +2032,9 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         if (iso.empty()) {
             std::string where = def->iso_dirs.empty() ? "roms" : "roms/" + def->iso_dirs.front();
             if (wrong_disc && !def->iso_disc_label.empty())
-                CoreSetToast(("ISO ENCONTRADO NAO E " + def->iso_disc_label + " - VEJA " + where).c_str(), 360);
+                CoreSetToast((Tr("ISO ENCONTRADO NAO E ", "ISO FOUND IS NOT ") + def->iso_disc_label + Tr(" - VEJA ", " - SEE ") + where).c_str(), 360);
             else
-                CoreSetToast(("COLOQUE SEU ISO DE " + def->display_name + " EM " + where).c_str(), 300);
+                CoreSetToast((Tr("COLOQUE SEU ISO DE ", "PUT YOUR ISO OF ") + def->display_name + Tr(" EM ", " IN ") + where).c_str(), 300);
             return false;
         }
         std::error_code aec;
@@ -2047,7 +2047,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         if (at == std::string::npos) continue;
         std::string rom = FindUserRom(*def, ResolvePortDir(port_id));
         if (rom.empty()) {
-            CoreSetToast(("COLOQUE A ROM DE " + (def ? def->display_name : port_id) + " EM roms/Nintendo64").c_str(), 300);
+            CoreSetToast((Tr("COLOQUE A ROM DE ", "PUT THE ROM OF ") + (def ? def->display_name : port_id) + Tr(" EM roms/Nintendo64", " IN roms/Nintendo64")).c_str(), 300);
             return false;
         }
         std::error_code rec;
@@ -2064,13 +2064,13 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 #ifdef _WIN32
             std::string ext_exe = port_dir + "/File Extractor GUI/File Extractor GUI.exe";
             if (fs::exists(ext_exe, wec)) {
-                CoreSetToast("EXTRAIA SUA ISO NO FILE EXTRACTOR", 360);
+                CoreSetToast(Tr("EXTRAIA SUA ISO NO FILE EXTRACTOR", "EXTRACT YOUR ISO IN THE FILE EXTRACTOR"), 360);
                 return LaunchResolvedExecutable(ext_exe, nullptr, port_id);
             }
 #else
             std::string ext_sh = port_dir + "/Run File Extractor.sh";
             if (fs::exists(ext_sh, wec)) {
-                CoreSetToast("EXTRAIA SUA ISO NO FILE EXTRACTOR", 360);
+                CoreSetToast(Tr("EXTRAIA SUA ISO NO FILE EXTRACTOR", "EXTRACT YOUR ISO IN THE FILE EXTRACTOR"), 360);
                 return LaunchResolvedExecutable(ext_sh, nullptr, port_id);
             }
 #endif
@@ -2197,7 +2197,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
     if (!ok) {
         if (window) SDL_RestoreWindow(window);
-        CoreSetToast("FALHA AO INICIAR PORT", 180);
+        CoreSetToast(Tr("FALHA AO INICIAR PORT", "COULD NOT START PORT"), 180);
         return false;
     }
 
@@ -2242,7 +2242,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     pid_t pid = fork();
     if (pid < 0) {
         if (window) SDL_RestoreWindow(window);
-        CoreSetToast("FALHA AO INICIAR PORT", 180);
+        CoreSetToast(Tr("FALHA AO INICIAR PORT", "COULD NOT START PORT"), 180);
         return false;
     }
     if (pid == 0) {
@@ -2256,7 +2256,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 #endif
 
     s_port_running.store(true);
-    CoreSetToast("INICIANDO PORT NATIVO...", 300); // 5 s
+    CoreSetToast(Tr("INICIANDO PORT NATIVO...", "STARTING NATIVE PORT..."), 300); // 5 s
 
     // 5. Monitor in background thread
     try {
@@ -2334,7 +2334,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         }
 #endif
         s_port_running.store(false);
-        CoreSetToast("FALHA AO MONITORAR PORT - TENTE NOVAMENTE", 200);
+        CoreSetToast(Tr("FALHA AO MONITORAR PORT - TENTE NOVAMENTE", "COULD NOT MONITOR PORT - TRY AGAIN"), 200);
         return false;
     }
 
@@ -2347,7 +2347,7 @@ bool PortLaunch(const std::string& port_id) {
     // still open (or its "still running" bookkeeping hadn't cleared yet)
     // looked exactly like the menu doing nothing, with no way to tell why.
     if (s_port_running.load()) {
-        CoreSetToast("JA HA UM PORT ABERTO - FECHE-O PRIMEIRO", 150);
+        CoreSetToast(Tr("JA HA UM PORT ABERTO - FECHE-O PRIMEIRO", "A PORT IS ALREADY OPEN - CLOSE IT FIRST"), 150);
         return false;
     }
 
@@ -2363,7 +2363,7 @@ bool PortLaunch(const std::string& port_id) {
     // there is nothing to prepare, so say where it goes before downloading.
     bool needs_psp_prep = def && !def->psp_game_dir.empty() && !PspGameReady(*def, dir);
     if (needs_psp_prep && FindUserIso(*def, dir).empty()) {
-        CoreSetToast(("COLOQUE SEU ISO DE " + def->display_name + " EM roms/" +
+        CoreSetToast((Tr("COLOQUE SEU ISO DE ", "PUT YOUR ISO OF ") + def->display_name + Tr(" EM roms/", " IN roms/") +
                       (def->iso_dirs.empty() ? std::string("PSP") : def->iso_dirs.front())).c_str(), 300);
         return false;
     }
@@ -2374,7 +2374,7 @@ bool PortLaunch(const std::string& port_id) {
     // nothing to download - say so and stop.
     if (exe_path.empty() || needs_x360_prep || needs_psp_prep) {
         if (exe_path.empty() && (!def || def->repo.empty())) {
-            CoreSetToast("PORT NAO INSTALADO EM ports/", 200);
+            CoreSetToast(Tr("PORT NAO INSTALADO EM ports/", "PORT NOT INSTALLED IN ports/"), 200);
             return false;
         }
 
@@ -2383,7 +2383,7 @@ bool PortLaunch(const std::string& port_id) {
         // ja instalados, que nao precisam baixar nada. So existe uma vaga de
         // download; um port que ja esta no disco nao disputa essa vaga.
         if (s_installing.load()) {
-            CoreSetToast("JA HA UM DOWNLOAD DE PORT EM ANDAMENTO", 150);
+            CoreSetToast(Tr("JA HA UM DOWNLOAD DE PORT EM ANDAMENTO", "A PORT DOWNLOAD IS ALREADY RUNNING"), 150);
             return false;
         }
 
@@ -2391,10 +2391,10 @@ bool PortLaunch(const std::string& port_id) {
         {
             std::lock_guard<std::mutex> lock(s_pending_lock);
             s_installing_name = def->display_name;
-            s_installing_verb = needs_download ? "BAIXANDO " : "PREPARANDO ";
+            s_installing_verb = needs_download ? Tr("BAIXANDO ", "DOWNLOADING ") : Tr("PREPARANDO ", "PREPARING ");
         }
         s_installing.store(true);
-        CoreSetToast(((needs_download ? "BAIXANDO " : "PREPARANDO ") + def->display_name + "...").c_str(), 600);
+        CoreSetToast(((needs_download ? Tr("BAIXANDO ", "DOWNLOADING ") : Tr("PREPARANDO ", "PREPARING ")) + def->display_name + "...").c_str(), 600);
 
         PortDefinition def_copy = *def;
         s_active_bg_threads.fetch_add(1);
@@ -2404,7 +2404,7 @@ bool PortLaunch(const std::string& port_id) {
                 bool ok = DownloadAndInstall(def_copy, error);
                 if (!ok) {
                     s_installing.store(false);
-                    CoreSetToast(("FALHA AO BAIXAR PORT: " + error).c_str(), 240);
+                    CoreSetToast((Tr("FALHA AO BAIXAR PORT: ", "PORT DOWNLOAD FAILED: ") + error).c_str(), 240);
                     s_active_bg_threads.fetch_sub(1);
                     return;
                 }
@@ -2417,7 +2417,7 @@ bool PortLaunch(const std::string& port_id) {
                 if (!X360GameReady(def_copy, port_dir)) {
                     {
                         std::lock_guard<std::mutex> lock(s_pending_lock);
-                        s_installing_verb = "PREPARANDO ";
+                        s_installing_verb = Tr("PREPARANDO ", "PREPARING ");
                     }
                     if (!PrepareX360Game(def_copy, port_dir, error)) {
                         s_installing.store(false);
@@ -2433,7 +2433,7 @@ bool PortLaunch(const std::string& port_id) {
                 if (!PspGameReady(def_copy, port_dir)) {
                     {
                         std::lock_guard<std::mutex> lock(s_pending_lock);
-                        s_installing_verb = "PREPARANDO ";
+                        s_installing_verb = Tr("PREPARANDO ", "PREPARING ");
                     }
                     if (!PreparePspGame(def_copy, port_dir, error)) {
                         s_installing.store(false);
@@ -2445,7 +2445,7 @@ bool PortLaunch(const std::string& port_id) {
             }
             s_installing.store(false);
 
-            CoreSetToast(needs_download ? "PORT INSTALADO! INICIANDO..." : "JOGO PREPARADO! INICIANDO...", 150);
+            CoreSetToast(needs_download ? Tr("PORT INSTALADO! INICIANDO...", "PORT INSTALLED! STARTING...") : Tr("JOGO PREPARADO! INICIANDO...", "GAME READY! STARTING..."), 150);
 
             // Hand off to the UI thread instead of launching from here - see
             // the comment on s_pending_lock above for why.
@@ -2505,7 +2505,7 @@ void PortPumpPendingLaunch() {
     std::string dir = ResolvePortDir(id);
     std::string exe_path = ResolvePortExe(FindPortDef(id), dir);
     if (exe_path.empty()) {
-        CoreSetToast("PORT BAIXADO MAS SEM EXECUTAVEL", 200);
+        CoreSetToast(Tr("PORT BAIXADO MAS SEM EXECUTAVEL", "PORT DOWNLOADED BUT HAS NO EXECUTABLE"), 200);
         return;
     }
 
@@ -2515,7 +2515,7 @@ void PortPumpPendingLaunch() {
     // cima do primeiro. Nesse caso so avisa: o port ja esta no disco e abre
     // pelo menu na hora que o jogador quiser.
     if (s_port_running.load()) {
-        CoreSetToast("DOWNLOAD CONCLUIDO - ABRA O PORT PELO MENU", 300);
+        CoreSetToast(Tr("DOWNLOAD CONCLUIDO - ABRA O PORT PELO MENU", "DOWNLOAD DONE - OPEN THE PORT FROM THE MENU"), 300);
         return;
     }
 
@@ -2544,7 +2544,7 @@ void PortShutdown() {
 
 bool PortInstallOnly(const std::string& port_id, std::string& out_error) {
     const PortDefinition* def = FindPortDef(port_id);
-    if (!def) { out_error = "id de port desconhecido: " + port_id; return false; }
+    if (!def) { out_error = Tr("id de port desconhecido: ", "unknown port id: ") + port_id; return false; }
 
     std::string dir = ResolvePortDir(port_id);
     if (!ResolvePortExe(def, dir).empty()) {
@@ -2559,7 +2559,7 @@ bool PortInstallOnly(const std::string& port_id, std::string& out_error) {
 
 bool PortPrepareOnly(const std::string& port_id, std::string& out_error) {
     const PortDefinition* def = FindPortDef(port_id);
-    if (!def) { out_error = "id de port desconhecido: " + port_id; return false; }
+    if (!def) { out_error = Tr("id de port desconhecido: ", "unknown port id: ") + port_id; return false; }
     if (!PortInstallOnly(port_id, out_error)) return false;
     if (def->id == "BlackRecomp") {
         std::string dir = ResolvePortDir(port_id);

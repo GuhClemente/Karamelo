@@ -731,7 +731,7 @@ static void RenderFrame()
 		const char* dots = (spin / 20) % 3 == 0 ? "." : ((spin / 20) % 3 == 1 ? ".." : "...");
 
 		char line[64];
-		snprintf(line, sizeof(line), "LOADING%s", dots);
+		snprintf(line, sizeof(line), Tr("CARREGANDO%s", "LOADING%s"), dots);
 		DrawString((CANVAS_WIDTH - (int)strlen(line) * 8) / 2, CANVAS_HEIGHT / 2 - 4, line, theme.text_white);
 
 		return;
@@ -900,7 +900,10 @@ static void RenderFrame()
 		struct tm* tm_now = localtime(&now);
 		if (tm_now)
 		{
-			static const char* MONTHS[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+			static const char* MONTHS_EN[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+			// The header date follows the menu language like every other text on screen.
+			static const char* MONTHS_PT[] = { "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez" };
+			const char* const* MONTHS = (MenuGetLanguage() == 1) ? MONTHS_EN : MONTHS_PT;
 
 			char date_str[64];
 			snprintf(date_str, sizeof(date_str), "%s %02d %02d:%02d",
