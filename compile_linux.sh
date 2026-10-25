@@ -122,6 +122,7 @@ g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     tests/test_updater.cpp \
     tests/test_crash_reporter.cpp \
     tests/test_port_catalog.cpp \
+    tests/test_input_mouse.cpp \
     build/linux_obj/karamelo_math.o \
     build/linux_obj/netplay_protocol.o \
     build/linux_obj/archive_helper.o \

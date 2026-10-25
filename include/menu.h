@@ -73,6 +73,8 @@ int  MenuGetSyncMode();
 int  MenuGetVsync();
 int  MenuGetN64Core();
 int  MenuGetHwRender();
+// 1 = controle e Espaco/Enter/setas tambem movem e clicam o mouse emulado.
+int  MenuGetPadAsMouse();
 int  MenuGetLanguage();
 void MenuSetLanguage(int lang);
 const char* Tr(const char* pt, const char* en);

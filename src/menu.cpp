@@ -253,6 +253,11 @@ static int setting_win_h = -1;
 static int setting_theme =
     0; // 0=Red/Burgundy, 1=Blue, 2=Green, 3=Amber, 4=Gray, 5=Dark
 static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
+// Controle (analogico, D-Pad, A/B, gatilhos) e Espaco/Enter/setas emulando o
+// mouse. Desligado por padrao: ligado para todo core, cada tiro tambem virava
+// clique - e o FM Towns tem o mouse na porta do jogador 2, entao atirar no
+// Tatsujin apertava o start do 2P. O mouse de verdade funciona sempre.
+static int setting_pad_mouse = 0;
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
 // Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
 // the mixer on a loaded machine; above 512ms the delay is audible against input.
@@ -666,6 +671,7 @@ void MenuSetWindowRect(int x, int y, int w, int h) {
     MenuSaveSettings();
 }
 int MenuGetDeadzone() { return (setting_deadzone + 1) * 5; }
+int MenuGetPadAsMouse() { return setting_pad_mouse; }
 int MenuGetAudioLatencyMs() { return kAudioLatencyMs[ClampInt(setting_latency, 0, 3)]; }
 int MenuGetVideoDriver() { return setting_driver; }
 void MenuSetVideoDriverForSelftest(int driver) {
@@ -1545,6 +1551,8 @@ void PopulateControllerSettings() {
 
   const char *deadzones[] = {"5%", "10%", "15%", "20%"};
   items.push_back({Tr("Deadzone", "Deadzone"), deadzones[setting_deadzone], false, false, 508});
+  items.push_back({Tr("Controle como Mouse", "Pad as Mouse"),
+                   setting_pad_mouse ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 541});
   items.push_back({Tr("Mapear Tudo (Passo a Passo)", "Map All (Step by Step)"), ">", false, true, 798});
 
   // Labels come from the running core when it supplied them, so the page reads
@@ -1624,6 +1632,7 @@ static void ResetAllSettingsToDefault() {
   setting_fullscreen = false;
   setting_theme = 0;
   setting_deadzone = 1;
+  setting_pad_mouse = 0;
   setting_latency = 1;
   setting_driver = 0;
   setting_sync = 1;
@@ -2634,6 +2643,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "win_h", setting_win_h);
   AppendSetting(out, "theme", setting_theme);
   AppendSetting(out, "deadzone", setting_deadzone);
+  AppendSetting(out, "pad_mouse", setting_pad_mouse);
   AppendSetting(out, "latency", setting_latency);
   AppendSetting(out, "driver", setting_driver);
   AppendSetting(out, "sync", setting_sync);
@@ -2736,6 +2746,8 @@ static void MenuLoadSettings() {
       setting_theme = ClampInt(iv, 0, 5);
     else if (!strcmp(key, "deadzone"))
       setting_deadzone = ClampInt(iv, 0, 3);
+    else if (!strcmp(key, "pad_mouse"))
+      setting_pad_mouse = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "pad_device"))
       setting_pad_device = ClampInt(iv, 0, 1);
     else if (InputBindFromConfigKey(key) >= 0)
@@ -3611,6 +3623,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
       setting_deadzone = (setting_deadzone + delta + 4) % 4;
       PopulateControllerSettings();
       SelectByAction(item.action_id, 2);
+    } else if (item.action_id == 541) // Controle como Mouse
+    {
+      setting_pad_mouse = !setting_pad_mouse;
+      PopulateControllerSettings();
+      SelectByAction(item.action_id, 3);
     } else if (item.action_id == 216) // Idioma
     {
       setting_language = (setting_language + delta + 2) % 2;

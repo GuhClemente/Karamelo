@@ -1769,3 +1769,22 @@ Novidades para o jogador:
 - **Tradução completa**: todos os avisos seguem o idioma escolhido (português/inglês).
 
 ---
+
+## 43. Lançamento da Versão 0.9.79 (25/10/2026)
+
+Versão de correção, no mesmo dia da 0.9.78. Sem mudança de contagens:
+**37 sistemas, 42 motores; 93 ports — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**.
+
+Novidades para o jogador:
+
+- **Um botão, uma ação**: o controle e as teclas Espaço/Enter não clicam mais o mouse
+  emulado sem o jogador pedir. No FM Towns o mouse fica na porta do jogador 2, então
+  atirar no Tatsujin também apertava o start do jogador 2. Para jogar point-and-click
+  (Monkey Island, Indiana Jones) com o controle, ligue Controles > Controle como Mouse.
+  O mouse de verdade funciona sempre.
+- **Linux: jogos em .rar abrem**: o descompactador agora tenta 7z, unrar e bsdtar - o
+  7z do Ubuntu lista arquivos RAR mas não extrai.
+- **Linux: PS2 e N64 fecham sem derrubar o app**: sair de um jogo no PCSX2 ou no
+  ParaLLEl N64 fechava o Karamelo inteiro.
+
+---

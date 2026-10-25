@@ -33,6 +33,7 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /WX /std:c++20 /EHsc ^
     tests\test_crash_reporter.cpp ^
     tests\test_x360_dump.cpp ^
     tests\test_port_catalog.cpp ^
+    tests\test_input_mouse.cpp ^
     src\karamelo_math.cpp ^
     src\netplay_protocol.cpp ^
     src\archive_helper.cpp ^

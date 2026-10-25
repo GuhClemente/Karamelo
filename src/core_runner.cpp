@@ -2680,6 +2680,14 @@ static void CB_InputPoll(void)
 #endif
 
 	// Gamepad stick to mouse (for point-and-click / adventure games on FM Towns, PC-98, DOS, etc.)
+	//
+	// Only with "Controle como Mouse" on. It used to run for every core, so
+	// the same press reached the game twice - once as the pad button, once as
+	// a mouse click. Wherever the mouse shares a port with a joystick (FM
+	// Towns puts it on player 2's port, the Amiga too) that click is player
+	// 2's button: firing in Tatsujin pressed player 2's start.
+	const bool pad_as_mouse = MenuGetPadAsMouse() != 0;
+	if (pad_as_mouse)
 	{
 		XINPUT_STATE pad0;
 		if (GamepadGetState(0, &pad0))
@@ -2715,22 +2723,22 @@ static void CB_InputPoll(void)
 			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP)    mouse_dy -= 3;
 			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN)  mouse_dy += 3;
 
-			// Button A or Right Trigger = Left Click
-			if ((w0 & PAD_BTN_A) || (pad0.Gamepad.bRightTrigger > 50))
-				mouse_btns |= 1;
-			// Button B or Left Trigger = Right Click
-			if ((w0 & PAD_BTN_B) || (pad0.Gamepad.bLeftTrigger > 50))
-				mouse_btns |= 2;
+			// A / right trigger = left click, B / left trigger = right click.
+			mouse_btns |= InputEmulatedMouseButtons(pad_as_mouse, w0, false, false);
 		}
 	}
 
-	// Keyboard arrows also nudge mouse for computer adventure games
-	if (GetAsyncKeyState(VK_LEFT) & 0x8000)  mouse_dx -= 6;
-	if (GetAsyncKeyState(VK_RIGHT) & 0x8000) mouse_dx += 6;
-	if (GetAsyncKeyState(VK_UP) & 0x8000)    mouse_dy -= 6;
-	if (GetAsyncKeyState(VK_DOWN) & 0x8000)  mouse_dy += 6;
-	if ((GetAsyncKeyState(VK_RETURN) & 0x8000) || (GetAsyncKeyState(VK_SPACE) & 0x8000))
-		mouse_btns |= 1;
+	// Keyboard arrows also nudge mouse for computer adventure games - same
+	// switch, same reason: Space and Enter are fire/start in most games.
+	if (pad_as_mouse)
+	{
+		if (GetAsyncKeyState(VK_LEFT) & 0x8000)  mouse_dx -= 6;
+		if (GetAsyncKeyState(VK_RIGHT) & 0x8000) mouse_dx += 6;
+		if (GetAsyncKeyState(VK_UP) & 0x8000)    mouse_dy -= 6;
+		if (GetAsyncKeyState(VK_DOWN) & 0x8000)  mouse_dy += 6;
+	}
+	mouse_btns |= InputEmulatedMouseButtons(pad_as_mouse, 0,
+		(GetAsyncKeyState(VK_SPACE) & 0x8000) != 0, (GetAsyncKeyState(VK_RETURN) & 0x8000) != 0);
 
 	InterlockedExchange(&g_mouse_rel_x, (LONG)mouse_dx);
 	InterlockedExchange(&g_mouse_rel_y, (LONG)mouse_dy);
