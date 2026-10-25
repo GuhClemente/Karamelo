@@ -34,7 +34,7 @@ rem PASSO 1: Compilacao, Testes e Empacotamento Windows
 rem -------------------------------------------------------------
 rem package_release.bat's own step [1/4] already calls compile_port.bat
 rem (compile + run the unit tests) before packaging.
-echo [1/3] Compilando, testando e empacotando release Windows...
+echo [1/4] Compilando, testando e empacotando release Windows...
 call "%~dp0package_release.bat" %*
 if errorlevel 1 (
     echo.
@@ -65,7 +65,7 @@ set LINUX_DEPLOY_FILES=
 where wsl >nul 2>&1
 if not errorlevel 1 (
     echo.
-    echo [2/3] Compilando, testando e empacotando release Linux via WSL...
+    echo [2/4] Compilando, testando e empacotando release Linux via WSL...
     wsl bash -c "cd '$(wslpath '%~dp0')' && sed -i 's/\r$//' package_linux.sh && chmod +x package_linux.sh && ./package_linux.sh"
     if errorlevel 1 (
         echo.
@@ -94,7 +94,7 @@ rem -------------------------------------------------------------
 rem PASSO 3: Upload via SCP para o Servidor VPS / Coolify
 rem -------------------------------------------------------------
 echo.
-echo [3/3] Enviando pacotes (v%APP_VER%), executaveis e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
+echo [3/4] Enviando pacotes (v%APP_VER%), executaveis e version.json para o servidor (%SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%)...
 echo.
 
 rem O pack de BIOS NAO sobe. Ele contem firmware de console, material
@@ -132,6 +132,21 @@ if errorlevel 1 (
     rem no servidor e os downloads em 404. O .gitattributes impede que volte, isto
     rem aqui garante que nem uma copia antiga do script derrube a publicacao.
     ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "sed -i 's/\r$//' /root/fix_server.sh && chmod +x /root/fix_server.sh && /root/fix_server.sh"
+)
+
+rem -------------------------------------------------------------
+rem PASSO 4: Release no GitHub com os mesmos arquivos de dist
+rem -------------------------------------------------------------
+rem Sobe para github.com/GuhClemente/Karamelo/releases o zip, o exe e os
+rem pacotes Linux/macOS que acabaram de ir para o site - nada e recompilado,
+rem entao os dois lugares servem os mesmos bytes. Falha aqui so avisa: o site
+rem ja foi publicado. Detalhes em tools\github_release.ps1.
+echo.
+echo [4/4] Publicando a release v%APP_VER% no GitHub...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\github_release.ps1" -Version %APP_VER%
+if errorlevel 1 (
+    echo   [AVISO] Release do GitHub nao publicada. Depois de resolver, rode:
+    echo       powershell -File tools\github_release.ps1 -Version %APP_VER%
 )
 
 rem -------------------------------------------------------------
