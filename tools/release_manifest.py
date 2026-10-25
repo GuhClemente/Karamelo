@@ -78,6 +78,12 @@ def ascii_fold(s):
     return "".join(c for c in s if ord(c) < 128 and not unicodedata.combining(c))
 
 
+def app_version():
+    with open(os.path.join(ROOT, "include", "app_info.h"), encoding="utf-8") as f:
+        m = re.search(r'#define\s+APP_VERSION\s+"([^"]+)"', f.read())
+    return m.group(1) if m else ""
+
+
 def notes_for(version):
     path = os.path.join(ROOT, "docs", "SITE_SYNC.md")
     with open(path, encoding="utf-8") as f:
@@ -133,17 +139,28 @@ def finalize():
         own = data.get(prefix + "_version", "")
         if own:
             if own != version:
-                print("  %s continua na v%s (binario nao refeito para a v%s)." % (name, own, version))
+                print("  %s na v%s; \"version\" (Windows) na v%s." % (name, own, version))
+            continue
+        # Sem campo de versao, o binario e o que foi publicado junto do
+        # "version" atual do site. So vira problema quando este deploy sobe o
+        # "version" (checkout em APP_VERSION): ai ele fica para tras.
+        if version != app_version():
             continue
         for k in (prefix + "_url", prefix + "_size", prefix + "_sha256"):
             data.pop(k, None)
         print("  [AVISO] binario %s de versao desconhecida removido do manifesto: quem usa %s"
               " nao recebe atualizacao ate a proxima build %s." % (name, name, name))
 
+    # As notas sao de "version" (a release do Windows). So quem esta lancando
+    # essa versao - o checkout em APP_VERSION - responde por elas: o Mac
+    # publicando a 0.9.78 antes do Windows encontra "version" 0.9.77 no site e
+    # deixa as notas dela como estao.
     notes = notes_for(version)
     if notes:
         data["notes"] = notes
         print("  notas da v%s: %s" % (version, notes))
+    elif version != app_version():
+        print("  \"version\" do site e a v%s (Windows); notas mantidas." % version)
     else:
         print("  [ERRO] docs/SITE_SYNC.md nao tem a secao \"## Versao %s\" - o site e o app"
               " mostrariam as notas da versao anterior. Escreva a secao e rode de novo." % version)
