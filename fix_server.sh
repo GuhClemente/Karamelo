@@ -163,13 +163,28 @@ fail=0
 for f in "$SRC"/*; do
     [ -f "$f" ] || continue
     base=$(basename "$f")
-    # Logo depois do restart, a rajada de pedidos daqui leva 429 (limite de
-    # requisicoes) ou 5xx de um app ainda subindo - foi o "429 ports.json" da
-    # 0.9.78, com o arquivo servido normalmente segundos depois. So conta como
-    # falha se continuar assim depois de algumas tentativas.
-    for tentativa in 1 2 3 4 5; do
-        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "https://$DOMAIN/downloads/$base")
-        case "$code" in 429|5??|000) sleep $((tentativa * 3)) ;; *) break ;; esac
+    # O site limita o ports.json a 6 pedidos por minuto por IP (cabecalhos
+    # X-Ratelimit-Limit: 6 e, no 429, Retry-After: 60). Este servidor e um IP
+    # so, e deploys e testes seguidos gastam a cota - foi o "429 ports.json"
+    # da 0.9.78, com o arquivo no ar. No 429 espera o Retry-After que o site
+    # manda (ate 70 s) e tenta de novo; 5xx de app ainda subindo espera pouco.
+    # E, antes de tudo, um pedido a cada 11 s: no maximo 6 por minuto, entao a
+    # checagem nao estoura o limite (8 arquivos, ~1,5 min).
+    [ -n "${checados:-}" ] && sleep 11
+    checados=1
+    for tentativa in 1 2 3; do
+        hdr=$(curl -s -o /dev/null -D - -w 'HTTP_CODE:%{http_code}' --max-time 30 "https://$DOMAIN/downloads/$base")
+        code=${hdr##*HTTP_CODE:}
+        case "$code" in
+            429)
+                espera=$(printf '%s\n' "$hdr" | tr -d '\r' | awk 'tolower($1)=="retry-after:" {print $2}')
+                case "$espera" in ''|*[!0-9]*) espera=60 ;; esac
+                [ "$espera" -gt 70 ] && espera=70
+                echo "  ...  $base: 429, esperando ${espera}s (limite do site)"
+                sleep $((espera + 1)) ;;
+            5??|000) sleep $((tentativa * 5)) ;;
+            *) break ;;
+        esac
     done
     printf '  %-4s %s\n' "$code" "$base"
     [ "$code" = "200" ] || fail=1
