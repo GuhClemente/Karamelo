@@ -18,3 +18,7 @@
 # Estes so rodam no Windows, onde CRLF e o esperado.
 *.bat  text eol=crlf
 *.ps1  text eol=crlf
+
+# O catalogo de ports e comparado byte a byte com a copia embutida no
+# binario (tests/test_port_catalog.cpp): fim de linha fixo, em qualquer SO.
+data/ports.json text eol=lf
