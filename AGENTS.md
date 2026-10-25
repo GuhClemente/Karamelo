@@ -24,7 +24,7 @@ Este documento é o guia de referência operacional e arquitetural para agentes 
 
 1. **Fontes Únicas da Verdade (Não Invente Números)**:
    - Contagem de Sistemas e Motores: Leia SEMPRE de `include/app_info.h` (`APP_SYSTEM_COUNT = 37`, `APP_CORE_ENGINES = 42`). Nunca use `APP_CORE_FILES` (43) pois conta duplicata técnica de N64.
-   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `data/ports.json` (o catalogo; ver `docs/PORTS_CATALOG.md`) e do `CREDITS.md` (70 ports totais: 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎). The Darkness (Xbox 360) está no código com `hidden = true` — fora do menu, do site e de toda contagem.
+   - Contagem e Compatibilidade de Ports: Leia SEMPRE de `data/ports.json` (o catalogo; ver `docs/PORTS_CATALOG.md`) e do `CREDITS.md` (93 ports totais: 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎). The Darkness (Xbox 360), Skate 3, Burnout 3: Takedown e Mario Kart Wii estão no catálogo com `hidden: true` — fora do menu, do site e de toda contagem (motivo no `CREDITS.md`, "Fora do menu").
    - Guia de BIOS: A fonte canônica é `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Higiene de Repositório**:
    - **NUNCA versione ROMs, BIOS, saves, estados ou caches**. O `.gitignore` cobre `roms/`, `bios/`, `saves/`, `cores/`, `cache/`.
@@ -84,17 +84,17 @@ src/
 
 - **Catalogo como dados**: a lista de ports nao esta mais no C++. Fica em `data/ports.json`, embutida no binario (`include/ports_catalog_json.h`, gerado por `tools/embed_ports.py`) e atualizada pelo app a partir de `https://karamelo-emu.com/downloads/ports.json` (vale do proximo inicio em diante, so se `catalog_version` for maior). Os testes reprovam o build se o JSON, o cabecalho e as contagens do `CREDITS.md` divergirem. Passo a passo em `docs/PORTS_CATALOG.md`; publicar so o catalogo: `deploy_ports_catalog.bat`.
 
-- **Contagem total**: 70 ports no menu (70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎).
+- **Contagem total**: 93 ports no menu (93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎).
 - **Fonte de download fora do GitHub (Foxhollow)**: `downloads_json_url` faz o `DownloadAndInstall` ler o feed do próprio projeto (`{"releases":[{"downloads":{"windows","linux","macos"}}]}`, mais novo primeiro) em vez da API de Releases; `iso_exts` libera `.rvz`/`.gcm` além de `.iso`.
 - **Ports ocultos** (`PortDefinition::hidden`): continuam no código e instaláveis por `--install-port`/`--prepare-port` para teste, mas `PortGetAvailableList()` os pula — não aparecem no menu nem entram em contagem. Hoje: só The Darkness.
 - **Xbox 360 (The Darkness, oculto)**: o dump do jogador (`roms/Xbox360/*.iso`) é extraído e convertido nativamente por `src/x360_dump.cpp` antes do launch, com portão de SHA-256 lido do próprio executável do port. Ver `docs/XBOX360_RECOMP.md`.
 - **ISO do jogador lido no lugar (Melee Unlocked)**: `launch_args` aceita `{iso}`, resolvido por `FindUserIso()` (palavras-chave no nome + cabeçalho GameCube `iso_disc_id`/`iso_disc_rev`, ex.: `GALE01` rev 2).
-- **Suporte macOS**: 31 ports com executáveis nativos Mach-O (`ARM64` > `Universal` > `x86_64`).
+- **Suporte macOS**: 42 ports com executáveis nativos Mach-O (`ARM64` > `Universal` > `x86_64`).
 - **Regras de Execução no macOS**:
   - `FindBestExecutable()` prioriza binários com permissão de execução (`chmod +x`), descartando utilitários como `crashpad_handler` ou `make`.
   - Extração de `.app` bundles: detecta executáveis dentro de `Contents/MacOS/<nome>`.
   - Extração de formatos: suporta `.zip`, `.tar.gz`, `.tar.xz` e imagens `.dmg` (montadas e extraídas transparentemente via `hdiutil`).
-  - Flag de inspeção: `./app/Karamelo --list-ports` lista os ports disponíveis para o SO em que o binário foi compilado (31 no macOS, 42 no Linux, 70 no Windows).
+  - Flag de inspeção: `./app/Karamelo --list-ports` lista os ports disponíveis para o SO em que o binário foi compilado (42 no macOS, 59 no Linux, 93 no Windows).
 
 ---
 

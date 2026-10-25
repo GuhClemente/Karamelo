@@ -190,11 +190,33 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Jungle Strike | 🪟 | [Junior-Jones/Jungle-Strike-SNES-Static-Recomp](https://github.com/Junior-Jones/Jungle-Strike-SNES-Static-Recomp) |
 | ICO | 🪟🐧🍎 | [nathanialf/ico-pc](https://github.com/nathanialf/ico-pc) |
 | Star Wars Battlefront: Renegade Squadron | 🪟 | [GTTeancum/StarWars-RenegadeSquadron-PC](https://github.com/GTTeancum/StarWars-RenegadeSquadron-PC) |
+| Donkey Kong 64 | 🪟🐧🍎 | [Rainchus/Donkey-Kong-64-Recompiled](https://github.com/Rainchus/Donkey-Kong-64-Recompiled) |
+| Paper Mario | 🪟🐧🍎 | [HarbourMasters/PaperBoat](https://github.com/HarbourMasters/PaperBoat) |
+| The Legend of Zelda: Twilight Princess | 🪟🐧🍎 | [TwilitRealm/dusklight](https://github.com/TwilitRealm/dusklight) |
+| The Legend of Zelda: Link's Awakening HD | 🪟🐧🍎 | [peiikai/LASRecomp](https://github.com/peiikai/LASRecomp) |
+| Jet Set Radio Future | 🪟🐧🍎 | [JuMatt/JetSetRadioFuture-Unleashed](https://github.com/JuMatt/JetSetRadioFuture-Unleashed) |
+| The Lord of the Rings: The Two Towers | 🪟🐧🍎 | [Gumpolas/TooTawersRecomp](https://github.com/Gumpolas/TooTawersRecomp) |
+| Silent Hill | 🪟🐧🍎 | [SlickAmogus/silent-hill-decomp](https://github.com/SlickAmogus/silent-hill-decomp) |
+| P.T. | 🪟🐧🍎 | [LoreanXavier/pt-pc](https://github.com/LoreanXavier/pt-pc) |
+| Mega Man X | 🪟🐧 | [mstan/MegaManXSNESRecomp](https://github.com/mstan/MegaManXSNESRecomp) |
+| Ninja Gaiden Black | 🪟🐧 | [gamboozino/ngbrecomp](https://github.com/gamboozino/ngbrecomp) |
+| Super Mario Sunshine | 🪟🐧 | [TekRantGaming/sms-pc-port](https://github.com/TekRantGaming/sms-pc-port) |
+| Luigi's Mansion | 🪟🐧 | [rob646464/luigis-mansion-recompiled](https://github.com/rob646464/luigis-mansion-recompiled) |
+| Mortal Kombat: Shaolin Monks | 🪟🐧 | [OAleex/ShaolinMonksRecomp](https://github.com/OAleex/ShaolinMonksRecomp) |
+| Jet Force Gemini | 🪟🐧 | [riseio/Jet-Force-Capricorn](https://github.com/riseio/Jet-Force-Capricorn) |
+| Forza Horizon | 🪟🐧🍎 | [arcanite24/pinyon-shift](https://github.com/arcanite24/pinyon-shift) |
+| Lost Odyssey | 🪟🐧🍎 | [freefrank/LostOdysseyRecomp](https://github.com/freefrank/LostOdysseyRecomp) |
+| The Legend of Zelda: A Link to the Past | 🪟 | [snesrev/zelda3](https://github.com/snesrev/zelda3) |
+| Splinter Cell: Double Agent | 🪟 | [TGP482/SCDA-XBERecomp](https://github.com/TGP482/SCDA-XBERecomp) |
+| Mercenaries: Playground of Destruction | 🪟 | [KraftMacAndChee/Mercenaries-Recompiled](https://github.com/KraftMacAndChee/Mercenaries-Recompiled) |
+| Fable II | 🪟 | [himdo/Fable-2-Recomp](https://github.com/himdo/Fable-2-Recomp) |
+| GoldenEye 007 (XBLA Remaster) | 🪟 | [SunJaycy/GoldenEye-Recomp](https://github.com/SunJaycy/GoldenEye-Recomp) |
+| Crash Team Racing (High Octane) | 🪟 | [Rinnegatamante/Crash-Team-Racing-High-Octane](https://github.com/Rinnegatamante/Crash-Team-Racing-High-Octane) |
+| The Legend of Zelda: The Minish Cap | 🪟🐧🍎 | [999sian/tmc](https://github.com/999sian/tmc) |
 
-**42 de 70 têm build Linux** e **31 de 70 têm build macOS** (Apple Silicon /
-Universal), verificado em 18/10/2026 contra a release mais recente de cada
-repositório (BLACK, Melee Unlocked, WG3D, Jungle Strike e Renegade Squadron só publicam Windows; Rush 2, Automobili Lamborghini, Road Rash 64 e ProjectCane publicam Windows
-e Linux; CPS-2 Recomp, ICO, Yakumo, Foxhollow, Conker's Bad Fur Day, Castlevania: Legacy of Darkness e F-Zero X publicam os três). Os outros publicam build utilizável apenas no Windows por este
+**59 de 93 têm build Linux** e **42 de 93 têm build macOS** (Apple Silicon /
+Universal), verificado em 25/10/2026 contra a release mais recente de cada
+repositório (adicionados 23 ports nas Ondas 1, 2 e 3: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane e Minish Cap; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -342,6 +364,34 @@ fork [dobsondev/N64RecompLauncher](https://github.com/dobsondev/N64RecompLaunche
 - nenhum código foi copiado, mas a lógica de detecção foi adaptada de lá
 depois que a abordagem original deste projeto (pegar o maior `.exe`) errou o
 executável em mais de um port real.
+
+### Fora do menu: Skate 3, Burnout 3: Takedown e Mario Kart Wii
+
+| Jogo | SO | Repositório |
+|---|---|---|
+| Skate 3 | 🪟🐧🍎 | [mchughalex/skate3recomp](https://github.com/mchughalex/skate3recomp) |
+| Burnout 3: Takedown | 🪟🐧🍎 | [xenophobentx/takedawn](https://github.com/xenophobentx/takedawn) |
+| Mario Kart Wii | 🪟🐧 | [patchzyy/wiicompiled](https://github.com/patchzyy/wiicompiled) |
+
+Entraram na Onda 1/2 de 25/10/2026 e saíram no mesmo dia, na revisão que
+instalou cada port novo de verdade (`tools/validate_ports.ps1`). **Não entram
+na tabela acima nem em nenhuma contagem**; ficam no catálogo com
+`"hidden": true` e o motivo no campo `notes`:
+
+- **Skate 3**: o antivírus (Avast WebShield) bloqueou o download do
+  `Skate3Recomp-Windows.zip` da v2.0.2 como conteúdo malicioso. Pode ser falso
+  positivo - recompilações costumam ser marcadas -, mas só volta depois de
+  conferido (VirusTotal, por exemplo).
+- **Burnout 3: Takedown**: no Windows a release só traz instalador
+  (`Takedawn-0.2.1-windows-x64-setup.exe`). O Karamelo baixa e descompacta o
+  port na pasta dele; um instalador colocaria o jogo fora dela, então o app
+  recusa ("release só oferece instalador").
+- **Mario Kart Wii (WiiCompiled)**: mesma coisa - a v0.9.2 só publica
+  instaladores (`WiiCompiled-Setup.exe`, `-Setup-x86_64.AppImage`, `.pkg`).
+
+Voltam ao menu quando o projeto publicar build portátil (ou, no caso do
+Skate 3, quando o arquivo for confirmado limpo): tirar o `hidden`, subir o
+`catalog_version` e recontar as linhas acima.
 
 ### Fora do menu: The Darkness (Xbox 360)
 

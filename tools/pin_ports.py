@@ -31,9 +31,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CATALOG = os.path.join(ROOT, "data", "ports.json")
 
 # Arquivos que o seletor do app pode escolher. Checksums, notas e pacotes de
-# codigo-fonte nao entram.
+# codigo-fonte nao entram, nem builds antigas que o autor deixou na release com
+# "_OLD" no nome (Silent Hill).
 ASSET_RE = re.compile(r"\.(zip|7z|rar|tar\.gz|tar\.xz|dmg|appimage|exe)$", re.I)
-SKIP_RE = re.compile(r"(source|src)\b", re.I)
+SKIP_RE = re.compile(r"(source|src)\b|_old\b", re.I)
 
 # Ordem dos campos: a mesma de PortCatalogToJson (src/port_catalog.cpp), para
 # o arquivo sair identico ao que o app grava com --dump-port-catalog.

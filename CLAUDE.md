@@ -24,7 +24,7 @@ This file provides project guidelines, architecture details, and essential comma
 
 1. **Never Invent Counts or Numbers**:
    - Systems & Engines: Read from `include/app_info.h` (`APP_SYSTEM_COUNT = 37`, `APP_CORE_ENGINES = 42`). Never report `APP_CORE_FILES` (43) as an engine count.
-   - Ports & Recomp: Source of truth is `data/ports.json` (the catalog; see `docs/PORTS_CATALOG.md`) and `CREDITS.md` (Total: 70 ports — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎). The Darkness (Xbox 360) is catalogued but `hidden` (out of the menu and the site) and is not counted.
+   - Ports & Recomp: Source of truth is `data/ports.json` (the catalog; see `docs/PORTS_CATALOG.md`) and `CREDITS.md` (Total: 93 ports — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎). The Darkness (Xbox 360), Skate 3, Burnout 3: Takedown and Mario Kart Wii are catalogued but `hidden` (out of the menu and the site) and are not counted.
    - BIOS Information: Source of truth is `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Repository Hygiene**:
    - **Never commit BIOS files, ROMs, saves, or runtime caches**. The `.gitignore` enforces this (`bios/`, `roms/`, `saves/`, `cache/`, `cores/`).

@@ -1,5 +1,5 @@
 {
-  "catalog_version": 2,
+  "catalog_version": 5,
   "ports": [
     {
       "id": "DrMario64",
@@ -1074,6 +1074,407 @@
         "RenegadeSquadronPC-0.9b.zip": "756bdab2501b8f69736eb971654d32d6a299a8406d20e68743ced51128a17a6d"
       },
       "notes": "Star Wars Battlefront: Renegade Squadron native PC port (PSP via static recomp by GTTeancum). Official releases publish Windows zip (RenegadeSquadronPC). Direct3D 12, 60 FPS, twin-stick controls. The game reads the disc's PSP_GAME folder from data/ - it takes no ISO argument. PreparePspGame() extracts the user's US ISO (ULUS10292) there before the first launch. Only a plain .iso: a .cso is compressed and nothing here can unpack it."
+    },
+    {
+      "id": "DK64Recomp",
+      "display_name": "Donkey Kong 64",
+      "repo": "Rainchus/Donkey-Kong-64-Recompiled",
+      "needs_rom": true,
+      "rom_keywords": ["donkey", "kong", "64"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "rom_exclude_keywords": ["diddy"],
+      "release_tag": "v1.0.3",
+      "asset_sha256": {
+        "DK64Recompiled-Flatpak-X64-Release-1-0-3.zip": "0974e1d264303cd4fbf71d95012649abe60baae539868c8381a1b46bb2b89f78",
+        "DK64Recompiled-Linux-ARM64-Release-1-0-3.zip": "bb887245c61ee08f98c2e724ec2b3877000a02554bd501a122bd91409c888ba4",
+        "DK64Recompiled-Linux-X64-Release-1-0-3.zip": "352380418f2376640825fe65b0ba085e12e7b792205cfa435a6caa0202e54b5c",
+        "DK64Recompiled-macOS-ARM64-Release-1-0-3.zip": "c3c80f5d0b7bf4c2a21386ae573d70f57d84046aee00906814a88081923b8046",
+        "DK64Recompiled-Windows-Release-1-0-3.zip": "bfde3985365247f083ee47568b496eaf8a4a0845155a95802bc8f4a4871c60d5"
+      },
+      "notes": "N64 static recomp (Donkey Kong 64 Recompiled) by Rainchus. Supports Windows, Linux (x64/arm64) and macOS Apple Silicon."
+    },
+    {
+      "id": "PaperBoat",
+      "display_name": "Paper Mario",
+      "repo": "HarbourMasters/PaperBoat",
+      "needs_rom": true,
+      "rom_keywords": ["paper", "mario"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "release_tag": "1.0.3",
+      "asset_sha256": {
+        "Paperboat-Mulberry-Delta-Linux.zip": "f6c72564e8c1485df6022aed24e33c5122815c9c6c90589411f3fbd23e56ffa2",
+        "Paperboat-Mulberry-Delta-Mac.zip": "9fc5e12658804d2d08defd6033495c1089aa2313808b77febbe16cadb37bc3ee",
+        "Paperboat-Mulberry-Delta-Win64.zip": "ad7a825befbbad2d925f511fc97cfa26027f825935b413040b9d294d953983f3"
+      },
+      "notes": "Paper Mario 64 PC port (PaperBoat) by Harbour Masters. Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "Dusklight",
+      "display_name": "The Legend of Zelda: Twilight Princess",
+      "repo": "TwilitRealm/dusklight",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["twilight", "princess"],
+      "iso_dirs": ["GameCube", "GC"],
+      "iso_exts": [".iso", ".rvz", ".gcm"],
+      "release_tag": "v2.0.3",
+      "asset_sha256": {
+        "Dusklight-v2.0.3-linux-arm64.AppImage": "7f7d72054847277afccdddb93f7cca4e3b730768da64e30a4cdd6774c23bdbf9",
+        "Dusklight-v2.0.3-linux-x86_64.AppImage": "87ec251963c984ad2b3ac075281431d2221db2297dc19f2ab5daad92e969fc06",
+        "Dusklight-v2.0.3-macos-arm64.zip": "b3e6aae6c7fc6a4f863b45b64e3bdcf12e5d88213f82bc5a08e215c39e4682f2",
+        "Dusklight-v2.0.3-macos-x86_64.zip": "ab54f38637e3a0a4b50192b5ba26d9052a66426e38ebaaf583d3eff4ac12aa01",
+        "Dusklight-v2.0.3-win32-arm64.zip": "1740d250e9891b7a8852e9f5bb9c84b6ac5698abb52836a169e933b3d59d5f42",
+        "Dusklight-v2.0.3-win32-x86_64.zip": "ac63514eeb13cd4e9bd22be02dabee4952d1331a78f0496326bba2b577b12caf"
+      },
+      "notes": "Twilight Princess native port (Dusklight) based on GC/Wii decompilation. Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "LASRecomp",
+      "display_name": "The Legend of Zelda: Link's Awakening HD",
+      "repo": "peiikai/LASRecomp",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "release_tag": "beta_5.2",
+      "asset_sha256": {
+        "LAS.Recomp-beta_5.2-linux-aarch64.AppImage": "fc045fc178348c22fa28474a55a40198968cb2242fea6e7e6b2bd34ec434b433",
+        "LAS.Recomp-beta_5.2-linux-x86_64.AppImage": "eb4d85af0fd92edb6de02fdecc8ad42738caac8642ffb39087144e7667ebb9f7",
+        "LAS.Recomp-beta_5.2-macOS.dmg": "139af3dbc43f3685dfae29c25a8b13c5eae2a6d3f3cdc584b0cd8ff7e3176d7b",
+        "LAS.Recomp-beta_5.2-windows.zip": "7d50243db04e2e8c9bb43dc4cfbba1a02164cefe41d9d799b3f3a8658bd46414"
+      },
+      "notes": "Link's Awakening Switch remake static recomp (LASRecomp). Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "JSRFUnleashed",
+      "display_name": "Jet Set Radio Future",
+      "repo": "JuMatt/JetSetRadioFuture-Unleashed",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "iso_keywords": ["jet", "set", "radio", "future"],
+      "iso_dirs": ["Xbox", "OriginalXbox", "XboxOG"],
+      "release_tag": "v0.5.5",
+      "asset_sha256": {
+        "JSRF-Unleashed-linux-x86_64.tar.gz": "68baf616739c8863fe0d8b565f29c08d155ed4e480a207c6fed85da46f9e287a",
+        "JSRF-Unleashed-macOS-arm64.zip": "2644502eb529ba8f112ff46a087d2a0a385c642ff40146cd73a40460a61cd04e",
+        "JSRF-Unleashed-windows-x86_64.zip": "7c9ce5af692abfebe8d11c66debda807b1f6ca634bbb1e5a2037decd55b0cc2b"
+      },
+      "notes": "Jet Set Radio Future native port (JSRF Unleashed). Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "Takedawn",
+      "display_name": "Burnout 3: Takedown",
+      "repo": "xenophobentx/takedawn",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "iso_keywords": ["burnout", "3"],
+      "iso_dirs": ["Xbox", "OriginalXbox", "XboxOG"],
+      "hidden": true,
+      "release_tag": "v0.2.1",
+      "asset_sha256": {
+        "Takedawn-0.2.1-linux-x86_64.AppImage": "255d5fa586285f34f2a6635ffb1d119cfe7924007421a500839f8db91015ff78",
+        "Takedawn-0.2.1-macos-arm64.dmg": "69b95450124dab7b59e75e52232db57987e7c100e1a311d764e7d2b9c285173a",
+        "Takedawn-0.2.1-windows-x64-setup.exe": "85ab4e81ece174f29656f9e39bf68bc39cd7e1f0018870d89a49bc596d06da7e"
+      },
+      "notes": "Burnout 3: Takedown Xbox static recomp (Takedawn). Supports Windows, Linux and macOS. OCULTO (25/10/2026): no Windows a release so tem instalador (Takedawn-0.2.1-windows-x64-setup.exe), que o app recusa. Volta quando houver build portatil."
+    },
+    {
+      "id": "Skate3Recomp",
+      "display_name": "Skate 3",
+      "repo": "mchughalex/skate3recomp",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "x360_game_dir": "Skate3",
+      "hidden": true,
+      "release_tag": "v2.0.2",
+      "asset_sha256": {
+        "Skate3Recomp-Linux.zip": "b1a5710e1467d3d750b73c106801815a8e2bc8b6ea860980f6db252eb1ffc07f",
+        "Skate3Recomp-macOS.zip": "0db19031ce06ef6d891e964c54e4d32da6dc0f78125146193a51d78cc36590cf",
+        "Skate3Recomp-Windows.zip": "b9785b9f3ba6f8180268dc5ea26ed2ec7b64af46a4c04219a33236c64bc65a17"
+      },
+      "notes": "Skate 3 Xbox 360 static recomp (Skate3Recomp). Supports Windows, Linux and macOS. OCULTO (25/10/2026): o Avast WebShield bloqueou o download do Skate3Recomp-Windows.zip (v2.0.2) como conteudo malicioso. Pode ser falso positivo; so volta depois de conferido (ex.: VirusTotal)."
+    },
+    {
+      "id": "TwoTowersRecomp",
+      "display_name": "The Lord of the Rings: The Two Towers",
+      "repo": "Gumpolas/TooTawersRecomp",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["two", "towers"],
+      "iso_dirs": ["PlayStation2", "PS2"],
+      "iso_exts": [".iso", ".bin", ".chd"],
+      "release_tag": "1.9.7",
+      "asset_sha256": {
+        "readmeslanguages.zip": "e3f1426abb8a511ea0a80ec0df8155b9868edacee2654538d45aee13959336e3",
+        "TwoTowers-Recompiled-v1.9.7-linux-x86_64.tar.gz": "7741d451b405b1795fe197f1b9a15fe2c7bde6aade2dfa5b8ad42ff85f146525",
+        "TwoTowers-Recompiled-v1.9.7-macos-x86_64.tar.gz": "747ab4d1cbb4f1f14c12dc534f9440caf9d6026d0467335401750deae9a016be",
+        "TwoTowers-Recompiled-v1.9.7-win64.zip": "1900f7f3801bcf58f46402e56c3d942cf6e751c9d453bf6ee44e15b7d814b96f"
+      },
+      "notes": "The Lord of the Rings: The Two Towers PS2 native recomp. Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "SilentHillDecomp",
+      "display_name": "Silent Hill",
+      "repo": "SlickAmogus/silent-hill-decomp",
+      "needs_rom": true,
+      "rom_keywords": ["silent", "hill"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "release_tag": "crossplatform-beta",
+      "asset_sha256": {
+        "SHPC-linux-x64_2026.09.27.1.tar.gz": "e2b8521c49341691e36800ebfdae0cf7f126498dc3b14efb7c0c8ab05387a974",
+        "SHPC-macos-arm64_2026.09.27.1.zip": "f0741ae6c49997964d3c6c14c6e07b196e4de6b5951b5787358e84cda6305298",
+        "SHPC_beta-2026.10.12.1.zip": "b22a1c93e5a9537bfa9c676071a2d7f1c8df6069fc44f7419fb73379d8cec81d"
+      },
+      "notes": "Silent Hill 1 PS1 native PC port. Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "PTPCPort",
+      "display_name": "P.T.",
+      "repo": "LoreanXavier/pt-pc",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "release_tag": "v1.0.8",
+      "asset_sha256": {
+        "P.T.PC.Port-macOS-arm64.dmg": "206619d404b917b67872bd07271d9f2294781d5c13bc40b41fdecabaab70a534",
+        "P.T.PC.Port-macOS-arm64.zip": "0d1b648e52ce2f704e0289088794bac36dc8545f29897ffd135e3f32504d52c9",
+        "P.T.PC.Port-macOS-x64.dmg": "32034da5f30f6c1a183f0bc1c63a300fecbe783605bf34aaf76afc4e2ca470bf",
+        "P.T.PC.Port-macOS-x64.zip": "74641a1b08b8af2f75b928d6f67764d3e0ebbc2d6ebb9c891105b99e26921bbc",
+        "P.T.PC.Port-portable-linux.zip": "aa59261385950717940207602acadea35440b98df90a66a8b13d5eca331b36ff",
+        "P.T.PC.Port-portable-windows.zip": "bbe35c93bb767354672a4b3bb885bef94ba78fc48f5a69d208d7201575cdc02e",
+        "P.T.PC.Port.Setup.exe": "f7daf0afc11ecdc772b70630999ba157e23c5c9419f8b74bcb10590c19305fd9"
+      },
+      "notes": "P.T. (Playable Teaser) native PC port. Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "MegaManXRecomp",
+      "display_name": "Mega Man X",
+      "repo": "mstan/MegaManXSNESRecomp",
+      "needs_rom": true,
+      "rom_keywords": ["mega", "man", "x"],
+      "has_linux_build": true,
+      "rom_exclude_keywords": ["x2", "x3", "x4", "x5", "x6", "x7", "x8"],
+      "release_tag": "v2.3.3",
+      "asset_sha256": {
+        "MegaManXSNESRecomp-linux-2.3.3-x86_64.AppImage": "39c022a4088a1efd0f12d5a7272451df8ca1abbb82a25d159ab96282b4d0c3d3",
+        "MegaManXSNESRecomp-windows-2.3.3.zip": "a6a9b181cdc125fa6e7a9e5831c537c005669511a3aca105c716ef1e55b7e8aa"
+      },
+      "notes": "SNES static recomp (Mega Man X) by mstan. Supports Windows and Linux."
+    },
+    {
+      "id": "NGBRecomp",
+      "display_name": "Ninja Gaiden Black",
+      "repo": "gamboozino/ngbrecomp",
+      "has_linux_build": true,
+      "iso_keywords": ["ninja", "gaiden", "black"],
+      "iso_dirs": ["Xbox", "OriginalXbox", "XboxOG"],
+      "release_tag": "v0.9.30",
+      "asset_sha256": {
+        "NinjaGaidenBlack-windows-x64-shadowfix.zip": "8c6d625f14c5ed731633d24049d9e4f054c9f3a2a8e4dfb2ae7e38aa78c6b9b1",
+        "NinjaGaidenBlack-windows-x64.zip": "9f95f6340d3923e1ee3bee75cffac8783e7a2d702a7967583342529d0f3f59c3",
+        "NinjaGaidenBlack-x86_64.AppImage": "5e767b2ab63b6f7085b7a86f3908f877edb1c3119c9d27c1c95aae0eb61ed3a8"
+      },
+      "notes": "Ninja Gaiden Black Xbox static recomp. Supports Windows and Linux."
+    },
+    {
+      "id": "SMSPCPort",
+      "display_name": "Super Mario Sunshine",
+      "repo": "TekRantGaming/sms-pc-port",
+      "has_linux_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["sunshine"],
+      "iso_dirs": ["GameCube", "GC"],
+      "iso_exts": [".iso", ".rvz", ".gcm"],
+      "release_tag": "v2.1.0",
+      "asset_sha256": {
+        "SMS-PC-Port-v2.1.0-linux-x86_64.AppImage": "645bb2f5be7c7408c47813909e368de465d643ac91e926ab2de3365bc9de8190",
+        "SMS-PC-Port-v2.1.0-windows-x64.zip": "2b9abf0b785abf27d60919da58a71a1ffd85d0a2d8fc307fa170960ddbfcbb00"
+      },
+      "notes": "Super Mario Sunshine native PC port. Supports Windows and Linux."
+    },
+    {
+      "id": "WiiCompiled",
+      "display_name": "Mario Kart Wii",
+      "repo": "patchzyy/wiicompiled",
+      "has_linux_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["mario", "kart", "wii"],
+      "iso_dirs": ["Wii"],
+      "iso_exts": [".iso", ".wbfs", ".rvz"],
+      "hidden": true,
+      "release_tag": "v0.9.2",
+      "asset_sha256": {
+        "WiiCompiled-Setup-aarch64.AppImage": "cebcee38645f50b0e36014f3aecb44d96d679ca2d23cfd53d50834da385b0f6f",
+        "WiiCompiled-Setup-x86_64.AppImage": "6101ec7f4a027706fabc786121b39af872ada96a7d06b25707bc10a431ed5252",
+        "WiiCompiled-Setup.exe": "d7a13c090d7a23463af45efeee6f588770b44fd43e02222694c275944e2e5ef4"
+      },
+      "notes": "Mario Kart Wii native port (WiiCompiled). Supports Windows and Linux. OCULTO (25/10/2026): a release so tem instaladores (WiiCompiled-Setup.exe/.AppImage/.pkg), que o app recusa. Volta quando houver build portatil."
+    },
+    {
+      "id": "LuigisMansionRecomp",
+      "display_name": "Luigi's Mansion",
+      "repo": "rob646464/luigis-mansion-recompiled",
+      "has_linux_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["luigi"],
+      "iso_dirs": ["GameCube", "GC"],
+      "iso_exts": [".iso", ".rvz", ".gcm"],
+      "release_tag": "v1.1.4",
+      "asset_sha256": {
+        "LuigisMansionRecompiled-1.1.4-linux-x86_64.tar.gz": "f178b9cff3e36062ecf584bde9c958fdb2bf2dbd98bd4e08308c891be872c947",
+        "LuigisMansionRecompiled-1.1.4-windows-x64.zip": "f060fc82603616fd5f746e16c5b715762cd6855f410fe785504ee7997a4e7da5"
+      },
+      "notes": "Luigi's Mansion GameCube static recomp. Supports Windows and Linux."
+    },
+    {
+      "id": "ShaolinMonksRecomp",
+      "display_name": "Mortal Kombat: Shaolin Monks",
+      "repo": "OAleex/ShaolinMonksRecomp",
+      "has_linux_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["shaolin", "monks"],
+      "iso_dirs": ["PlayStation2", "PS2"],
+      "iso_exts": [".iso", ".bin", ".chd"],
+      "release_tag": "0.2.0",
+      "asset_sha256": {
+        "ShaolinMonksRecomp-0.2.0-Linux-x64.tar.gz": "c4e618e624110e4d2e5e15687ae5ec5cc30efe704b6fffeef519a8011521f521",
+        "ShaolinMonksRecomp-0.2.0-Windows-x64.zip": "5a977a1cbfb2decfdb83c573b1c3d97cf3f224fd28b71abc83ebe8ef03551605"
+      },
+      "notes": "Mortal Kombat: Shaolin Monks PS2 native recomp. Supports Windows and Linux."
+    },
+    {
+      "id": "JetForceCapricorn",
+      "display_name": "Jet Force Gemini",
+      "repo": "riseio/Jet-Force-Capricorn",
+      "needs_rom": true,
+      "rom_keywords": ["jet", "force", "gemini"],
+      "has_linux_build": true,
+      "release_tag": "JetForceCapricorn_0.3.176",
+      "asset_sha256": {
+        "CadgPP-Portable.exe": "c71a5f86b209137c87e470d6ac46009b40277fd696d6fd278acf2d6332e93115",
+        "CadgPP-SteamDeck-x86_64.AppImage": "3e460c621398224dd8909bc4989f81635707001c7f7c03e60b9752e0d511218d"
+      },
+      "notes": "Jet Force Gemini N64 static recomp (Capricorn). Supports Windows and Linux."
+    },
+    {
+      "id": "PinyonShift",
+      "display_name": "Forza Horizon",
+      "repo": "arcanite24/pinyon-shift",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "x360_game_dir": "ForzaHorizon",
+      "release_tag": "v0.6.1",
+      "asset_sha256": {
+        "PinyonShift-Launcher-linux-x86_64.tar.gz": "c3a2fc30f7ce204affde453ceafc3db3f82705e840e16140b7477677ebed0b04",
+        "PinyonShift-Launcher-macos-arm64.zip": "a9c6ce7cb58eff40a57a8d1f40da614594620ef3f5da8b06081c85e376a22e11",
+        "PinyonShift-Launcher.zip": "b38fe82590702388a450dc685dd29d71850ce3eff5e36947b264d99e59b31585"
+      },
+      "notes": "Forza Horizon 1 Xbox 360 static recomp (Pinyon Shift). Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "LostOdysseyRecomp",
+      "display_name": "Lost Odyssey",
+      "repo": "freefrank/LostOdysseyRecomp",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "x360_game_dir": "LostOdyssey",
+      "release_tag": "v1.0.6",
+      "asset_sha256": {
+        "LostOdysseyRecomp-linux-x64-v1.0.6.AppImage": "32fd391316645508ac6a4d6857b911fe98b77da7a1921667235bb0bd0ba2d542",
+        "LostOdysseyRecomp-macos-arm64-v1.0.6.dmg": "a948768b22f7172f6834c1b53677f864639b5ff2ad0fa1146a52d7596e6bed67",
+        "LostOdysseyRecomp-windows-x64-v1.0.6.zip": "d332c86c8dabd71c1fcd13c2d70fe073192e32fc8928765ab45684c24a4ce4ec"
+      },
+      "notes": "Lost Odyssey Xbox 360 static recomp. Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "Zelda3PC",
+      "display_name": "The Legend of Zelda: A Link to the Past",
+      "repo": "snesrev/zelda3",
+      "needs_rom": true,
+      "rom_keywords": ["zelda", "past"],
+      "release_tag": "v0.3",
+      "asset_sha256": {
+        "zelda3_v0.3.zip": "0d8709a4a2731920f44f1ea662d665c8c5c223c40f18865692bd6b1602250fb6"
+      },
+      "notes": "A Link to the Past native C reimplementation (zelda3) by snesrev. Features widescreen 16:9, MSU-1 audio and shaders."
+    },
+    {
+      "id": "SCDARecomp",
+      "display_name": "Splinter Cell: Double Agent",
+      "repo": "TGP482/SCDA-XBERecomp",
+      "iso_keywords": ["splinter", "cell", "double", "agent"],
+      "iso_dirs": ["Xbox", "OriginalXbox", "XboxOG"],
+      "release_tag": "V2",
+      "asset_sha256": {
+        "SCDA-XBERecomp.zip": "2e0f5c3c458148a635c656cc0de6e9e39c3b26a50e874e4209dd8c79cca7d13e"
+      },
+      "notes": "Splinter Cell: Double Agent Xbox static recomp by TGP482 (BLACK dev). Features unlocked framerate, widescreen and mouse/keyboard controls."
+    },
+    {
+      "id": "MercenariesRecomp",
+      "display_name": "Mercenaries: Playground of Destruction",
+      "repo": "KraftMacAndChee/Mercenaries-Recompiled",
+      "iso_keywords": ["mercenaries"],
+      "iso_dirs": ["Xbox", "OriginalXbox", "XboxOG"],
+      "release_tag": "v1.1.1",
+      "asset_sha256": {
+        "Mercenaries.Recompiled.Public.1.1.1.zip": "f83749a46d0c69a1f9020bef5ef01bfdc86b4d87ffb864c6232f6c7e0df520b3"
+      },
+      "notes": "Mercenaries Xbox static recomp with 4K resolution, mouse/keyboard and bugfixes."
+    },
+    {
+      "id": "Fable2Recomp",
+      "display_name": "Fable II",
+      "repo": "himdo/Fable-2-Recomp",
+      "x360_game_dir": "Fable2",
+      "release_tag": "1.5.0",
+      "asset_sha256": {
+        "Fable_2_recomp_v1.5.0_windows.zip": "18a4420725442d4f24c08a07da8361cc62d2a875169a3cc95d5d3ee294d4558c"
+      },
+      "notes": "Fable 2 Xbox 360 static recomp."
+    },
+    {
+      "id": "GoldenEyeXBLARecomp",
+      "display_name": "GoldenEye 007 (XBLA Remaster)",
+      "repo": "SunJaycy/GoldenEye-Recomp",
+      "release_tag": "Goldeneye1.2.4",
+      "asset_sha256": {
+        "GoldenEye-Recomp-Win.rar": "78793e2e4651709de0ae9e929be03096c23c50e6ba814c5ef4e8137fb557e635"
+      },
+      "notes": "GoldenEye 007 cancelled XBLA remaster static recomp with 60 FPS and HD textures."
+    },
+    {
+      "id": "CTRHighOctane",
+      "display_name": "Crash Team Racing (High Octane)",
+      "repo": "Rinnegatamante/Crash-Team-Racing-High-Octane",
+      "needs_rom": true,
+      "rom_keywords": ["crash", "team", "racing"],
+      "release_tag": "v.1.5",
+      "asset_sha256": {
+        "ctr-high-octane-x64.win.zip": "005924af516a3cb2bcdc19269422e2de77719600656e5b00df45424fe081693e"
+      },
+      "notes": "Crash Team Racing PS1 native PC port (High Octane) with 60 FPS and widescreen."
+    },
+    {
+      "id": "MinishCapPC",
+      "display_name": "The Legend of Zelda: The Minish Cap",
+      "repo": "999sian/tmc",
+      "needs_rom": true,
+      "rom_keywords": ["minish", "cap"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "release_tag": "v0.9.6",
+      "asset_sha256": {
+        "tmc-multi-linux-arm64-v0.9.6.tar.gz": "63b9edef7418960610488c703eaa11b93ba22b73e53c12f976565b6a97372670",
+        "tmc-multi-linux-x86_64-v0.9.6.tar.gz": "c0d097f68112039e22fea83d22be811770617e09bc4525a3e347a210844234c3",
+        "tmc-multi-macos-arm64-v0.9.6.tar.gz": "8978cb67d93e5b6f17dc3ebe91c7fb4cfb8f64bef95b4fd3e12fc3f1878e44b0",
+        "tmc-multi-macos-x86_64-v0.9.6.tar.gz": "6b6407a17ecd0761982531180af614cafc5d7c17fc343cbccbf951fb8ba3a8f4",
+        "tmc-multi-windows-arm64-v0.9.6.tar.gz": "508ec89c58c4083243a598011be16cfcde9b8985c9fe12f4d955d34408ae82f5",
+        "tmc-multi-windows-x86_64-v0.9.6.tar.gz": "5e30fc0068b827a5fe526f744438ec729c297d9315b1c4254d8db79ba7197498"
+      },
+      "notes": "The Legend of Zelda: The Minish Cap GBA native port. Supports Windows, Linux and macOS."
     }
   ]
 }

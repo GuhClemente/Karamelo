@@ -381,17 +381,11 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 18/10/2026:** são **70** jogos de "Ports & Recomp" — 42 até
-11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (Pokemon Red/Blue, Spider-Man,
-F-Zero X, AeroGauge, Crash Bandicoot, Super Mario Strikers, Pikmin / Open Nectar,
-Soulcalibur II / Ring Out — ver seção 16), +1 em 27/09 (Super Smash Bros. Melee /
-Melee Unlocked — ver seção 18), +1 em 27/09 (Monster Hunter Portable 3rd /
-Yakumo — ver seção 20), +1 em 29/09 (Star Fox Adventures / Foxhollow — ver
-seção 23), +1 em 12/10 (Conker's Bad Fur Day / CBFD-Recompiled — ver seção 25),
-+1 em 12/10 (Sly Cooper / ProjectCane — ver seção 26), +1 em 12/10 (Castlevania: Legacy of Darkness / cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK / BLACK-XBERecomp — ver seção 30), e +8 em 18/10 (CPS-2 Recomp, Wayne Gretzky's 3D Hockey, Rush 2, Automobili Lamborghini, Road Rash 64, Jungle Strike, ICO, Star Wars Battlefront: Renegade Squadron — ver seção 33). The Darkness (Xbox 360) chegou a ser anunciado
+**Atualizado em 25/10/2026 (Ondas 1, 2 e 3):** são **93** jogos de "Ports & Recomp" (93 🪟, 59 🐧, 42 🍎) — 42 até
+11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 34), +8 em 25/10 (Onda 2 — ver seção 35) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 36). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 37): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
-nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 61, 62) de outra página no futuro. É coincidência
+nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 61, 62, 70, 80, 89, 96) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -486,8 +480,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **70** jogos de Ports & Recomp (atualizado em 18/10/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30 e 33),
+- Os **93** jogos de Ports & Recomp (atualizado em 25/10/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 34, 35, 36 e 37),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -1605,7 +1599,7 @@ arquivo `data/ports.json` do repositório, publicado em
 > **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
 > arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
 > `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
-> Hoje: **70 jogos — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎** (sem mudança de contagem).
+> Hoje: **93 jogos — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 37 para os 3 que saíram).
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
@@ -1614,7 +1608,7 @@ o catálogo novo em segundo plano e mostra o port a partir do próximo início.
 
 ## Versão 0.9.78 (preparada em 25/10/2026)
 
-Sem mudança de contagens: **37 sistemas, 42 motores; 70 ports — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎**.
+Contagens atualizadas: **37 sistemas, 42 motores; 93 ports — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**.
 
 Novidades para o jogador:
 
@@ -1628,3 +1622,143 @@ Novidades para o jogador:
 - **Relatório de falhas agora é opcional**: vem desligado; o jogador ativa em
   Configurações > Diagnóstico. Se o app fechar sozinho, ele avisa onde ativar.
 - **Tradução completa**: todos os avisos seguem o idioma escolhido (português/inglês).
+
+---
+
+## 34. Adição de 25/10/2026 (Onda 1) — 10 Novos Ports Multiplataforma Total (🪟🐧🍎) (8 ficaram — ver seção 37)
+
+Adicionados 10 jogos de grande porte no catálogo `data/ports.json`, totalizando **78 ports visíveis no menu** (**78 Windows 🪟, 50 Linux 🐧, 39 macOS 🍎**, já sem Burnout 3 e Skate 3). Todos os 10 novos títulos possuem binários oficiais verificados para os três sistemas operacionais:
+
+1. **Donkey Kong 64** (`Rainchus/Donkey-Kong-64-Recompiled`):
+   - Recompilação estática de N64 por Rainchus. Fecha a era de ouro da Rare no Karamelo.
+   - Requer a ROM americana `.z64` em `roms/Nintendo64/`. Suporta Windows, Linux (x64/arm64) e macOS (arm64).
+
+2. **Paper Mario** (`HarbourMasters/PaperBoat`):
+   - Port nativo de N64 pelo time Harbour Masters (mesmos criadores de *Ship of Harkinian* e *Starship*).
+   - Requer a ROM americana `.z64` em `roms/Nintendo64/`. Suporta Windows, Linux e macOS.
+
+3. **The Legend of Zelda: Twilight Princess** (`TwilitRealm/dusklight`):
+   - Port nativo (Dusklight) baseado na descompilação de GameCube/Wii, com gerenciador de mods integrado, suporte a resoluções ultrawide e framerates modernos.
+   - Lê a ISO do usuário em `roms/GameCube/` via `{iso}`. Suporta Windows, Linux e macOS.
+
+4. **The Legend of Zelda: Link's Awakening HD** (`peiikai/LASRecomp`):
+   - Recompilação estática do remake de Switch rodando nativamente no PC a 120 FPS+ sem quedas de performance.
+   - Suporta Windows, Linux e macOS.
+
+5. **Jet Set Radio Future** (`JuMatt/JetSetRadioFuture-Unleashed`):
+   - Port nativo (JSRF Unleashed) do clássico cult do Xbox original da SEGA.
+   - Lê os dados do jogo em `roms/Xbox/`. Suporta Windows, Linux e macOS.
+
+6. ~~**Burnout 3: Takedown**~~ e 7. ~~**Skate 3**~~ — **retirados no mesmo dia**, não publique
+   (motivo na seção 37).
+
+8. **The Lord of the Rings: The Two Towers** (`Gumpolas/TooTawersRecomp`):
+   - Port nativo da versão de PS2 do aclamado jogo de ação da EA Games.
+   - Lê a imagem de disco em `roms/PlayStation2/` via `{iso}`. Suporta Windows, Linux e macOS.
+
+9. **Silent Hill** (`SlickAmogus/silent-hill-decomp`):
+   - Descompilação de PlayStation 1 rodando nativamente com renderização sem distorções poligonais.
+   - Requer o dump do jogo original em `roms/PlayStation/`. Suporta Windows, Linux e macOS.
+
+10. **P.T.** (`LoreanXavier/pt-pc`):
+    - Port/recriação 1:1 nativa no PC do lendário teaser de terror de Hideo Kojima e Guillermo del Toro no PS4.
+    - Suporta Windows, Linux e macOS.
+
+---
+
+## 35. Adição de 25/10/2026 (Onda 2) — 9 Novos Ports de Alto Impacto (🪟🐧 / 🪟🐧🍎) (8 ficaram — ver seção 37)
+
+Adicionados 9 novos ports no catálogo `data/ports.json`, elevando o total para **86 ports visíveis** (**86 Windows 🪟, 58 Linux 🐧, 41 macOS 🍎**, já sem Burnout 3, Skate 3 e Mario Kart Wii):
+
+1. **Mega Man X** (`mstan/MegaManXSNESRecomp`):
+   - Recompilação estática de SNES desenvolvida por mstan (mesmo autor de *Super Mario World Recomp* e *Super Metroid Recomp*).
+   - Requer a ROM original em `roms/SNES/`. Suporta Windows e Linux.
+
+2. **Ninja Gaiden Black** (`gamboozino/ngbrecomp`):
+   - Recompilação nativa em C++ do clássico hack-and-slash do Xbox original. Muito mais fluido e estável que o emulador Xemu.
+   - Lê a ISO do jogo em `roms/Xbox/`. Suporta Windows e Linux.
+
+3. **Super Mario Sunshine** (`TekRantGaming/sms-pc-port`):
+   - Port nativo de GameCube para PC com câmera analógica livre, 60 FPS estáveis e suporte a texturas HD.
+   - Lê a ISO do usuário em `roms/GameCube/` via `{iso}`. Suporta Windows e Linux.
+
+4. ~~**Mario Kart Wii**~~ — **retirado no mesmo dia**, não publique (motivo na seção 37).
+
+5. **Luigi's Mansion** (`rob646464/luigis-mansion-recompiled`):
+   - Recompilação estática do clássico de lançamento do GameCube.
+   - Lê a imagem de disco em `roms/GameCube/` via `{iso}`. Suporta Windows e Linux.
+
+6. **Mortal Kombat: Shaolin Monks** (`OAleex/ShaolinMonksRecomp`):
+   - Recompilação nativa do clássico de ação e combate cooperativo de PS2, com suporte nativo a múltiplos idiomas e áudio de alta fidelidade.
+   - Lê a imagem de disco em `roms/PlayStation2/` via `{iso}`. Suporta Windows e Linux.
+
+7. **Jet Force Gemini** (`riseio/Jet-Force-Capricorn`):
+   - Recompilação estática de N64 do shooter em terceira pessoa da Rareware.
+   - Requer a ROM americana `.z64` em `roms/Nintendo64/`. Suporta Windows e Linux.
+
+8. **Forza Horizon** (`arcanite24/pinyon-shift`):
+   - Recompilação estática do primeiro Forza Horizon de Xbox 360 (Pinyon Shift), com carregamento instantâneo e framerate destravado.
+   - Suporta Windows, Linux e macOS.
+
+9. **Lost Odyssey** (`freefrank/LostOdysseyRecomp`):
+   - Recompilação estática de Xbox 360 do aclamado JRPG de Hironobu Sakaguchi. Roda infinitamente superior ao Xenia.
+   - Suporta Windows, Linux e macOS.
+
+---
+
+## 36. Adição de 25/10/2026 (Onda 3) — 7 Novos Ports & Recompilações (🪟 e 🪟🐧🍎)
+
+Adicionados 7 novos ports ao catálogo `data/ports.json`, elevando o catálogo para **93 ports visíveis** (**93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**):
+
+1. **The Legend of Zelda: A Link to the Past** (`snesrev/zelda3`):
+   - Re-implementação e descompilação nativa em C do clássico absoluto de SNES por snesrev.
+   - Suporta tela widescreen 16:9, texturas em alta resolução e carregamento nativo sem latência. Binário verificado Windows x64.
+
+2. **Splinter Cell: Double Agent** (`TGP482/SCDA-XBERecomp`):
+   - Recompilação estática da consagrada versão de Xbox original do jogo de espionagem tática de Tom Clancy.
+   - Lê a ISO ou dados de disco em `roms/Xbox/`. Binário verificado Windows x64.
+
+3. **Mercenaries: Playground of Destruction** (`KraftMacAndChee/Mercenaries-Recompiled`):
+   - Recompilação nativa do clássico sandbox militar e caótico de PlayStation 2 / Xbox por Pandemic Studios.
+   - Lê a ISO do Xbox original em `roms/Xbox/`. Binário verificado Windows x64.
+
+4. **Fable II** (`himdo/Fable-2-Recomp`):
+   - Recompilação estática de Xbox 360 do aclamado RPG da Lionhead Studios por himdo.
+   - Suporta framerate nativo destravado e carregamentos instantâneos. Binário verificado Windows x64.
+
+5. **GoldenEye 007 (XBLA Remaster)** (`SunJaycy/GoldenEye-Recomp`):
+   - Recompilação estática da versão remasterizada em alta definição desenvolvida originalmente para a Xbox Live Arcade (XBLA).
+   - Texturas renovadas, controles modernos de duplo analógico nativos e 60 FPS cravados. Binário verificado Windows x64.
+
+6. **Crash Team Racing (High Octane)** (`Rinnegatamante/Crash-Team-Racing-High-Octane`):
+   - Port/descompilação nativa do clássico de corrida de karts de PlayStation 1 por Rinnegatamante.
+   - Suporta 60 FPS e resoluções widescreen sem afetar a física clássica original. Binário verificado Windows x64.
+
+7. **The Legend of Zelda: The Minish Cap** (`999sian/tmc`):
+   - Descompilação e port nativo de Game Boy Advance desenvolvido por 999sian.
+   - Multiplataforma total com builds verificados para Windows, Linux (x64) e macOS (ARM64 Apple Silicon nativo).
+
+---
+
+## 37. Revisão de 25/10/2026 — 3 ports das Ondas 1 e 2 saem do menu
+
+Os 26 ports das Ondas 1, 2 e 3 foram instalados de verdade, um por um, no
+Windows (`tools/validate_ports.ps1`, que baixa a versão fixada e confere o
+SHA-256). Três **saem do menu e do site** e ficam no catálogo com
+`"hidden": true`:
+
+| Jogo | Motivo |
+|---|---|
+| **Skate 3** (`mchughalex/skate3recomp`) | O antivírus (Avast WebShield) bloqueou o download do `Skate3Recomp-Windows.zip` como conteúdo malicioso. Pode ser falso positivo; só volta depois de conferido. |
+| **Burnout 3: Takedown** (`xenophobentx/takedawn`) | No Windows a release só tem instalador (`setup.exe`). O Karamelo recusa instaladores: eles colocariam o jogo fora da pasta do port. |
+| **Mario Kart Wii** (`patchzyy/wiicompiled`) | A release só publica instaladores (`Setup.exe`, `Setup.AppImage`, `.pkg`). |
+
+> **Aviso para a IA do site:** tire os três da lista de Ports & Recomp e de
+> qualquer destaque. Os totais passam a **93 jogos — 93 Windows 🪟, 59 Linux 🐧,
+> 42 macOS 🍎**. Não anuncie que "vão voltar": só voltam se o projeto publicar
+> build portátil (ou se o Skate 3 for confirmado limpo), e aí entram como
+> novidade de novo.
+
+Na mesma revisão, o Silent Hill (que falhava no Windows por haver builds
+antigas e uma de Xbox na release) passou a instalar normalmente. Os outros 22
+instalaram de primeira.

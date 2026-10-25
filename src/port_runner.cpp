@@ -856,6 +856,18 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     }
 
     std::vector<GhAsset> assets = ParseReleaseAssets(json);
+    // With hashes in the catalog, only the files it lists are candidates at
+    // all. Picking among every asset first and refusing afterwards lost ports
+    // whose release also carries an old build or a console build next to the
+    // PC one (Silent Hill: "SHPC_beta-...zip" plus "_OLD" and Xbox zips), since
+    // the untagged-zip fallback below needs a single candidate.
+    if (!def.asset_sha256.empty()) {
+        std::vector<GhAsset> listed;
+        for (const auto& a : assets)
+            for (const auto& h : def.asset_sha256)
+                if (h.first == a.name) { listed.push_back(a); break; }
+        assets.swap(listed);
+    }
 #ifdef _WIN32
     asset = PickWindowsAsset(assets);
     if (asset.url.empty()) { out_error = Tr("nenhum build Windows na release", "no Windows build in the release"); return false; }
@@ -903,6 +915,15 @@ static bool DownloadAndInstall(const PortDefinition& def, std::string& out_error
     // extract it.
     if (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".msi") {
         out_error = Tr("release so oferece instalador (.msi), sem suporte", "release only offers an installer (.msi), not supported");
+        return false;
+    }
+    // Same for a bare installer .exe/AppImage ("Takedawn-...-setup.exe",
+    // "WiiCompiled-Setup.exe"): saved as the port, the menu would run a setup
+    // wizard that installs the game somewhere outside ports/<id>.
+    bool is_bare_binary = (lower_name.size() >= 4 && lower_name.substr(lower_name.size() - 4) == ".exe") ||
+                          (lower_name.size() >= 9 && lower_name.substr(lower_name.size() - 9) == ".appimage");
+    if (is_bare_binary && ContainsAny(lower_name, { "setup", "installer" })) {
+        out_error = Tr("release so oferece instalador, sem suporte", "release only offers an installer, not supported");
         return false;
     }
 
