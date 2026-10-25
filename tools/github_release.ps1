@@ -7,7 +7,7 @@
 #
 # - Tag: v<versao>, criada no commit atual (HEAD). O commit precisa estar no
 #   GitHub (git push) - senao a release apontaria para um codigo que ninguem ve.
-# - Notas: a secao "## Versao <versao>" do docs/SITE_SYNC.md; sem ela, o campo
+# - Notas: a secao do docs/SITE_SYNC.md com "Versao <versao>" no titulo; sem ela, o campo
 #   "notes" do dist\version.json.
 # - Se a release ja existe (deploy rodado de novo, ou o pacote macOS chegando
 #   depois), os arquivos sao substituidos e nada mais muda.
@@ -62,7 +62,7 @@ $notes = ""
 $sync = Get-Content docs\SITE_SYNC.md -Encoding UTF8
 $start = -1
 for ($i = 0; $i -lt $sync.Count; $i++) {
-    if ($sync[$i] -match "^## Vers.o $([regex]::Escape($Version))\b") { $start = $i + 1; break }
+    if ($sync[$i] -match "^## .*Vers.o $([regex]::Escape($Version))\b") { $start = $i + 1; break }
 }
 if ($start -ge 0) {
     $body = @()

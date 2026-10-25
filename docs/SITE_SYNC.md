@@ -382,7 +382,7 @@ Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
 **Atualizado em 25/10/2026 (Ondas 1, 2 e 3):** são **93** jogos de "Ports & Recomp" (93 🪟, 59 🐧, 42 🍎) — 42 até
-11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 34), +8 em 25/10 (Onda 2 — ver seção 35) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 36). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 37): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
+11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
 nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 61, 62, 70, 80, 89, 96) de outra página no futuro. É coincidência
@@ -481,7 +481,7 @@ que é a página onde a marca de terceiro mais aparece.
 ### 9.9 O que está certo — não mexa
 
 - Os **93** jogos de Ports & Recomp (atualizado em 25/10/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 34, 35, 36 e 37),
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40 e 41),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -1590,7 +1590,7 @@ Inclusão oficial de dois dos computadores mais icônicos do mercado japonês no
 
 ---
 
-## Catálogo de Ports & Recomp publicado como dado (25/10/2026)
+## 37. Catálogo de Ports & Recomp publicado como dado (25/10/2026)
 
 A lista de "Ports & Recomp" deixou de ficar dentro do código do app. Ela agora é o
 arquivo `data/ports.json` do repositório, publicado em
@@ -1599,33 +1599,14 @@ arquivo `data/ports.json` do repositório, publicado em
 > **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
 > arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
 > `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
-> Hoje: **93 jogos — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 37 para os 3 que saíram).
+> Hoje: **93 jogos — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram).
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
 
 ---
 
-## Versão 0.9.78 (preparada em 25/10/2026)
-
-Contagens atualizadas: **37 sistemas, 42 motores; 93 ports — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**.
-
-Novidades para o jogador:
-
-- **Ports com versão e arquivo verificados**: cada port do catálogo instala uma versão
-  específica e o Karamelo confere o SHA-256 do arquivo baixado. Arquivo diferente do
-  esperado é recusado — proteção contra repositório invadido ou release adulterada.
-- **Novos ports sem atualizar o app**: o catálogo é baixado de
-  `karamelo-emu.com/downloads/ports.json` e vale a partir do próximo início.
-- **Nomes de jogos em qualquer idioma (Windows)**: ROMs com nome em japonês ou outros
-  alfabetos agora aparecem na lista e abrem; acentos são mostrados sem acento no menu.
-- **Relatório de falhas agora é opcional**: vem desligado; o jogador ativa em
-  Configurações > Diagnóstico. Se o app fechar sozinho, ele avisa onde ativar.
-- **Tradução completa**: todos os avisos seguem o idioma escolhido (português/inglês).
-
----
-
-## 34. Adição de 25/10/2026 (Onda 1) — 10 Novos Ports Multiplataforma Total (🪟🐧🍎) (8 ficaram — ver seção 37)
+## 38. Adição de 25/10/2026 (Onda 1) — 10 Novos Ports Multiplataforma Total (🪟🐧🍎) (8 ficaram — ver seção 41)
 
 Adicionados 10 jogos de grande porte no catálogo `data/ports.json`, totalizando **78 ports visíveis no menu** (**78 Windows 🪟, 50 Linux 🐧, 39 macOS 🍎**, já sem Burnout 3 e Skate 3). Todos os 10 novos títulos possuem binários oficiais verificados para os três sistemas operacionais:
 
@@ -1650,7 +1631,7 @@ Adicionados 10 jogos de grande porte no catálogo `data/ports.json`, totalizando
    - Lê os dados do jogo em `roms/Xbox/`. Suporta Windows, Linux e macOS.
 
 6. ~~**Burnout 3: Takedown**~~ e 7. ~~**Skate 3**~~ — **retirados no mesmo dia**, não publique
-   (motivo na seção 37).
+   (motivo na seção 41).
 
 8. **The Lord of the Rings: The Two Towers** (`Gumpolas/TooTawersRecomp`):
    - Port nativo da versão de PS2 do aclamado jogo de ação da EA Games.
@@ -1666,7 +1647,7 @@ Adicionados 10 jogos de grande porte no catálogo `data/ports.json`, totalizando
 
 ---
 
-## 35. Adição de 25/10/2026 (Onda 2) — 9 Novos Ports de Alto Impacto (🪟🐧 / 🪟🐧🍎) (8 ficaram — ver seção 37)
+## 39. Adição de 25/10/2026 (Onda 2) — 9 Novos Ports de Alto Impacto (🪟🐧 / 🪟🐧🍎) (8 ficaram — ver seção 41)
 
 Adicionados 9 novos ports no catálogo `data/ports.json`, elevando o total para **86 ports visíveis** (**86 Windows 🪟, 58 Linux 🐧, 41 macOS 🍎**, já sem Burnout 3, Skate 3 e Mario Kart Wii):
 
@@ -1682,7 +1663,7 @@ Adicionados 9 novos ports no catálogo `data/ports.json`, elevando o total para 
    - Port nativo de GameCube para PC com câmera analógica livre, 60 FPS estáveis e suporte a texturas HD.
    - Lê a ISO do usuário em `roms/GameCube/` via `{iso}`. Suporta Windows e Linux.
 
-4. ~~**Mario Kart Wii**~~ — **retirado no mesmo dia**, não publique (motivo na seção 37).
+4. ~~**Mario Kart Wii**~~ — **retirado no mesmo dia**, não publique (motivo na seção 41).
 
 5. **Luigi's Mansion** (`rob646464/luigis-mansion-recompiled`):
    - Recompilação estática do clássico de lançamento do GameCube.
@@ -1706,7 +1687,7 @@ Adicionados 9 novos ports no catálogo `data/ports.json`, elevando o total para 
 
 ---
 
-## 36. Adição de 25/10/2026 (Onda 3) — 7 Novos Ports & Recompilações (🪟 e 🪟🐧🍎)
+## 40. Adição de 25/10/2026 (Onda 3) — 7 Novos Ports & Recompilações (🪟 e 🪟🐧🍎)
 
 Adicionados 7 novos ports ao catálogo `data/ports.json`, elevando o catálogo para **93 ports visíveis** (**93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**):
 
@@ -1740,7 +1721,7 @@ Adicionados 7 novos ports ao catálogo `data/ports.json`, elevando o catálogo p
 
 ---
 
-## 37. Revisão de 25/10/2026 — 3 ports das Ondas 1 e 2 saem do menu
+## 41. Revisão de 25/10/2026 — 3 ports das Ondas 1 e 2 saem do menu
 
 Os 26 ports das Ondas 1, 2 e 3 foram instalados de verdade, um por um, no
 Windows (`tools/validate_ports.ps1`, que baixa a versão fixada e confere o
@@ -1762,3 +1743,29 @@ SHA-256). Três **saem do menu e do site** e ficam no catálogo com
 Na mesma revisão, o Silent Hill (que falhava no Windows por haver builds
 antigas e uma de Xbox na release) passou a instalar normalmente. Os outros 22
 instalaram de primeira.
+
+---
+
+## 42. Lançamento da Versão 0.9.78 (25/10/2026)
+
+Publicada em 25/10/2026 para Windows, Linux e macOS (Apple Silicon): os três pacotes
+estão no `version.json` do site e na release
+[v0.9.78 do GitHub](https://github.com/GuhClemente/Karamelo/releases/tag/v0.9.78).
+O catálogo de ports publicado junto é o `ports.json` v5.
+
+Contagens atualizadas: **37 sistemas, 42 motores; 93 ports — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**.
+
+Novidades para o jogador:
+
+- **Ports com versão e arquivo verificados**: cada port do catálogo instala uma versão
+  específica e o Karamelo confere o SHA-256 do arquivo baixado. Arquivo diferente do
+  esperado é recusado — proteção contra repositório invadido ou release adulterada.
+- **Novos ports sem atualizar o app**: o catálogo é baixado de
+  `karamelo-emu.com/downloads/ports.json` e vale a partir do próximo início.
+- **Nomes de jogos em qualquer idioma (Windows)**: ROMs com nome em japonês ou outros
+  alfabetos agora aparecem na lista e abrem; acentos são mostrados sem acento no menu.
+- **Relatório de falhas agora é opcional**: vem desligado; o jogador ativa em
+  Configurações > Diagnóstico. Se o app fechar sozinho, ele avisa onde ativar.
+- **Tradução completa**: todos os avisos seguem o idioma escolhido (português/inglês).
+
+---

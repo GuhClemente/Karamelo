@@ -646,6 +646,18 @@ static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
 				}
 			}
 		}
+		// Same fallbacks as the extraction in ArchiveExtractAll: macOS ships no
+		// 7z at all, and its tar is bsdtar (libarchive), which reads both.
+		if (exit_code != 0 && ext == ".rar")
+		{
+			output.clear();
+			exit_code = RunHiddenCommandCaptureOutput({ "unrar", "lb", archive_path }, 30000, output);
+		}
+		if (exit_code != 0)
+		{
+			output.clear();
+			exit_code = RunHiddenCommandCaptureOutput({ "bsdtar", "-tf", archive_path }, 30000, output);
+		}
 	}
 	else if (ext == ".zip")
 	{
@@ -750,7 +762,27 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 #endif
 	if (ext == ".7z" || ext == ".rar")
 	{
+		// 7z is not enough on its own. Ubuntu 24.04's "7zip" package is the
+		// build without the RAR codec: it lists a .rar fine and then fails on
+		// every file ("Sub items Errors"), leaving empty files behind - PC-98
+		// games distributed as .rar never opened on Linux. macOS has no 7z at
+		// all. So: 7z, then unrar for RAR, then bsdtar (libarchive, macOS's own
+		// tar), each starting from an empty folder.
+		auto reset_dest = [&]() {
+			fs::remove_all(dest_dir, fs_ec);
+			fs::create_directories(dest_dir, fs_ec);
+		};
 		ok = RunHiddenCommand({ "7z", "x", "-y", "-o" + dest_dir, archive_path }, EXTRACT_TIMEOUT_MS);
+		if (!ok && ext == ".rar")
+		{
+			reset_dest();
+			ok = RunHiddenCommand({ "unrar", "x", "-o+", "-y", archive_path, dest_dir + "/" }, EXTRACT_TIMEOUT_MS);
+		}
+		if (!ok)
+		{
+			reset_dest();
+			ok = RunHiddenCommand({ "bsdtar", "-xf", archive_path, "-C", dest_dir }, EXTRACT_TIMEOUT_MS);
+		}
 	}
 	else if (ext == ".zip")
 	{

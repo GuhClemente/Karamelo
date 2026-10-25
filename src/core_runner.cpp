@@ -9,6 +9,7 @@
 #else
 #include "compat_win32.h"
 #endif
+#include <atomic>
 #include <thread>
 #include <vector>
 #include <SDL3/SDL.h>
@@ -1900,7 +1901,15 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// a thread that owns a window and never pumps messages is asking
 			// for a stall.
 			else if (strcmp(var->key, "parallel-n64-gfxplugin") == 0)
+#ifdef _WIN32
 				var->value = (MenuGetHwRender() && HwGlProbed()) ? "glide64" : "angrylion";
+#else
+				// glide64 crashes inside Mesa from retro_unload_game - every
+				// N64 game closed with ParaLLEl killed the app on Linux (seen
+				// on llvmpipe and on an NVIDIA GPU through d3d12 alike).
+				// GLideN64 is the same plugin Mupen64Plus-Next uses here.
+				var->value = (MenuGetHwRender() && HwGlProbed()) ? "gliden64" : "angrylion";
+#endif
 			else if (strcmp(var->key, "parallel-n64-rspplugin") == 0)
 				var->value = (MenuGetHwRender() && HwGlProbed()) ? "hle" : "cxd4";
 			else if (strcmp(var->key, "mupen64plus-rdp-plugin") == 0)
@@ -3674,8 +3683,16 @@ void CoreRecoverLocksHeldByThread(unsigned long thread_id)
 // Defined further down, next to the buffer it owns.
 static void FreeLoadedRomData();
 
+static std::atomic<bool> s_core_force_killed{ false };
+
+bool CoreWasForceKilled()
+{
+	return s_core_force_killed.load();
+}
+
 static void RecoverAfterKilledCore(unsigned long killed_thread_id)
 {
+	s_core_force_killed.store(true);
 	// The core thread was killed, so RetroUnloadGameGuarded never ran and never
 	// got to release the game buffer. Nothing can still be reading it - the only
 	// thing that ever held the pointer was the core we just terminated.
@@ -4566,6 +4583,12 @@ static void CoreUnload()
 		g_core_option_raw.clear();
 		LeaveCriticalSection(&options_lock);
 
+		// A GL core frees its GL objects inside retro_unload_game, so its
+		// context has to be current on this thread when it runs. ParaLLEl N64
+		// on Linux crashed inside Mesa (libgallium) right there, from
+		// retro_unload_game - every close of an N64 game with that core.
+		if (HwIsActive() && !HwMakeCurrent())
+			CoreLogPrintf(RETRO_LOG_WARN, "[CoreUnload] contexto GL nao pode ser ativado antes do unload");
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando RetroUnloadGameGuarded...");
 		RetroUnloadGameGuarded();
 		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] RetroUnloadGameGuarded concluido.");

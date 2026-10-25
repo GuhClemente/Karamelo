@@ -14,6 +14,11 @@
 // declare the window unresponsive.
 bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint);
 bool CoreIsLoading();
+// True once a core thread had to be stopped by force (CoreShutdown timed out).
+// Its library is still mapped with a thread frozen inside it, so the process
+// must not run that library's static destructors on the way out - see
+// main_linux.cpp, which then leaves with _exit().
+bool CoreWasForceKilled();
 std::string CoreResolveBinaryPath(const char* dll_or_so_path);
 bool CoreBinaryExists(const char* dll_or_so_path);
 // Video frames the current game has delivered since it loaded (reset on every

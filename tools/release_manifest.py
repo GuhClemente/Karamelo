@@ -17,7 +17,8 @@ macos_bin_* e linux_bin_*. Cada build e publicada de uma maquina diferente
               mesmo binario velho (o hash confere) e pediria de novo a cada
               inicio. Os campos do binario saem; o pacote (tar_url) fica para
               o site. Com o campo de versao, o app 0.9.78+ decide sozinho.
-            - "notes" vem da secao "## Versao <version>" do docs/SITE_SYNC.md
+            - "notes" vem da secao do docs/SITE_SYNC.md cujo titulo tem "Versao <version>"
+              (ex.: "## 42. Lancamento da Versao 0.9.78 (25/10/2026)")
               (os titulos em negrito, sem acento: o OSD so tem ASCII). Sem a
               secao, as notas da versao anterior ficariam - isso e erro.
 
@@ -88,7 +89,7 @@ def notes_for(version):
     path = os.path.join(ROOT, "docs", "SITE_SYNC.md")
     with open(path, encoding="utf-8") as f:
         lines = f.read().splitlines()
-    head = re.compile(r"^## Vers.o %s\b" % re.escape(version))
+    head = re.compile(r"^## .*Vers.o %s\b" % re.escape(version))
     for i, line in enumerate(lines):
         if head.match(line):
             titles = []
@@ -162,7 +163,7 @@ def finalize():
     elif version != app_version():
         print("  \"version\" do site e a v%s (Windows); notas mantidas." % version)
     else:
-        print("  [ERRO] docs/SITE_SYNC.md nao tem a secao \"## Versao %s\" - o site e o app"
+        print("  [ERRO] docs/SITE_SYNC.md nao tem uma secao com \"Versao %s\" no titulo - o site e o app"
               " mostrariam as notas da versao anterior. Escreva a secao e rode de novo." % version)
         ok = False
 

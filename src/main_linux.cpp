@@ -776,6 +776,23 @@ static void InstallLinuxDesktopEntry()
 }
 #endif
 
+// After a core thread was stopped by force it is frozen inside the core's
+// library, which is still loaded. A normal return from main runs that
+// library's static destructors anyway, against the state the frozen thread
+// owns - LRPS2 freed its "host memory for virtual systems" that way and glibc
+// aborted the process on the corrupted heap ("corrupted size vs. prev_size"),
+// after the game had loaded and closed fine. _exit() skips them; the log is
+// written line by line, so nothing is lost.
+static int LeaveMain(int code)
+{
+	if (CoreWasForceKilled())
+	{
+		fflush(nullptr);
+		_exit(code);
+	}
+	return code;
+}
+
 int main(int argc, char* argv[])
 {
 #ifndef _WIN32
@@ -1034,7 +1051,7 @@ int main(int argc, char* argv[])
 		bool pass = started && produced_video && (!has_retry || (retry_started && retry_running));
 		log("RESULT=%s", pass ? "PASS" : "FAIL");
 		if (lf) fclose(lf);
-		return pass ? 0 : 1;
+		return LeaveMain(pass ? 0 : 1);
 	}
 
 	// -------------------------------------------------------------
@@ -1428,5 +1445,5 @@ int main(int argc, char* argv[])
 	if (g_window) { SDL_DestroyWindow(g_window); g_window = nullptr; }
 
 	SDL_Quit();
-	return 0;
+	return LeaveMain(0);
 }

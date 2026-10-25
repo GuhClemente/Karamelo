@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 #include <errno.h>
 #include <time.h>
 #include <dlfcn.h>
@@ -197,17 +198,10 @@ static inline void ThreadCleanupHandler(void* arg)
 
 static inline void* ThreadShimProc(void* p)
 {
-	// Async, not the pthread default of deferred: TerminateThread() below is
-	// pthread_cancel() under the hood, and deferred cancellation only takes
-	// effect at a cancellation point (a blocking syscall). A core thread stuck
-	// in a CPU-bound loop with no such call never hits one, so the "graceful
-	// stop timed out, force it" recovery path silently did nothing - the
-	// thread kept running and consuming CPU while CoreShutdown() went on to
-	// free the memory and unload the DLL out from under it. TerminateThread
-	// is already the last-resort, already-known-to-be-risky escape hatch
-	// (same as real Windows TerminateThread); this just makes it actually
-	// terminate the thread instead of quietly failing to.
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+	// TerminateThread() below parks the thread with a signal instead of
+	// pthread_cancel() (see there), which also stops a thread stuck in a
+	// CPU-bound loop with no cancellation point. Nothing cancels threads
+	// anymore, so the cancel type is left at the pthread default.
 
 	ThreadShimData* s = (ThreadShimData*)p;
 	LPTHREAD_START_ROUTINE fn = s->fn;
@@ -418,6 +412,39 @@ static inline BOOL CloseHandle(HANDLE handle)
 	return TRUE;
 }
 
+// The signal TerminateThread parks a thread with. A real-time signal on Linux
+// (nothing else in the process uses it); macOS has none, so SIGUSR2 there.
+static inline int KarameloParkSignal()
+{
+#if defined(SIGRTMIN)
+	return SIGRTMIN + 4;
+#else
+	return SIGUSR2;
+#endif
+}
+
+static inline void KarameloParkHandler(int)
+{
+	// Never returns: the thread stops right where the signal found it.
+	sigset_t all;
+	sigfillset(&all);
+	for (;;) sigsuspend(&all);
+}
+
+// Windows' TerminateThread stops a thread where it is - no unwinding, no
+// destructors. pthread_cancel() was the stand-in and is not that: it unwinds
+// the stack with a forced exception, which (1) RetroUnloadGameGuarded's
+// catch(...) swallows, and glibc aborts the process when that happens
+// ("FATAL: exception not rethrown", exit 134 - LRPS2 on Linux), and (2) runs
+// through the core's own frames, which segfaulted ParaLLEl N64 (exit 139).
+// Both only showed up when a core took more than 8 s to shut down, which a
+// software-rendered Linux (WSL, llvmpipe) does routinely.
+//
+// Parking the thread in a signal handler that never returns is the actual
+// equivalent: it stops executing, keeps its stack, and the process lives on.
+// Same caveat as on Windows - whatever locks it held stay held - and the same
+// reason to accept it: this is the last resort after a core ignored the
+// request to stop.
 static inline BOOL TerminateThread(HANDLE handle, DWORD exitCode)
 {
 	(void)exitCode;
@@ -425,7 +452,16 @@ static inline BOOL TerminateThread(HANDLE handle, DWORD exitCode)
 	WinHandle* h = (WinHandle*)handle;
 	if (h->type == HANDLE_TYPE_THREAD)
 	{
-		return pthread_cancel(h->thread.th) == 0 ? TRUE : FALSE;
+		static bool installed = false;
+		if (!installed)
+		{
+			struct sigaction sa = {};
+			sa.sa_handler = KarameloParkHandler;
+			sigfillset(&sa.sa_mask);
+			sigaction(KarameloParkSignal(), &sa, NULL);
+			installed = true;
+		}
+		return pthread_kill(h->thread.th, KarameloParkSignal()) == 0 ? TRUE : FALSE;
 	}
 	return FALSE;
 }
