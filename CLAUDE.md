@@ -24,7 +24,7 @@ This file provides project guidelines, architecture details, and essential comma
 
 1. **Never Invent Counts or Numbers**:
    - Systems & Engines: Read from `include/app_info.h` (`APP_SYSTEM_COUNT = 37`, `APP_CORE_ENGINES = 42`). Never report `APP_CORE_FILES` (43) as an engine count.
-   - Ports & Recomp: Source of truth is `CREDITS.md` and `src/port_runner.cpp` (Total: 70 ports — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎). The Darkness (Xbox 360) is catalogued but `hidden` (out of the menu and the site) and is not counted.
+   - Ports & Recomp: Source of truth is `data/ports.json` (the catalog; see `docs/PORTS_CATALOG.md`) and `CREDITS.md` (Total: 70 ports — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎). The Darkness (Xbox 360) is catalogued but `hidden` (out of the menu and the site) and is not counted.
    - BIOS Information: Source of truth is `packaging/bios-guide/BIOS_NECESSARIOS.txt`.
 2. **Repository Hygiene**:
    - **Never commit BIOS files, ROMs, saves, or runtime caches**. The `.gitignore` enforces this (`bios/`, `roms/`, `saves/`, `cache/`, `cores/`).
@@ -90,6 +90,7 @@ upload_to_server.bat
 * **`src/main_win32.cpp`**: Win32 window management, Direct3D 11 swapchain, raw input, and WASAPI audio ring buffer.
 * **`src/main_linux.cpp`**: SDL3 window, event pump, gamepad handling, and renderer for Linux and macOS.
 * **`src/core_runner.cpp`**: Libretro core hosting thread, audio resampler, aspect ratio calculations, scanlines and CRT shader pipeline. Loads `.dll` (Win), `.so` (Linux), `.dylib` (macOS).
+* **`data/ports.json`** + **`src/port_catalog.cpp`**: the Ports & Recomp catalog as data, embedded in the binary (`include/ports_catalog_json.h`, regenerate with `tools/embed_ports.py`) and refreshed from `karamelo-emu.com/downloads/ports.json`. Adding a port: `docs/PORTS_CATALOG.md`.
 * **`src/port_runner.cpp`**: PC Ports & Static Recomp runner. Fetches latest GitHub releases, matches platform assets, unpacks `.zip`/`.tar.gz`/`.tar.xz`, extracts `.app` bundles (`Contents/MacOS/`), resolves executable architectures (`ARM64` > `Universal` > `x86_64`), sets permissions (`chmod +x`), and launches the games.
 * **`src/menu.cpp` & `src/osd.cpp`**: Clean-room raster OSD engine mimicking the MiSTer retro aesthetic without using GPL code from MiSTer.
 * **`src/updater.cpp`**: Checks `https://karamelo-emu.com/downloads/version.json` for binary auto-updates across Windows (`exe_*`), macOS (`macos_bin_*`) and Linux (`linux_bin_*`). Every download is size- and SHA-256-checked before it replaces the running binary. On macOS/Linux, `Karamelo --update` runs the same check/download/apply headless.

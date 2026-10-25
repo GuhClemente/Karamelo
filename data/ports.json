@@ -1,0 +1,626 @@
+{
+  "catalog_version": 1,
+  "ports": [
+    {
+      "id": "DrMario64",
+      "display_name": "Dr. Mario 64",
+      "repo": "theboy181/drmario64_recomp_plus",
+      "exe_hint": "drmario64_recomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["dr", "mario"],
+      "notes": "Verified against theboy181/drmario64_recomp_plus's actual release - the one entry here launched end-to-end (download, extract, ROM auto-copy, launch) rather than only checked against the API."
+    },
+    {
+      "id": "Zelda64Recomp",
+      "display_name": "Zelda64Recomp",
+      "repo": "Zelda64Recomp/Zelda64Recomp",
+      "needs_rom": true,
+      "rom_keywords": ["zelda", "majora"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "Goemon64Recomp",
+      "display_name": "Goemon 64",
+      "repo": "klorfmorf/Goemon64Recomp",
+      "needs_rom": true,
+      "rom_keywords": ["goemon"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "DinosaurPlanet",
+      "display_name": "Dinosaur Planet",
+      "repo": "DinosaurPlanetRecomp/dino-recomp",
+      "needs_rom": true,
+      "rom_keywords": ["dinosaur"]
+    },
+    {
+      "id": "HarvestMoon64Recomp",
+      "display_name": "Harvest Moon 64",
+      "repo": "HarvestMoon64Recomp/HarvestMoon64Recomp",
+      "needs_rom": true,
+      "rom_keywords": ["harvest", "moon"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "SnowboardKids2Recomp",
+      "display_name": "Snowboard Kids 2",
+      "repo": "cdlewis/snowboardkids2-recomp",
+      "needs_rom": true,
+      "rom_keywords": ["snowboard", "kids", "2"],
+      "has_macos_build": true
+    },
+    {
+      "id": "PokemonStadiumRecomp",
+      "display_name": "Pokemon Stadium",
+      "repo": "mstan/PokemonStadiumRecomp",
+      "needs_rom": true,
+      "rom_keywords": ["pokemon", "stadium"]
+    },
+    {
+      "id": "Banjo64Recomp",
+      "display_name": "Banjo 64",
+      "repo": "BanjoRecomp/BanjoRecomp",
+      "needs_rom": true,
+      "rom_keywords": ["banjo"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "BM64Recomp",
+      "display_name": "Bomberman 64",
+      "repo": "RevoSucks/BM64Recomp",
+      "needs_rom": true,
+      "rom_keywords": ["bomberman"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "ChameleonTwistRecomp",
+      "display_name": "Chameleon Twist",
+      "repo": "Rainchus/ChameleonTwist1-JP-Recomp",
+      "needs_rom": true,
+      "rom_keywords": ["chameleon"]
+    },
+    {
+      "id": "MegaMan64Recomp",
+      "display_name": "Mega Man 64",
+      "repo": "MegaMan64Recomp/MegaMan64Recompiled",
+      "needs_rom": true,
+      "rom_keywords": ["mega", "man"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "Quest64Recomp",
+      "display_name": "Quest 64",
+      "repo": "Rainchus/Quest64-Recomp",
+      "needs_rom": true,
+      "rom_keywords": ["quest"]
+    },
+    {
+      "id": "BMHeroRecomp",
+      "display_name": "Bomberman Hero",
+      "repo": "RevoSucks/BMHeroRecomp",
+      "needs_rom": true,
+      "rom_keywords": ["bomberman", "hero"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "ShipOfHarkinian",
+      "display_name": "Ship of Harkinian",
+      "repo": "harbourmasters/shipwright",
+      "needs_rom": true,
+      "rom_keywords": ["zelda", "ocarina"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "2Ship2Harkinian",
+      "display_name": "2 Ship 2 Harkinian",
+      "repo": "harbourmasters/2ship2harkinian",
+      "needs_rom": true,
+      "rom_keywords": ["zelda", "majora"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "Starship",
+      "display_name": "Starship",
+      "repo": "harbourmasters/starship",
+      "needs_rom": true,
+      "rom_keywords": ["star", "fox"],
+      "has_linux_build": true
+    },
+    {
+      "id": "StarFoxEnhanced",
+      "display_name": "Star Fox Enhanced",
+      "repo": "kandowontu/starfox-enhanced",
+      "needs_rom": true,
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "SpaghettiKart",
+      "display_name": "SpaghettiKart",
+      "repo": "harbourmasters/spaghettikart",
+      "needs_rom": true,
+      "rom_keywords": ["mario", "kart"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "Ghostship",
+      "display_name": "Ghostship",
+      "repo": "harbourmasters/ghostship",
+      "needs_rom": true,
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "PerfectDark",
+      "display_name": "Perfect Dark",
+      "repo": "perfect-dark-pc-port/perfect_dark",
+      "needs_rom": true,
+      "rom_keywords": ["perfect", "dark"],
+      "has_macos_build": true
+    },
+    {
+      "id": "SM64CoopDX",
+      "display_name": "Super Mario 64 CoopDX",
+      "repo": "coop-deluxe/sm64coopdx",
+      "needs_rom": true,
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "CannonballDX",
+      "display_name": "OutRun (CannonBall DX)",
+      "repo": "Endprodukt/cannonball-dx",
+      "exe_hint": "cannonball-dx.exe",
+      "needs_rom": true,
+      "rom_keywords": ["outrun"]
+    },
+    {
+      "id": "AnimalCrossingGC",
+      "display_name": "Animal Crossing",
+      "repo": "flyngmt/ACGC-PC-Port",
+      "needs_rom": true
+    },
+    {
+      "id": "NutsAndBolts",
+      "display_name": "Banjo-Kazooie: Nuts & Bolts",
+      "repo": "masterspike52/reNut",
+      "needs_rom": true
+    },
+    {
+      "id": "DBZBudokai",
+      "display_name": "Dragon Ball Z Budokai",
+      "repo": "WistfulHopes/DBZ1",
+      "needs_rom": true
+    },
+    {
+      "id": "InfiniteMario64",
+      "display_name": "Infinite Mario 64",
+      "repo": "Brawmario/infinite-mario-64-ever",
+      "needs_rom": true,
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "JakAndDaxter",
+      "display_name": "Jak & Daxter",
+      "repo": "open-goal/jak-project",
+      "needs_rom": true
+    },
+    {
+      "id": "SeveredChains",
+      "display_name": "Severed Chains",
+      "repo": "Legend-of-Dragoon-Modding/Severed-Chains",
+      "needs_rom": true
+    },
+    {
+      "id": "REDRIVER2",
+      "display_name": "REDRIVER 2",
+      "repo": "OpenDriver2/REDRIVER2",
+      "needs_rom": true,
+      "has_linux_build": true
+    },
+    {
+      "id": "SymphonyRecomp",
+      "display_name": "Castlevania: Symphony of the Night",
+      "repo": "GuhClemente/SymphonyRecomp",
+      "needs_rom": true
+    },
+    {
+      "id": "Sonic1Forever",
+      "display_name": "Sonic 1 Forever",
+      "repo": "ElspethThePict/S1Forever",
+      "needs_rom": true
+    },
+    {
+      "id": "Sonic3AIR",
+      "display_name": "Sonic 3 A.I.R.",
+      "repo": "Eukaryot/sonic3air",
+      "needs_rom": true,
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "notes": "macOS flipped true 27/09/2026: the stable release's .dmg only failed to install because ArchiveExtractAll tripped over the volume's unreadable .Trashes - fixed there. Verified end to end with --install-port (universal Mach-O, Developer ID signed) and a launch that reaches the game's own ROM prompt."
+    },
+    {
+      "id": "SonicUnleashedRecomp",
+      "display_name": "Sonic Unleashed",
+      "repo": "hedge-dev/UnleashedRecomp",
+      "needs_rom": true
+    },
+    {
+      "id": "SpaceStationSiliconValley",
+      "display_name": "Space Station Silicon Valley",
+      "repo": "Cellenseres/SSSV_Recomp",
+      "needs_rom": true,
+      "rom_keywords": ["silicon", "valley"],
+      "has_macos_build": true
+    },
+    {
+      "id": "SMBRemastered",
+      "display_name": "Super Mario Bros. Remastered",
+      "repo": "JHDev2006/Super-Mario-Bros.-Remastered-Public",
+      "needs_rom": true,
+      "has_linux_build": true
+    },
+    {
+      "id": "SuperMarioWorldRecomp",
+      "display_name": "Super Mario World",
+      "repo": "mstan/SuperMarioWorldRecomp",
+      "needs_rom": true,
+      "has_linux_build": true
+    },
+    {
+      "id": "SuperMetroidRecomp",
+      "display_name": "Super Metroid",
+      "repo": "mstan/SuperMetroidRecomp",
+      "exe_hint": "SuperMetroidSNESRecomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["metroid"],
+      "notes": "Linux and macOS flipped back to false 27/09/2026: v0.3.9 (22/09) ships only SuperMetroidSNESRecomp-windows-x64-v0.3.9.zip, where v0.3.4-v0.3.8 also had linux-x64 and macos-arm64/x64 zips. On a Mac --install-port now fails with \"nenhum build macOS na release deste port\"; Linux was not run here, but the one asset left has nothing PickLinuxAsset can match. Flip again if upstream brings them back."
+    },
+    {
+      "id": "VivaPinataTiP",
+      "display_name": "Viva Pinata: Trouble in Paradise",
+      "repo": "SolarCookies/TiP-Recomp",
+      "needs_rom": true
+    },
+    {
+      "id": "WipeoutPhantomEdition",
+      "display_name": "WipEout Phantom Edition",
+      "repo": "wipeout-phantom-edition/wipeout-phantom-edition",
+      "needs_rom": true
+    },
+    {
+      "id": "ValkyrieRecomp",
+      "display_name": "Valkyrie Profile",
+      "repo": "Ed1z19/ValkyrieRecomp",
+      "exe_hint": "ValkyrieRecomp.exe",
+      "needs_rom": true,
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "WaveRace64Recomp",
+      "display_name": "Wave Race 64",
+      "repo": "elliotttate/wave-race-64-recomp",
+      "exe_hint": "WaveRace64Recomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["wave", "race"],
+      "has_macos_build": true
+    },
+    {
+      "id": "Snap64Recomp",
+      "display_name": "Pokemon Snap",
+      "repo": "JackandBeans/Snap64Recomp",
+      "exe_hint": "Snap64Recomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["pokemon", "snap"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "notes": "Linux flipped true 21/09/2026: PickLinuxAsset now accepts .tar.gz directly (it didn't when this entry was first added, on 11/09 - see CREDITS.md's own note on this row, now stale) and the release still ships a real linux-x86_64.tar.gz. Verified end to end with --install-port, not just by re-reading the release assets. macOS flipped true 27/09/2026: v1.1.0 is the first release with a macos-universal.zip. Verified with --install-port (universal Mach-O .app, exe found inside Contents/MacOS) and a launch that reaches the game's own ROM prompt."
+    },
+    {
+      "id": "BodyHarvestRecomp",
+      "display_name": "Body Harvest",
+      "repo": "danielgomesvieira2000/body-harvest-recomp",
+      "exe_hint": "body-harvest-recomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["body", "harvest"],
+      "has_linux_build": true
+    },
+    {
+      "id": "DKRRecomp",
+      "display_name": "Diddy Kong Racing",
+      "repo": "ThatGuyMcd/DKR-R",
+      "exe_hint": "DKR-R.exe",
+      "needs_rom": true,
+      "rom_keywords": ["diddy", "kong", "racing"],
+      "has_linux_build": true
+    },
+    {
+      "id": "DevilutionX",
+      "display_name": "Diablo (DevilutionX)",
+      "repo": "diasurgical/devilutionX",
+      "exe_hint": "devilutionx.exe",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "notes": "DevilutionX and Fallout1CE ship .dmg for macOS - native mounting via hdiutil in ArchiveExtractAll handles this seamlessly."
+    },
+    {
+      "id": "TheForceEngine",
+      "display_name": "Star Wars: Dark Forces (TFE)",
+      "repo": "TheForceEngine/TheForceEngine",
+      "exe_hint": "TheForceEngine.exe"
+    },
+    {
+      "id": "Fallout1CE",
+      "display_name": "Fallout (Community Edition)",
+      "repo": "alexbatalov/fallout1-ce",
+      "exe_hint": "fallout-ce.exe",
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "Reblue",
+      "display_name": "Pokemon Red and Blue (reblue)",
+      "repo": "zolaware/reblue",
+      "exe_hint": "reblue.exe",
+      "needs_rom": true,
+      "rom_keywords": ["pokemon"],
+      "has_linux_build": true
+    },
+    {
+      "id": "OpenSpideyPS1",
+      "display_name": "Spider-Man (OpenSpidey)",
+      "repo": "GTTeancum/OpenSpideyPS1",
+      "needs_rom": true,
+      "rom_keywords": ["spider", "man"]
+    },
+    {
+      "id": "FZeroRecomp",
+      "display_name": "F-Zero X",
+      "repo": "craigshaw/FZeroRecomp",
+      "exe_hint": "FZeroRecomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["f-zero"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "AeroGaugeRecomp",
+      "display_name": "AeroGauge",
+      "repo": "alondero/aerogauge-recomp",
+      "exe_hint": "aerogauge_modern.exe",
+      "needs_rom": true,
+      "rom_keywords": ["aerogauge"],
+      "has_linux_build": true
+    },
+    {
+      "id": "CrashBandicootLauncher",
+      "display_name": "Crash Bandicoot",
+      "repo": "Matteo842/CrashBandicoot-Launcher",
+      "exe_hint": "CrashBandicoot.exe",
+      "needs_rom": true,
+      "rom_keywords": ["crash"],
+      "has_linux_build": true
+    },
+    {
+      "id": "MarioStrikers",
+      "display_name": "Super Mario Strikers",
+      "repo": "new-coke/strikers",
+      "exe_hint": "strikers.exe",
+      "needs_rom": true,
+      "rom_keywords": ["strikers"],
+      "has_linux_build": true,
+      "has_macos_build": true
+    },
+    {
+      "id": "OpenNectar",
+      "display_name": "Pikmin (Open Nectar)",
+      "repo": "SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port",
+      "exe_hint": "nectar.exe",
+      "needs_rom": true,
+      "rom_keywords": ["pikmin"],
+      "has_linux_build": true
+    },
+    {
+      "id": "RingOut",
+      "display_name": "Soulcalibur II (Ring Out)",
+      "repo": "jackpoison-prog/RingOut",
+      "exe_hint": "RingOut.exe",
+      "needs_rom": true,
+      "rom_keywords": ["soul"],
+      "has_linux_build": true
+    },
+    {
+      "id": "TheDarknessRecomp",
+      "display_name": "The Darkness",
+      "repo": "portingpete/The-Darkness-Recomp",
+      "exe_hint": "DarkRecomp.exe",
+      "exe_relpath": "build_native/Release/DarkRecomp.exe",
+      "launch_args": ["--timeout-ms", "0", "--engine-preview"],
+      "console_log_relpath": "build_native/run/karamelo_runtime.log",
+      "x360_game_dir": "Darkness",
+      "iso_keywords": ["darkness"],
+      "iso_dirs": ["Xbox360", "Xbox 360", "X360"],
+      "hidden": true,
+      "notes": "Xbox 360 static recomp. Verified 27/09/2026 against the real v0.1.2 release (prerelease-only repo - /latest 404s, the /releases fallback in DownloadAndInstall picks it up): one \"-windows-x64.zip\" with Launch.cmd at the root and the game in build_native/Release/. Arguments mirror what upstream's own DarkRecompPreview.exe passes (\"play\" mode): without --timeout-ms 0 the runtime quits itself after 30 s, and --engine-preview is the playable engine path. --game-dir is left at its default (\"Darkness\", relative to the working directory, which exe_relpath makes the port folder). No Linux/macOS build. Hidden since 27/09/2026: the dump pipeline is validated against a real disc and the game boots, but upstream's runtime is still far too broken to offer - see docs/XBOX360_RECOMP.md."
+    },
+    {
+      "id": "MeleeUnlocked",
+      "display_name": "Super Smash Bros. Melee (Unlocked)",
+      "repo": "Hero88go/melee-unlocked",
+      "exe_hint": "melee_port.exe",
+      "exe_relpath": "melee_port.exe",
+      "launch_args": ["--iso", "{iso}", "--settings-path", "port-settings.ini", "--sys-dir", "Sys", "--user-dir", "User/Slippi", "--replay-dir", "Replays", "--card-dir", "User/GC/CardA", "--threaded-renderer"],
+      "iso_keywords": ["melee"],
+      "iso_dirs": ["GameCube", "GC"],
+      "iso_disc_id": "GALE01",
+      "iso_disc_rev": 2,
+      "iso_disc_label": "MELEE NTSC 1.02",
+      "notes": "GameCube static recomp (PowerPC -> C++ plus Slippi's Gecko codes), D3D12/D3D11. Verified 27/09/2026 against the real v0.7.1 release: one \"-win64.zip\" wrapping a single MeleeUnlocked-<ver>/ folder (flattened on install). The pinned exe matters here: the alphabetical tie-break would pick MeleeUnlockedLauncher.exe, the project's optional launcher that updates itself into Versions/ - not something Karamelo should hand control to. Arguments are exactly MeleeUnlocked.bat's, with paths relative to the port folder (the working directory) and the ISO read in place from roms/GameCube/ rather than copied next to it as melee.iso. GUI subsystem, so no console to hide. Needs the NTSC 1.02 disc; the game itself checks the revision. No Linux/macOS build."
+    },
+    {
+      "id": "Yakumo",
+      "display_name": "Monster Hunter Portable 3rd (Yakumo)",
+      "repo": "TeamGDB/Yakumo",
+      "exe_hint": "Yakumo.exe",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "notes": "PSP static recomp of Monster Hunter Portable 3rd HD Ver. (Vulkan, SDL3, MIT). Releases ship Windows zip, Linux tar.gz (+ a Flatpak the picker skips), macOS .dmg and an Android .apk, next to an ffmpeg source tarball. No ROM handling here: the game's own first-run setup asks for the NPJB-40001 image, checks it and prepares the executable itself, gamepad-friendly."
+    },
+    {
+      "id": "Foxhollow",
+      "display_name": "Star Fox Adventures (Foxhollow)",
+      "repo": "JackPriceBurns/foxhollow",
+      "exe_hint": "foxhollow.exe",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["fox", "adventures"],
+      "iso_dirs": ["GameCube", "GC"],
+      "iso_exts": [".iso", ".rvz", ".gcm"],
+      "downloads_json_url": "https://api.foxhollow.dev/releases",
+      "notes": "Star Fox Adventures native port (SFA decompilation + Aurora), CC0-1.0. Verified 29/09/2026 against v1.0.7: the GitHub release carries no binaries - the project's launcher downloads them from api.foxhollow.dev/releases (public, newest first), one per OS: a Windows .zip with foxhollow.exe + DLLs at the root, a Linux x86-64 ELF and a native arm64 Mach-O, each alone in a .tar.gz. The disc path is argv[1]; the game reads .iso and .rvz in place and accepts GSAE01 1.0/1.1, GSAP01 1.0/1.1 and GSAJ01 1.0, so there is no header check here - an unsupported disc makes the game itself refuse it."
+    },
+    {
+      "id": "CBFDRecomp",
+      "display_name": "Conker's Bad Fur Day",
+      "repo": "sciaschi/CBFD-Recompiled",
+      "exe_hint": "ConkerRecomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["conker"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "launch_args": ["--rom", "{rom}"],
+      "notes": "Conker's Bad Fur Day static recomp (CBFD-Recompiled / RT64, GPL-3.0). Official releases publish Windows zip, Linux tar.gz and native macOS (Apple Silicon) zip with ConkerRecomp.app. Assets include a separate Mods zip (filtered out by LooksLikeCompanionTool). Requires the original US ROM (.z64); passing --rom registers it into the game's local storage on first run and boots immediately."
+    },
+    {
+      "id": "ProjectCane",
+      "display_name": "Sly Cooper (ProjectCane)",
+      "repo": "theclub654/ProjectCane",
+      "exe_hint": "Sly Cooper and the Thievius Raccoonus.exe",
+      "has_linux_build": true,
+      "notes": "Sly Cooper and the Thievius Raccoonus native PC port (ProjectCane, PS2 reverse engineering). Official releases publish Windows RAR (with game exe + File Extractor GUI) and a Linux RAR (portable AppImage + File Extractor GUI). Upstream has no macOS build. Requires game assets from NTSC PS2 ISO (SCUS-97198) extracted via File Extractor GUI."
+    },
+    {
+      "id": "LodRecomp",
+      "display_name": "Castlevania: Legacy of Darkness",
+      "repo": "fliperama86/cvlod_recomp",
+      "exe_hint": "LodRecomp.exe",
+      "needs_rom": true,
+      "rom_keywords": ["legacy"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "launch_args": ["{rom}"],
+      "notes": "Castlevania: Legacy of Darkness static recomp (cvlod_recomp / N64Recomp, GPL-3.0). Official releases publish Windows zip, Linux tar.gz and native macOS (Apple Silicon arm64) zip. Requires stock Castlevania: Legacy of Darkness USA ROM (.z64, ND4E). Accepts {rom} positional argument and rom.z64 in the port directory."
+    },
+    {
+      "id": "BlackRecomp",
+      "display_name": "BLACK",
+      "repo": "TGP482/BLACK-XBERecomp",
+      "exe_hint": "BLACK.exe",
+      "iso_keywords": ["black"],
+      "iso_dirs": ["Xbox", "OriginalXbox", "XboxOG"],
+      "notes": "BLACK static recomp (original Xbox via XboxXBE-Recomp SDK), Direct3D 12. Official releases publish Windows zip (BLACK-XBERecomp.zip) containing BLACK.exe, d3dcompiler_47.dll and an assets/ directory. Game assets: the game reads default.xbe or an original Xbox .iso directly placed inside the assets/ directory (supports USA and Europe releases). Karamelo automatically resolves and links/copies the user's ISO from roms/Xbox/ into ports/BlackRecomp/assets/ if not already present."
+    },
+    {
+      "id": "CPS2Recomp",
+      "display_name": "CPS-2 Recomp (Capcom Arcade)",
+      "repo": "tmcleroy/cps2recomp",
+      "exe_hint": "cps2recomp-launcher.exe",
+      "needs_rom": true,
+      "rom_keywords": ["sfa2", "dino", "avsp", "vsav"],
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "notes": "CPS-2 Recomp (Capcom CPS-1 and CPS-2 arcade static recompilation by tmcleroy). Official releases publish Windows zip (CPS2Recomp-windows-x64.zip), Linux tarball (CPS2Recomp-linux-x86_64.tar.gz), and macOS zip (CPS2Recomp-macOS.zip with CPS-2 Recomp.app). Includes Street Fighter Alpha 2, Cadillacs and Dinosaurs, Alien vs. Predator, Super Puzzle Fighter II Turbo, Vampire Savior 1/2, Vampire Hunter 2, and Vampire Savior Definitive. Karamelo automatically copies available ROM sets from roms/Arcade (sfa2u.zip, dino.zip, avspu.zip, etc.) into ports/CPS2Recomp/ before execution."
+    },
+    {
+      "id": "WG3DRecomp",
+      "display_name": "Wayne Gretzky's 3D Hockey",
+      "repo": "geno55/wg3d-recomp",
+      "exe_hint": "wg3d.exe",
+      "needs_rom": true,
+      "rom_keywords": ["gretzky"],
+      "launch_args": ["{rom}"],
+      "rom_exclude_keywords": ["98"],
+      "notes": "Wayne Gretzky's 3D Hockey static recomp (N64 USA v1.0 via N64Recomp + RT64 by geno55). Official releases publish Windows zip (wg3d-recomp-v<ver>-windows-x64.zip) containing wg3d.exe, RT64 D3D12/Vulkan backends and MSVC runtime DLLs. Accepts original USA N64 ROM (.z64/.v64/.n64) as argument or copied to port directory."
+    },
+    {
+      "id": "Rush2Recompiled",
+      "display_name": "Rush 2: Extreme Racing USA",
+      "repo": "bryantmh/rush2recompiled",
+      "exe_hint": "Rush2Recompiled.exe",
+      "needs_rom": true,
+      "rom_keywords": ["rush 2", "extreme"],
+      "has_linux_build": true,
+      "launch_args": ["{rom}"],
+      "notes": "Rush 2: Extreme Racing USA static recomp (N64 via N64Recomp by bryantmh). Official releases publish Windows zip (Rush2Recompiled-<ver>.zip) and Linux AppImage."
+    },
+    {
+      "id": "AutomobiliLamborghini",
+      "display_name": "Automobili Lamborghini",
+      "repo": "alondero/automobililamborghini-recomp",
+      "exe_hint": "lamborghini_modern.exe",
+      "needs_rom": true,
+      "rom_keywords": ["lamborghini"],
+      "has_linux_build": true,
+      "launch_args": ["{rom}"],
+      "notes": "Automobili Lamborghini static recomp (N64 USA via N64Recomp + RT64 by alondero). Official releases publish Windows zip and Linux zip (lamborghini_modern)."
+    },
+    {
+      "id": "RoadRash64",
+      "display_name": "Road Rash 64",
+      "repo": "linkssy2/RoadRash64Recompiled",
+      "exe_hint": "RoadRash64Recompiled.exe",
+      "needs_rom": true,
+      "rom_keywords": ["road", "rash"],
+      "has_linux_build": true,
+      "launch_args": ["{rom}"],
+      "notes": "Road Rash 64 static recomp (N64 USA v1.0 via N64Recomp by linkssy2). Official releases publish Windows zip and Linux Experimental AppImage."
+    },
+    {
+      "id": "JungleStrikeSNES",
+      "display_name": "Jungle Strike",
+      "repo": "Junior-Jones/Jungle-Strike-SNES-Static-Recomp",
+      "exe_hint": "Launcher.exe",
+      "needs_rom": true,
+      "rom_keywords": ["jungle", "strike"],
+      "notes": "Jungle Strike static recomp (SNES by Junior-Jones). Official releases publish Windows zip with Launcher.exe and Rom/ directory."
+    },
+    {
+      "id": "IcoPC",
+      "display_name": "ICO",
+      "repo": "nathanialf/ico-pc",
+      "exe_hint": "ico_pc_x64.exe",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "launch_args": ["{iso}"],
+      "iso_keywords": ["ico"],
+      "iso_dirs": ["PlayStation2", "PS2"],
+      "iso_exts": [".iso", ".chd", ".bin"],
+      "iso_keywords_whole_word": true,
+      "notes": "ICO native PC port (PS2 PAL SCES-50760 decompilation by nathanialf). Official releases publish Windows zip, Linux tarball and macOS (Apple Silicon arm64) dmg/zip. Accepts user's PAL disc image (.iso, .chd, .bin)."
+    },
+    {
+      "id": "RenegadeSquadronPC",
+      "display_name": "Star Wars Battlefront: Renegade Squadron",
+      "repo": "GTTeancum/StarWars-RenegadeSquadron-PC",
+      "exe_hint": "RenegadeSquadron.exe",
+      "iso_keywords": ["renegade", "squadron"],
+      "iso_dirs": ["PSP", "PlayStationPortable"],
+      "iso_exts": [".iso"],
+      "psp_game_dir": "data",
+      "notes": "Star Wars Battlefront: Renegade Squadron native PC port (PSP via static recomp by GTTeancum). Official releases publish Windows zip (RenegadeSquadronPC). Direct3D 12, 60 FPS, twin-stick controls. The game reads the disc's PSP_GAME folder from data/ - it takes no ISO argument. PreparePspGame() extracts the user's US ISO (ULUS10292) there before the first launch. Only a plain .iso: a .cso is compressed and nothing here can unpack it."
+    }
+  ]
+}

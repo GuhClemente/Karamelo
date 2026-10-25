@@ -56,4 +56,9 @@ bool PortInstallOnly(const std::string& port_id, std::string& out_error);
 // _uncrypted.xex generation, digest-checked). Used by --prepare-port.
 bool PortPrepareOnly(const std::string& port_id, std::string& out_error);
 
+// Writes the loaded ports catalog as JSON (see port_catalog.h).
+bool PortDumpCatalog(const char* path);
+// Background check for a newer catalog on karamelo-emu.com (next start).
+void PortStartCatalogRefresh();
+
 #endif

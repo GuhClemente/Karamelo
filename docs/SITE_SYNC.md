@@ -1586,7 +1586,18 @@ Inclusão oficial de dois dos computadores mais icônicos do mercado japonês no
    - Substituição da ROM de estresse em `app/roms/PlayStation2/`: conversão da imagem MODE2/2352 de *Sega Ages 2500 Series Vol. 1: Phantasy Star Generation: 1* para `.iso` padrão ISO9660 de **60 MB** (em substituição à imagem de 943 MB de *Men in Black II*).
    - Redução drástica no tempo de teste do PS2 no pipeline de build (`compile_port.bat`, `package_release.bat`, `deploy_all.bat`), caindo de ~54s para ~36s por ciclo de driver e liberando quase 900 MB de espaço em disco.
 
+---
 
+## Catálogo de Ports & Recomp publicado como dado (25/10/2026)
 
+A lista de "Ports & Recomp" deixou de ficar dentro do código do app. Ela agora é o
+arquivo `data/ports.json` do repositório, publicado em
+**`https://karamelo-emu.com/downloads/ports.json`** junto do `version.json`.
 
+> **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
+> arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
+> `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
+> Hoje: **70 jogos — 70 Windows 🪟, 42 Linux 🐧, 31 macOS 🍎** (sem mudança de contagem).
 
+Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
+o catálogo novo em segundo plano e mostra o port a partir do próximo início.

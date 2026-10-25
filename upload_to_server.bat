@@ -67,7 +67,7 @@ rem redistribuicao, a mesma coisa que o README proibe para o repositorio.
 rem O create_packs.ps1 continua gerando o arquivo em dist/ para uso local.
 set EXTRA_FILES=
 
-scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" %LINUX_DEPLOY_FILES% %MACOS_DEPLOY_FILES% "%LOCAL_JSON%" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" %LINUX_DEPLOY_FILES% %MACOS_DEPLOY_FILES% "%LOCAL_JSON%" "%~dp0data\ports.json" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
 rem O script de deploy vai para /root/, nunca para %REMOTE_DIR%: aquela pasta e
 rem servida publicamente, e o fix_server.sh acabou exposto em /downloads/.
 scp -o StrictHostKeyChecking=no "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:/root/fix_server.sh

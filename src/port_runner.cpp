@@ -23,6 +23,7 @@ extern char **environ;
 #include <stdio.h>
 
 #include "port_runner.h"
+#include "port_catalog.h"
 #include "core_runner.h"
 #include "menu.h"
 #include "osd.h"
@@ -100,114 +101,7 @@ static std::string ToLowerStr(const std::string& s) {
 // -------------------------------------------------------------
 // Known ports registry
 // -------------------------------------------------------------
-// Adding a new N64Recomp-style port is one entry here: id (also the folder
-// name under ports/), display name, "owner/repo" for its GitHub releases,
-// and - if the game needs the original ROM present to extract its assets -
-// the keywords a candidate ROM filename must all contain. exe_hint is only
-// an optimization; leave it empty and FindBestExecutable() below picks the
-// largest .exe in the extracted tree, which is enough to launch a port whose
-// exact executable name was never verified against a real release.
-//
-// DrMario64 is the one entry this file has actually launched end-to-end,
-// ROM auto-copy included. Zelda64Recomp's repo and release asset naming are
-// confirmed against the real GitHub release, but nobody has run a full
-// download-to-launch pass on it here - it is the worked example for "how do
-// I add the next one", not a second verified port.
-struct PortDefinition {
-    std::string id;
-    std::string display_name;
-    std::string repo;        // "owner/repo" on GitHub; empty = not auto-installable
-    std::string exe_hint;    // expected exe filename, best-effort only
-    bool needs_rom;
-    std::vector<std::string> rom_keywords; // all must appear (lowercased) in a ROM filename
-    // Verified 11/09/2026 by actually checking each repo's latest release for
-    // a .zip PickLinuxAsset would pick (an explicit linux/.deb/.rpm/appimage/
-    // flatpak marker, matching IsLinuxAssetName - see that function's own
-    // comment for why an unmarked zip is never assumed to be a Linux build).
-    // Most of this table has never shipped anything but a Windows zip; only
-    // the entries below with true actually have one. Defaults to false via
-    // this trailing member initializer (valid since C++14 for an aggregate,
-    // which this still is) so every existing entry above didn't need
-    // touching - only the ones being marked true got a 7th element added.
-    // Two releases that DO publish a Linux-tagged .zip were deliberately
-    // left false anyway: BanjoRecomp and SonicUnleashedRecomp's only Linux
-    // asset is a Flatpak bundle wrapped in a .zip, which is not something
-    // FindBestExecutable can launch (no plain executable inside, just the
-    // .flatpak bundle file) - it would pass this matcher, download, then
-    // fail with "pacote instalado sem executavel" the moment it's selected.
-    // This needs re-checking periodically, same as exe_hint/rom_keywords -
-    // a project can add or drop platforms between verifications.
-    bool has_linux_build = false;
-    bool has_macos_build = false;
-
-    // Everything below is optional and only used by ports whose release
-    // cannot be launched by "find the one .exe and run it bare". The Darkness
-    // Recomp (first user of all four) ships a 93 MB console-subsystem
-    // DarkRecomp.exe two folders deep, next to a 64 KB DarkRecompPreview.exe
-    // launcher that fires the game off and exits at once - which would make
-    // the exit monitor restore Karamelo over a game that is still running.
-    //
-    // exe_relpath: exact executable, relative to the port folder. When set it
-    // replaces FindBestExecutable() entirely (a guess there would pick the
-    // dump's own basefile.exe, which is a memory image, not a program) and
-    // the process starts with the port folder itself as working directory.
-    std::string exe_relpath;
-    // Extra command-line arguments. "{iso}" inside one is replaced with the
-    // absolute path of the user's disc image (see iso_keywords) - a port
-    // that reads the ISO in place gets pointed at it instead of a multi-GB
-    // copy. With no matching image the launch stops with a toast saying
-    // where to put it.
-    std::vector<std::string> launch_args;
-    // Non-empty: start the process with no console window and send its
-    // stdout/stderr to this file (relative to the port folder) instead.
-    std::string console_log_relpath;
-    // Non-empty: Xbox 360 dump folder (relative to the port folder) that
-    // must hold basefile.exe + _uncrypted.xex before launch. Karamelo builds
-    // them itself - extracting the user's ISO (found by iso_keywords) and
-    // decoding default.xex - see PrepareX360Game().
-    std::string x360_game_dir;
-    // The user's own .iso: every keyword must appear in its lowercased file
-    // name; looked for in the port folder, in roms/<d> and app/roms/<d> for
-    // each iso_dirs entry, then in roms/ itself. See FindUserIso().
-    std::vector<std::string> iso_keywords;
-    std::vector<std::string> iso_dirs;
-    // Accepted disc image extensions (lowercase, with the dot). Empty means
-    // ".iso" only. The header check below only applies to raw images
-    // (.iso/.gcm) - a compressed .rvz does not start with the disc header.
-    std::vector<std::string> iso_exts;
-    // GameCube/Wii disc header check: the 6-character game ID at offset 0
-    // and the disc revision byte at offset 7 (-1 = any revision). When set,
-    // only an image whose header matches is picked - Melee players commonly
-    // keep 1.00, Training Mode and 20XX images, all named "...melee...",
-    // next to the one NTSC 1.02 disc the recomp was built from.
-    std::string iso_disc_id;
-    int iso_disc_rev = -1;
-    // What the toast calls the required disc when none matches.
-    std::string iso_disc_label;
-    // Kept out of the menu (and so out of every count) while the upstream
-    // project is too unfinished to offer - the entry, its install path and
-    // --install-port / --prepare-port all keep working for testing. A folder
-    // already under ports/ stays hidden too: it still matches this entry, so
-    // it never falls through to the hand-dropped "(PC Port)" listing.
-    bool hidden = false;
-    // Non-empty: the project does not publish builds on GitHub Releases but
-    // on its own feed - a JSON {"releases":[{"downloads":{"windows":url,
-    // "linux":url,"macos":url}}, ...]}, newest first - and DownloadAndInstall
-    // reads that instead of the GitHub API. `repo` stays for credits only.
-    std::string downloads_json_url;
-    // A ROM whose lowercased file name contains any of these is never picked,
-    // even when every rom_keywords entry matches - Wayne Gretzky's 3D Hockey
-    // '98 shares every word of the original's name.
-    std::vector<std::string> rom_exclude_keywords;
-    // iso_keywords must match whole words (bounded by anything that is not a
-    // letter or digit) instead of anywhere in the name. For a keyword short
-    // enough to sit inside other titles: ICO's "ico" is in "Unicorn".
-    bool iso_keywords_whole_word = false;
-    // Non-empty: folder (relative to the port folder) that must hold the
-    // PSP disc's PSP_GAME/ tree before launch. Karamelo extracts it from the
-    // user's .iso (found by iso_keywords) - see PreparePspGame().
-    std::string psp_game_dir;
-};
+// PortDefinition and the catalog format live in port_catalog.h.
 
 static bool NameHasKeyword(const std::string& lower_name, const std::string& kw, bool whole_word) {
     if (!whole_word) return lower_name.find(kw) != std::string::npos;
@@ -230,361 +124,59 @@ static bool RomNameMatches(const PortDefinition& def, const std::string& lower_n
     return true;
 }
 
+// -------------------------------------------------------------
+// Catalog loading
+// -------------------------------------------------------------
+// The URL the app checks for a newer catalog. Published by the deploy
+// scripts next to version.json (see docs/PORTS_CATALOG.md).
+static const char* kPortsCatalogUrl = "https://karamelo-emu.com/downloads/ports.json";
+// A newer catalog downloaded in an earlier run. Read once at startup; the
+// download itself never changes the list the running app is showing.
+static const char* kPortsCatalogCache = "Config/ports_cache.json";
+
+static void CatalogLog(const std::string& line) {
+    FILE* lf = fopen("karamelo.log", "a");
+    if (!lf) return;
+    fprintf(lf, "[INFO] [PORT-CATALOG] %s\n", line.c_str());
+    fclose(lf);
+}
+
+// The embedded copy always parses (the unit tests guarantee it). A cached
+// download wins only when it parses, validates and is newer - a damaged or
+// older cache is ignored, never trusted over what shipped in the binary.
+static PortCatalog LoadActiveCatalog() {
+    PortCatalog embedded;
+    std::string err;
+    if (!PortCatalogParse(PortCatalogEmbeddedJson(), embedded, err))
+        CatalogLog("catalogo embutido invalido: " + err);
+
+    std::ifstream f(kPortsCatalogCache, std::ios::binary);
+    if (f) {
+        std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        PortCatalog cached;
+        if (!PortCatalogParse(text, cached, err)) {
+            CatalogLog(std::string(kPortsCatalogCache) + " ignorado: " + err);
+        } else if (cached.catalog_version > embedded.catalog_version) {
+            CatalogLog("usando catalogo baixado v" + std::to_string(cached.catalog_version) +
+                       " (embutido v" + std::to_string(embedded.catalog_version) + "), " +
+                       std::to_string(cached.ports.size()) + " ports");
+            return cached;
+        }
+    }
+    CatalogLog("usando catalogo embutido v" + std::to_string(embedded.catalog_version) + ", " +
+               std::to_string(embedded.ports.size()) + " ports");
+    return embedded;
+}
+
+// Loaded once, on first use, and never replaced while the app runs: callers
+// keep PortDefinition pointers (FindPortDef) for as long as they like.
+static const PortCatalog& ActiveCatalog() {
+    static const PortCatalog cat = LoadActiveCatalog();
+    return cat;
+}
+
 static const std::vector<PortDefinition>& KnownPortDefs() {
-    static const std::vector<PortDefinition> defs = {
-        // Verified against theboy181/drmario64_recomp_plus's actual release -
-        // the one entry here launched end-to-end (download, extract, ROM
-        // auto-copy, launch) rather than only checked against the API.
-        { "DrMario64", "Dr. Mario 64",
-          "theboy181/drmario64_recomp_plus", "drmario64_recomp.exe",
-          true, { "dr", "mario" }, false, false },
-        { "Zelda64Recomp", "Zelda64Recomp",
-          "Zelda64Recomp/Zelda64Recomp", "", true, { "zelda", "majora" }, true, true },
-        { "Goemon64Recomp", "Goemon 64",
-          "klorfmorf/Goemon64Recomp", "", true, { "goemon" }, true, true },
-        { "DinosaurPlanet", "Dinosaur Planet",
-          "DinosaurPlanetRecomp/dino-recomp", "", true, { "dinosaur" }, false, false },
-        { "HarvestMoon64Recomp", "Harvest Moon 64",
-          "HarvestMoon64Recomp/HarvestMoon64Recomp", "", true, { "harvest", "moon" }, true, true },
-        { "SnowboardKids2Recomp", "Snowboard Kids 2",
-          "cdlewis/snowboardkids2-recomp", "", true, { "snowboard", "kids", "2" }, false, true },
-        { "PokemonStadiumRecomp", "Pokemon Stadium",
-          "mstan/PokemonStadiumRecomp", "", true, { "pokemon", "stadium" }, false, false },
-        { "Banjo64Recomp", "Banjo 64",
-          "BanjoRecomp/BanjoRecomp", "", true, { "banjo" }, true, true },
-        { "BM64Recomp", "Bomberman 64",
-          "RevoSucks/BM64Recomp", "", true, { "bomberman" }, true, true },
-        { "ChameleonTwistRecomp", "Chameleon Twist",
-          "Rainchus/ChameleonTwist1-JP-Recomp", "", true, { "chameleon" }, false, false },
-        { "MegaMan64Recomp", "Mega Man 64",
-          "MegaMan64Recomp/MegaMan64Recompiled", "", true, { "mega", "man" }, true, true },
-        { "Quest64Recomp", "Quest 64",
-          "Rainchus/Quest64-Recomp", "", true, { "quest" }, false, false },
-        { "BMHeroRecomp", "Bomberman Hero",
-          "RevoSucks/BMHeroRecomp", "", true, { "bomberman", "hero" }, true, true },
-        { "ShipOfHarkinian", "Ship of Harkinian",
-          "harbourmasters/shipwright", "", true, { "zelda", "ocarina" }, true, true },
-        { "2Ship2Harkinian", "2 Ship 2 Harkinian",
-          "harbourmasters/2ship2harkinian", "", true, { "zelda", "majora" }, true, true },
-        { "Starship", "Starship",
-          "harbourmasters/starship", "", true, { "star", "fox" }, true, false },
-        { "StarFoxEnhanced", "Star Fox Enhanced",
-          "kandowontu/starfox-enhanced", "", true, {}, true, true },
-        { "SpaghettiKart", "SpaghettiKart",
-          "harbourmasters/spaghettikart", "", true, { "mario", "kart" }, true, true },
-        { "Ghostship", "Ghostship",
-          "harbourmasters/ghostship", "", true, {}, true, true },
-        { "PerfectDark", "Perfect Dark",
-          "perfect-dark-pc-port/perfect_dark", "", true, { "perfect", "dark" }, false, true },
-        { "SM64CoopDX", "Super Mario 64 CoopDX",
-          "coop-deluxe/sm64coopdx", "", true, {}, true, true },
-        { "CannonballDX", "OutRun (CannonBall DX)",
-          "Endprodukt/cannonball-dx", "cannonball-dx.exe",
-          true, { "outrun" }, false, false },
-        { "AnimalCrossingGC", "Animal Crossing",
-          "flyngmt/ACGC-PC-Port", "", true, {}, false, false },
-        { "NutsAndBolts", "Banjo-Kazooie: Nuts & Bolts",
-          "masterspike52/reNut", "", true, {}, false, false },
-        { "DBZBudokai", "Dragon Ball Z Budokai",
-          "WistfulHopes/DBZ1", "", true, {}, false, false },
-        { "InfiniteMario64", "Infinite Mario 64",
-          "Brawmario/infinite-mario-64-ever", "", true, {}, true, true },
-        { "JakAndDaxter", "Jak & Daxter",
-          "open-goal/jak-project", "", true, {}, false, false },
-        { "SeveredChains", "Severed Chains",
-          "Legend-of-Dragoon-Modding/Severed-Chains", "", true, {}, false, false },
-        { "REDRIVER2", "REDRIVER 2",
-          "OpenDriver2/REDRIVER2", "", true, {}, true, false },
-        { "SymphonyRecomp", "Castlevania: Symphony of the Night",
-          "GuhClemente/SymphonyRecomp", "", true, {}, false, false },
-        { "Sonic1Forever", "Sonic 1 Forever",
-          "ElspethThePict/S1Forever", "", true, {}, false, false },
-        // macOS flipped true 27/09/2026: the stable release's .dmg only
-        // failed to install because ArchiveExtractAll tripped over the
-        // volume's unreadable .Trashes - fixed there. Verified end to end
-        // with --install-port (universal Mach-O, Developer ID signed) and a
-        // launch that reaches the game's own ROM prompt.
-        { "Sonic3AIR", "Sonic 3 A.I.R.",
-          "Eukaryot/sonic3air", "", true, {}, true, true },
-        { "SonicUnleashedRecomp", "Sonic Unleashed",
-          "hedge-dev/UnleashedRecomp", "", true, {}, false, false },
-        { "SpaceStationSiliconValley", "Space Station Silicon Valley",
-          "Cellenseres/SSSV_Recomp", "", true, { "silicon", "valley" }, false, true },
-        { "SMBRemastered", "Super Mario Bros. Remastered",
-          "JHDev2006/Super-Mario-Bros.-Remastered-Public", "", true, {}, true, false },
-        { "SuperMarioWorldRecomp", "Super Mario World",
-          "mstan/SuperMarioWorldRecomp", "", true, {}, true, false },
-        // Linux and macOS flipped back to false 27/09/2026: v0.3.9 (22/09)
-        // ships only SuperMetroidSNESRecomp-windows-x64-v0.3.9.zip, where
-        // v0.3.4-v0.3.8 also had linux-x64 and macos-arm64/x64 zips. On a Mac
-        // --install-port now fails with "nenhum build macOS na release deste
-        // port"; Linux was not run here, but the one asset left has nothing
-        // PickLinuxAsset can match. Flip again if upstream brings them back.
-        { "SuperMetroidRecomp", "Super Metroid",
-          "mstan/SuperMetroidRecomp", "SuperMetroidSNESRecomp.exe", true, { "metroid" }, false, false },
-        { "VivaPinataTiP", "Viva Pinata: Trouble in Paradise",
-          "SolarCookies/TiP-Recomp", "", true, {}, false, false },
-        { "WipeoutPhantomEdition", "WipEout Phantom Edition",
-          "wipeout-phantom-edition/wipeout-phantom-edition", "", true, {}, false, false },
-        { "ValkyrieRecomp", "Valkyrie Profile",
-          "Ed1z19/ValkyrieRecomp", "ValkyrieRecomp.exe", true, {}, true, true },
-        { "WaveRace64Recomp", "Wave Race 64",
-          "elliotttate/wave-race-64-recomp", "WaveRace64Recomp.exe",
-          true, { "wave", "race" }, false, true },
-        // Linux flipped true 21/09/2026: PickLinuxAsset now accepts .tar.gz
-        // directly (it didn't when this entry was first added, on 11/09 -
-        // see CREDITS.md's own note on this row, now stale) and the release
-        // still ships a real linux-x86_64.tar.gz. Verified end to end with
-        // --install-port, not just by re-reading the release assets.
-        // macOS flipped true 27/09/2026: v1.1.0 is the first release with a
-        // macos-universal.zip. Verified with --install-port (universal
-        // Mach-O .app, exe found inside Contents/MacOS) and a launch that
-        // reaches the game's own ROM prompt.
-        { "Snap64Recomp", "Pokemon Snap",
-          "JackandBeans/Snap64Recomp", "Snap64Recomp.exe",
-          true, { "pokemon", "snap" }, true, true },
-        { "BodyHarvestRecomp", "Body Harvest",
-          "danielgomesvieira2000/body-harvest-recomp", "body-harvest-recomp.exe",
-          true, { "body", "harvest" }, true, false },
-        { "DKRRecomp", "Diddy Kong Racing",
-          "ThatGuyMcd/DKR-R", "DKR-R.exe",
-          true, { "diddy", "kong", "racing" }, true, false },
-        // DevilutionX and Fallout1CE ship .dmg for macOS - native mounting
-        // via hdiutil in ArchiveExtractAll handles this seamlessly.
-        { "DevilutionX", "Diablo (DevilutionX)",
-          "diasurgical/devilutionX", "devilutionx.exe",
-          false, {}, true, true },
-        { "TheForceEngine", "Star Wars: Dark Forces (TFE)",
-          "TheForceEngine/TheForceEngine", "TheForceEngine.exe",
-          false, {}, false, false },
-        { "Fallout1CE", "Fallout (Community Edition)",
-          "alexbatalov/fallout1-ce", "fallout-ce.exe",
-          false, {}, true, true },
-        { "Reblue", "Pokemon Red and Blue (reblue)",
-          "zolaware/reblue", "reblue.exe",
-          true, { "pokemon" }, true, false },
-        { "OpenSpideyPS1", "Spider-Man (OpenSpidey)",
-          "GTTeancum/OpenSpideyPS1", "",
-          true, { "spider", "man" }, false, false },
-        { "FZeroRecomp", "F-Zero X",
-          "craigshaw/FZeroRecomp", "FZeroRecomp.exe",
-          true, { "f-zero" }, true, true },
-        { "AeroGaugeRecomp", "AeroGauge",
-          "alondero/aerogauge-recomp", "aerogauge_modern.exe",
-          true, { "aerogauge" }, true, false },
-        { "CrashBandicootLauncher", "Crash Bandicoot",
-          "Matteo842/CrashBandicoot-Launcher", "CrashBandicoot.exe",
-          true, { "crash" }, true, false },
-        { "MarioStrikers", "Super Mario Strikers",
-          "new-coke/strikers", "strikers.exe",
-          true, { "strikers" }, true, true },
-        { "OpenNectar", "Pikmin (Open Nectar)",
-          "SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port", "nectar.exe",
-          true, { "pikmin" }, true, false },
-        { "RingOut", "Soulcalibur II (Ring Out)",
-          "jackpoison-prog/RingOut", "RingOut.exe",
-          true, { "soul" }, true, false },
-        // Xbox 360 static recomp. Verified 27/09/2026 against the real
-        // v0.1.2 release (prerelease-only repo - /latest 404s, the /releases
-        // fallback in DownloadAndInstall picks it up): one
-        // "-windows-x64.zip" with Launch.cmd at the root and the game in
-        // build_native/Release/. Arguments mirror what upstream's own
-        // DarkRecompPreview.exe passes ("play" mode): without
-        // --timeout-ms 0 the runtime quits itself after 30 s, and
-        // --engine-preview is the playable engine path. --game-dir is left
-        // at its default ("Darkness", relative to the working directory,
-        // which exe_relpath makes the port folder). No Linux/macOS build.
-        // Hidden since 27/09/2026: the dump pipeline is validated against a
-        // real disc and the game boots, but upstream's runtime is still far
-        // too broken to offer - see docs/XBOX360_RECOMP.md.
-        { .id = "TheDarknessRecomp", .display_name = "The Darkness",
-          .repo = "portingpete/The-Darkness-Recomp", .exe_hint = "DarkRecomp.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = false, .has_macos_build = false,
-          .exe_relpath = "build_native/Release/DarkRecomp.exe",
-          .launch_args = { "--timeout-ms", "0", "--engine-preview" },
-          .console_log_relpath = "build_native/run/karamelo_runtime.log",
-          .x360_game_dir = "Darkness",
-          .iso_keywords = { "darkness" },
-          .iso_dirs = { "Xbox360", "Xbox 360", "X360" },
-          .hidden = true },
-        // GameCube static recomp (PowerPC -> C++ plus Slippi's Gecko codes),
-        // D3D12/D3D11. Verified 27/09/2026 against the real v0.7.1 release:
-        // one "-win64.zip" wrapping a single MeleeUnlocked-<ver>/ folder
-        // (flattened on install). The pinned exe matters here: the
-        // alphabetical tie-break would pick MeleeUnlockedLauncher.exe, the
-        // project's optional launcher that updates itself into Versions/ -
-        // not something Karamelo should hand control to. Arguments are
-        // exactly MeleeUnlocked.bat's, with paths relative to the port
-        // folder (the working directory) and the ISO read in place from
-        // roms/GameCube/ rather than copied next to it as melee.iso. GUI
-        // subsystem, so no console to hide. Needs the NTSC 1.02 disc; the
-        // game itself checks the revision. No Linux/macOS build.
-        { .id = "MeleeUnlocked", .display_name = "Super Smash Bros. Melee (Unlocked)",
-          .repo = "Hero88go/melee-unlocked", .exe_hint = "melee_port.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = false, .has_macos_build = false,
-          .exe_relpath = "melee_port.exe",
-          .launch_args = { "--iso", "{iso}",
-                           "--settings-path", "port-settings.ini",
-                           "--sys-dir", "Sys",
-                           "--user-dir", "User/Slippi",
-                           "--replay-dir", "Replays",
-                           "--card-dir", "User/GC/CardA",
-                           "--threaded-renderer" },
-          .iso_keywords = { "melee" },
-          .iso_dirs = { "GameCube", "GC" },
-          .iso_disc_id = "GALE01", .iso_disc_rev = 2,
-          .iso_disc_label = "MELEE NTSC 1.02" },
-        // PSP static recomp of Monster Hunter Portable 3rd HD Ver. (Vulkan,
-        // SDL3, MIT). Releases ship Windows zip, Linux tar.gz (+ a Flatpak
-        // the picker skips), macOS .dmg and an Android .apk, next to an
-        // ffmpeg source tarball. No ROM handling here: the game's own
-        // first-run setup asks for the NPJB-40001 image, checks it and
-        // prepares the executable itself, gamepad-friendly.
-        { .id = "Yakumo", .display_name = "Monster Hunter Portable 3rd (Yakumo)",
-          .repo = "TeamGDB/Yakumo", .exe_hint = "Yakumo.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = true, .has_macos_build = true },
-        // Star Fox Adventures native port (SFA decompilation + Aurora),
-        // CC0-1.0. Verified 29/09/2026 against v1.0.7: the GitHub release
-        // carries no binaries - the project's launcher downloads them from
-        // api.foxhollow.dev/releases (public, newest first), one per OS: a
-        // Windows .zip with foxhollow.exe + DLLs at the root, a Linux
-        // x86-64 ELF and a native arm64 Mach-O, each alone in a .tar.gz.
-        // The disc path is argv[1]; the game reads .iso and .rvz in place
-        // and accepts GSAE01 1.0/1.1, GSAP01 1.0/1.1 and GSAJ01 1.0, so
-        // there is no header check here - an unsupported disc makes the
-        // game itself refuse it.
-        { .id = "Foxhollow", .display_name = "Star Fox Adventures (Foxhollow)",
-          .repo = "JackPriceBurns/foxhollow", .exe_hint = "foxhollow.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = true, .has_macos_build = true,
-          .launch_args = { "{iso}" },
-          .iso_keywords = { "fox", "adventures" },
-          .iso_dirs = { "GameCube", "GC" },
-          .iso_exts = { ".iso", ".rvz", ".gcm" },
-          .downloads_json_url = "https://api.foxhollow.dev/releases" },
-        // Conker's Bad Fur Day static recomp (CBFD-Recompiled / RT64, GPL-3.0).
-        // Official releases publish Windows zip, Linux tar.gz and native macOS
-        // (Apple Silicon) zip with ConkerRecomp.app. Assets include a separate
-        // Mods zip (filtered out by LooksLikeCompanionTool). Requires the
-        // original US ROM (.z64); passing --rom registers it into the game's
-        // local storage on first run and boots immediately.
-        { .id = "CBFDRecomp", .display_name = "Conker's Bad Fur Day",
-          .repo = "sciaschi/CBFD-Recompiled", .exe_hint = "ConkerRecomp.exe",
-          .needs_rom = true, .rom_keywords = { "conker" },
-          .has_linux_build = true, .has_macos_build = true,
-          .launch_args = { "--rom", "{rom}" } },
-        // Sly Cooper and the Thievius Raccoonus native PC port (ProjectCane, PS2 reverse engineering).
-        // Official releases publish Windows RAR (with game exe + File Extractor GUI) and
-        // a Linux RAR (portable AppImage + File Extractor GUI). Upstream has no macOS build.
-        // Requires game assets from NTSC PS2 ISO (SCUS-97198) extracted via File Extractor GUI.
-        { .id = "ProjectCane", .display_name = "Sly Cooper (ProjectCane)",
-          .repo = "theclub654/ProjectCane", .exe_hint = "Sly Cooper and the Thievius Raccoonus.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = true, .has_macos_build = false },
-        // Castlevania: Legacy of Darkness static recomp (cvlod_recomp / N64Recomp, GPL-3.0).
-        // Official releases publish Windows zip, Linux tar.gz and native macOS (Apple Silicon arm64) zip.
-        // Requires stock Castlevania: Legacy of Darkness USA ROM (.z64, ND4E). Accepts {rom} positional argument
-        // and rom.z64 in the port directory.
-        { .id = "LodRecomp", .display_name = "Castlevania: Legacy of Darkness",
-          .repo = "fliperama86/cvlod_recomp", .exe_hint = "LodRecomp.exe",
-          .needs_rom = true, .rom_keywords = { "legacy" },
-          .has_linux_build = true, .has_macos_build = true,
-          .launch_args = { "{rom}" } },
-        // BLACK static recomp (original Xbox via XboxXBE-Recomp SDK), Direct3D 12.
-        // Official releases publish Windows zip (BLACK-XBERecomp.zip) containing
-        // BLACK.exe, d3dcompiler_47.dll and an assets/ directory.
-        // Game assets: the game reads default.xbe or an original Xbox .iso directly
-        // placed inside the assets/ directory (supports USA and Europe releases).
-        // Karamelo automatically resolves and links/copies the user's ISO from roms/Xbox/
-        // into ports/BlackRecomp/assets/ if not already present.
-        { .id = "BlackRecomp", .display_name = "BLACK",
-          .repo = "TGP482/BLACK-XBERecomp", .exe_hint = "BLACK.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = false, .has_macos_build = false,
-          .iso_keywords = { "black" },
-          .iso_dirs = { "Xbox", "OriginalXbox", "XboxOG" } },
-        // CPS-2 Recomp (Capcom CPS-1 and CPS-2 arcade static recompilation by tmcleroy).
-        // Official releases publish Windows zip (CPS2Recomp-windows-x64.zip),
-        // Linux tarball (CPS2Recomp-linux-x86_64.tar.gz), and macOS zip (CPS2Recomp-macOS.zip
-        // with CPS-2 Recomp.app).
-        // Includes Street Fighter Alpha 2, Cadillacs and Dinosaurs, Alien vs. Predator,
-        // Super Puzzle Fighter II Turbo, Vampire Savior 1/2, Vampire Hunter 2, and
-        // Vampire Savior Definitive.
-        // Karamelo automatically copies available ROM sets from roms/Arcade (sfa2u.zip,
-        // dino.zip, avspu.zip, etc.) into ports/CPS2Recomp/ before execution.
-        { .id = "CPS2Recomp", .display_name = "CPS-2 Recomp (Capcom Arcade)",
-          .repo = "tmcleroy/cps2recomp", .exe_hint = "cps2recomp-launcher.exe",
-          .needs_rom = true, .rom_keywords = { "sfa2", "dino", "avsp", "vsav" },
-          .has_linux_build = true, .has_macos_build = true },
-        // Wayne Gretzky's 3D Hockey static recomp (N64 USA v1.0 via N64Recomp + RT64 by geno55).
-        // Official releases publish Windows zip (wg3d-recomp-v<ver>-windows-x64.zip) containing
-        // wg3d.exe, RT64 D3D12/Vulkan backends and MSVC runtime DLLs.
-        // Accepts original USA N64 ROM (.z64/.v64/.n64) as argument or copied to port directory.
-        { .id = "WG3DRecomp", .display_name = "Wayne Gretzky's 3D Hockey",
-          .repo = "geno55/wg3d-recomp", .exe_hint = "wg3d.exe",
-          .needs_rom = true, .rom_keywords = { "gretzky" },
-          .has_linux_build = false, .has_macos_build = false,
-          .launch_args = { "{rom}" },
-          .rom_exclude_keywords = { "98" } },
-        // Rush 2: Extreme Racing USA static recomp (N64 via N64Recomp by bryantmh).
-        // Official releases publish Windows zip (Rush2Recompiled-<ver>.zip) and Linux AppImage.
-        { .id = "Rush2Recompiled", .display_name = "Rush 2: Extreme Racing USA",
-          .repo = "bryantmh/rush2recompiled", .exe_hint = "Rush2Recompiled.exe",
-          .needs_rom = true, .rom_keywords = { "rush 2", "extreme" },
-          .has_linux_build = true, .has_macos_build = false,
-          .launch_args = { "{rom}" } },
-        // Automobili Lamborghini static recomp (N64 USA via N64Recomp + RT64 by alondero).
-        // Official releases publish Windows zip and Linux zip (lamborghini_modern).
-        { .id = "AutomobiliLamborghini", .display_name = "Automobili Lamborghini",
-          .repo = "alondero/automobililamborghini-recomp", .exe_hint = "lamborghini_modern.exe",
-          .needs_rom = true, .rom_keywords = { "lamborghini" },
-          .has_linux_build = true, .has_macos_build = false,
-          .launch_args = { "{rom}" } },
-        // Road Rash 64 static recomp (N64 USA v1.0 via N64Recomp by linkssy2).
-        // Official releases publish Windows zip and Linux Experimental AppImage.
-        { .id = "RoadRash64", .display_name = "Road Rash 64",
-          .repo = "linkssy2/RoadRash64Recompiled", .exe_hint = "RoadRash64Recompiled.exe",
-          .needs_rom = true, .rom_keywords = { "road", "rash" },
-          .has_linux_build = true, .has_macos_build = false,
-          .launch_args = { "{rom}" } },
-        // Jungle Strike static recomp (SNES by Junior-Jones).
-        // Official releases publish Windows zip with Launcher.exe and Rom/ directory.
-        { .id = "JungleStrikeSNES", .display_name = "Jungle Strike",
-          .repo = "Junior-Jones/Jungle-Strike-SNES-Static-Recomp", .exe_hint = "Launcher.exe",
-          .needs_rom = true, .rom_keywords = { "jungle", "strike" },
-          .has_linux_build = false, .has_macos_build = false },
-        // ICO native PC port (PS2 PAL SCES-50760 decompilation by nathanialf).
-        // Official releases publish Windows zip, Linux tarball and macOS (Apple Silicon arm64) dmg/zip.
-        // Accepts user's PAL disc image (.iso, .chd, .bin).
-        { .id = "IcoPC", .display_name = "ICO",
-          .repo = "nathanialf/ico-pc", .exe_hint = "ico_pc_x64.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = true, .has_macos_build = true,
-          .launch_args = { "{iso}" },
-          .iso_keywords = { "ico" },
-          .iso_dirs = { "PlayStation2", "PS2" },
-          .iso_exts = { ".iso", ".chd", ".bin" },
-          .iso_keywords_whole_word = true },
-        // Star Wars Battlefront: Renegade Squadron native PC port (PSP via static recomp by GTTeancum).
-        // Official releases publish Windows zip (RenegadeSquadronPC).
-        // Direct3D 12, 60 FPS, twin-stick controls.
-        // The game reads the disc's PSP_GAME folder from data/ - it takes no
-        // ISO argument. PreparePspGame() extracts the user's US ISO (ULUS10292)
-        // there before the first launch. Only a plain .iso: a .cso is
-        // compressed and nothing here can unpack it.
-        { .id = "RenegadeSquadronPC", .display_name = "Star Wars Battlefront: Renegade Squadron",
-          .repo = "GTTeancum/StarWars-RenegadeSquadron-PC", .exe_hint = "RenegadeSquadron.exe",
-          .needs_rom = false, .rom_keywords = {},
-          .has_linux_build = false, .has_macos_build = false,
-          .iso_keywords = { "renegade", "squadron" },
-          .iso_dirs = { "PSP", "PlayStationPortable" },
-          .iso_exts = { ".iso" },
-          .psp_game_dir = "data" },
-    };
-    return defs;
+    return ActiveCatalog().ports;
 }
 
 static const PortDefinition* FindPortDef(const std::string& id) {
@@ -2573,4 +2165,54 @@ bool PortPrepareOnly(const std::string& port_id, std::string& out_error) {
     std::string dir = ResolvePortDir(port_id);
     if (X360GameReady(*def, dir)) { out_error.clear(); return true; }
     return PrepareX360Game(*def, dir, out_error);
+}
+
+// Writes the catalog this binary is running to path, in the data/ports.json
+// format. --dump-port-catalog: shows exactly what the app loaded, and how
+// data/ports.json was first produced from the old built-in table.
+bool PortDumpCatalog(const char* path) {
+    const PortCatalog& cat = ActiveCatalog();
+    std::string json = PortCatalogToJson(cat);
+    FILE* f = path ? fopen(path, "wb") : nullptr;
+    if (!f) return false;
+    bool ok = fwrite(json.data(), 1, json.size(), f) == json.size();
+    ok = (fclose(f) == 0) && ok;
+    return ok;
+}
+
+// Checks the site for a newer catalog in the background and keeps it in
+// Config/ports_cache.json for the next start. Only from the windowed app -
+// the command-line modes exit before a download could finish.
+void PortStartCatalogRefresh() {
+    int current = ActiveCatalog().catalog_version;
+    s_active_bg_threads.fetch_add(1);
+    try {
+        std::thread([current]() {
+            std::string text, err;
+            PortCatalog fresh;
+            if (!UpdaterHttpGetString(kPortsCatalogUrl, text)) {
+                CatalogLog("sem acesso ao catalogo online - seguindo com o atual");
+            } else if (!PortCatalogParse(text, fresh, err)) {
+                CatalogLog("catalogo online rejeitado: " + err);
+            } else if (fresh.catalog_version > current) {
+                std::error_code ec;
+                fs::create_directories("Config", ec);
+                std::string tmp = std::string(kPortsCatalogCache) + ".tmp";
+                FILE* f = fopen(tmp.c_str(), "wb");
+                bool ok = f && fwrite(text.data(), 1, text.size(), f) == text.size();
+                if (f) ok = (fclose(f) == 0) && ok;
+                if (ok) fs::rename(tmp, kPortsCatalogCache, ec);
+                if (!ok || ec) {
+                    fs::remove(tmp, ec);
+                    CatalogLog("falha ao gravar o catalogo baixado");
+                } else {
+                    CatalogLog("catalogo v" + std::to_string(fresh.catalog_version) +
+                               " baixado - vale a partir do proximo inicio");
+                }
+            }
+            s_active_bg_threads.fetch_sub(1);
+        }).detach();
+    } catch (const std::system_error&) {
+        s_active_bg_threads.fetch_sub(1);
+    }
 }

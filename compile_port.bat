@@ -105,6 +105,8 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     src\retroachievements.cpp ^
     src\updater.cpp ^
     src\port_runner.cpp ^
+    src\port_catalog.cpp ^
+    src\json_mini.cpp ^
     src\x360_dump.cpp ^
     third_party\libmspack\lzxd.c ^
     src\crash_reporter.cpp ^

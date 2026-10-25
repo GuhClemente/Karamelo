@@ -28,12 +28,15 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     tests\test_updater.cpp ^
     tests\test_crash_reporter.cpp ^
     tests\test_x360_dump.cpp ^
+    tests\test_port_catalog.cpp ^
     src\karamelo_math.cpp ^
     src\netplay_protocol.cpp ^
     src\archive_helper.cpp ^
     src\updater.cpp ^
     src\crash_reporter.cpp ^
     src\x360_dump.cpp ^
+    src\port_catalog.cpp ^
+    src\json_mini.cpp ^
     src\input_map.cpp ^
     src\gamepad_sdl.cpp ^
     third_party\libmspack\lzxd.c ^

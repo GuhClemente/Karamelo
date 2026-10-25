@@ -42,7 +42,7 @@ fi
 # 3. Upload via SCP
 echo ""
 echo "[2/2] Enviando arquivos para $SERVER_USER@$SERVER_IP:$REMOTE_DIR..."
-if scp -o StrictHostKeyChecking=no "$LOCAL_TAR" "$LOCAL_BIN" "$LOCAL_JSON" "$SERVER_USER@$SERVER_IP:$REMOTE_DIR"; then
+if scp -o StrictHostKeyChecking=no "$LOCAL_TAR" "$LOCAL_BIN" "$LOCAL_JSON" data/ports.json "$SERVER_USER@$SERVER_IP:$REMOTE_DIR"; then
     scp -o StrictHostKeyChecking=no fix_server.sh "$SERVER_USER@$SERVER_IP:/root/fix_server.sh" 2>/dev/null || true
     echo ""
     echo "Sincronizando com containers do Coolify e ajustando permissoes..."

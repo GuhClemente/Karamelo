@@ -83,6 +83,8 @@ KARAMELO_SRCS=(
     src/retroachievements.cpp
     src/updater.cpp
     src/port_runner.cpp
+    src/port_catalog.cpp
+    src/json_mini.cpp
     src/x360_dump.cpp
     src/crash_reporter.cpp
     src/main_linux.cpp
@@ -117,6 +119,7 @@ g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     tests/test_math_video.cpp \
     tests/test_updater.cpp \
     tests/test_crash_reporter.cpp \
+    tests/test_port_catalog.cpp \
     build/linux_obj/karamelo_math.o \
     build/linux_obj/netplay_protocol.o \
     build/linux_obj/archive_helper.o \
@@ -124,6 +127,8 @@ g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/linux_obj/crash_reporter.o \
     build/linux_obj/input_map.o \
     build/linux_obj/gamepad_sdl.o \
+    build/linux_obj/port_catalog.o \
+    build/linux_obj/json_mini.o \
     build/sdl3_linux/libSDL3.a \
     -lpthread -ldl -lm \
     -o build/karamelo_tests

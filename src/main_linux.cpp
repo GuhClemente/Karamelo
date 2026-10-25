@@ -1090,6 +1090,10 @@ int main(int argc, char* argv[])
 			passed, iterations, elapsed / 1000.0, elapsed / (double)iterations);
 		return (passed == iterations) ? 0 : 1;
 	}
+
+	// --dump-port-catalog <file>: the loaded Ports & Recomp catalog as JSON.
+	if (argc > 2 && strcasecmp(argv[1], "--dump-port-catalog") == 0)
+		return PortDumpCatalog(argv[2]) ? 0 : 1;
 
 	if (argc > 1 && strcasecmp(argv[1], "--list-ports") == 0)
 	{
@@ -1208,6 +1212,7 @@ int main(int argc, char* argv[])
 	RaInit();
 	UpdaterInit();
 	PortInit();
+	if (!is_cli_mode) PortStartCatalogRefresh();
 	if (!is_cli_mode)
 	{
 		CrashReporterCheckAndDispatch();

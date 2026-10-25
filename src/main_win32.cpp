@@ -1557,6 +1557,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// every known port (id, exe path, installed state) and exits. Exists so
 	// the executable-picking logic can be checked against real downloaded
 	// files without spawning a game or going through the menu.
+	// "Karamelo.exe --dump-port-catalog <file>": the Ports & Recomp catalog
+	// this binary loaded, written as JSON (see port_catalog.h).
+	if (__argc > 2 && _stricmp(__argv[1], "--dump-port-catalog") == 0)
+	{
+		return PortDumpCatalog(__argv[2]) ? 0 : 1;
+	}
+
 	if (__argc > 1 && _stricmp(__argv[1], "--list-ports") == 0)
 	{
 		PortInit();
@@ -1843,6 +1850,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	RaInit();
 	UpdaterInit();
 	PortInit();
+	PortStartCatalogRefresh();
 
 	// A path on the command line loads that game straight away. Useful for file
 	// associations and drag-and-drop, and it removes menu navigation as a
