@@ -163,7 +163,14 @@ fail=0
 for f in "$SRC"/*; do
     [ -f "$f" ] || continue
     base=$(basename "$f")
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "https://$DOMAIN/downloads/$base")
+    # Logo depois do restart, a rajada de pedidos daqui leva 429 (limite de
+    # requisicoes) ou 5xx de um app ainda subindo - foi o "429 ports.json" da
+    # 0.9.78, com o arquivo servido normalmente segundos depois. So conta como
+    # falha se continuar assim depois de algumas tentativas.
+    for tentativa in 1 2 3 4 5; do
+        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "https://$DOMAIN/downloads/$base")
+        case "$code" in 429|5??|000) sleep $((tentativa * 3)) ;; *) break ;; esac
+    done
     printf '  %-4s %s\n' "$code" "$base"
     [ "$code" = "200" ] || fail=1
 done
