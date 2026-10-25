@@ -145,7 +145,10 @@ if exist "%LOCAL_MACOS_TAR%" (
 rem Manifesto final: tira o binario de plataforma que nao foi refeito e poe as
 rem notas da secao da versao no docs\SITE_SYNC.md. Sem essa secao, nao publica.
 echo.
-python "%~dp0tools\release_manifest.py" finalize
+set UPLOADING=exe
+if defined LINUX_DEPLOY_FILES set UPLOADING=!UPLOADING!,linux_bin
+if defined MACOS_DEPLOY_FILES set UPLOADING=!UPLOADING!,macos_bin
+python "%~dp0tools\release_manifest.py" finalize --uploading !UPLOADING!
 if errorlevel 1 (
     echo [FALHA] version.json incompleto - deploy cancelado antes do upload.
     pause

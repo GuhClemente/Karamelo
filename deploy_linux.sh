@@ -58,7 +58,7 @@ if [ ! -f "$LOCAL_TAR" ]; then
 fi
 
 # Manifesto final: tira binario de plataforma nao refeito, notas do SITE_SYNC.
-if ! python3 tools/release_manifest.py finalize; then
+if ! python3 tools/release_manifest.py finalize --uploading linux_bin; then
     echo "[FALHA] version.json incompleto - deploy cancelado antes do upload."
     exit 1
 fi

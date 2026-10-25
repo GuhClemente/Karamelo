@@ -191,6 +191,27 @@ for f in "$SRC"/*; do
 done
 
 echo ""
+echo "=== 7. Conferindo binarios x version.json ==="
+# Cada binario do auto-update tem que ter o SHA-256 que o manifesto anuncia,
+# senao o app baixa, recusa pelo hash e o jogador fica sem atualizar. Na 0.9.78
+# um deploy do Windows rodando junto com o do Mac subiu um manifesto com o hash
+# do Karamelo_mac antigo por cima do novo, e nada acusou.
+for par in "Karamelo.exe:exe" "Karamelo_linux:linux_bin" "Karamelo_mac:macos_bin"; do
+    arq=${par%%:*}; chave=${par##*:}
+    esperado=$(grep -o "\"${chave}_sha256\"[^,}]*" "$SRC/version.json" 2>/dev/null | sed 's/.*: *"//; s/".*//' | tr 'A-F' 'a-f')
+    [ -n "$esperado" ] || { echo "  --   $arq (sem hash no manifesto)"; continue; }
+    if [ ! -f "$SRC/$arq" ]; then
+        echo "  FALTA $arq (o manifesto anuncia, o servidor nao tem)"; fail=1; continue
+    fi
+    real=$(sha256sum "$SRC/$arq" | cut -d' ' -f1)
+    if [ "$real" = "$esperado" ]; then
+        echo "  ok   $arq"
+    else
+        echo "  ERRO $arq: arquivo ${real:0:12}... manifesto ${esperado:0:12}..."; fail=1
+    fi
+done
+
+echo ""
 if [ "$fail" = "0" ]; then
     echo "=== PUBLICADO ==="
 else

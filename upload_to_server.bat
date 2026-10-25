@@ -69,7 +69,10 @@ set EXTRA_FILES=
 
 rem O manifesto que sobe e o finalizado (binario de plataforma nao refeito
 rem fica de fora, notas da versao) - ver tools\release_manifest.py.
-python "%~dp0tools\release_manifest.py" finalize
+set UPLOADING=exe
+if defined LINUX_DEPLOY_FILES set UPLOADING=!UPLOADING!,linux_bin
+if defined MACOS_DEPLOY_FILES set UPLOADING=!UPLOADING!,macos_bin
+python "%~dp0tools\release_manifest.py" finalize --uploading !UPLOADING!
 if errorlevel 1 (
     echo [ERRO] version.json incompleto - upload cancelado.
     pause

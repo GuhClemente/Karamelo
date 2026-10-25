@@ -24,8 +24,13 @@ macos_bin_* e linux_bin_*. Cada build e publicada de uma maquina diferente
 
 Uso:
   python tools/release_manifest.py fetch
-  python tools/release_manifest.py finalize
+  python tools/release_manifest.py finalize --uploading exe,linux_bin
   python tools/release_manifest.py catalog-check
+
+finalize --uploading: rele o version.json do site na hora do upload e troca so
+os blocos dos binarios que este deploy sobe (exe, linux_bin, macos_bin); os
+outros ficam como o site esta - outra maquina pode ter publicado o dela
+enquanto este build rodava.
 
 catalog-check (deploy_ports_catalog.bat): o data/ports.json local precisa ter
 catalog_version MAIOR que o publicado - o app ignora catalogo de versao igual
@@ -129,8 +134,53 @@ def catalog_check():
     return 0
 
 
-def finalize():
+# Campos de cada build. Os gerais ("version", notas...) sao da release do
+# Windows e andam com o bloco "exe".
+BLOCKS = {
+    "exe": ("exe_url", "exe_size", "exe_sha256", "exe_version", "zip_url",
+            "version", "title", "release_date", "notes", "force_full_package"),
+    "linux_bin": ("linux_bin_url", "linux_bin_size", "linux_bin_sha256", "linux_bin_version", "linux_tar_url"),
+    "macos_bin": ("macos_bin_url", "macos_bin_size", "macos_bin_sha256", "macos_bin_version", "macos_tar_url"),
+}
+
+
+def fetch_site():
+    req = urllib.request.Request(URL, headers={"User-Agent": "karamelo-release"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.loads(r.read().decode("utf-8-sig"))
+    if "version" not in data:
+        raise ValueError("sem campo version")
+    return data
+
+
+def merge_with_site(local, uploading):
+    """O version.json que sobe = o do site AGORA + so os blocos dos binarios que
+    este deploy esta subindo. O "fetch" do inicio do deploy e de minutos antes
+    (o build fica no meio); um deploy do Mac terminado nesse intervalo tinha o
+    bloco dele apagado - foi o que aconteceu na 0.9.78: site servindo o
+    Karamelo_mac novo com o hash do antigo no manifesto, e a atualizacao do Mac
+    recusada por hash errado."""
+    try:
+        site = fetch_site()
+    except Exception as e:
+        print("  [AVISO] nao consegui reler o version.json do site (%s) - subindo o local inteiro." % e)
+        return local
+    merged = dict(site)
+    for block in uploading:
+        for k in BLOCKS[block]:
+            if k in local:
+                merged[k] = local[k]
+            else:
+                merged.pop(k, None)
+    kept = [b for b in BLOCKS if b not in uploading]
+    print("  blocos deste deploy: %s; do site: %s" % (", ".join(uploading), ", ".join(kept) or "-"))
+    return merged
+
+
+def finalize(uploading=None):
     data = load()
+    if uploading:
+        data = merge_with_site(data, uploading)
     version = data.get("version", "")
     ok = True
 
@@ -173,6 +223,15 @@ def finalize():
 
 if __name__ == "__main__":
     commands = {"fetch": fetch, "finalize": finalize, "catalog-check": catalog_check}
-    if len(sys.argv) != 2 or sys.argv[1] not in commands:
+    args = sys.argv[1:]
+    if not args or args[0] not in commands:
         sys.exit(__doc__)
-    sys.exit(commands[sys.argv[1]]())
+    if args[0] == "finalize" and len(args) == 3 and args[1] == "--uploading":
+        blocks = [b for b in args[2].split(",") if b]
+        bad = [b for b in blocks if b not in BLOCKS]
+        if bad or not blocks:
+            sys.exit("--uploading aceita: %s" % ", ".join(BLOCKS))
+        sys.exit(finalize(blocks))
+    if len(args) != 1:
+        sys.exit(__doc__)
+    sys.exit(commands[args[0]]())
