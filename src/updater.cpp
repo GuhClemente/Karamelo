@@ -143,6 +143,14 @@ bool UpdaterParseManifest(const std::string& json, const std::string& platform, 
 	else if (platform == "linux") { bin = "linux_bin"; pkg = "linux_tar_url"; }
 	else                          { bin = "exe";       pkg = "zip_url"; }
 
+	// Each build also carries its own version (exe_version, macos_bin_version,
+	// linux_bin_version). "version" is the Windows release; a Mac or Linux
+	// binary that was not rebuilt for it would otherwise be offered as the new
+	// version, pass the hash check (it is the same old file) and be offered
+	// again after every restart.
+	std::string platform_version = ExtractJsonString(json, bin + "_version");
+	if (!platform_version.empty()) out.version = platform_version;
+
 	out.exe_url = ExtractJsonString(json, bin + "_url");
 	out.exe_sha256 = ExtractJsonString(json, bin + "_sha256");
 	out.exe_size = ExtractJsonNumber(json, bin + "_size");

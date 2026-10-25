@@ -82,6 +82,25 @@ TEST_CASE(UpdaterManifestPicksPlatformFields)
 	ASSERT_TRUE(lin.zip_url == "https://x/Karamelo_v0.9.6_Linux64.tar.gz");
 }
 
+TEST_CASE(UpdaterManifestPrefersPlatformVersion)
+{
+	// Windows released 0.9.78, the Mac binary on the server is still 0.9.77:
+	// the Mac build must not see an update it cannot get.
+	const std::string json =
+		"{ \"version\": \"0.9.78\", \"exe_version\": \"0.9.78\", \"exe_url\": \"https://x/Karamelo.exe\", "
+		"\"macos_bin_version\": \"0.9.77\", \"macos_bin_url\": \"https://x/Karamelo_mac\", "
+		"\"linux_bin_url\": \"https://x/Karamelo_linux\" }";
+
+	UpdateInfo win, mac, lin;
+	ASSERT_TRUE(UpdaterParseManifest(json, "windows", win));
+	ASSERT_TRUE(UpdaterParseManifest(json, "macos", mac));
+	ASSERT_TRUE(UpdaterParseManifest(json, "linux", lin));
+	ASSERT_TRUE(win.version == "0.9.78");
+	ASSERT_TRUE(mac.version == "0.9.77");
+	ASSERT_FALSE(UpdaterIsNewerVersion("0.9.77", mac.version));
+	ASSERT_TRUE(lin.version == "0.9.78");  // no linux_bin_version: falls back to "version"
+}
+
 TEST_CASE(UpdaterManifestNeverFallsBackToWindowsExe)
 {
 	// A manifest with only the Windows build must leave the macOS/Linux fields

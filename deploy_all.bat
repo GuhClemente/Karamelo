@@ -69,6 +69,16 @@ if not defined PUSHED (
     exit /b 1
 )
 echo [0/4] Tudo commitado e no GitHub ^(v%CUR_VER%^).
+
+rem O version.json de partida e o que esta no site, nao o dist\ local: o bloco
+rem macOS e publicado do Mac e so existe la. Detalhes em tools\release_manifest.py.
+where python >nul 2>&1
+if errorlevel 1 (
+    echo [ERRO] python nao encontrado no PATH - ele monta o version.json.
+    pause
+    exit /b 1
+)
+python "%~dp0tools\release_manifest.py" fetch
 echo.
 
 rem -------------------------------------------------------------
@@ -132,6 +142,16 @@ if exist "%LOCAL_MACOS_TAR%" (
     set MACOS_DEPLOY_FILES="%LOCAL_MACOS_TAR%" "%LOCAL_MACOS_BIN%"
 )
 
+rem Manifesto final: tira o binario de plataforma que nao foi refeito e poe as
+rem notas da secao da versao no docs\SITE_SYNC.md. Sem essa secao, nao publica.
+echo.
+python "%~dp0tools\release_manifest.py" finalize
+if errorlevel 1 (
+    echo [FALHA] version.json incompleto - deploy cancelado antes do upload.
+    pause
+    exit /b 1
+)
+
 rem -------------------------------------------------------------
 rem PASSO 3: Upload via SCP para o Servidor VPS / Coolify
 rem -------------------------------------------------------------
@@ -145,11 +165,19 @@ rem redistribuicao, a mesma coisa que o README proibe para o repositorio.
 rem O create_packs.ps1 continua gerando o arquivo em dist/ para uso local.
 set EXTRA_FILES=
 
+rem O resultado que importa e o do upload dos pacotes. Antes o errorlevel era
+rem lido so depois do scp do fix_server.sh, entao um upload que falhava no meio
+rem seguia como sucesso e reiniciava o site com arquivos faltando.
+set UPLOAD_FAILED=
 scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" %LINUX_DEPLOY_FILES% %MACOS_DEPLOY_FILES% "%LOCAL_JSON%" "%~dp0data\ports.json" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+if errorlevel 1 set UPLOAD_FAILED=1
 rem O script de deploy vai para /root/, nunca para %REMOTE_DIR%: aquela pasta e
 rem servida publicamente, e o fix_server.sh acabou exposto em /downloads/.
-scp -o StrictHostKeyChecking=no "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:/root/fix_server.sh
-if errorlevel 1 (
+if not defined UPLOAD_FAILED (
+    scp -o StrictHostKeyChecking=no "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:/root/fix_server.sh
+    if errorlevel 1 set UPLOAD_FAILED=1
+)
+if defined UPLOAD_FAILED (
     echo.
     echo [AVISO] Falha no upload via SCP - verifique se a chave SSH esta configurada.
     echo Os arquivos estao prontos na pasta dist\ para upload manual no Coolify:
@@ -184,11 +212,17 @@ rem pacotes Linux/macOS que acabaram de ir para o site - nada e recompilado,
 rem entao os dois lugares servem os mesmos bytes. Falha aqui so avisa: o site
 rem ja foi publicado. Detalhes em tools\github_release.ps1.
 echo.
-echo [4/4] Publicando a release v%APP_VER% no GitHub...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\github_release.ps1" -Version %APP_VER%
-if errorlevel 1 (
-    echo   [AVISO] Release do GitHub nao publicada. Depois de resolver, rode:
+if defined UPLOAD_FAILED (
+    echo [4/4] Release do GitHub nao criada: o site nao recebeu os arquivos.
+    echo       Depois de subir para o site, rode:
     echo       powershell -File tools\github_release.ps1 -Version %APP_VER%
+) else (
+    echo [4/4] Publicando a release v%APP_VER% no GitHub...
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\github_release.ps1" -Version %APP_VER%
+    if errorlevel 1 (
+        echo   [AVISO] Release do GitHub nao publicada. Depois de resolver, rode:
+        echo       powershell -File tools\github_release.ps1 -Version %APP_VER%
+    )
 )
 
 rem -------------------------------------------------------------

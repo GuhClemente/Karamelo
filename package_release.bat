@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 cls
 echo =======================================================
-echo   Karamelo v1.0 - Packaging ^& Release Generator
+echo   Karamelo - Packaging ^& Release Generator
 echo =======================================================
 echo.
 
@@ -60,7 +60,7 @@ copy /Y "%~dp0packaging\bios-guide\BIOS_NECESSARIOS.txt" "%DIST_DIR%\bios\BIOS_N
 if exist "%~dp0docs\GUIA_COMPLETO_BIOS.md" copy /Y "%~dp0docs\GUIA_COMPLETO_BIOS.md" "%DIST_DIR%\bios\GUIA_COMPLETO_BIOS.md" >nul
 
 rem ---------------------------------------------------------------
-rem Create all 35 ROM system folders with user instructions
+rem Create the ROM system folders (one per system) with user instructions
 rem ---------------------------------------------------------------
 set ROMS_DIR=%DIST_DIR%\roms
 mkdir "%ROMS_DIR%"
@@ -144,7 +144,7 @@ powershell -NoProfile -Command "$f = Get-Item '%~dp0dist\%DIST_NAME%.zip'; Write
 
 rem 5. Prepare Standalone Executable & version.json for Auto-Updater
 copy /Y "app\%APP_EXE%" "dist\Karamelo.exe" >nul
-powershell -NoProfile -Command "$exe = Get-Item 'dist\Karamelo.exe'; $exeHash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash; $date = (Get-Date -Format 'yyyy-MM-dd'); $obj = [ordered]@{}; if (Test-Path 'dist\version.json') { try { $raw = Get-Content 'dist\version.json' -Raw -Encoding UTF8 | ConvertFrom-Json; foreach ($prop in $raw.psobject.properties) { $obj[$prop.Name] = $prop.Value } } catch {} }; $obj['version'] = '%APP_VER%'; $obj['title'] = 'Karamelo v%APP_VER%'; $obj['release_date'] = $date; if (-not $obj.Contains('notes')) { $obj['notes'] = 'Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update.' }; $obj['exe_url'] = 'https://karamelo-emu.com/downloads/Karamelo.exe'; $obj['exe_size'] = $exe.Length; $obj['exe_sha256'] = $exeHash; $obj['zip_url'] = 'https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip'; if (-not $obj.Contains('force_full_package')) { $obj['force_full_package'] = $false }; $json = $obj | ConvertTo-Json -Depth 4; Set-Content -Path 'dist\version.json' -Value $json -Encoding UTF8"
+powershell -NoProfile -Command "$exe = Get-Item 'dist\Karamelo.exe'; $exeHash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash; $date = (Get-Date -Format 'yyyy-MM-dd'); $obj = [ordered]@{}; if (Test-Path 'dist\version.json') { try { $raw = Get-Content 'dist\version.json' -Raw -Encoding UTF8 | ConvertFrom-Json; foreach ($prop in $raw.psobject.properties) { $obj[$prop.Name] = $prop.Value } } catch {} }; $obj['version'] = '%APP_VER%'; $obj['exe_version'] = '%APP_VER%'; $obj['title'] = 'Karamelo v%APP_VER%'; $obj['release_date'] = $date; if (-not $obj.Contains('notes')) { $obj['notes'] = 'Nova versao do Karamelo.' }; $obj['exe_url'] = 'https://karamelo-emu.com/downloads/Karamelo.exe'; $obj['exe_size'] = $exe.Length; $obj['exe_sha256'] = $exeHash; $obj['zip_url'] = 'https://karamelo-emu.com/downloads/Karamelo_v%APP_VER%_Win64.zip'; if (-not $obj.Contains('force_full_package')) { $obj['force_full_package'] = $false }; $json = $obj | ConvertTo-Json -Depth 4; Set-Content -Path 'dist\version.json' -Value $json -Encoding UTF8"
 
 echo   Updater: dist\Karamelo.exe
 echo   Manifest: dist\version.json

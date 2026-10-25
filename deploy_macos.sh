@@ -25,6 +25,24 @@ SERVER_IP="${SERVER_IP:-187.127.59.127}"
 SERVER_USER="${SERVER_USER:-root}"
 REMOTE_DIR="${REMOTE_DIR:-/data/downloads/}"
 
+# 0. So publica o que esta commitado e no GitHub (mesma regra do deploy_all.bat):
+#    o binario que o jogador baixa tem que sair de um codigo que existe no repo.
+#    dist/version.json fica de fora - o empacotamento regrava ele.
+if ! git diff --quiet HEAD -- . ':(exclude)dist/version.json'; then
+    echo "[ERRO] Ha alteracoes nao commitadas - deploy cancelado:"
+    git status --short --untracked-files=no -- . ':(exclude)dist/version.json'
+    exit 1
+fi
+git fetch -q origin || { echo "[ERRO] Nao consegui falar com o GitHub (git fetch)."; exit 1; }
+if [ -z "$(git branch -r --contains HEAD)" ]; then
+    echo "[ERRO] O commit atual ainda nao esta no GitHub - rode git push antes."
+    exit 1
+fi
+
+# O version.json de partida e o do site: o bloco das outras plataformas so
+# existe la (tools/release_manifest.py).
+python3 tools/release_manifest.py fetch
+
 # 2. Compilacao, testes e empacotamento da release macOS
 echo "[1/2] Compilando, testando e empacotando release macOS..."
 ./package_macos.sh
@@ -36,6 +54,12 @@ LOCAL_JSON="dist/version.json"
 
 if [ ! -f "$LOCAL_TAR" ]; then
     echo "[FALHA] Pacote $LOCAL_TAR nao foi encontrado."
+    exit 1
+fi
+
+# Manifesto final: tira binario de plataforma nao refeito, notas do SITE_SYNC.
+if ! python3 tools/release_manifest.py finalize; then
+    echo "[FALHA] version.json incompleto - deploy cancelado antes do upload."
     exit 1
 fi
 

@@ -29,7 +29,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/2] Executando correcao no servidor...
-ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "chmod +x /root/fix_server.sh && /root/fix_server.sh"
+ssh -o StrictHostKeyChecking=no %SERVER_USER%@%SERVER_IP% "sed -i 's/\r$//' /root/fix_server.sh && chmod +x /root/fix_server.sh && /root/fix_server.sh"
 
 echo.
 echo =======================================================

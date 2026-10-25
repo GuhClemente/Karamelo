@@ -115,7 +115,7 @@ if [ -f "docs/GUIA_COMPLETO_BIOS.md" ]; then
     cp -a "docs/GUIA_COMPLETO_BIOS.md" "$DIST_DIR/bios/GUIA_COMPLETO_BIOS.txt"
 fi
 
-# Criar pastas de ROMs dos 35 sistemas com seus LEIA-ME.txt
+# Criar pastas de ROMs de cada sistema com seus LEIA-ME.txt
 if [ -d "packaging/rom-folder-guides" ]; then
     for sdir in packaging/rom-folder-guides/*; do
         if [ -d "$sdir" ]; then
@@ -209,11 +209,14 @@ if "title" not in data:
 if "release_date" not in data:
     data["release_date"] = datetime.now().strftime("%Y-%m-%d")
 if "notes" not in data:
-    data["notes"] = f"Lancamento oficial do Karamelo com 35 sistemas nativos e Auto-Update."
+    data["notes"] = "Nova versao do Karamelo."
 if "force_full_package" not in data:
     data["force_full_package"] = False
 
 # Campos do macOS
+# Versao deste binario: o app 0.9.78+ compara com ela, e nao com
+# "version" (que e a do Windows) - ver tools/release_manifest.py.
+data["macos_bin_version"] = ver
 data["macos_bin_url"] = "https://karamelo-emu.com/downloads/Karamelo_mac"
 data["macos_bin_size"] = bin_size
 data["macos_bin_sha256"] = bin_sha

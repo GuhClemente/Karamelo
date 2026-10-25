@@ -44,15 +44,14 @@ if (-not $remote) {
     exit 1
 }
 
-$candidates = @(
-    "dist\Karamelo_v${Version}_Win64.zip",
-    "dist\Karamelo.exe",
-    "dist\Karamelo_v${Version}_Linux64.tar.gz",
-    "dist\Karamelo_linux",
-    "dist\Karamelo_v${Version}_macOS_arm64.tar.gz",
-    "dist\Karamelo_mac"
-)
-$assets = @($candidates | Where-Object { Test-Path $_ })
+# Karamelo_linux / Karamelo_mac nao tem versao no nome: so entram junto do
+# pacote desta versao, senao um binario de uma build antiga iria na release.
+$assets = @("dist\Karamelo_v${Version}_Win64.zip", "dist\Karamelo.exe") | Where-Object { Test-Path $_ }
+foreach ($p in @(@("Linux64.tar.gz", "Karamelo_linux"), @("macOS_arm64.tar.gz", "Karamelo_mac"))) {
+    $pkg = "dist\Karamelo_v${Version}_$($p[0])"
+    if ((Test-Path $pkg) -and (Test-Path "dist\$($p[1])")) { $assets += $pkg, "dist\$($p[1])" }
+}
+$assets = @($assets)
 if (-not ($assets -contains "dist\Karamelo_v${Version}_Win64.zip")) {
     Write-Host "  [AVISO] dist\Karamelo_v${Version}_Win64.zip nao existe - nada publicado no GitHub."
     exit 1

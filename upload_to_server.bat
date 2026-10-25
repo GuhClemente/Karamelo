@@ -67,12 +67,28 @@ rem redistribuicao, a mesma coisa que o README proibe para o repositorio.
 rem O create_packs.ps1 continua gerando o arquivo em dist/ para uso local.
 set EXTRA_FILES=
 
+rem O manifesto que sobe e o finalizado (binario de plataforma nao refeito
+rem fica de fora, notas da versao) - ver tools\release_manifest.py.
+python "%~dp0tools\release_manifest.py" finalize
+if errorlevel 1 (
+    echo [ERRO] version.json incompleto - upload cancelado.
+    pause
+    exit /b 1
+)
+
+rem O errorlevel que importa e o do upload dos pacotes, nao o do scp do
+rem fix_server.sh logo abaixo.
+set UPLOAD_FAILED=
 scp -o StrictHostKeyChecking=no "%LOCAL_ZIP%" "%LOCAL_EXE%" %LINUX_DEPLOY_FILES% %MACOS_DEPLOY_FILES% "%LOCAL_JSON%" "%~dp0data\ports.json" %EXTRA_FILES% %SERVER_USER%@%SERVER_IP%:%REMOTE_DIR%
+if errorlevel 1 set UPLOAD_FAILED=1
 rem O script de deploy vai para /root/, nunca para %REMOTE_DIR%: aquela pasta e
 rem servida publicamente, e o fix_server.sh acabou exposto em /downloads/.
-scp -o StrictHostKeyChecking=no "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:/root/fix_server.sh
+if not defined UPLOAD_FAILED (
+    scp -o StrictHostKeyChecking=no "%~dp0fix_server.sh" %SERVER_USER%@%SERVER_IP%:/root/fix_server.sh
+    if errorlevel 1 set UPLOAD_FAILED=1
+)
 
-if errorlevel 1 (
+if defined UPLOAD_FAILED (
     echo.
     echo [ERRO] Falha no upload via SCP - verifique a conexao e chave SSH.
 ) else (

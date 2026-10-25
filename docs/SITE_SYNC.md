@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.77 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.78 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -135,6 +135,14 @@ exige tocar no site.
 ⚠️ **Esse arquivo é lido pelo auto-update do aplicativo (Windows, Linux e macOS).**
 Não altere nomes de campos nem quebre o JSON. Se ele quebrar, os usuários perdem
 a atualização automática.
+
+Desde a 0.9.78 cada build também tem a própria versão: `exe_version`,
+`linux_bin_version` e `macos_bin_version`. `version` é a do Windows. Quando a
+build de Linux ou macOS não foi refeita para a versão nova, o campo dela continua
+na versão anterior. Para o botão de cada sistema, mostre a versão da build daquele
+sistema e use `version` só se o campo não existir. Os campos `*_bin_url/_size/_sha256`
+de uma plataforma podem faltar (binário de versão desconhecida). Os `*_tar_url`
+dos pacotes continuam sempre lá.
 
 ### O que oferecer para download
 
