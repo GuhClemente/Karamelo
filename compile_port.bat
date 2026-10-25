@@ -36,6 +36,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem libmspack's lzxd.c, also vendored and also at /W0: at /W3 it emits two
+rem C4244 conversion warnings in code we do not edit. Our own sources build
+rem with /WX below, so the build output has to be warning-free to begin with.
+echo [libmspack]
+cl.exe /nologo /c /MT /O2 /W0 /FS ^
+    /D_CRT_SECURE_NO_WARNINGS ^
+    /I third_party\libmspack ^
+    /Fobuild\ ^
+    third_party\libmspack\lzxd.c
+if errorlevel 1 (
+    echo [BUILD FAILED] libmspack failed to compile.
+    exit /b 1
+)
+
 rem SDL3, vendored as source under third_party\SDL3 (dev-sdl3 migration branch) and
 rem built once as a static lib into build\sdl3\ - cached there across runs since
 rem compile_port.bat never wipes build\, same as every .obj file below. Building
@@ -75,7 +89,7 @@ rem metadata RTTI would otherwise leave sitting in the binary for anyone to read
 rem /guard:cf (paired with /GUARD:CF at link) adds Control Flow Guard instrumentation -
 rem free hardening against control-flow-hijacking exploits, no separate tool required.
 
-cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf /Zi ^
+cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /WX /std:c++20 /EHsc /GR- /guard:cf /Zi ^
     /I include ^
     /I third_party\rcheevos\include ^
     /I third_party\rcheevos\src ^
@@ -108,7 +122,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- /guard:cf 
     src\port_catalog.cpp ^
     src\json_mini.cpp ^
     src\x360_dump.cpp ^
-    third_party\libmspack\lzxd.c ^
+    build\lzxd.obj ^
     src\crash_reporter.cpp ^
     src\main_win32.cpp ^
     third_party\rcheevos\src\*.c ^

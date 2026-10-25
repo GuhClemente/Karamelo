@@ -93,7 +93,9 @@ KARAMELO_SRCS=(
 for src in "${KARAMELO_SRCS[@]}"; do
     echo "  Compilando $src..."
     obj="build/linux_obj/$(basename "$src" .cpp).o"
-    g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj"
+    # -Werror so nosso codigo: warning quebra o build (e o CI) em vez de
+    # passar no meio do log. Terceiros (libchdr, rcheevos) ficam de fora.
+    g++ -std=c++20 -O2 -Werror $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj"
 done
 
 # 6. Linkar Executavel Principal

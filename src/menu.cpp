@@ -3543,7 +3543,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       if (setting_driver == VIDEO_DRIVER_SOFTWARE) {
         snprintf(msg, sizeof(msg), "DRIVER: SOFTWARE (CPU)");
       } else if (setting_driver == VIDEO_DRIVER_AUTO) {
-        snprintf(msg, sizeof(msg), Tr("DRIVER: AUTO (DETECTA GPU CONFORME O JOGO)", "DRIVER: AUTO (PICKS THE GPU PER GAME)"));
+        snprintf(msg, sizeof(msg), "%s", Tr("DRIVER: AUTO (DETECTA GPU CONFORME O JOGO)", "DRIVER: AUTO (PICKS THE GPU PER GAME)"));
       } else {
         snprintf(msg, sizeof(msg), Tr("DRIVER: %s (3D GPU ATIVADO)", "DRIVER: %s (3D GPU ENABLED)"), GetCurrentDriverToast());
       }

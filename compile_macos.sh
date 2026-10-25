@@ -109,7 +109,8 @@ for src in "${KARAMELO_SRCS[@]}"; do
     obj="build/macos_obj/$(basename "$src" .cpp).o"
     if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
         echo "  Compilando $src..."
-        clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj"
+        # -Werror so no nosso codigo (ver compile_linux.sh).
+        clang++ -std=c++20 -O2 -Werror $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj"
     fi
 done
 

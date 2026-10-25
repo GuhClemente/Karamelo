@@ -4928,7 +4928,7 @@ bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t
 	if (!fs::exists(save_file, ec) || !fs::is_regular_file(save_file, ec))
 	{
 		if (out_time_str && max_time_len > 0)
-			snprintf(out_time_str, max_time_len, Tr("Vazio", "Empty"));
+			snprintf(out_time_str, max_time_len, "%s", Tr("Vazio", "Empty"));
 		return true;
 	}
 
@@ -4954,7 +4954,7 @@ bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t
 		}
 		else
 		{
-			snprintf(out_time_str, max_time_len, Tr("Salvo", "Saved"));
+			snprintf(out_time_str, max_time_len, "%s", Tr("Salvo", "Saved"));
 		}
 	}
 	return true;

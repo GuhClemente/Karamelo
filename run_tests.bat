@@ -13,7 +13,11 @@ rem Production sources are linked in on purpose. The suite used to compile only
 rem tests\*.cpp and every test kept its own private copy of the logic, so the
 rem whole thing was green while testing code that never shipped.
 echo [BUILDING UNIT TESTS]...
-cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
+rem lzxd.c is third-party: /W0 on its own, as in compile_port.bat. Everything
+rem else is ours and builds with /WX - a warning fails the build.
+cl.exe /nologo /c /O2 /W0 /D_CRT_SECURE_NO_WARNINGS /I third_party\libmspack /Fobuild\tests\ third_party\libmspack\lzxd.c
+if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
+cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /WX /std:c++20 /EHsc ^
     /I include ^
     /I tests ^
     /I third_party\libmspack ^
@@ -39,7 +43,7 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /std:c++20 /EHsc ^
     src\json_mini.cpp ^
     src\input_map.cpp ^
     src\gamepad_sdl.cpp ^
-    third_party\libmspack\lzxd.c ^
+    build\tests\lzxd.obj ^
     build\sdl3\SDL3-static.lib ^
     /link /OUT:build\karamelo_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib shell32.lib user32.lib gdi32.lib winmm.lib bcrypt.lib ole32.lib oleaut32.lib imm32.lib setupapi.lib version.lib advapi32.lib
 
