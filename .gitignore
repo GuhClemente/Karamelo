@@ -38,6 +38,8 @@ psx_last_run_report.json
 /app/bios/
 /app/roms/
 /app/games/
+# Gerado pelos cores em tempo de execucao (Dolphin grava .cht aqui).
+/app/cheats/
 /roms
 /roms/
 /games
