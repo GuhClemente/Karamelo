@@ -4066,57 +4066,51 @@ static bool CoreLoad(const char* core_dll_path)
 	// proxima criacao de dispositivo chamaria create_device do core anterior.
 	VkHwClearNegotiationInterface();
 
-	InterlockedExchange(&g_core_in_module_op, 1);
-#ifndef _WIN32
+	// One path, resolved once, for every OS: CoreResolveBinaryPath is also what
+	// the menu's "present / missing" uses, so what the menu shows and what gets
+	// loaded can no longer disagree. It used to: Windows loaded the raw hint
+	// ("cores/x.dll") while the check also accepted app/cores/x.dll, and on
+	// macOS/Linux a failed dlopen fell through four more attempts at files that
+	// do not exist - the log then showed the last dlerror() ("no such file")
+	// instead of the real one (missing dependency, wrong architecture).
 	std::string resolved = CoreResolveBinaryPath(core_dll_path);
+	std::string load_error;
+	InterlockedExchange(&g_core_in_module_op, 1);
 	if (!resolved.empty())
 	{
+#ifndef _WIN32
+		// dlopen treats a name without a slash as a library to look up in the
+		// system paths, not as a file here.
 		if (resolved[0] != '/' && resolved.rfind("./", 0) != 0)
 			resolved = "./" + resolved;
 		h_core_dll = LoadLibraryA(resolved.c_str());
-	}
-	if (!h_core_dll)
-	{
-		std::string path_str = core_dll_path ? core_dll_path : "";
-		std::string dylib_path = "";
-		std::string so_path = "";
-		if (path_str.size() > 4 && path_str.substr(path_str.size() - 4) == ".dll")
+		if (!h_core_dll)
 		{
-			std::string base = path_str.substr(0, path_str.size() - 4);
-			dylib_path = base + ".dylib";
-			so_path = base + ".so";
+			const char* err = dlerror();
+			load_error = err ? err : "dlopen falhou";
 		}
-		if (!dylib_path.empty() && dylib_path[0] != '/' && dylib_path.rfind("./", 0) != 0)
-			dylib_path = "./" + dylib_path;
-		if (!so_path.empty() && so_path[0] != '/' && so_path.rfind("./", 0) != 0)
-			so_path = "./" + so_path;
-		if (!path_str.empty() && path_str[0] != '/' && path_str.rfind("./", 0) != 0)
-			path_str = "./" + path_str;
-
-#if defined(__APPLE__)
-		if (!dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
-		if (!h_core_dll && !so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
 #else
-		if (!so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
-		if (!h_core_dll && !dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
+		h_core_dll = LoadLibraryA(resolved.c_str());
+		if (!h_core_dll)
+			load_error = "GetLastError=" + std::to_string(GetLastError());
 #endif
-		if (!h_core_dll && !path_str.empty())
-			h_core_dll = LoadLibraryA(path_str.c_str());
-		if (!h_core_dll && core_dll_path)
-			h_core_dll = LoadLibraryA(core_dll_path);
 	}
+	else
+	{
+#if defined(__APPLE__)
+		load_error = "arquivo .dylib nao encontrado em cores/";
+#elif !defined(_WIN32)
+		load_error = "arquivo .so nao encontrado em cores/";
 #else
-	h_core_dll = LoadLibraryA(core_dll_path);
+		load_error = "arquivo .dll nao encontrado em cores/";
 #endif
+	}
 	InterlockedExchange(&g_core_in_module_op, 0);
 	if (!h_core_dll)
 	{
-#ifndef _WIN32
-		const char* err = dlerror();
-		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] falha ao carregar o core %s (%s)", core_dll_path, err ? err : "erro desconhecido");
-#else
-		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] falha ao carregar o core %s (GetLastError=%lu)", core_dll_path, GetLastError());
-#endif
+		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] falha ao carregar o core %s%s%s (%s)",
+			core_dll_path ? core_dll_path : "(nenhum)",
+			resolved.empty() ? "" : " -> ", resolved.c_str(), load_error.c_str());
 		return false;
 	}
 
@@ -4234,6 +4228,8 @@ static bool CoreLoad(const char* core_dll_path)
 	else if (strstr(core_dll_path, "wswan")) loaded_core_name = "WonderSwan";
 	else if (strstr(core_dll_path, "lynx")) loaded_core_name = "Atari Lynx";
 	else if (strstr(core_dll_path, "pcfx")) loaded_core_name = "PC-FX";
+	else if (strstr(core_dll_path, "fmtowns")) loaded_core_name = "FM Towns";
+	else if (strstr(core_dll_path, "pc98")) loaded_core_name = "PC-98";
 	else if (strstr(core_dll_path, "arcade") || strstr(core_dll_path, "fbneo") || strstr(core_dll_path, "mame")) loaded_core_name = "Arcade";
 	LeaveCriticalSection(&name_lock);
 

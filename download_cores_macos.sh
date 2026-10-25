@@ -56,6 +56,11 @@ CORES_LIST=(
     "dosbox_pure.dylib:dosbox_pure_libretro.dylib.zip"
     "pc98.dylib:np2kai_libretro.dylib.zip"
     "fmtowns.dylib:geartowns_libretro.dylib.zip"
+    # PlayStation 2: o app procura cores/ps2 (LRPS2) e cores/ps2_play (Play!),
+    # como no Linux. Sem estas duas linhas o Mac mostrava o sistema no menu e
+    # so dava "CORE AUSENTE". O buildbot publica os dois para arm64.
+    "ps2.dylib:pcsx2_libretro.dylib.zip"
+    "ps2_play.dylib:play_libretro.dylib.zip"
 )
 
 echo "====================================================================="
