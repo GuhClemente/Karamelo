@@ -175,3 +175,13 @@ psx_last_run_report.json
 # Emulator save data (SRAM / FM-PAC battery)
 *.sav
 *.srm
+
+# Arquivos de sistema do macOS e Windows
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
