@@ -743,23 +743,7 @@ static const char *GetArcadeCoreDll(const std::string &file_path = "") {
   return "cores/arcade_fbneo.dll";
 }
 
-static bool CoreBinaryExists(const char* dll_or_so_path) {
-  if (!dll_or_so_path) return false;
-  std::error_code ec;
-  std::string p = dll_or_so_path;
-#ifndef _WIN32
-  if (p.size() >= 4 && p.substr(p.size() - 4) == ".dll") {
-    std::string base = p.substr(0, p.size() - 4);
-    std::string dylib = base + ".dylib";
-    std::string so = base + ".so";
-    if (fs::exists(dylib, ec) || fs::exists("app/" + dylib, ec) ||
-        fs::exists(so, ec) || fs::exists("app/" + so, ec)) return true;
-  }
-  return fs::exists(p, ec) || fs::exists("app/" + p, ec);
-#else
-  return fs::exists(p, ec) || fs::exists("app/" + p, ec);
-#endif
-}
+// CoreBinaryExists is declared in core_runner.h
 
 static const char *GetN64CoreDll() {
   if (setting_n64_core == 0 && CoreBinaryExists("cores/n64_parallel.dll"))
@@ -2084,7 +2068,7 @@ void PopulateAbout() {
         break;
       std::string x = entry.path().extension().string();
       std::transform(x.begin(), x.end(), x.begin(), ::tolower);
-      if (x == ".dll")
+      if (x == ".dll" || x == ".dylib" || x == ".so")
         core_files++;
     }
   }
@@ -2180,9 +2164,8 @@ void PopulateCoresList() {
     {"WonderSwan", "Beetle Cygne", "cores/wswan.dll"}
   };
 
-  std::error_code ec;
   for (const auto& c : kAllCores) {
-    bool present = fs::exists(c.dll, ec);
+    bool present = CoreBinaryExists(c.dll);
     std::string status = present ? c.engine : Tr("(Ausente)", "(Missing)");
     items.push_back({c.system, status, false, false, 0});
   }

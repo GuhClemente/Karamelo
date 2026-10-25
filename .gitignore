@@ -38,9 +38,13 @@ psx_last_run_report.json
 /app/bios/
 /app/roms/
 /app/games/
+/roms
 /roms/
+/games
 /games/
+/bios
 /bios/
+/cores
 /cores/
 **/bios/
 **/cores/

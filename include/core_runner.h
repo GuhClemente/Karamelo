@@ -14,6 +14,8 @@
 // declare the window unresponsive.
 bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint);
 bool CoreIsLoading();
+std::string CoreResolveBinaryPath(const char* dll_or_so_path);
+bool CoreBinaryExists(const char* dll_or_so_path);
 // Video frames the current game has delivered since it loaded (reset on every
 // load). The self-test uses it to tell a game that runs from one that only
 // got past retro_load_game.

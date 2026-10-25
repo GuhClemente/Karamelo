@@ -3117,6 +3117,40 @@ static std::string CoreFamily(const std::string& core_path)
 	return cut == std::string::npos ? stem : stem.substr(0, cut);
 }
 
+std::string CoreResolveBinaryPath(const char* dll_or_so_path)
+{
+	if (!dll_or_so_path || !dll_or_so_path[0]) return "";
+	std::error_code ec;
+	std::string p = dll_or_so_path;
+#ifndef _WIN32
+	if (p.size() >= 4 && p.substr(p.size() - 4) == ".dll")
+	{
+		std::string base = p.substr(0, p.size() - 4);
+		std::string dylib = base + ".dylib";
+		std::string so = base + ".so";
+#if defined(__APPLE__)
+		if (fs::exists(dylib, ec)) return dylib;
+		if (fs::exists("app/" + dylib, ec)) return "app/" + dylib;
+		if (fs::exists(so, ec)) return so;
+		if (fs::exists("app/" + so, ec)) return "app/" + so;
+#else
+		if (fs::exists(so, ec)) return so;
+		if (fs::exists("app/" + so, ec)) return "app/" + so;
+		if (fs::exists(dylib, ec)) return dylib;
+		if (fs::exists("app/" + dylib, ec)) return "app/" + dylib;
+#endif
+	}
+#endif
+	if (fs::exists(p, ec)) return p;
+	if (fs::exists("app/" + p, ec)) return "app/" + p;
+	return "";
+}
+
+bool CoreBinaryExists(const char* dll_or_so_path)
+{
+	return !CoreResolveBinaryPath(dll_or_so_path).empty();
+}
+
 static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 {
 	(void)lpParam;
@@ -3267,13 +3301,13 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		// correct attempt instead of fifteen wrong ones.
 		{
 			auto it = s_arcade_core_for_rom.find(original_rom_path);
-			if (it != s_arcade_core_for_rom.end() && fs::exists(it->second))
+			if (it != s_arcade_core_for_rom.end() && CoreBinaryExists(it->second.c_str()))
 			{
 				candidate_cores.push_back(it->second);
 			}
 		}
 
-		if (!core_dll.empty() && fs::exists(core_dll) &&
+		if (!core_dll.empty() && CoreBinaryExists(core_dll.c_str()) &&
 			std::find(candidate_cores.begin(), candidate_cores.end(), core_dll) == candidate_cores.end())
 		{
 			candidate_cores.push_back(core_dll);
@@ -3295,7 +3329,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 
 		for (const auto& c : default_arcade_cores)
 		{
-			if (std::find(candidate_cores.begin(), candidate_cores.end(), c) == candidate_cores.end() && fs::exists(c))
+			if (std::find(candidate_cores.begin(), candidate_cores.end(), c) == candidate_cores.end() && CoreBinaryExists(c.c_str()))
 			{
 				candidate_cores.push_back(c);
 			}
@@ -3315,7 +3349,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 				{
 					if (it != candidate_cores.begin()) std::rotate(candidate_cores.begin(), it, it + 1);
 				}
-				else if (fs::exists(fly))
+				else if (CoreBinaryExists(fly.c_str()))
 				{
 					candidate_cores.insert(candidate_cores.begin(), fly);
 				}
@@ -3404,11 +3438,22 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	}
 	else
 	{
-		if (core_dll.empty() || !fs::exists(core_dll))
+		if (core_dll.empty() || !CoreBinaryExists(core_dll.c_str()))
 		{
 			char msg[160];
+#if defined(__APPLE__)
+			std::string display_core = core_dll;
+			if (display_core.size() > 4 && display_core.substr(display_core.size() - 4) == ".dll")
+				display_core = display_core.substr(0, display_core.size() - 4) + ".dylib";
+#elif !defined(_WIN32)
+			std::string display_core = core_dll;
+			if (display_core.size() > 4 && display_core.substr(display_core.size() - 4) == ".dll")
+				display_core = display_core.substr(0, display_core.size() - 4) + ".so";
+#else
+			const std::string& display_core = core_dll;
+#endif
 			snprintf(msg, sizeof(msg), Tr("CORE AUSENTE: %s", "CORE MISSING: %s"),
-				core_dll.empty() ? Tr("nenhum core para este formato", "no core for this format") : core_dll.c_str());
+				core_dll.empty() ? Tr("nenhum core para este formato", "no core for this format") : display_core.c_str());
 			CoreSetToast(msg, 300);
 			InterlockedExchange(&g_core_state, CORE_STATE_IDLE);
 			return 0;
@@ -4023,33 +4068,43 @@ static bool CoreLoad(const char* core_dll_path)
 
 	InterlockedExchange(&g_core_in_module_op, 1);
 #ifndef _WIN32
-	std::string path_str = core_dll_path ? core_dll_path : "";
-	std::string dylib_path = "";
-	std::string so_path = "";
-	if (path_str.size() > 4 && path_str.substr(path_str.size() - 4) == ".dll")
+	std::string resolved = CoreResolveBinaryPath(core_dll_path);
+	if (!resolved.empty())
 	{
-		std::string base = path_str.substr(0, path_str.size() - 4);
-		dylib_path = base + ".dylib";
-		so_path = base + ".so";
+		if (resolved[0] != '/' && resolved.rfind("./", 0) != 0)
+			resolved = "./" + resolved;
+		h_core_dll = LoadLibraryA(resolved.c_str());
 	}
-	if (!dylib_path.empty() && dylib_path[0] != '/' && dylib_path.rfind("./", 0) != 0)
-		dylib_path = "./" + dylib_path;
-	if (!so_path.empty() && so_path[0] != '/' && so_path.rfind("./", 0) != 0)
-		so_path = "./" + so_path;
-	if (!path_str.empty() && path_str[0] != '/' && path_str.rfind("./", 0) != 0)
-		path_str = "./" + path_str;
+	if (!h_core_dll)
+	{
+		std::string path_str = core_dll_path ? core_dll_path : "";
+		std::string dylib_path = "";
+		std::string so_path = "";
+		if (path_str.size() > 4 && path_str.substr(path_str.size() - 4) == ".dll")
+		{
+			std::string base = path_str.substr(0, path_str.size() - 4);
+			dylib_path = base + ".dylib";
+			so_path = base + ".so";
+		}
+		if (!dylib_path.empty() && dylib_path[0] != '/' && dylib_path.rfind("./", 0) != 0)
+			dylib_path = "./" + dylib_path;
+		if (!so_path.empty() && so_path[0] != '/' && so_path.rfind("./", 0) != 0)
+			so_path = "./" + so_path;
+		if (!path_str.empty() && path_str[0] != '/' && path_str.rfind("./", 0) != 0)
+			path_str = "./" + path_str;
 
 #if defined(__APPLE__)
-	if (!dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
-	if (!h_core_dll && !so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
+		if (!dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
+		if (!h_core_dll && !so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
 #else
-	if (!so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
-	if (!h_core_dll && !dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
+		if (!so_path.empty()) h_core_dll = LoadLibraryA(so_path.c_str());
+		if (!h_core_dll && !dylib_path.empty()) h_core_dll = LoadLibraryA(dylib_path.c_str());
 #endif
-	if (!h_core_dll && !path_str.empty())
-		h_core_dll = LoadLibraryA(path_str.c_str());
-	if (!h_core_dll && core_dll_path)
-		h_core_dll = LoadLibraryA(core_dll_path);
+		if (!h_core_dll && !path_str.empty())
+			h_core_dll = LoadLibraryA(path_str.c_str());
+		if (!h_core_dll && core_dll_path)
+			h_core_dll = LoadLibraryA(core_dll_path);
+	}
 #else
 	h_core_dll = LoadLibraryA(core_dll_path);
 #endif
