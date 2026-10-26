@@ -71,6 +71,20 @@ if scp -o StrictHostKeyChecking=no "$LOCAL_TAR" "$LOCAL_BIN" "$LOCAL_JSON" data/
     echo ""
     echo "Sincronizando com containers do Coolify e ajustando permissoes..."
     ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "sed -i 's/\r$//' /root/fix_server.sh && chmod +x /root/fix_server.sh && /root/fix_server.sh"
+    # Release do GitHub: se a v$APP_VER ja existe (o deploy do Windows a cria),
+    # os arquivos deste sistema entram nela. Se ainda nao existe, o
+    # tools/github_release.ps1 do Windows baixa estes mesmos arquivos do site
+    # quando criar a release - nos dois casos ela fica completa.
+    if command -v gh >/dev/null 2>&1 && gh release view "v$APP_VER" >/dev/null 2>&1; then
+        echo ""
+        echo "Enviando os arquivos para a release v$APP_VER do GitHub..."
+        gh release upload "v$APP_VER" "$LOCAL_TAR" "$LOCAL_BIN" --clobber \
+            || echo "  [AVISO] falha ao enviar para a release do GitHub - o site ja foi publicado."
+    elif ! command -v gh >/dev/null 2>&1; then
+        echo "  [AVISO] gh (GitHub CLI) nao instalado - a release do GitHub recebe estes arquivos no proximo deploy do Windows."
+    else
+        echo "  Release v$APP_VER ainda nao existe no GitHub - o deploy do Windows inclui estes arquivos ao cria-la."
+    fi
     echo ""
     echo "====================================================================="
     echo "  [DEPLOY MACOS CONCLUIDO COM SUCESSO - VERSAO v$APP_VER]"

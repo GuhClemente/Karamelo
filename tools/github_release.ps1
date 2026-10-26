@@ -46,10 +46,43 @@ if (-not $remote) {
 
 # Karamelo_linux / Karamelo_mac nao tem versao no nome: so entram junto do
 # pacote desta versao, senao um binario de uma build antiga iria na release.
-$assets = @("dist\Karamelo_v${Version}_Win64.zip", "dist\Karamelo.exe") | Where-Object { Test-Path $_ }
-foreach ($p in @(@("Linux64.tar.gz", "Karamelo_linux"), @("macOS_arm64.tar.gz", "Karamelo_mac"))) {
+$assets = @(@("dist\Karamelo_v${Version}_Win64.zip", "dist\Karamelo.exe") | Where-Object { Test-Path $_ })
+
+# Linux e macOS sao gerados em outras maquinas (WSL, Mac) e vao direto para o
+# site - o pacote do Mac nunca passa por este dist\, e a release do GitHub da
+# 0.9.78 e da 0.9.79 saiu sem ele. O que faltar aqui vem do site, se o
+# version.json de la anuncia esta versao para aquela plataforma, e o binario so
+# entra se o SHA-256 bater com o manifesto.
+$site = $null
+try { $site = (Invoke-WebRequest "https://karamelo-emu.com/downloads/version.json" -UseBasicParsing -TimeoutSec 30).Content | ConvertFrom-Json } catch {}
+$fetchDir = Join-Path $env:TEMP "karamelo_release_$Version"
+foreach ($p in @(@("Linux64.tar.gz", "Karamelo_linux", "linux_bin"), @("macOS_arm64.tar.gz", "Karamelo_mac", "macos_bin"))) {
     $pkg = "dist\Karamelo_v${Version}_$($p[0])"
-    if ((Test-Path $pkg) -and (Test-Path "dist\$($p[1])")) { $assets += $pkg, "dist\$($p[1])" }
+    $bin = "dist\$($p[1])"
+    if ((Test-Path $pkg) -and (Test-Path $bin)) { $assets += $pkg, $bin; continue }
+    $prefix = $p[2]
+    if (-not $site -or $site."${prefix}_version" -ne $Version) {
+        Write-Host "  $($p[1]): nao esta em dist\ nem publicado como $Version no site - fica fora da release."
+        continue
+    }
+    New-Item -ItemType Directory -Force $fetchDir | Out-Null
+    $pkgName = Split-Path $pkg -Leaf
+    $pkgOut = Join-Path $fetchDir $pkgName
+    $binOut = Join-Path $fetchDir $p[1]
+    try {
+        Invoke-WebRequest "https://karamelo-emu.com/downloads/$pkgName" -OutFile $pkgOut -UseBasicParsing
+        Invoke-WebRequest "https://karamelo-emu.com/downloads/$($p[1])" -OutFile $binOut -UseBasicParsing
+    } catch {
+        Write-Host "  [AVISO] nao consegui baixar $($p[1]) do site: $($_.Exception.Message)"
+        continue
+    }
+    $hash = (Get-FileHash $binOut -Algorithm SHA256).Hash
+    if ($hash -ne ([string]$site."${prefix}_sha256").ToUpper()) {
+        Write-Host "  [AVISO] $($p[1]) do site nao bate com o version.json do site - fica fora da release."
+        continue
+    }
+    Write-Host "  $($p[1]) e $pkgName vieram do site (hash conferido)."
+    $assets += $pkgOut, $binOut
 }
 $assets = @($assets)
 if (-not ($assets -contains "dist\Karamelo_v${Version}_Win64.zip")) {
