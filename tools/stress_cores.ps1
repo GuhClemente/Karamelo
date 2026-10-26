@@ -20,6 +20,12 @@
 #   ...\stress_cores.ps1 -TimeoutSec 90          # cores pesados (PS2, GC)
 #   ...\stress_cores.ps1 -Driver 2               # tudo em Vulkan
 #   ...\stress_cores.ps1 -Driver 3               # tudo em DirectX 11
+#   ...\stress_cores.ps1 -InputProbe             # tambem aperta cada botao (ver abaixo)
+#
+# -InputProbe: com o jogo aberto, aperta cada botao do controle e as teclas do
+# layout, um de cada vez, e reprova se o toque chegou ao core como outra coisa
+# alem do jogador 1 (outra porta, clique de mouse, pistola). Foi o que deixou
+# passar a 0.9.78: no FM Towns todo tiro tambem apertava o start do jogador 2.
 
 [CmdletBinding()]
 param(
@@ -31,7 +37,8 @@ param(
     # so o caminho Auto: nenhum core era exercitado em Vulkan ou DirectX 11,
     # que sao justamente onde moram as diferencas entre um core e outro.
     [ValidateRange(-1, 4)]
-    [int]$Driver = -1
+    [int]$Driver = -1,
+    [switch]$InputProbe
 )
 
 $ErrorActionPreference = "Stop"
@@ -199,6 +206,7 @@ foreach ($t in $targets) {
         # terem crashado.
         $argLine = '--core-selftest "{0}" "{1}" "{0}" "{1}"' -f $t.Dll, $t.Rom
         if ($Driver -ge 0) { $argLine += ' --driver ' + $Driver }
+        if ($InputProbe) { $argLine += ' --input-probe' }
         $p = Start-Process -FilePath $exe.FullName -WorkingDirectory $app -PassThru -WindowStyle Hidden `
              -ArgumentList $argLine
         if (-not $p.WaitForExit($TimeoutSec * 1000)) {
@@ -209,6 +217,8 @@ foreach ($t in $targets) {
         switch ($p.ExitCode) {
             0 { $marks += "."; Write-Host -NoNewline "." -ForegroundColor Green }
             1 { $marks += "F"; Write-Host -NoNewline "F" -ForegroundColor Yellow; if ($worst -eq "PASS") { $worst = "FAIL" } }
+            5 { $marks += "I"; Write-Host -NoNewline "I" -ForegroundColor Red; if ($worst -eq "PASS" -or $worst -eq "FAIL") { $worst = "INPUT" } }
+            6 { $marks += "?"; Write-Host -NoNewline "?" -ForegroundColor DarkYellow; if ($worst -eq "PASS") { $worst = "UNTESTED" } }
             default {
                 $marks += "X"
                 Write-Host -NoNewline "X" -ForegroundColor Red
@@ -222,6 +232,8 @@ foreach ($t in $targets) {
     $color = switch ($worst) {
         "PASS"    { "Green" }
         "FAIL"    { "Yellow" }
+        "INPUT"   { "Red" }
+        "UNTESTED" { "DarkYellow" }
         default   { "Red" }
     }
     Write-Host ("]  {0}  ({1:N0}s)" -f $worst, $sw.Elapsed.TotalSeconds) -ForegroundColor $color
@@ -229,14 +241,28 @@ foreach ($t in $targets) {
 }
 
 Write-Host ("-" * 78)
-Write-Host "  . = ciclo ok    F = core recusou    X = processo morreu    T = travou" -ForegroundColor DarkGray
+Write-Host "  . = ciclo ok    F = core recusou    I = toque chegou como outra coisa    ? = toques nao testados    X = processo morreu    T = travou" -ForegroundColor DarkGray
 Write-Host ""
 
 $crash = @($results | Where-Object { $_.Resultado -eq "CRASH" -or $_.Resultado -eq "TIMEOUT" })
 $fail  = @($results | Where-Object { $_.Resultado -eq "FAIL" })
+$leak = @($results | Where-Object { $_.Resultado -eq "INPUT" })
+$untested = @($results | Where-Object { $_.Resultado -eq "UNTESTED" })
 
 Write-Host ("  {0} sistemas ok, {1} com recusa, {2} derrubaram ou travaram o processo" -f
-            ($results.Count - $fail.Count - $crash.Count), $fail.Count, $crash.Count)
+            ($results.Count - $fail.Count - $crash.Count - $leak.Count - $untested.Count), $fail.Count, $crash.Count)
+if ($InputProbe) {
+    Write-Host ("  {0} com toque vazando para outra entrada, {1} sem os toques testados" -f $leak.Count, $untested.Count)
+}
+if ($untested.Count) {
+    Write-Host "  Abriram, mas o core nao leu a entrada durante os toques - nao verificados:" -ForegroundColor DarkYellow
+    $untested | ForEach-Object { Write-Host ("    {0,-14} {1}" -f $_.Sistema, $_.Rom) -ForegroundColor DarkYellow }
+}
+if ($leak.Count) {
+    Write-Host ""
+    Write-Host "  Um toque chegou ao jogo como outra coisa (detalhe em app\karamelo.log, 'INPUT-PROBE vazou'):" -ForegroundColor Red
+    $leak | ForEach-Object { Write-Host ("    {0,-14} {1}" -f $_.Sistema, $_.Rom) -ForegroundColor Red }
+}
 
 if ($crash.Count) {
     Write-Host ""
@@ -258,4 +284,4 @@ if ($pulados.Count) {
 }
 
 Write-Host ""
-if ($crash.Count) { exit 2 } elseif ($fail.Count) { exit 1 } else { exit 0 }
+if ($crash.Count) { exit 2 } elseif ($fail.Count -or $leak.Count) { exit 1 } else { exit 0 }

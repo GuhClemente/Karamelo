@@ -1782,6 +1782,9 @@ Novidades para o jogador:
   atirar no Tatsujin também apertava o start do jogador 2. Para jogar point-and-click
   (Monkey Island, Indiana Jones) com o controle, ligue Controles > Controle como Mouse.
   O mouse de verdade funciona sempre.
+- **Linux e Mac: o mouse de verdade funciona nos jogos**: Indiana Jones e Monkey Island
+  no FM Towns, jogos de DOS e de PC-98 com mouse. Antes, fora do Windows, o mouse não
+  chegava ao jogo e só o controle fazia o papel dele.
 - **Linux: jogos em .rar abrem**: o descompactador agora tenta 7z, unrar e bsdtar - o
   7z do Ubuntu lista arquivos RAR mas não extrai.
 - **Linux: PS2 e N64 fecham sem derrubar o app**: sair de um jogo no PCSX2 ou no

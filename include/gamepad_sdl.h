@@ -29,6 +29,13 @@ union SDL_Event;
 // index than before. Same behavior SDL itself has everywhere else.
 bool GamepadGetState(int slot, XINPUT_STATE* out_state);
 
+// Input self-test (--core-selftest ... --input-probe): with a state set, `slot`
+// reports exactly that and every other slot reads as disconnected, so a real
+// controller cannot leak into the measurement. nullptr goes back to the real
+// pads. The fake pad enters where the real one does - every translation the
+// app applies afterward (bindings, pad-as-mouse, keyboard bridge) is exercised.
+void GamepadSetProbeState(const XINPUT_STATE* state, int slot = 0);
+
 // Returns the device name reported by SDL3 (e.g. "DualSense Wireless Controller"),
 // or nullptr if no device is connected in that slot.
 const char* GamepadGetDeviceName(int slot);

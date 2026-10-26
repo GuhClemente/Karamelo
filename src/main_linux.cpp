@@ -565,6 +565,16 @@ static void PollMouseStylus()
 
 	bool down = (btn & SDL_BUTTON_LMASK) != 0;
 	CoreSetPointer((double)mx / (double)win_w, (double)my / (double)win_h, down);
+
+	// The same mouse as a mouse, for cores that read one (FM Towns, DOS,
+	// PC-98, Amiga): motion since the last call plus the buttons held.
+	float rdx = 0.0f, rdy = 0.0f;
+	SDL_GetRelativeMouseState(&rdx, &rdy);
+	int buttons = 0;
+	if (btn & SDL_BUTTON_LMASK) buttons |= 1;
+	if (btn & SDL_BUTTON_RMASK) buttons |= 2;
+	if (btn & SDL_BUTTON_MMASK) buttons |= 4;
+	CoreSetHostMouse((int)rdx, (int)rdy, buttons);
 }
 
 static WORD s_prev_pad_buttons = 0;
@@ -938,8 +948,22 @@ int main(int argc, char* argv[])
 		// Same parsing as main_win32.cpp: "--driver N" is taken out of the
 		// positional list instead of being read as the recovery-check pair.
 		std::vector<const char*> pos;
+		bool input_probe = false;
+		int probe_delay_ms = 1500;
 		for (int i = 2; i < argc; i++)
 		{
+			if (strcasecmp(argv[i], "--input-probe") == 0)
+			{
+				input_probe = true;
+				continue;
+			}
+			if (strcasecmp(argv[i], "--probe-delay") == 0 && i + 1 < argc)
+			{
+				// Seconds of play before the presses: a disc system (FM Towns) is still
+				// booting a second after the first frame and reads no input yet.
+				probe_delay_ms = atoi(argv[++i]) * 1000;
+				continue;
+			}
 			if (strcasecmp(argv[i], "--driver") == 0 && i + 1 < argc)
 			{
 				int drv = atoi(argv[i + 1]);
@@ -952,7 +976,7 @@ int main(int argc, char* argv[])
 		}
 		if (pos.size() < 2)
 		{
-			log("uso: --core-selftest <core> <rom> [<core2> <rom2>] [--driver N]");
+			log("uso: --core-selftest <core> <rom> [<core2> <rom2>] [--driver N] [--input-probe]");
 			if (lf) fclose(lf);
 			return 2;
 		}
@@ -995,6 +1019,33 @@ int main(int argc, char* argv[])
 			log("video: frames=%ld running=%d", frames, running ? 1 : 0);
 		}
 		const bool produced_video = running && frames >= 5;
+
+		// --input-probe: with the game up, press every button once and check
+		// nothing else reached the core (CoreRunInputProbe). A second or so of
+		// play first - some cores only start reading input after their boot.
+		int probe_result = PROBE_OK;
+		if (input_probe && produced_video)
+		{
+			// The app starts with the menu open, and with it open no input reaches
+			// the game (by design). A player who picks a game closes it; this test
+			// loads the game directly, so it has to close it too - without this the
+			// probe pressed buttons into a closed door and passed every core.
+			OsdDisable();
+			Sleep(probe_delay_ms);
+			std::string probe_report;
+			probe_result = CoreRunInputProbe(probe_report);
+			size_t at = 0;
+			while (at < probe_report.size())
+			{
+				size_t nl = probe_report.find('\n', at);
+				if (nl == std::string::npos) nl = probe_report.size();
+				std::string line = probe_report.substr(at, nl - at);
+				log("INPUT-PROBE %s%s", line.rfind("o core consultou", 0) == 0 ? "" : "vazou: ", line.c_str());
+				at = nl + 1;
+			}
+			log("INPUT-PROBE %s", probe_result == PROBE_OK ? "ok - cada toque chegou so como deveria" :
+			                      probe_result == PROBE_LEAK ? "FALHOU" : "NAO TESTADO - o core nao leu a entrada durante os toques");
+		}
 
 		DWORD shutdown_t0 = GetTickCount();
 		CoreShutdown();
@@ -1049,9 +1100,12 @@ int main(int argc, char* argv[])
 		}
 
 		bool pass = started && produced_video && (!has_retry || (retry_started && retry_running));
-		log("RESULT=%s", pass ? "PASS" : "FAIL");
+		log("RESULT=%s", pass ? (probe_result == PROBE_LEAK ? "INPUT-LEAK" : "PASS") : "FAIL");
 		if (lf) fclose(lf);
-		return LeaveMain(pass ? 0 : 1);
+		// 0 = ok, 1 = o core recusou, 5 = abriu mas um toque chegou como outra
+		// coisa, 6 = abriu mas o core nao leu a entrada durante os toques (nao
+		// testado - nao e aprovacao). As baterias leem estes codigos.
+		return LeaveMain(pass ? (probe_result == PROBE_LEAK ? 5 : probe_result == PROBE_UNTESTED ? 6 : 0) : 1);
 	}
 
 	// -------------------------------------------------------------

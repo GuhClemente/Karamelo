@@ -1611,8 +1611,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		// "--driver"/"2" as the recovery-check core and ROM and reported FAIL
 		// for a load that had worked.
 		std::vector<const char*> pos;
+		bool input_probe = false;
+		int probe_delay_ms = 1500;
 		for (int i = 2; i < __argc; i++)
 		{
+			if (_stricmp(__argv[i], "--input-probe") == 0)
+			{
+				input_probe = true;
+				continue;
+			}
+			if (_stricmp(__argv[i], "--probe-delay") == 0 && i + 1 < __argc)
+			{
+				// Seconds of play before the presses: a disc system (FM Towns) is still
+				// booting a second after the first frame and reads no input yet.
+				probe_delay_ms = atoi(__argv[++i]) * 1000;
+				continue;
+			}
 			if (_stricmp(__argv[i], "--driver") == 0 && i + 1 < __argc)
 			{
 				int drv = atoi(__argv[i + 1]);
@@ -1625,7 +1639,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 		if (pos.size() < 2)
 		{
-			log("uso: --core-selftest <core> <rom> [<core2> <rom2>] [--driver N]");
+			log("uso: --core-selftest <core> <rom> [<core2> <rom2>] [--driver N] [--input-probe]");
 			if (lf) fclose(lf);
 			TerminateProcess(GetCurrentProcess(), 2);
 			return 2;
@@ -1674,6 +1688,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			log("video: frames=%ld running=%d", frames, running ? 1 : 0);
 		}
 		const bool produced_video = running && frames >= 5;
+
+		// --input-probe: with the game up, press every button once and check
+		// nothing else reached the core (CoreRunInputProbe). A second or so of
+		// play first - some cores only start reading input after their boot.
+		int probe_result = PROBE_OK;
+		if (input_probe && produced_video)
+		{
+			// The app starts with the menu open, and with it open no input reaches
+			// the game (by design). A player who picks a game closes it; this test
+			// loads the game directly, so it has to close it too - without this the
+			// probe pressed buttons into a closed door and passed every core.
+			OsdDisable();
+			Sleep(probe_delay_ms);
+			std::string probe_report;
+			probe_result = CoreRunInputProbe(probe_report);
+			size_t at = 0;
+			while (at < probe_report.size())
+			{
+				size_t nl = probe_report.find('\n', at);
+				if (nl == std::string::npos) nl = probe_report.size();
+				std::string line = probe_report.substr(at, nl - at);
+				log("INPUT-PROBE %s%s", line.rfind("o core consultou", 0) == 0 ? "" : "vazou: ", line.c_str());
+				at = nl + 1;
+			}
+			log("INPUT-PROBE %s", probe_result == PROBE_OK ? "ok - cada toque chegou so como deveria" :
+			                      probe_result == PROBE_LEAK ? "FALHOU" : "NAO TESTADO - o core nao leu a entrada durante os toques");
+		}
 
 		DWORD shutdown_t0 = GetTickCount();
 		CoreShutdown();
@@ -1743,14 +1784,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 
 		bool pass = started && produced_video && (!has_retry || (retry_started && retry_running));
-		log("RESULT=%s", pass ? "PASS" : "FAIL");
+		log("RESULT=%s", pass ? (probe_result == PROBE_LEAK ? "INPUT-LEAK" : "PASS") : "FAIL");
 		if (lf) fclose(lf);
+		// 0 = ok, 1 = o core recusou, 5 = abriu mas um toque chegou como outra
+		// coisa, 6 = abriu mas o core nao leu a entrada durante os toques (nao
+		// testado - nao e aprovacao). A bateria le estes codigos.
+		const int code = pass ? (probe_result == PROBE_LEAK ? 5 : probe_result == PROBE_UNTESTED ? 6 : 0) : 1;
 		// Mesmo motivo do fim do WinMain: a destruicao estatica da DLL do core
 		// derruba o processo depois do teste terminar, e a bateria leria isso
 		// como crash de um teste que passou. O codigo de saida e preservado,
 		// que e o que ela le.
-		TerminateProcess(GetCurrentProcess(), pass ? 0 : 1);
-		return pass ? 0 : 1;
+		TerminateProcess(GetCurrentProcess(), code);
+		return code;
 	}
 
 	// dev-sdl3: window creation and the message pump are now SDL3's - see

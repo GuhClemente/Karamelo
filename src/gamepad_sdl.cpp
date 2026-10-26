@@ -134,9 +134,33 @@ static BYTE ScaleTrigger(Sint16 v)
 	return (BYTE)scaled;
 }
 
+static SRWLOCK s_probe_lock = SRWLOCK_INIT;
+static bool s_probe_on = false;
+static int s_probe_slot = 0;
+static XINPUT_STATE s_probe_state;
+
+void GamepadSetProbeState(const XINPUT_STATE* state, int slot)
+{
+	AcquireSRWLockExclusive(&s_probe_lock);
+	s_probe_on = state != nullptr;
+	s_probe_slot = slot;
+	if (state) s_probe_state = *state;
+	ReleaseSRWLockExclusive(&s_probe_lock);
+}
+
 bool GamepadGetState(int slot, XINPUT_STATE* out_state)
 {
 	if (slot < 0 || slot >= 4) return false;
+
+	AcquireSRWLockShared(&s_probe_lock);
+	if (s_probe_on)
+	{
+		bool connected = slot == s_probe_slot;
+		if (connected) *out_state = s_probe_state;
+		ReleaseSRWLockShared(&s_probe_lock);
+		return connected;
+	}
+	ReleaseSRWLockShared(&s_probe_lock);
 
 	// Shared for the whole read, not just to fetch the pointer: SDL_CloseGamepad
 	// on the main thread frees the object, so the lock has to still be held

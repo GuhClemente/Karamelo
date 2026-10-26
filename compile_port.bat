@@ -194,7 +194,7 @@ echo.
 echo ==================================================
 echo [RUNNING CORE BATTERY]
 echo ==================================================
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\stress_cores.ps1" -Cycles 1 -Driver 0
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\stress_cores.ps1" -Cycles 1 -Driver 0 -InputProbe
 if errorlevel 1 (
     echo [BUILD FAILED] Bateria de cores reprovou no driver Auto - veja a lista acima.
     exit /b 1

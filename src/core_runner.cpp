@@ -12,6 +12,8 @@
 #include <atomic>
 #include <thread>
 #include <vector>
+#include <mutex>
+#include <tuple>
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -2459,8 +2461,57 @@ static volatile LONG g_mouse_rel_x = 0;
 static volatile LONG g_mouse_rel_y = 0;
 static volatile LONG g_mouse_buttons = 0; // bit 0 = Left, bit 1 = Right, bit 2 = Middle
 
+// ---------------------------------------------------------------------------
+// Input probe (--core-selftest ... --input-probe, see CoreRunInputProbe).
+//
+// The core battery loads and closes games; it never pressed a button, so a
+// press that reached the game twice passed every test. Shipped in 0.9.78: on
+// FM Towns every shot in Tatsujin also pressed player 2's start, because the
+// pad's A doubled as a mouse click and the mouse sits on player 2's port.
+//
+// While the probe runs, the real keyboard and pads are cut off (fake pad in
+// gamepad_sdl.cpp, fake keys in ProbeAwareKeyState) and every input the core
+// reads as active is recorded, so one press can be checked for what it
+// actually produced.
+static std::atomic<bool> s_probe_on{ false };
+
+// Real mouse on Linux/macOS, fed by the SDL window (see CoreSetHostMouse).
+static std::atomic<int> s_host_mouse_dx{ 0 };
+static std::atomic<int> s_host_mouse_dy{ 0 };
+static std::atomic<int> s_host_mouse_btns{ 0 };
+
+void CoreSetHostMouse(int dx, int dy, int buttons)
+{
+	s_host_mouse_dx.fetch_add(dx);
+	s_host_mouse_dy.fetch_add(dy);
+	s_host_mouse_btns.store(buttons);
+}
+static std::atomic<int>  s_probe_key{ 0 };   // virtual key held by the probe, 0 = none
+static std::atomic<long> s_probe_polls{ 0 };
+static std::mutex s_probe_mtx;
+static std::set<std::tuple<unsigned, unsigned, unsigned>> s_probe_hits; // port, device, id
+// Every (port, device) the core asked about during the probe, active or not:
+// a probe on a game that never reads player 2's port cannot see a leak into
+// it, and the report has to say so instead of a bare "ok".
+static std::set<std::pair<unsigned, unsigned>> s_probe_queried;
+
+// Every key read below goes through here. With the probe on only the key it
+// holds is down - the person sitting at the machine cannot type into the test.
+static SHORT ProbeAwareKeyState(int vk)
+{
+	if (s_probe_on.load())
+	{
+		int held = s_probe_key.load();
+		return (held != 0 && held == vk) ? (SHORT)0x8000 : (SHORT)0;
+	}
+	return GetAsyncKeyState(vk);
+}
+#define GetAsyncKeyState ProbeAwareKeyState
+
 static void CB_InputPoll(void)
 {
+	s_probe_polls.fetch_add(1);
+
 	// Must clear buttons every frame, otherwise any pressed button remains stuck
 	memset(joypad_buttons, 0, sizeof(joypad_buttons));
 	memset(analog_sticks, 0, sizeof(analog_sticks));
@@ -2497,7 +2548,8 @@ static void CB_InputPoll(void)
 	// with no way to tell why is far worse than a stray keypress, so we only
 	// block when another process is positively known to hold focus.
 	HWND fg = GetForegroundWindow();
-	if (fg)
+	// The probe runs with no window of its own in front; its input is fake.
+	if (fg && !s_probe_on.load())
 	{
 		DWORD fg_pid = 0;
 		GetWindowThreadProcessId(fg, &fg_pid);
@@ -2676,6 +2728,23 @@ static void CB_InputPoll(void)
 		if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) mouse_btns |= 1;
 		if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) mouse_btns |= 2;
 		if (GetAsyncKeyState(VK_MBUTTON) & 0x8000) mouse_btns |= 4;
+	}
+#else
+	// Linux/macOS: the window (SDL, main thread) reports the real mouse through
+	// CoreSetHostMouse. Before this the physical mouse never reached a game
+	// outside Windows - Indiana Jones on FM Towns or a DOS game with a mouse
+	// could only be played with the pad acting as one.
+	mouse_dx = s_host_mouse_dx.exchange(0);
+	mouse_dy = s_host_mouse_dy.exchange(0);
+	if (s_probe_on.load())
+	{
+		// The probe holds buttons through the key hook, as on Windows.
+		if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) mouse_btns |= 1;
+		if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) mouse_btns |= 2;
+	}
+	else
+	{
+		mouse_btns |= s_host_mouse_btns.load();
 	}
 #endif
 
@@ -2890,7 +2959,7 @@ static int RetroKeyToVK(unsigned id)
 	}
 }
 
-static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, unsigned id)
+static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, unsigned id)
 {
 	if (port >= 4) return 0;
 
@@ -2911,7 +2980,7 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 	{
 		if (OsdIsEnabled()) return 0;
 		HWND fg = GetForegroundWindow();
-		if (fg)
+		if (fg && !s_probe_on.load())
 		{
 			DWORD fg_pid = 0;
 			GetWindowThreadProcessId(fg, &fg_pid);
@@ -3042,6 +3111,249 @@ static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, uns
 		}
 	}
 	return 0;
+}
+
+static int16_t CB_InputState(unsigned port, unsigned device, unsigned index, unsigned id)
+{
+	int16_t v = CB_InputStateRaw(port, device, index, id);
+	if (s_probe_on.load())
+	{
+		std::lock_guard<std::mutex> lk(s_probe_mtx);
+		s_probe_queried.insert({ port, device });
+	}
+	if (v != 0 && s_probe_on.load())
+	{
+		// Motion is not an action: mouse/pointer X and Y move with the real
+		// cursor, and a resting analog stick never reads exactly zero.
+		bool record = true;
+		if ((device == RETRO_DEVICE_MOUSE || device == RETRO_DEVICE_POINTER) && id <= 1) record = false;
+		if (device == RETRO_DEVICE_ANALOG && v > -8000 && v < 8000) record = false;
+		if (record)
+		{
+			std::lock_guard<std::mutex> lk(s_probe_mtx);
+			if (device == RETRO_DEVICE_JOYPAD && id == RETRO_DEVICE_ID_JOYPAD_MASK)
+			{
+				for (unsigned b = 0; b < 16; b++)
+					if (v & (1 << b)) s_probe_hits.insert({ port, device, b });
+			}
+			else
+			{
+				s_probe_hits.insert({ port, device, id });
+			}
+		}
+	}
+	return v;
+}
+
+static const char* ProbeDeviceName(unsigned device)
+{
+	switch (device)
+	{
+	case RETRO_DEVICE_JOYPAD:   return "controle";
+	case RETRO_DEVICE_MOUSE:    return "mouse";
+	case RETRO_DEVICE_KEYBOARD: return "teclado";
+	case RETRO_DEVICE_LIGHTGUN: return "pistola";
+	case RETRO_DEVICE_ANALOG:   return "analogico";
+	case RETRO_DEVICE_POINTER:  return "toque";
+	default:                    return "?";
+	}
+}
+
+// Waits until the core has polled input `polls` more times (it reads input
+// once per frame), or gives up after timeout_ms. Returns how many polls it saw.
+static long ProbeWaitPolls(long polls, DWORD timeout_ms)
+{
+	long start = s_probe_polls.load();
+	DWORD waited = 0;
+	while (s_probe_polls.load() - start < polls && waited < timeout_ms && CoreIsRunning())
+	{
+		Sleep(5);
+		waited += 5;
+	}
+	return s_probe_polls.load() - start;
+}
+
+int CoreRunInputProbe(std::string& report)
+{
+	// kind: 0 = pad (slot = which controller), 1 = keyboard key, 2 = mouse button.
+	struct Press { const char* name; int kind; int slot; WORD buttons; bool lt, rt; int vk; };
+	struct PadButton { const char* name; WORD buttons; bool lt, rt; };
+	static const PadButton kPad[] = {
+		{ "A", XINPUT_GAMEPAD_A, false, false },
+		{ "B", XINPUT_GAMEPAD_B, false, false },
+		{ "X", XINPUT_GAMEPAD_X, false, false },
+		{ "Y", XINPUT_GAMEPAD_Y, false, false },
+		{ "Start", XINPUT_GAMEPAD_START, false, false },
+		{ "Select", XINPUT_GAMEPAD_BACK, false, false },
+		{ "Cima", XINPUT_GAMEPAD_DPAD_UP, false, false },
+		{ "Baixo", XINPUT_GAMEPAD_DPAD_DOWN, false, false },
+		{ "Esquerda", XINPUT_GAMEPAD_DPAD_LEFT, false, false },
+		{ "Direita", XINPUT_GAMEPAD_DPAD_RIGHT, false, false },
+		{ "LB", XINPUT_GAMEPAD_LEFT_SHOULDER, false, false },
+		{ "RB", XINPUT_GAMEPAD_RIGHT_SHOULDER, false, false },
+		{ "LT", 0, true, false },
+		{ "RT", 0, false, true },
+		{ "L3", XINPUT_GAMEPAD_LEFT_THUMB, false, false },
+		{ "R3", XINPUT_GAMEPAD_RIGHT_THUMB, false, false },
+	};
+	static char pad_names[2][16][32];
+	std::vector<Press> presses;
+	// Controller 1 and controller 2: each must arrive only on its own port.
+	for (int slot = 0; slot < 2; slot++)
+		for (int i = 0; i < 16; i++)
+		{
+			snprintf(pad_names[slot][i], sizeof(pad_names[slot][i]), "controle %d %s", slot + 1, kPad[i].name);
+			presses.push_back({ pad_names[slot][i], 0, slot, kPad[i].buttons, kPad[i].lt, kPad[i].rt, 0 });
+		}
+	presses.push_back({ "tecla Espaco", 1, 0, 0, false, false, VK_SPACE });
+	presses.push_back({ "tecla Enter", 1, 0, 0, false, false, VK_RETURN });
+	// The real mouse: a click must stay a click (FM Towns and DOS adventures).
+	presses.push_back({ "mouse esquerdo", 2, 0, 0, false, false, VK_LBUTTON });
+	presses.push_back({ "mouse direito", 2, 0, 0, false, false, VK_RBUTTON });
+	// Plus every key the keyboard layout binds to a button.
+	static char key_names[BIND_COUNT][32];
+	for (int bind = 0; bind < BIND_COUNT; bind++)
+	{
+		int vk = InputBindGetKey(bind);
+		if (vk <= 0 || vk == VK_SPACE || vk == VK_RETURN) continue;
+		bool dup = false;
+		for (const auto& pr : presses) if (pr.vk == vk) dup = true;
+		if (dup) continue;
+		snprintf(key_names[bind], sizeof(key_names[bind]), "tecla %s", InputBindKeyName(bind));
+		presses.push_back({ key_names[bind], 1, 0, 0, false, false, vk });
+	}
+
+	XINPUT_STATE idle = {};
+	GamepadSetProbeState(&idle);
+	s_probe_key.store(0);
+	{
+		std::lock_guard<std::mutex> lk(s_probe_mtx);
+		s_probe_queried.clear();
+	}
+	s_probe_on.store(true);
+	ProbeWaitPolls(10, 3000);
+	{
+		std::lock_guard<std::mutex> lk(s_probe_mtx);
+		s_probe_hits.clear();
+	}
+	ProbeWaitPolls(10, 3000);
+	std::set<std::tuple<unsigned, unsigned, unsigned>> baseline;
+	{
+		std::lock_guard<std::mutex> lk(s_probe_mtx);
+		baseline = s_probe_hits;
+	}
+
+	int leaks = 0;
+	int silent_presses = 0;
+	size_t tested = 0;
+	for (const auto& pr : presses)
+	{
+		if (!CoreIsRunning()) break;
+		{
+			std::lock_guard<std::mutex> lk(s_probe_mtx);
+			s_probe_hits.clear();
+		}
+		XINPUT_STATE st = {};
+		st.Gamepad.wButtons = pr.buttons;
+		st.Gamepad.bLeftTrigger = pr.lt ? 255 : 0;
+		st.Gamepad.bRightTrigger = pr.rt ? 255 : 0;
+		GamepadSetProbeState(&st, pr.slot);
+		s_probe_key.store(pr.vk);
+		long seen = ProbeWaitPolls(8, 1000);
+
+		std::set<std::tuple<unsigned, unsigned, unsigned>> hits;
+		{
+			std::lock_guard<std::mutex> lk(s_probe_mtx);
+			hits = s_probe_hits;
+		}
+		GamepadSetProbeState(&idle, pr.slot);
+		s_probe_key.store(0);
+
+		// A core busy loading (a CD system on a slow machine) reads no input
+		// at all for a while. Waiting a second per press there made the run
+		// outlast the battery's timeout; after two silent presses in a row the
+		// rest is reported as not tested instead.
+		if (seen == 0)
+		{
+			if (++silent_presses >= 2)
+			{
+				char buf[128];
+				snprintf(buf, sizeof(buf), "o core consultou-aviso: parou de ler a entrada - %zu de %zu toques testados\n",
+					tested, presses.size());
+				report += buf;
+				break;
+			}
+			continue;
+		}
+		silent_presses = 0;
+		tested++;
+		ProbeWaitPolls(8, 1000);
+
+		// What each kind of press may legitimately become:
+		// - a pad button: that controller's own port, as buttons or the stick
+		//   a D-Pad also drives (plus keystrokes where the keyboard bridge is on);
+		// - a key: player 1's pad (the keyboard layout) and the key itself;
+		// - a mouse button: the mouse (on whatever port the core put it - FM
+		//   Towns uses player 2's) or the DS touch screen.
+		// Anything else is the same press doing a second thing.
+		std::string leaked;
+		for (const auto& h : hits)
+		{
+			if (baseline.count(h)) continue;
+			unsigned port = std::get<0>(h), device = std::get<1>(h), id = std::get<2>(h);
+			bool ok = false;
+			if (pr.kind == 0)
+				ok = (int)port == pr.slot && (device == RETRO_DEVICE_JOYPAD || device == RETRO_DEVICE_ANALOG ||
+				     (device == RETRO_DEVICE_KEYBOARD && keyboard_bridge_active && pr.slot == 0));
+			else if (pr.kind == 1)
+				ok = port == 0 && (device == RETRO_DEVICE_JOYPAD || device == RETRO_DEVICE_ANALOG ||
+				     device == RETRO_DEVICE_KEYBOARD);
+			else
+				ok = device == RETRO_DEVICE_MOUSE || device == RETRO_DEVICE_POINTER;
+			if (ok) continue;
+			char buf[64];
+			snprintf(buf, sizeof(buf), "%sporta %u %s %u", leaked.empty() ? "" : ", ", port + 1, ProbeDeviceName(device), id);
+			leaked += buf;
+		}
+		// KARAMELO_PROBE_VERBOSE=1: every press with everything it produced,
+		// allowed or not - for reading what a core actually receives.
+		if (getenv("KARAMELO_PROBE_VERBOSE"))
+		{
+			std::string all;
+			for (const auto& h : hits)
+			{
+				char buf[64];
+				snprintf(buf, sizeof(buf), " [porta %u %s %u]", std::get<0>(h) + 1, ProbeDeviceName(std::get<1>(h)), std::get<2>(h));
+				all += buf;
+			}
+			report += std::string("o core consultou-detalhe ") + pr.name + ":" + (all.empty() ? " nada" : all) + "\n";
+		}
+		if (!leaked.empty())
+		{
+			leaks++;
+			report += std::string(pr.name) + " -> tambem " + leaked + "\n";
+		}
+	}
+
+	s_probe_on.store(false);
+	s_probe_key.store(0);
+	GamepadSetProbeState(nullptr);
+
+	std::string queried;
+	{
+		std::lock_guard<std::mutex> lk(s_probe_mtx);
+		for (const auto& q : s_probe_queried)
+		{
+			char buf[48];
+			snprintf(buf, sizeof(buf), "%sporta %u %s", queried.empty() ? "" : ", ", q.first + 1, ProbeDeviceName(q.second));
+			queried += buf;
+		}
+	}
+	report += "o core consultou: " + (queried.empty() ? std::string("nada") : queried) +
+		" (controle como mouse: " + (MenuGetPadAsMouse() ? "ligado" : "desligado") +
+		"; " + std::to_string(tested) + " de " + std::to_string(presses.size()) + " toques testados)\n";
+	if (leaks) return PROBE_LEAK;
+	return tested ? PROBE_OK : PROBE_UNTESTED;
 }
 
 // -------------------------------------------------------------

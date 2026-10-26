@@ -10,6 +10,11 @@
 #   ./tools/stress_cores_linux.sh              # todos, 1 ciclo
 #   CYCLES=3 ./tools/stress_cores_linux.sh     # 3 ciclos
 #   ./tools/stress_cores_linux.sh PSP          # so um sistema
+#   INPUT_PROBE=0 ./tools/stress_cores_linux.sh   # sem apertar botoes
+#
+# Por padrao tambem aperta cada botao do controle e as teclas do layout com o
+# jogo aberto (--input-probe) e reprova se o toque chegou ao core como outra
+# coisa alem do jogador 1 - outra porta, clique de mouse, pistola. Saida 5.
 #
 # O app procura "cores/<nome>.dll" e resolve para <nome>.so no Linux - por isso o
 # mapa abaixo usa os mesmos nomes do stress_cores.ps1.
@@ -20,6 +25,9 @@ EXE="$APP/Karamelo"
 CYCLES="${CYCLES:-1}"
 TIMEOUT="${TIMEOUT:-90}"
 ONLY="${1:-}"
+INPUT_PROBE="${INPUT_PROBE:-1}"
+PROBE_ARG=""
+[ "$INPUT_PROBE" = "1" ] && PROBE_ARG="--input-probe"
 
 [ -x "$EXE" ] || { echo "app/Karamelo nao encontrado - rode ./compile_linux.sh antes."; exit 2; }
 
@@ -44,8 +52,8 @@ MAP=(
 declare -A TESTROM=( [Atari5200]=atari5200.a52 [Lynx]=lynx.lnx [WonderSwan]=wswan.ws [NGP]=ngp.ngp [PCFX]=pcfx.cue [3DO]=3do.iso )
 
 cd "$APP" || exit 2
-ok=0; fail=0; crash=0; skipped=()
-failed=(); crashed=()
+ok=0; fail=0; crash=0; leak=0; untested=0; skipped=()
+failed=(); crashed=(); leaked=(); not_tested=()
 for entry in "${MAP[@]}"; do
     IFS=: read -r sys core dir <<< "$entry"
     [ -n "$ONLY" ] && [ "$sys" != "$ONLY" ] && continue
@@ -61,11 +69,13 @@ for entry in "${MAP[@]}"; do
     printf '  %-14s[' "$sys"
     worst=PASS; start=$SECONDS
     for ((i = 1; i <= CYCLES; i++)); do
-        timeout "$TIMEOUT" "$EXE" --core-selftest "cores/$core.dll" "$rom" "cores/$core.dll" "$rom" >/dev/null 2>&1
+        timeout -k 10 "$TIMEOUT" "$EXE" --core-selftest "cores/$core.dll" "$rom" "cores/$core.dll" "$rom" $PROBE_ARG >/dev/null 2>&1
         rc=$?
         case $rc in
             0) printf '.' ;;
             1) printf 'F'; [ "$worst" = PASS ] && worst=FAIL ;;
+            5) printf 'I'; { [ "$worst" = PASS ] || [ "$worst" = FAIL ]; } && worst=INPUT ;;
+            6) printf '?'; [ "$worst" = PASS ] && worst=UNTESTED ;;
             124) printf 'T'; worst=TIMEOUT ;;
             *) printf 'X'; worst="CRASH(rc=$rc)" ;;
         esac
@@ -74,16 +84,20 @@ for entry in "${MAP[@]}"; do
     case $worst in
         PASS) ok=$((ok + 1)) ;;
         FAIL) fail=$((fail + 1)); failed+=("$sys $rom") ;;
+        INPUT) leak=$((leak + 1)); leaked+=("$sys $rom") ;;
+        UNTESTED) untested=$((untested + 1)); not_tested+=("$sys $rom") ;;
         *) crash=$((crash + 1)); crashed+=("$sys $worst $rom") ;;
     esac
 done
 
-echo "  . = ciclo ok    F = core recusou    X = processo morreu    T = travou"
-echo "  $ok sistemas ok, $fail com recusa, $crash derrubaram ou travaram o processo"
+echo "  . = ciclo ok    F = core recusou    I = toque chegou como outra coisa    ? = toques nao testados    X = processo morreu    T = travou"
+echo "  $ok sistemas ok, $fail com recusa, $crash derrubaram ou travaram o processo, $leak com toque vazando, $untested sem os toques testados"
+for u in "${not_tested[@]}"; do echo "    TOQUES NAO TESTADOS: $u (o core nao leu a entrada)"; done
+for l in "${leaked[@]}"; do echo "    TOQUE VAZOU: $l (detalhe: 'INPUT-PROBE vazou' em app/karamelo.log)"; done
 for c in "${crashed[@]}"; do echo "    MORREU/TRAVOU: $c"; done
 for f in "${failed[@]}"; do echo "    RECUSOU: $f"; done
 if [ ${#skipped[@]} -gt 0 ]; then
     echo "  NAO testados (${#skipped[@]}):"
     for s in "${skipped[@]}"; do echo "    $s"; done
 fi
-[ $crash -eq 0 ] && [ $fail -eq 0 ]
+[ $crash -eq 0 ] && [ $fail -eq 0 ] && [ $leak -eq 0 ]

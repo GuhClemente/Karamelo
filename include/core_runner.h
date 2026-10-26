@@ -19,6 +19,18 @@ bool CoreIsLoading();
 // must not run that library's static destructors on the way out - see
 // main_linux.cpp, which then leaves with _exit().
 bool CoreWasForceKilled();
+// Linux/macOS: the window reports the physical mouse - motion since the last
+// call and the buttons held (bit 0 left, 1 right, 2 middle). Windows reads the
+// mouse itself.
+void CoreSetHostMouse(int dx, int dy, int buttons);
+// With a game running: presses every pad button and the bound keys on player 1,
+// one at a time, with the real pads and keyboard cut off, and reports every
+// press that also reached the core as something else (another port, a mouse
+// click, a light gun). Returns PROBE_OK, PROBE_LEAK, or PROBE_UNTESTED when the
+// core read no input while the presses were made (busy loading) - that is not
+// a pass. Used by --core-selftest --input-probe.
+enum { PROBE_OK = 0, PROBE_LEAK = 1, PROBE_UNTESTED = 2 };
+int CoreRunInputProbe(std::string& report);
 std::string CoreResolveBinaryPath(const char* dll_or_so_path);
 bool CoreBinaryExists(const char* dll_or_so_path);
 // Video frames the current game has delivered since it loaded (reset on every
