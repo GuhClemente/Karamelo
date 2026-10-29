@@ -404,3 +404,72 @@ TEST_CASE(DesktopChat_WireFormatEphemeralRamAndChallenge)
     DesktopChatShutdown();
     ASSERT_EQ(DesktopChatGetRoomMessages().size(), (size_t)0);
 }
+
+TEST_CASE(DesktopChat_FriendsListAndKarameloTagPresence)
+{
+    DesktopChatInit();
+
+    // 1. KarameloTag BattleTag format
+    std::string tag = DesktopChatGetKarameloTag();
+    ASSERT_TRUE(tag.find('#') != std::string::npos);
+    DesktopChatSetKarameloTag("GuhPlayer#7777");
+    ASSERT_STR_EQ(DesktopChatGetKarameloTag(), "GuhPlayer#7777");
+
+    // 2. Room codes (KRM-XXXX)
+    std::string room_code = DesktopChatGenerateRoomCode("192.168.1.100", 55435);
+    ASSERT_TRUE(room_code.rfind("KRM-", 0) == 0);
+    ASSERT_EQ(room_code.length(), (size_t)8);
+
+    std::string resolved_ip;
+    int resolved_port = 0;
+    ASSERT_TRUE(DesktopChatResolveRoomCode(room_code, resolved_ip, resolved_port));
+    ASSERT_STR_EQ(resolved_ip, "192.168.1.100");
+    ASSERT_EQ(resolved_port, 55435);
+
+    // 3. Persistent Friends list & favorites
+    ASSERT_TRUE(DesktopChatAddFriend("RetroChamp#1234", "RetroChamp"));
+    ASSERT_TRUE(DesktopChatIsFriend("RetroChamp#1234"));
+    ASSERT_TRUE(DesktopChatToggleFriendFavorite("RetroChamp#1234"));
+
+    auto friends = DesktopChatGetFriends();
+    ASSERT_TRUE(friends.size() >= 1);
+    bool found_friend = false;
+    for (const auto& fr : friends) {
+        if (fr.tag == "RetroChamp#1234") {
+            found_friend = true;
+            ASSERT_TRUE(fr.favorite);
+            break;
+        }
+    }
+    ASSERT_TRUE(found_friend);
+
+    // 4. Peer discovery and presence syncing to friend status
+    LobbyPresencePeer peer;
+    peer.tag = "RetroChamp#1234";
+    peer.host_ip = "192.168.1.120";
+    peer.host_port = 55435;
+    peer.current_game = "Street Fighter Alpha 3";
+    peer.status = 2;
+    peer.last_seen_utc = (int64_t)time(NULL);
+    DesktopChatRegisterPeerPresence(peer);
+
+    auto peers = DesktopChatGetActivePeers();
+    ASSERT_TRUE(peers.size() >= 1);
+
+    // Presence automatically updates friend online and active game info
+    friends = DesktopChatGetFriends();
+    for (const auto& fr : friends) {
+        if (fr.tag == "RetroChamp#1234") {
+            ASSERT_TRUE(fr.online);
+            ASSERT_STR_EQ(fr.current_game, "Street Fighter Alpha 3");
+            break;
+        }
+    }
+
+    // 5. Clean friend removal
+    ASSERT_TRUE(DesktopChatRemoveFriend("RetroChamp#1234"));
+    ASSERT_FALSE(DesktopChatIsFriend("RetroChamp#1234"));
+
+    DesktopChatShutdown();
+}
+

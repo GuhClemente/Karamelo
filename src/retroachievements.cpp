@@ -36,6 +36,7 @@ namespace fs = std::filesystem;
 static const char* RA_CONFIG_PATH = "Config/retroachievements.cfg";
 
 static rc_client_t* g_client = NULL;
+static rc_client_async_handle_t* g_login_async = NULL;
 // rc_client is documented as single-threaded, but RaGetAchievements() is
 // called from the UI thread (menu.cpp's Achievements page) while
 // RaDoFrame()/RaOnGameLoad()/RaOnGameUnload() drive the same g_client from
@@ -662,9 +663,13 @@ static void RC_CCONV RaLoginCallback(int result, const char* error_message,
 	rc_client_t* client, void* userdata)
 {
 	(void)client; (void)userdata;
+	g_login_async = NULL;
 
 	if (result != RC_OK)
 	{
+		if (result == RC_ABORTED) return;
+		if (error_message && strstr(error_message, "already in progress")) return;
+
 		char buf[256];
 		snprintf(buf, sizeof(buf), Tr("RA: falha no login (%s)", "RA: login failed (%s)"),
 			error_message ? error_message : "erro desconhecido");
@@ -832,11 +837,17 @@ void RaInit()
 	g_enabled = true;
 	SetStatus(Tr("RA: conectando...", "RA: connecting..."));
 
+	if (g_login_async && g_client)
+	{
+		rc_client_abort_async(g_client, g_login_async);
+		g_login_async = NULL;
+	}
+
 	if (!g_token.empty())
-		rc_client_begin_login_with_token(g_client, g_username.c_str(), g_token.c_str(),
+		g_login_async = rc_client_begin_login_with_token(g_client, g_username.c_str(), g_token.c_str(),
 			RaLoginCallback, NULL);
 	else
-		rc_client_begin_login_with_password(g_client, g_username.c_str(), g_password.c_str(),
+		g_login_async = rc_client_begin_login_with_password(g_client, g_username.c_str(), g_password.c_str(),
 			RaLoginCallback, NULL);
 }
 
@@ -878,6 +889,12 @@ void RaShutdown()
 			g_http_thread.join();
 		else
 			g_http_thread.detach();
+	}
+
+	if (g_login_async && g_client)
+	{
+		rc_client_abort_async(g_client, g_login_async);
+		g_login_async = NULL;
 	}
 
 	// The worker thread has fully stopped by this point (waited above), so
@@ -1086,6 +1103,11 @@ bool RaSetCredentials(const char* username, const char* password_or_token, bool 
 	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
 	if (logout)
 	{
+		if (g_login_async && g_client)
+		{
+			rc_client_abort_async(g_client, g_login_async);
+			g_login_async = NULL;
+		}
 		g_username.clear();
 		g_password.clear();
 		g_token.clear();
@@ -1139,11 +1161,17 @@ bool RaSetCredentials(const char* username, const char* password_or_token, bool 
 	g_enabled = true;
 	SetStatus(Tr("RA: conectando...", "RA: connecting..."));
 
+	if (g_login_async && g_client)
+	{
+		rc_client_abort_async(g_client, g_login_async);
+		g_login_async = NULL;
+	}
+
 	if (!g_token.empty())
-		rc_client_begin_login_with_token(g_client, g_username.c_str(), g_token.c_str(),
+		g_login_async = rc_client_begin_login_with_token(g_client, g_username.c_str(), g_token.c_str(),
 			RaLoginCallback, NULL);
 	else
-		rc_client_begin_login_with_password(g_client, g_username.c_str(), g_password.c_str(),
+		g_login_async = rc_client_begin_login_with_password(g_client, g_username.c_str(), g_password.c_str(),
 			RaLoginCallback, NULL);
 
 	return true;

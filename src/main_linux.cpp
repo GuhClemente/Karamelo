@@ -1321,6 +1321,7 @@ int main(int argc, char* argv[])
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
+			DesktopChatProcessSdlEvent(&event);
 			GamepadHandleDeviceEvent(&event);
 
 			if (event.type == SDL_EVENT_QUIT)
@@ -1481,6 +1482,8 @@ int main(int argc, char* argv[])
 			SDL_RenderTexture(g_renderer, g_texture, NULL, &dst);
 			SDL_RenderPresent(g_renderer);
 		}
+
+		DesktopChatRenderSdlWindow();
 
 		if (PortIsRunning())
 		{

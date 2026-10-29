@@ -10,6 +10,9 @@ const char* CoreGetGameName() { return "Street Fighter III: 3rd Strike"; }
 const char* NetplayGetLocalIp() { return "127.0.0.1"; }
 bool NetplayStartHost(int port) { (void)port; return true; }
 bool NetplayStartClient(const char* ip, int port) { (void)ip; (void)port; return true; }
+#include "netplay.h"
+NetplayRole NetplayGetRole() { return NETPLAY_NONE; }
+NetplayState NetplayGetState() { return NETPLAY_DISCONNECTED; }
 void MenuRequestQuit() {}
 
 int main(int argc, char* argv[])
