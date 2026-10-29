@@ -1054,6 +1054,33 @@ bool RaHasToken()
 	return !g_token.empty();
 }
 
+const char* RaGetTokenOrPassword()
+{
+	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+	if (!g_token.empty()) return g_token.c_str();
+	if (!g_password.empty()) return g_password.c_str();
+	return "";
+}
+
+const char* RaGetGameTitle()
+{
+	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+	if (!g_client) return "";
+	const rc_client_game_t* game = rc_client_get_game_info(g_client);
+	if (game && game->title && *game->title)
+		return game->title;
+	return "";
+}
+
+void RaUpdate()
+{
+	if (!g_client) return;
+	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+	RaPumpHttp();
+	if (!g_memory_ready)
+		rc_client_idle(g_client);
+}
+
 bool RaSetCredentials(const char* username, const char* password_or_token, bool is_token, bool hardcore, bool logout)
 {
 	std::lock_guard<std::recursive_mutex> lock(g_client_lock);

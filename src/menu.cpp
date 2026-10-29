@@ -3270,6 +3270,10 @@ void MenuInit() {
   web_hooks.ra_get_ach_total = RaGetAchievementCount;
   web_hooks.ra_get_ach_unlocked = RaGetAchievementsUnlocked;
   web_hooks.ra_set_credentials = RaSetCredentials;
+  web_hooks.ra_update = RaUpdate;
+  web_hooks.ra_get_token = RaGetTokenOrPassword;
+  web_hooks.ra_get_game_title = RaGetGameTitle;
+  web_hooks.ra_get_achievements = RaGetAchievements;
   web_hooks.is_system_visible = MenuIsSystemVisible;
   web_hooks.set_system_visible = MenuSetSystemVisible;
   web_hooks.set_all_systems_visible = MenuSetAllSystemsVisible;
@@ -3294,6 +3298,7 @@ void MenuSetStatus(const char *status) {
 
 void MenuRun() {
   NetplayUpdate();
+  RaUpdate();
 
   // Process tasks enqueued from background threads (Web Studio LAN, RPC, etc.)
   {

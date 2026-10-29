@@ -7,6 +7,7 @@
 #include "tray_manager.h"
 #include "app_info.h"
 #include "system_registry.h"
+#include "retroachievements.h"
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -1345,6 +1346,72 @@ input:checked + .slider:before {
   line-height: 1.5;
 }
 
+/* RetroAchievements Trophy Items */
+.ra-ach-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(8, 14, 23, 0.55);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+.ra-ach-item:hover {
+  background: rgba(18, 26, 40, 0.85);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.ra-ach-item.unlocked {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.05);
+}
+.ra-ach-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+.ra-ach-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ra-ach-item:not(.unlocked) .ra-ach-icon {
+  filter: grayscale(1) opacity(0.35);
+}
+.ra-ach-texts {
+  min-width: 0;
+}
+.ra-ach-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ra-ach-item.unlocked .ra-ach-title {
+  color: var(--gold-primary);
+}
+.ra-ach-prog {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.ra-ach-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.badge-dim {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
 /* Mobile & Tablet Responsive (< 900px) */
 @media (max-width: 900px) {
   .app-layout {
@@ -1407,9 +1474,13 @@ input:checked + .slider:before {
         <span class="tab-icon">📊</span>
         <span class="tab-title">Painel &amp; Controle</span>
       </button>
-      <button class="tab-btn" data-tab="tab-retroarch">
+      <button class="tab-btn" data-tab="tab-ra">
         <span class="tab-icon">🏆</span>
-        <span class="tab-title">RetroAchievements &amp; Vídeo</span>
+        <span class="tab-title">RetroAchievements</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-video">
+        <span class="tab-icon">📺</span>
+        <span class="tab-title">Vídeo &amp; Ajustes</span>
       </button>
       <button class="tab-btn" data-tab="tab-systems">
         <span class="tab-icon">🎛️</span>
@@ -1523,11 +1594,11 @@ input:checked + .slider:before {
         </div>
       </div>
 
-      <!-- TAB 2: RetroAchievements & Ajustes -->
-      <div id="tab-retroarch" class="tab-content">
+      <!-- TAB 2: RetroAchievements -->
+      <div id="tab-ra" class="tab-content">
         <div class="card">
           <div class="card-title">
-            <span>🏆 RetroAchievements (Contas &amp; Conquistas)</span>
+            <span>🏆 RetroAchievements (Conta &amp; Autenticação)</span>
             <span id="lbl-ra-badge" class="badge badge-gold">Verificando...</span>
           </div>
           <p class="card-desc">
@@ -1544,7 +1615,7 @@ input:checked + .slider:before {
               <div style="display:flex;gap:6px;">
                 <input type="password" id="ra-password" placeholder="Senha do site ou token..." style="flex:1;">
 )raw";
-	h << R"raw(                <button type="button" class="btn-secondary btn-sm" id="btn-ra-toggle-pass" title="Mostrar/Ocultar">👁️</button>
+	h << R"raw(                <button type="button" class="btn-secondary btn-sm" id="btn-ra-toggle-pass" title="Mostrar/Ocultar Senha ou Token">👁️</button>
               </div>
             </div>
           </div>
@@ -1566,13 +1637,37 @@ input:checked + .slider:before {
 
           <div id="ra-live-box" style="margin-top:16px;background:rgba(8,14,23,0.7);border:1px solid var(--border-subtle);border-radius:10px;padding:14px;display:none;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <strong style="color:var(--gold-primary);" id="ra-live-user">Jogador</strong>
+              <div>
+                <strong style="color:var(--gold-primary);" id="ra-live-user">Jogador</strong>
+                <span id="ra-live-mode" style="margin-left:8px;font-size:11.5px;color:var(--text-muted);"></span>
+              </div>
               <span class="badge badge-live" id="ra-live-score">0 Pontos</span>
             </div>
-            <div style="font-size:12.5px;color:var(--text-muted);" id="ra-live-summary">Nenhum jogo em execução.</div>
+            <div style="font-size:12.5px;color:var(--text-muted);" id="ra-live-summary">Aguardando jogo ativo.</div>
           </div>
         </div>
 
+        <div class="card">
+          <div class="card-title">
+            <span>🎮 Troféus &amp; Conquistas do Jogo em Execução</span>
+            <span id="ra-achievements-summary" class="badge badge-gold">0 / 0 Conquistas</span>
+          </div>
+          <p id="ra-active-game-title" class="card-desc" style="font-weight:600;color:var(--text-primary);margin-bottom:10px;">
+            Nenhum jogo ativo no momento
+          </p>
+          <div style="background:rgba(255,255,255,0.06);border-radius:6px;height:8px;overflow:hidden;margin-bottom:16px;">
+            <div id="ra-achievements-bar" style="height:100%;background:linear-gradient(90deg,var(--gold-primary),#10b981);width:0%;transition:width 0.4s ease;"></div>
+          </div>
+          <div id="ra-achievements-list">
+            <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">
+              Inicie um jogo suportado no Karamelo para acompanhar os troféus aqui.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Vídeo & Emulação -->
+      <div id="tab-video" class="tab-content">
         <div class="card">
           <div class="card-title">
             <span>📺 Vídeo &amp; Shaders CRT (Estilo RetroArch)</span>
@@ -1822,7 +1917,8 @@ let statusTimer=null;
 
 const kTabTitles = {
   'tab-dash': 'Painel & Controle Remoto',
-  'tab-retroarch': 'RetroAchievements & Ajustes de Vídeo',
+  'tab-ra': 'RetroAchievements (Troféus & Conta)',
+  'tab-video': 'Vídeo, Shaders CRT & Savestates',
   'tab-systems': 'Gerenciador de Sistemas & Visibilidade',
   'tab-roms': 'ROMs & Jogos (FTP / Web Manager)',
   'tab-bios': 'Auditor de BIOS em Tempo Real',
@@ -1851,7 +1947,8 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(tabId==='tab-roms')loadSystems();
     if(tabId==='tab-bios')loadBios();
     if(tabId==='tab-dash')loadStatus();
-    if(tabId==='tab-retroarch'){loadRaConfig();loadEmulationConfig();}
+    if(tabId==='tab-ra'){loadRaConfig();loadRaAchievements();}
+    if(tabId==='tab-video'){loadEmulationConfig();}
     if(tabId==='tab-systems')loadSystemsVisibility();
   });
 });
@@ -1878,16 +1975,18 @@ document.getElementById('btn-act-mute').addEventListener('click',()=>{
   remoteAction('volume',cur===0?'100':'0');
 });
 
-// RetroAchievements & Emulation Controls
+// RetroAchievements Controls & Trophies
 async function loadRaConfig(){
   try{
     const r=await fetch('/api/ra/status');
     if(!r.ok)return;
     const d=await r.json();
     const uEl=document.getElementById('ra-username');
-    if(uEl&&!uEl.value) uEl.value=d.username||'';
+    if(uEl && document.activeElement !== uEl) uEl.value=d.username||'';
+    const pEl=document.getElementById('ra-password');
+    if(pEl && d.token && document.activeElement !== pEl) pEl.value=d.token;
     const tokEl=document.getElementById('ra-is-token');
-    if(tokEl) tokEl.checked=!!d.has_token;
+    if(tokEl) tokEl.checked=!!d.has_token || (d.token && d.token.length > 0);
     const hcEl=document.getElementById('ra-hardcore');
     if(hcEl) hcEl.checked=!!d.hardcore;
     const badge=document.getElementById('lbl-ra-badge');
@@ -1902,12 +2001,105 @@ async function loadRaConfig(){
 )raw";
 	h << R"raw(        document.getElementById('ra-live-user').textContent=d.username||'Jogador';
         document.getElementById('ra-live-score').textContent=(d.score||0)+' Pontos';
+        const mEl=document.getElementById('ra-live-mode');
+        if(mEl) mEl.textContent=d.hardcore?'(Modo Hardcore)':'(Modo Softcore)';
         document.getElementById('ra-live-summary').textContent=
-          d.achievements_total>0?`${d.achievements_unlocked}/${d.achievements_total} Conquistas Desbloqueadas`:'Sem jogo suportado no momento.';
+          d.achievements_total>0?`${d.achievements_unlocked}/${d.achievements_total} Conquistas Desbloqueadas`:'Aguardando jogo ativo com conquistas.';
       }else{
         liveBox.style.display='none';
       }
     }
+  }catch(e){}
+}
+async function loadRaAchievements(){
+  try{
+    const r=await fetch('/api/ra/achievements');
+    if(!r.ok)return;
+    const d=await r.json();
+    const gameEl=document.getElementById('ra-active-game-title');
+    const listEl=document.getElementById('ra-achievements-list');
+    const barEl=document.getElementById('ra-achievements-bar');
+    const summaryEl=document.getElementById('ra-achievements-summary');
+    if(!listEl)return;
+
+    const gameTitle=d.game_title||'';
+    if(gameEl) gameEl.textContent = gameTitle ? ('Jogo: ' + gameTitle) : 'Nenhum jogo ativo no momento';
+
+    const achs = d.achievements || [];
+    listEl.innerHTML = '';
+    if(achs.length === 0){
+      const empty = document.createElement('div');
+      empty.style.textAlign = 'center';
+      empty.style.padding = '28px 14px';
+      empty.style.color = 'var(--text-muted)';
+      empty.style.fontSize = '13px';
+      empty.textContent = gameTitle ? 'Este jogo não possui conquistas cadastradas no RetroAchievements.' : 'Inicie um jogo compatível no Karamelo para visualizar e acompanhar seus troféus em tempo real.';
+      listEl.appendChild(empty);
+      if(summaryEl) summaryEl.textContent = '0 / 0 Conquistas';
+      if(barEl) barEl.style.width = '0%';
+      return;
+    }
+
+    let unl = 0;
+    let totalPts = 0;
+    let unlPts = 0;
+    achs.forEach(a => {
+      totalPts += a.points || 0;
+      if(a.unlocked){
+        unl++;
+        unlPts += a.points || 0;
+      }
+    });
+
+    const pct = achs.length > 0 ? Math.round((unl / achs.length) * 100) : 0;
+    if(summaryEl) summaryEl.textContent = `${unl} de ${achs.length} desbloqueadas (${pct}%) • ${unlPts}/${totalPts} Pontos`;
+    if(barEl) barEl.style.width = pct + '%';
+
+    achs.forEach(a => {
+      const item = document.createElement('div');
+      item.className = 'ra-ach-item' + (a.unlocked ? ' unlocked' : '');
+
+      const left = document.createElement('div');
+      left.className = 'ra-ach-left';
+
+      const ico = document.createElement('span');
+      ico.className = 'ra-ach-icon';
+      ico.textContent = a.unlocked ? '🏆' : '🔒';
+      left.appendChild(ico);
+
+      const texts = document.createElement('div');
+      texts.className = 'ra-ach-texts';
+
+      const title = document.createElement('div');
+      title.className = 'ra-ach-title';
+      title.textContent = a.title;
+      texts.appendChild(title);
+
+      if(a.progress){
+        const prog = document.createElement('div');
+        prog.className = 'ra-ach-prog';
+        prog.textContent = 'Progresso: ' + a.progress;
+        texts.appendChild(prog);
+      }
+      left.appendChild(texts);
+      item.appendChild(left);
+
+      const right = document.createElement('div');
+      right.className = 'ra-ach-right';
+
+      const pts = document.createElement('span');
+      pts.className = 'badge ' + (a.unlocked ? 'badge-gold' : 'badge-dim');
+      pts.textContent = a.points + ' pts';
+      right.appendChild(pts);
+
+      const st = document.createElement('span');
+      st.className = 'badge ' + (a.unlocked ? 'badge-ok' : '');
+      st.textContent = a.unlocked ? 'Desbloqueado' : 'Bloqueado';
+      right.appendChild(st);
+
+      item.appendChild(right);
+      listEl.appendChild(item);
+    });
   }catch(e){}
 }
 async function saveRaConfig(logout){
@@ -1931,9 +2123,10 @@ async function saveRaConfig(logout){
       }
       if(logout){
         const p=document.getElementById('ra-password');if(p)p.value='';
+        const u=document.getElementById('ra-username');if(u)u.value='';
       }
       setTimeout(()=>{if(st)st.textContent='';},3500);
-      setTimeout(loadRaConfig, 600);
+      setTimeout(()=>{loadRaConfig();loadRaAchievements();}, 800);
     }else{
       if(st){
         st.style.color='#ef4444';
@@ -2298,7 +2491,7 @@ document.getElementById('btn-login')?.addEventListener('click',async()=>{
   const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
   if(r.ok){
     const d=await r.json();csrfToken=d.csrf_token||'';setAuthVisible(true);
-    loadStatus();if(!statusTimer)statusTimer=setInterval(()=>{loadStatus();loadRaConfig();},2500);
+    loadStatus();if(!statusTimer)statusTimer=setInterval(()=>{loadStatus();if(document.getElementById('tab-ra')?.classList.contains('active')){loadRaConfig();loadRaAchievements();}},2500);
   }else{alert('PIN incorreto ou expirado.');}
 });
 document.getElementById('btn-logout')?.addEventListener('click',async()=>{
@@ -2312,7 +2505,7 @@ loadStatus().then(()=>{
   loadBios();
   loadSystems();
 });
-if(!statusTimer) statusTimer=setInterval(()=>{loadStatus();loadRaConfig();},2500);
+if(!statusTimer) statusTimer=setInterval(()=>{loadStatus();if(document.getElementById('tab-ra')?.classList.contains('active')){loadRaConfig();loadRaAchievements();}},2500);
 </script></body></html>)raw";
 	return h.str();
 }
@@ -2608,29 +2801,64 @@ static void HandleClientConnection(
 		return;
 	}
 
-		if (method == "GET" && path == "/api/ra/status")
+	if (method == "GET" && path == "/api/ra/status")
 	{
+		if (g_hooks.ra_update)
+			g_hooks.ra_update();
+
 		std::ostringstream ss;
 		const char* user = g_hooks.ra_get_user ? g_hooks.ra_get_user() : "";
 		const char* st = g_hooks.ra_get_status ? g_hooks.ra_get_status() : "Desconectado";
 		bool hc = g_hooks.ra_get_hardcore ? g_hooks.ra_get_hardcore() : false;
 		bool tok = g_hooks.ra_has_token ? g_hooks.ra_has_token() : false;
+		const char* tok_val = g_hooks.ra_get_token ? g_hooks.ra_get_token() : "";
 		bool in = g_hooks.ra_is_logged_in ? g_hooks.ra_is_logged_in() : false;
 		bool en = g_hooks.ra_is_enabled ? g_hooks.ra_is_enabled() : false;
 		uint32_t sc = g_hooks.ra_get_score ? g_hooks.ra_get_score() : 0;
+		const char* gtitle = g_hooks.ra_get_game_title ? g_hooks.ra_get_game_title() : "";
 		int total = g_hooks.ra_get_ach_total ? g_hooks.ra_get_ach_total() : 0;
 		int unl = g_hooks.ra_get_ach_unlocked ? g_hooks.ra_get_ach_unlocked() : 0;
 
 		ss << "{\"username\":" << JsonQuote(user ? user : "")
 		   << ",\"hardcore\":" << (hc ? "true" : "false")
 		   << ",\"has_token\":" << (tok ? "true" : "false")
+		   << ",\"token\":" << JsonQuote(tok_val ? tok_val : "")
 		   << ",\"logged_in\":" << (in ? "true" : "false")
 		   << ",\"enabled\":" << (en ? "true" : "false")
 		   << ",\"status\":" << JsonQuote(st ? st : "")
 		   << ",\"score\":" << sc
+		   << ",\"game_title\":" << JsonQuote(gtitle ? gtitle : "")
 		   << ",\"achievements_total\":" << total
 		   << ",\"achievements_unlocked\":" << unl
 		   << "}";
+		SendHttpResponse(cli, "200 OK", "application/json; charset=utf-8", ss.str());
+		return;
+	}
+
+	if (method == "GET" && path == "/api/ra/achievements")
+	{
+		std::ostringstream ss;
+		const char* gtitle = g_hooks.ra_get_game_title ? g_hooks.ra_get_game_title() : "";
+		ss << "{\"game_title\":" << JsonQuote(gtitle ? gtitle : "")
+		   << ",\"achievements\":[";
+
+		if (g_hooks.ra_get_achievements)
+		{
+			RaAchievementInfo items[256];
+			int count = g_hooks.ra_get_achievements(items, 256);
+			for (int i = 0; i < count; ++i)
+			{
+				if (i > 0) ss << ",";
+				ss << "{"
+				   << "\"title\":" << JsonQuote(items[i].title)
+				   << ",\"progress\":" << JsonQuote(items[i].progress)
+				   << ",\"points\":" << items[i].points
+				   << ",\"unlocked\":" << (items[i].unlocked ? "true" : "false")
+				   << "}";
+			}
+		}
+
+		ss << "]}";
 		SendHttpResponse(cli, "200 OK", "application/json; charset=utf-8", ss.str());
 		return;
 	}

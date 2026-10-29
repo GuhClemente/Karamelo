@@ -247,6 +247,15 @@ TEST_CASE(WebAdmin_BiosAuditorAndLoopbackHttpSecurity)
     ASSERT_TRUE(ra_resp.find("HTTP/1.1 200 OK") != std::string::npos);
     ASSERT_TRUE(ra_resp.find("\"username\":") != std::string::npos);
 
+    std::string ach_req =
+        "GET /api/ra/achievements HTTP/1.1\r\n"
+        "Host: 127.0.0.1:18089\r\n"
+        "Cookie: " + sid_cookie + "\r\n"
+        "Connection: close\r\n\r\n";
+    std::string ach_resp = http_req(ach_req);
+    ASSERT_TRUE(ach_resp.find("HTTP/1.1 200 OK") != std::string::npos);
+    ASSERT_TRUE(ach_resp.find("\"achievements\":") != std::string::npos);
+
     std::string emu_req =
         "GET /api/emulation/config HTTP/1.1\r\n"
         "Host: 127.0.0.1:18089\r\n"
