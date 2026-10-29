@@ -1,6 +1,6 @@
 # Build + unit tests on the three platforms, on every push and pull request.
 #
-# The core battery that compile_port.bat runs needs cores and ROMs, which are
+# The core battery that compile.bat runs needs cores and ROMs, which are
 # never in the repository; on these runners it reports "bateria pulada" and
 # moves on. The unit tests still run everywhere - including the ports catalog
 # checks (tests/test_port_catalog.cpp).
@@ -24,10 +24,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/sdl3
-          key: sdl3-win-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_port.bat') }}
+          key: sdl3-win-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile.bat') }}
       - name: Build and test
         shell: cmd
-        run: call compile_port.bat
+        run: call compile.bat
       - uses: actions/upload-artifact@v4
         if: always()
         with:

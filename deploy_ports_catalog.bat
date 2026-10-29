@@ -7,7 +7,7 @@ rem Quem ja tem o Karamelo baixa o catalogo novo sozinho e passa a ver o port
 rem no proximo inicio. Antes de publicar:
 rem   1. aumente "catalog_version" em data\ports.json (o app so troca para um
 rem      catalogo de versao MAIOR que a que ele tem);
-rem   2. rode compile_port.bat - os testes conferem o JSON, o cabecalho embutido
+rem   2. rode compile.bat - os testes conferem o JSON, o cabecalho embutido
 rem      e as contagens do CREDITS.md.
 rem Detalhes em docs\PORTS_CATALOG.md.
 
@@ -27,7 +27,7 @@ if errorlevel 1 (
 )
 git diff --quiet -- include\ports_catalog_json.h
 if errorlevel 1 (
-    echo [AVISO] include\ports_catalog_json.h mudou ao regerar: rode compile_port.bat e
+    echo [AVISO] include\ports_catalog_json.h mudou ao regerar: rode compile.bat e
     echo         commite o JSON e o cabecalho juntos antes de publicar.
     exit /b 1
 )

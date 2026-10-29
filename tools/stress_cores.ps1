@@ -46,7 +46,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $app  = Join-Path $root "app"
 $exe  = Get-ChildItem (Join-Path $app "Karamelo_v*.exe") -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $exe) { throw "Executavel nao encontrado em $app - rode compile_port.bat antes." }
+if (-not $exe) { throw "Executavel nao encontrado em $app - rode compile.bat antes." }
 
 $log = Join-Path $app "karamelo.log"
 

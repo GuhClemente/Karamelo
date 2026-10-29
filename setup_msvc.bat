@@ -2,7 +2,7 @@
 rem ---------------------------------------------------------------------------
 rem Locates and initialises the MSVC x64 toolchain.
 rem
-rem Shared by compile_port.bat and run_tests.bat so there is one definition. Two
+rem Shared by compile.bat and run_tests.bat so there is one definition. Two
 rem copies of a build recipe drift apart - that already happened here once, when
 rem the duplicated test recipe stopped linking the sources the tests needed.
 rem

@@ -28,7 +28,7 @@ echo.
 
 rem 1. Compile clean release binary
 echo [1/4] Compilando executavel de producao com /MT (Static CRT)...
-call "%~dp0compile_port.bat"
+call "%~dp0compile.bat"
 if errorlevel 1 (
     echo [ERRO] Falha na compilacao. O pacote nao pode ser criado.
     exit /b 1

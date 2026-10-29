@@ -102,6 +102,11 @@ KARAMELO_SRCS=(
     src/json_mini.cpp
     src/x360_dump.cpp
     src/crash_reporter.cpp
+    src/cloud_sync.cpp
+    src/web_admin.cpp
+    src/voice_chat.cpp
+    src/tray_manager.cpp
+    src/desktop_chat.cpp
     src/main_linux.cpp
 )
 
@@ -142,6 +147,7 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     tests/test_crash_reporter.cpp \
     tests/test_port_catalog.cpp \
     tests/test_input_mouse.cpp \
+    tests/test_cloud_live.cpp \
     build/macos_obj/karamelo_math.o \
     build/macos_obj/netplay_protocol.o \
     build/macos_obj/archive_helper.o \
@@ -151,6 +157,12 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/macos_obj/gamepad_sdl.o \
     build/macos_obj/port_catalog.o \
     build/macos_obj/json_mini.o \
+    build/macos_obj/charrom.o \
+    build/macos_obj/cloud_sync.o \
+    build/macos_obj/web_admin.o \
+    build/macos_obj/voice_chat.o \
+    build/macos_obj/tray_manager.o \
+    build/macos_obj/desktop_chat.o \
     $SDL3_LIBS \
     -lpthread -ldl \
     -o build/karamelo_tests

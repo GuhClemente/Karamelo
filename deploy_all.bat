@@ -84,7 +84,7 @@ echo.
 rem -------------------------------------------------------------
 rem PASSO 1: Compilacao, Testes e Empacotamento Windows
 rem -------------------------------------------------------------
-rem package_release.bat's own step [1/4] already calls compile_port.bat
+rem package_release.bat's own step [1/4] already calls compile.bat
 rem (compile + run the unit tests) before packaging.
 echo [1/4] Compilando, testando e empacotando release Windows...
 call "%~dp0package_release.bat" %*

@@ -16,11 +16,11 @@ if not exist tools\record_gameplay\out mkdir tools\record_gameplay\out
 
 rem dev-sdl3: core_runner.cpp/input_map.cpp/hw_render.cpp now depend on SDL3
 rem (SDL_AudioStream, SDL_Gamepad). This tool shares the same cached build
-rem compile_port.bat produces rather than configuring its own - run that
+rem compile.bat produces rather than configuring its own - run that
 rem first if this is a clean checkout.
 if not exist build\sdl3\SDL3-static.lib (
     echo [BUILD FAILED] build\sdl3\SDL3-static.lib nao existe ainda.
-    echo Rode compile_port.bat pelo menos uma vez primeiro - ele configura e
+    echo Rode compile.bat pelo menos uma vez primeiro - ele configura e
     echo compila a SDL3, e este script reaproveita esse resultado.
     exit /b 1
 )

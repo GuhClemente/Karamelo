@@ -43,7 +43,7 @@ if (-not $changed.Count) {
 }
 
 $exe = Get-ChildItem app\Karamelo_v*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $exe) { throw "Executavel nao encontrado em app\ - rode compile_port.bat antes." }
+if (-not $exe) { throw "Executavel nao encontrado em app\ - rode compile.bat antes." }
 
 $failed = 0
 foreach ($p in $changed) {
