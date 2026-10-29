@@ -65,6 +65,7 @@ static void SetStatus(const char* text)
 	std::lock_guard<std::mutex> lock(g_status_lock);
 	strncpy_s(g_status, sizeof(g_status), text, _TRUNCATE);
 }
+static uint32_t     g_user_score = 0;
 static std::string  g_username;
 static std::string  g_password;
 static std::string  g_token;
@@ -689,6 +690,7 @@ static void RC_CCONV RaLoginCallback(int result, const char* error_message,
 		}
 
 		char buf[256];
+		g_user_score = user->score;
 		snprintf(buf, sizeof(buf), Tr("RA: %s (%u pontos)", "RA: %s (%u points)"), g_username.c_str(), user->score);
 		SetStatus(buf);
 	}
@@ -776,6 +778,39 @@ static void RC_CCONV RaLoadGameCallback(int result, const char* error_message,
 // -------------------------------------------------------------
 // Public API
 // -------------------------------------------------------------
+static bool RaEnsureClientStarted()
+{
+	if (g_client) return true;
+
+	if (!g_http_running.load())
+	{
+		g_http_running.store(true);
+		g_http_thread = std::thread(HttpThreadProc);
+	}
+
+	g_client = rc_client_create(RaReadMemory, RaServerCall);
+	if (!g_client)
+	{
+		SetStatus(Tr("RA: falha ao criar o cliente", "RA: failed to create the client"));
+		return false;
+	}
+
+	rc_client_set_event_handler(g_client, RaEventHandler);
+	rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_WARN, RaClientLog);
+
+	{
+		char clause[128] = { 0 };
+		rc_client_get_user_agent_clause(g_client, clause, sizeof(clause));
+
+		char agent[256];
+		snprintf(agent, sizeof(agent), "Karamelo/2.0 %s", clause);
+		MultiByteToWideChar(CP_UTF8, 0, agent, -1, g_user_agent, 256);
+		g_user_agent_str = agent;
+	}
+	rc_client_set_hardcore_enabled(g_client, g_hardcore ? 1 : 0);
+	return true;
+}
+
 void RaInit()
 {
 	// Must happen before any hash is attempted.
@@ -792,30 +827,7 @@ void RaInit()
 		return;
 	}
 
-	g_http_running.store(true);
-	g_http_thread = std::thread(HttpThreadProc);
-
-	g_client = rc_client_create(RaReadMemory, RaServerCall);
-	if (!g_client)
-	{
-		SetStatus(Tr("RA: falha ao criar o cliente", "RA: failed to create the client"));
-		return;
-	}
-
-	rc_client_set_event_handler(g_client, RaEventHandler);
-	rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_WARN, RaClientLog);
-
-	{
-		// "Karamelo/2.0 rcheevos/12.4.0" - the clause is what RA reads.
-		char clause[128] = { 0 };
-		rc_client_get_user_agent_clause(g_client, clause, sizeof(clause));
-
-		char agent[256];
-		snprintf(agent, sizeof(agent), "Karamelo/2.0 %s", clause);
-		MultiByteToWideChar(CP_UTF8, 0, agent, -1, g_user_agent, 256);
-		g_user_agent_str = agent;
-	}
-	rc_client_set_hardcore_enabled(g_client, g_hardcore ? 1 : 0);
+	if (!RaEnsureClientStarted()) return;
 
 	g_enabled = true;
 	SetStatus(Tr("RA: conectando...", "RA: connecting..."));
@@ -1026,3 +1038,86 @@ const char* RaGetUserName()
 }
 int         RaGetAchievementCount() { return g_ach_total; }
 int         RaGetAchievementsUnlocked() { return g_ach_unlocked; }
+
+uint32_t RaGetScore()
+{
+	return g_user_score;
+}
+
+bool RaGetHardcore()
+{
+	return g_hardcore;
+}
+
+bool RaHasToken()
+{
+	return !g_token.empty();
+}
+
+bool RaSetCredentials(const char* username, const char* password_or_token, bool is_token, bool hardcore, bool logout)
+{
+	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+	if (logout)
+	{
+		g_username.clear();
+		g_password.clear();
+		g_token.clear();
+		g_user_score = 0;
+		g_logged_in = false;
+		g_enabled = false;
+		if (g_client)
+			rc_client_logout(g_client);
+		SetStatus(Tr("RA: desconectado", "RA: disconnected"));
+		SyncUsernameMirror();
+		RaSaveConfig();
+		return true;
+	}
+
+	if (username && *username)
+	{
+		g_username = username;
+		SyncUsernameMirror();
+	}
+
+	if (password_or_token && *password_or_token)
+	{
+		if (is_token)
+		{
+			g_token = password_or_token;
+			g_password.clear();
+		}
+		else
+		{
+			g_password = password_or_token;
+			g_token.clear();
+		}
+	}
+
+	g_hardcore = hardcore;
+	RaSaveConfig();
+
+	if (g_username.empty() || (g_password.empty() && g_token.empty()))
+	{
+		SetStatus(Tr("RA: sem credenciais", "RA: no credentials"));
+		return false;
+	}
+
+	if (!RaEnsureClientStarted()) return false;
+
+	if (g_client)
+		rc_client_logout(g_client);
+
+	rc_client_set_hardcore_enabled(g_client, g_hardcore ? 1 : 0);
+
+	g_enabled = true;
+	SetStatus(Tr("RA: conectando...", "RA: connecting..."));
+
+	if (!g_token.empty())
+		rc_client_begin_login_with_token(g_client, g_username.c_str(), g_token.c_str(),
+			RaLoginCallback, NULL);
+	else
+		rc_client_begin_login_with_password(g_client, g_username.c_str(), g_password.c_str(),
+			RaLoginCallback, NULL);
+
+	return true;
+}

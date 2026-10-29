@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!--
-  Embedded by compile_port.bat (/MANIFEST:EMBED /MANIFESTINPUT).
+  Embedded by compile.bat (/MANIFEST:EMBED /MANIFESTINPUT).
 
   activeCodePage UTF-8 (Windows 10 1903+): every narrow string in this process -
   file names from the ROM browser, fopen, std::filesystem, and the paths cores

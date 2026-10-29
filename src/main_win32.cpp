@@ -38,6 +38,11 @@ namespace fs = std::filesystem;
 #include "karamelo_math.h"
 #include "gamepad_sdl.h"
 #include "crash_reporter.h"
+#include "cloud_sync.h"
+#include "web_admin.h"
+#include "voice_chat.h"
+#include "tray_manager.h"
+#include "desktop_chat.h"
 
 // dev-sdl3: first slice of the SDL3 migration. This only proves the vendored,
 // statically-linked SDL3 build actually links and runs inside this exe - it
@@ -57,6 +62,8 @@ namespace fs = std::filesystem;
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "crypt32.lib")
 
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
@@ -1214,6 +1221,11 @@ static void BlitToDc(HDC hdc, HWND hwnd)
 			SRCCOPY
 		);
 	}
+
+	if (hwnd == g_hwnd)
+	{
+		DesktopChatRenderOverlayWin32((void*)hdc, client.right, client.bottom);
+	}
 }
 
 // dev-sdl3: PresentFrame calls this directly, once per frame, instead of the
@@ -1247,6 +1259,19 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 	UINT msg = msg_ptr->message;
 	WPARAM wParam = msg_ptr->wParam;
 	LPARAM lParam = msg_ptr->lParam;
+
+	if (TrayManagerHandleWin32Message(hwnd, msg, wParam, lParam))
+	{
+		return false;
+	}
+
+	// Never intercept messages aimed at auxiliary windows (such as the native
+	// Steam/Battle.net-style Karamelo Social & Chat window).
+	if (hwnd != g_hwnd)
+	{
+		return true;
+	}
+
 	// Bit 30: the key was already down - this WM_KEYDOWN is auto-repeat.
 	// Holding F2 used to save the state over and over (F4 kept reloading it,
 	// F9 filled screenshots/, F12 flickered the menu open and shut), so the
@@ -1270,6 +1295,15 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 			ToggleFullscreen(hwnd);
 			return false;
 		}
+		if (wParam == VK_F10 && !(GetKeyState(VK_MENU) & 0x8000) && !key_repeat)
+		{
+			if (GetKeyState(VK_SHIFT) & 0x8000)
+				DesktopChatToggleWindow();
+			else
+				DesktopChatToggleOverlay();
+			InvalidateRect(hwnd, NULL, FALSE);
+			return false;
+		}
 		return true;
 
 	case WM_KEYDOWN:
@@ -1277,6 +1311,19 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 		{
 			if (!key_repeat) ToggleFullscreen(hwnd);
 			return 0;
+		}
+
+		if (wParam == VK_F10)
+		{
+			if (!key_repeat)
+			{
+				if (GetKeyState(VK_SHIFT) & 0x8000)
+					DesktopChatToggleWindow();
+				else
+					DesktopChatToggleOverlay();
+			}
+			InvalidateRect(hwnd, NULL, FALSE);
+			return false;
 		}
 
 		if (wParam == VK_F12)
@@ -1844,6 +1891,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ReleaseDC(hwnd, hdc);
 
 	MenuInit();
+	TrayManagerInit(hwnd);
 
 	// Restore the windowed-mode size/position saved on a previous exit, now
 	// that MenuInit() has loaded it. Guards against a monitor that is no
@@ -2044,6 +2092,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	CoreShutdown();
 	RaShutdown();
 	UpdaterShutdown();
+	DesktopChatShutdown();
+	TrayManagerShutdown();
+	WebAdminShutdown();
+	VoiceChatShutdown();
+	CloudSyncShutdown();
 
 	// CoreShutdown() has already joined the core thread, so nothing else can
 	// be holding the GL context current at this point - safe to tear it down

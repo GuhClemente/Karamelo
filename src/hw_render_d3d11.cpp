@@ -11,7 +11,7 @@
 
 // D3D11 is a plain system API here, unlike Vulkan - d3d11.lib/d3dcompiler.lib
 // are always present in the Windows SDK this project already builds against
-// (compile_port.bat links them), so this links directly instead of the
+// (compile.bat links them), so this links directly instead of the
 // dynamic-load dance hw_render_vulkan.cpp needs for a not-vendored SDK.
 
 static void D3D11HwLog(const char* fmt, ...)

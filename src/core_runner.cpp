@@ -44,6 +44,8 @@
 #include "hw_render_vulkan.h"
 #include "hw_render_d3d11.h"
 #include "crash_reporter.h"
+#include "cloud_sync.h"
+#include "tray_manager.h"
 
 namespace fs = std::filesystem;
 
@@ -356,6 +358,8 @@ static std::string   g_pending_core_hint;
 // Forward declarations: these run on the core thread only.
 static bool CoreLoad(const char* core_dll_path);
 static bool CoreLoadGame(const char* rom_path, bool suppress_toast = false);
+static void CoreLoadBatterySram();
+static void CoreSaveBatterySram();
 static void CoreUnload();
 static void ProcessPendingCommand();
 static void ApplyDisplaySync();
@@ -3835,6 +3839,8 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 	}
 
 	RaOnGameLoad(rom_path.c_str(), loaded_core_name.c_str());
+	CloudSyncOnGameLoad(loaded_system_dir.c_str(), loaded_game_stem.c_str());
+	TrayManagerSetStatus(TRAY_STATUS_PLAYING, loaded_game_stem.c_str());
 
 	InterlockedExchange(&g_core_state, CORE_STATE_RUNNING);
 
@@ -4856,7 +4862,63 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 	is_game_loaded = true;
 	s_game_loaded_tick = GetTickCount();
 	s_core_faulted = false;
+	CoreLoadBatterySram();
 	return true;
+}
+
+static void CoreLoadBatterySram()
+{
+	if (!is_core_loaded || !p_retro_get_memory_data || !p_retro_get_memory_size) return;
+	size_t sram_sz = CoreGetMemorySize(RETRO_MEMORY_SAVE_RAM);
+	void* sram_ptr = (sram_sz > 0) ? CoreGetMemoryData(RETRO_MEMORY_SAVE_RAM) : NULL;
+	if (!sram_ptr || sram_sz == 0 || sram_sz > 16u * 1024u * 1024u) return;
+
+	std::string stem = GetLoadedGameStemSafe();
+	if (stem.empty() || loaded_system_dir.empty()) return;
+
+	std::error_code ec;
+	fs::path srm_file = fs::absolute("saves/" + loaded_system_dir, ec) / (stem + ".srm");
+	if (!fs::exists(srm_file, ec) || !fs::is_regular_file(srm_file, ec)) return;
+
+	FILE* f = fopen(srm_file.string().c_str(), "rb");
+	if (!f) return;
+	size_t rd = fread(sram_ptr, 1, sram_sz, f);
+	fclose(f);
+	if (rd > 0)
+		CoreLogPrintf(RETRO_LOG_INFO, "[SRAM] Carregado %zu bytes de %s", rd, srm_file.string().c_str());
+}
+
+static void CoreSaveBatterySram()
+{
+	if (!is_core_loaded || !is_game_loaded || s_core_faulted) return;
+	size_t sram_sz = CoreGetMemorySize(RETRO_MEMORY_SAVE_RAM);
+	void* sram_ptr = (sram_sz > 0) ? CoreGetMemoryData(RETRO_MEMORY_SAVE_RAM) : NULL;
+	if (!sram_ptr || sram_sz == 0 || sram_sz > 16u * 1024u * 1024u) return;
+
+	std::string stem = GetLoadedGameStemSafe();
+	if (stem.empty() || loaded_system_dir.empty()) return;
+
+	std::error_code ec;
+	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir, ec);
+	fs::create_directories(save_dir, ec);
+	fs::path srm_file = save_dir / (stem + ".srm");
+	fs::path tmp_file = srm_file;
+	tmp_file += ".tmp";
+
+	FILE* f = fopen(tmp_file.string().c_str(), "wb");
+	if (!f) return;
+	bool ok = (fwrite(sram_ptr, 1, sram_sz, f) == sram_sz);
+	ok = (fclose(f) == 0) && ok;
+	if (ok)
+	{
+		fs::rename(tmp_file, srm_file, ec);
+		if (!ec)
+			CoreLogPrintf(RETRO_LOG_INFO, "[SRAM] Salvo %zu bytes em %s", sram_sz, srm_file.string().c_str());
+	}
+	else
+	{
+		fs::remove(tmp_file, ec);
+	}
 }
 
 static void CoreUnload()
@@ -4894,6 +4956,10 @@ static void CoreUnload()
 
 	if (is_game_loaded)
 	{
+		CoreSaveBatterySram();
+		DWORD elapsed_ms = GetTickCount() - s_game_loaded_tick;
+		CloudSyncOnGameUnload(loaded_system_dir.c_str(), GetLoadedGameStemSafe().c_str(), (uint64_t)(elapsed_ms / 1000));
+		TrayManagerSetStatus(TRAY_STATUS_ONLINE);
 		RaOnGameUnload();
 		CoreReleaseMemoryMap();
 

@@ -9,6 +9,9 @@
 #include <string.h>
 #include <string>
 #include <unordered_set>
+#include <mutex>
+#include <atomic>
+#include <sstream>
 #include <unordered_map>
 #include <vector>
 #ifdef _WIN32
@@ -27,6 +30,8 @@
 #include "hw_render_d3d11.h"
 #include "input_map.h"
 #include "menu.h"
+#include "system_registry.h"
+#include <functional>
 #include "karamelo_math.h"
 #include "netplay.h"
 #include "osd.h"
@@ -34,6 +39,11 @@
 #include "updater.h"
 #include "port_runner.h"
 #include "crash_reporter.h"
+#include "cloud_sync.h"
+#include "web_admin.h"
+#include "voice_chat.h"
+#include "tray_manager.h"
+#include "desktop_chat.h"
 
 namespace fs = std::filesystem;
 
@@ -55,7 +65,11 @@ enum MenuState {
   STATE_DIAGNOSTICS,
   STATE_FAVORITES,
   STATE_RECENT,
-  STATE_SYSTEMS
+  STATE_SYSTEMS,
+  STATE_CLOUD,
+  STATE_WEB_ADMIN,
+  STATE_LIVE_CHAT,
+  STATE_MANAGE_SYSTEMS
 };
 
 struct MenuItem {
@@ -558,6 +572,21 @@ void MenuSetPersistedCoreOption(const char* key, const char* value) {
 int MenuGetAspectMode() { return setting_aspect; }
 int MenuGetFilterMode() { return setting_filter; }
 int MenuGetWallpaperMode() { return setting_wallpaper; }
+void MenuSetAspectMode(int aspect) {
+  setting_aspect = ClampInt(aspect, 0, 2);
+  MenuSaveSettings();
+}
+void MenuSetFilterMode(int filter) {
+  setting_filter = MigrateFilter(ClampInt(filter, 0, 9));
+  MenuSaveSettings();
+}
+void MenuSetVsync(int vsync) {
+  setting_vsync = ClampInt(vsync, 0, 1);
+  MenuSaveSettings();
+}
+void MenuSaveSettingsExport() {
+  MenuSaveSettings();
+}
 
 // Every .raw file in wallpapers/ becomes a selectable "Custom" wallpaper slot,
 // on top of the 4 built-in procedural ones (None/Static Noise/Parallax
@@ -1057,6 +1086,7 @@ void PopulateCoresList();
 void PopulateSaveStates();
 void PopulateShaderList();
 void PopulateDiagnostics();
+void PopulateManageSystems();
 static MenuState shader_list_previous_state = STATE_VIDEO;
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
@@ -1377,6 +1407,85 @@ void PopulateMainMenu() {
   scroll_top = 0;
 }
 
+// Thread-safe task queue for operations dispatched from background threads (e.g. Web Studio)
+static std::mutex s_menu_task_mutex;
+static std::vector<std::function<void()>> s_menu_task_queue;
+
+void MenuEnqueueTask(std::function<void()> task) {
+  if (!task) return;
+  std::lock_guard<std::mutex> lk(s_menu_task_mutex);
+  s_menu_task_queue.push_back(std::move(task));
+}
+
+// Sistemas ocultos pelo jogador (Configuracoes > Gerenciar Sistemas, ou pelo
+// Web Studio). As funcoes abaixo sao chamadas tambem pela thread do servidor
+// web, entao o conjunto fica atras de um mutex e nada aqui grava arquivo nem
+// mexe em items[]: so marca s_systems_dirty, e MenuRun() - na thread principal -
+// salva o karamelo.cfg e redesenha a tela aberta.
+static std::unordered_set<int> s_hidden_systems;
+static std::mutex s_hidden_mutex;
+static std::atomic<bool> s_systems_dirty{false};
+
+bool MenuIsSystemVisible(int action_id) {
+  std::lock_guard<std::mutex> lk(s_hidden_mutex);
+  return s_hidden_systems.find(action_id) == s_hidden_systems.end();
+}
+
+void MenuSetSystemVisible(int action_id, bool visible) {
+  {
+    std::lock_guard<std::mutex> lk(s_hidden_mutex);
+    if (visible)
+      s_hidden_systems.erase(action_id);
+    else
+      s_hidden_systems.insert(action_id);
+  }
+  s_systems_dirty = true;
+}
+
+void MenuSetAllSystemsVisible(bool visible) {
+  {
+    std::lock_guard<std::mutex> lk(s_hidden_mutex);
+    s_hidden_systems.clear();
+    if (!visible)
+      for (size_t i = 0; i < kSystemRegistryCount; i++)
+        s_hidden_systems.insert(kSystemRegistry[i].action_id);
+  }
+  s_systems_dirty = true;
+}
+
+void MenuHideCategory(const char* category) {
+  if (!category) return;
+  {
+    std::lock_guard<std::mutex> lk(s_hidden_mutex);
+    for (size_t i = 0; i < kSystemRegistryCount; i++)
+      if (strcmp(kSystemRegistry[i].category, category) == 0)
+        s_hidden_systems.insert(kSystemRegistry[i].action_id);
+  }
+  s_systems_dirty = true;
+}
+
+// Oculta sistemas cujo diretorio de roms esteja vazio. O PC Ports (140) fica
+// de fora - a lista e o catalogo, instalado pelo proprio menu, e nunca esta
+// "vazia" no sentido que importa aqui. Usa contagem canonica de roms de system_registry.h.
+void MenuHideEmptySystems() {
+  std::vector<int> empty_ids, filled_ids;
+  for (size_t i = 0; i < kSystemRegistryCount; i++) {
+    int id = kSystemRegistry[i].action_id;
+    if (id == 140) continue;
+
+    fs::path dir = ResolveSystemRomDir(kSystemRegistry[i].id);
+    int count = CountGamesInDirectory(dir, false);
+    if (count > 0) filled_ids.push_back(id);
+    else empty_ids.push_back(id);
+  }
+  {
+    std::lock_guard<std::mutex> lk(s_hidden_mutex);
+    for (int id : empty_ids) s_hidden_systems.insert(id);
+    for (int id : filled_ids) s_hidden_systems.erase(id);
+  }
+  s_systems_dirty = true;
+}
+
 void PopulateSystemsMenu() {
   items.clear();
   current_title = APP_NAME;
@@ -1395,81 +1504,81 @@ void PopulateSystemsMenu() {
   items.push_back({" ", "", false, false, 0});
 
   // Main Systems Menu (Alphabetical)
-  if (SystemHasCore(117))
+  if (SystemHasCore(117) && MenuIsSystemVisible(117))
     items.push_back({"Arcade", ">", true, true, 117});
-  if (SystemHasCore(101))
+  if (SystemHasCore(101) && MenuIsSystemVisible(101))
     items.push_back({"Atari 2600", ">", true, true, 101});
-  if (SystemHasCore(129))
+  if (SystemHasCore(129) && MenuIsSystemVisible(129))
     items.push_back({"Atari 5200", ">", true, true, 129});
-  if (SystemHasCore(130))
+  if (SystemHasCore(130) && MenuIsSystemVisible(130))
     items.push_back({"Atari 7800", ">", true, true, 130});
-  if (SystemHasCore(128))
+  if (SystemHasCore(128) && MenuIsSystemVisible(128))
     items.push_back({"Atari Jaguar", ">", true, true, 128});
-  if (SystemHasCore(134))
+  if (SystemHasCore(134) && MenuIsSystemVisible(134))
     items.push_back({"Atari Lynx", ">", true, true, 134});
-  if (SystemHasCore(131))
+  if (SystemHasCore(131) && MenuIsSystemVisible(131))
     items.push_back({"ColecoVision", ">", true, true, 131});
-  if (SystemHasCore(124))
+  if (SystemHasCore(124) && MenuIsSystemVisible(124))
     items.push_back({"Commodore 64", ">", true, true, 124});
-  if (SystemHasCore(123))
+  if (SystemHasCore(123) && MenuIsSystemVisible(123))
     items.push_back({"Commodore Amiga", ">", true, true, 123});
-  if (SystemHasCore(112))
+  if (SystemHasCore(112) && MenuIsSystemVisible(112))
     items.push_back({"Dreamcast", ">", true, true, 112});
-  if (SystemHasCore(137))
+  if (SystemHasCore(137) && MenuIsSystemVisible(137))
     items.push_back({"FM Towns / Marty", ">", true, true, 137});
-  if (SystemHasCore(119))
+  if (SystemHasCore(119) && MenuIsSystemVisible(119))
     items.push_back({"Game Boy / Color", ">", true, true, 119});
-  if (SystemHasCore(118))
+  if (SystemHasCore(118) && MenuIsSystemVisible(118))
     items.push_back({"Game Boy Advance", ">", true, true, 118});
-  if (SystemHasCore(113))
+  if (SystemHasCore(113) && MenuIsSystemVisible(113))
     items.push_back({"GameCube", ">", true, true, 113});
-  if (SystemHasCore(102))
+  if (SystemHasCore(102) && MenuIsSystemVisible(102))
     items.push_back({"Genesis / Mega Drive", ">", true, true, 102});
-  if (SystemHasCore(103))
+  if (SystemHasCore(103) && MenuIsSystemVisible(103))
     items.push_back({"Master System", ">", true, true, 103});
-  if (SystemHasCore(104))
+  if (SystemHasCore(104) && MenuIsSystemVisible(104))
     items.push_back({"Mega CD", ">", true, true, 104});
-  if (SystemHasCore(121))
+  if (SystemHasCore(121) && MenuIsSystemVisible(121))
     items.push_back({"MS-DOS", ">", true, true, 121});
-  if (SystemHasCore(122))
+  if (SystemHasCore(122) && MenuIsSystemVisible(122))
     items.push_back({"MSX / MSX2", ">", true, true, 122});
-  if (SystemHasCore(136))
+  if (SystemHasCore(136) && MenuIsSystemVisible(136))
     items.push_back({"NEC PC-98", ">", true, true, 136});
-  if (SystemHasCore(105))
+  if (SystemHasCore(105) && MenuIsSystemVisible(105))
     items.push_back({"NES / Famicom", ">", true, true, 105});
-  if (SystemHasCore(132))
+  if (SystemHasCore(132) && MenuIsSystemVisible(132))
     items.push_back({"Neo Geo Pocket", ">", true, true, 132});
-  if (SystemHasCore(106))
+  if (SystemHasCore(106) && MenuIsSystemVisible(106))
     items.push_back({"NeoGeo / CD", ">", true, true, 106});
-  if (SystemHasCore(115))
+  if (SystemHasCore(115) && MenuIsSystemVisible(115))
     items.push_back({"Nintendo 3DS", ">", true, true, 115});
-  if (SystemHasCore(107))
+  if (SystemHasCore(107) && MenuIsSystemVisible(107))
     items.push_back({"Nintendo 64", ">", true, true, 107});
-  if (SystemHasCore(114))
+  if (SystemHasCore(114) && MenuIsSystemVisible(114))
     items.push_back({"Nintendo DS", ">", true, true, 114});
-  if (SystemHasCore(127))
+  if (SystemHasCore(127) && MenuIsSystemVisible(127))
     items.push_back({"Panasonic 3DO", ">", true, true, 127});
-  if (SystemHasCore(135))
+  if (SystemHasCore(135) && MenuIsSystemVisible(135))
     items.push_back({"PC-FX", ">", true, true, 135});
-  if (SystemHasCore(108))
+  if (SystemHasCore(108) && MenuIsSystemVisible(108))
     items.push_back({"PlayStation 1", ">", true, true, 108});
-  if (SystemHasCore(116))
+  if (SystemHasCore(116) && MenuIsSystemVisible(116))
     items.push_back({"PlayStation 2 (PS2)", ">", true, true, 116});
-  if (SystemHasCore(120))
+  if (SystemHasCore(120) && MenuIsSystemVisible(120))
     items.push_back({"PlayStation Portable (PSP)", ">", true, true, 120});
-  if (SystemHasCore(140))
+  if (SystemHasCore(140) && MenuIsSystemVisible(140))
     items.push_back({"Ports & Recomp", ">", true, true, 140});
-  if (SystemHasCore(110))
+  if (SystemHasCore(110) && MenuIsSystemVisible(110))
     items.push_back({"Saturn", ">", true, true, 110});
-  if (SystemHasCore(126))
+  if (SystemHasCore(126) && MenuIsSystemVisible(126))
     items.push_back({"Sega 32X", ">", true, true, 126});
-  if (SystemHasCore(109))
+  if (SystemHasCore(109) && MenuIsSystemVisible(109))
     items.push_back({"SNES / Super Famicom", ">", true, true, 109});
-  if (SystemHasCore(111))
+  if (SystemHasCore(111) && MenuIsSystemVisible(111))
     items.push_back({"TurboGrafx 16 / PCE", ">", true, true, 111});
-  if (SystemHasCore(133))
+  if (SystemHasCore(133) && MenuIsSystemVisible(133))
     items.push_back({"WonderSwan", ">", true, true, 133});
-  if (SystemHasCore(125))
+  if (SystemHasCore(125) && MenuIsSystemVisible(125))
     items.push_back({"ZX Spectrum", ">", true, true, 125});
   // Blank row before the app entries, the way the MiSTer OSD separates the
   // system list from Settings / Update / Close.
@@ -1483,6 +1592,11 @@ void PopulateSystemsMenu() {
   for (const auto &it : items)
     if ((it.action_id >= 101 && it.action_id <= 137) || it.action_id == 140)
       g_system_count++;
+
+  if (g_system_count == 0) {
+    items.push_back({Tr("(Todos sistemas ocultos)", "(All systems hidden)"), "", false, false, 0});
+    items.push_back({Tr("Configurar Gerenciar Sistemas", "Configure Manage Systems"), ">", false, true, 225});
+  }
 
   OsdSetSize((int)items.size());
 }
@@ -1625,6 +1739,7 @@ void PopulateControllerSettings() {
 // would log the user out or lose their friend's address as a side effect of
 // "fix my messed-up video settings."
 static void ResetAllSettingsToDefault() {
+  MenuSetAllSystemsVisible(true);
   setting_aspect = 0;
   setting_filter = 0;
   setting_pad_device = 0;
@@ -1659,6 +1774,13 @@ static void ResetAllSettingsToDefault() {
   InputBindResetDefaults();
   CoreSetVolume(100);
   CoreSetMute(false);
+  VoiceChatSetEnabled(true);
+  VoiceChatSetDenoiseEngine(VOICE_DENOISE_DEEPFILTERNET);
+  VoiceChatSetVadEnabled(true);
+  VoiceChatSetVadSensitivity(VOICE_VAD_MEDIUM);
+  VoiceChatSetAecEnabled(true);
+  VoiceChatSetAgcEnabled(true);
+  TrayManagerSetEnabled(true);
 
   MenuSaveSettings();
 }
@@ -1671,19 +1793,110 @@ static void SelectByAction(int action_id, int fallback_idx);
 void PopulateSettings() {
   items.clear();
   current_title = Tr("Configuracoes", "Settings");
-  OsdSetSize(10);
+  OsdSetSize(13);
 
   items.push_back({Tr("Idioma", "Language"), setting_language == 0 ? "Portugues" : "English", false, false, 216});
   items.push_back({Tr("Video", "Video"), ">", false, true, 201});
-  items.push_back({Tr("Audio", "Audio"), ">", false, true, 202});
+  items.push_back({Tr("Audio & Voz", "Audio & Voice"), ">", false, true, 202});
   items.push_back({Tr("Controles", "Controller"), ">", false, true, 203});
   items.push_back({Tr("Netplay (Online)", "Netplay (Online)"), ">", false, true, 204});
+  items.push_back({"Karamelo Cloud", ">", false, true, 217});
+  items.push_back({"Karamelo Live (Chat)", ">", false, true, 218});
+  items.push_back({"Web Admin (Wi-Fi)", ">", false, true, 219});
   items.push_back({"RetroAchievements", ">", false, true, 206});
+  items.push_back({Tr("Gerenciar Sistemas", "Manage Systems"), ">", false, true, 225});
   items.push_back({Tr("Diagnostico & Falhas", "Diagnostics & Crash"), ">", false, true, 215});
   items.push_back({Tr("Sobre", "About"), ">", false, true, 205});
   items.push_back({Tr("Restaurar Padroes", "Restore Defaults"), ">", false, true, 210});
 
   selected_idx = 0;
+  scroll_top = 0;
+}
+
+void PopulateCloudSettings() {
+  items.clear();
+  current_title = "Karamelo Cloud";
+  OsdSetSize(10);
+
+  items.push_back({"Status", CloudSyncGetStatusString(), false, false, 0});
+  char cnt_buf[32];
+  snprintf(cnt_buf, sizeof(cnt_buf), "%d", CloudSyncGetSyncedFileCount());
+  items.push_back({Tr("Arquivos Salvos", "Saved Files"), cnt_buf, false, false, 0});
+  items.push_back({Tr("Ultimo Sync", "Last Sync"), CloudSyncGetLastSyncTimeStr(), false, false, 0});
+  items.push_back({Tr("Sync Automatico", "Auto Sync"), CloudSyncGetAutoSync() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 901});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Sincronizar Agora", "Sync Now"), ">", false, true, 902});
+  if (CloudSyncIsConnected()) {
+    items.push_back({Tr("Desconectar Google", "Disconnect Google"), ">", false, true, 904});
+  } else {
+    items.push_back({Tr("Conectar Google Drive", "Connect Google Drive"), ">", false, true, 903});
+  }
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
+
+  SelectByAction(902, 5);
+  scroll_top = 0;
+}
+
+void PopulateManageSystems() {
+  items.clear();
+  current_title = Tr("Gerenciar Sistemas", "Manage Systems");
+
+  items.push_back({Tr("Exibir Todos os Sistemas", "Show All Systems"), ">", false, true, 1850});
+  items.push_back({Tr("Ocultar Sistemas Sem Jogos", "Hide Empty Systems"), ">", false, true, 1851});
+  items.push_back({Tr("Ocultar Computadores", "Hide Computers"), ">", false, true, 1852});
+  items.push_back({Tr("Ocultar Todos os Sistemas", "Hide All Systems"), ">", false, true, 1853});
+  items.push_back({" ", "", false, false, 0});
+
+  for (size_t i = 0; i < kSystemRegistryCount; i++) {
+    const auto &sys = kSystemRegistry[i];
+    bool vis = MenuIsSystemVisible(sys.action_id);
+    std::string mark = vis ? Tr("[Visivel]", "[Visible]") : Tr("[Oculto]", "[Hidden]");
+    items.push_back({sys.name, mark, false, true, 8000 + sys.action_id});
+  }
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({std::string("< ") + Tr("Voltar", "Back"), "", false, true, 999});
+
+  OsdSetSize((int)items.size());
+}
+
+void PopulateWebAdminSettings() {
+  items.clear();
+  current_title = "Web Admin Wi-Fi";
+  OsdSetSize(10);
+
+  bool running = WebAdminIsRunning();
+  items.push_back({Tr("Servidor Local", "Local Server"), running ? Tr("Ativo (LAN)", "Active (LAN)") : Tr("Desligado", "Stopped"), false, true, 910});
+  items.push_back({Tr("Abrir no Navegador (PC)", "Open in Browser (PC)"), running ? WebAdminGetLocalUrl() : Tr("(Iniciar e Abrir)", "(Start & Open)"), false, true, 912});
+  items.push_back({Tr("URL Wi-Fi (Celular)", "Wi-Fi URL (Mobile)"), running ? WebAdminGetUrl() : Tr("(Inativo)", "(Stopped)"), false, false, 0});
+  items.push_back({Tr("PIN de Acesso", "Access PIN"), WebAdminGetPin(), false, false, 0});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Gerar Novo PIN", "Regenerate PIN"), ">", false, true, 911});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
+
+  SelectByAction(910, 0);
+  scroll_top = 0;
+}
+
+void PopulateLiveChatSettings() {
+  items.clear();
+  current_title = "Karamelo Live";
+  OsdSetSize(11);
+
+  items.push_back({Tr("Sala Ativa", "Active Room"), DesktopChatGetRoomName(DesktopChatGetRoom()), false, false, 920});
+  items.push_back({Tr("Status Presenca", "Presence Status"), TrayManagerGetStatusName(TrayManagerGetStatus()), false, false, 921});
+  items.push_back({Tr("Bandeja Sistema", "System Tray"), TrayManagerIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 922});
+  items.push_back({Tr("Overlay em Jogo", "In-Game Overlay"), DesktopChatIsOverlayVisible() ? Tr("Visivel [F10]", "Visible [F10]") : Tr("Oculto [F10]", "Hidden [F10]"), false, true, 924});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Abrir Janela Chat", "Open Chat Window"), ">", false, true, 923});
+  items.push_back({Tr("Desafiar 1-Click", "1-Click Challenge"), ">", false, true, 925});
+  items.push_back({Tr("Aceitar Desafio", "Accept Challenge"), ">", false, true, 926});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
+
+  SelectByAction(923, 5);
   scroll_top = 0;
 }
 
@@ -1880,8 +2093,8 @@ void PopulateSaveStates() {
 
 void PopulateAudioSettings() {
   items.clear();
-  current_title = Tr("Audio", "Audio");
-  OsdSetSize(5);
+  current_title = Tr("Audio & Voz", "Audio & Voice");
+  OsdSetSize(13);
 
   const char *latencies[] = {"64 ms", "128 ms", "256 ms", "512 ms"};
 
@@ -1891,6 +2104,17 @@ void PopulateAudioSettings() {
   char vol_str[32];
   snprintf(vol_str, sizeof(vol_str), "%d%%", CoreGetVolume());
   items.push_back({Tr("Volume", "Volume"), vol_str, false, false, 403});
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Chat de Voz P2P", "P2P Voice Chat"), VoiceChatIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 930});
+  items.push_back({Tr("Microfone", "Microphone"), VoiceChatIsMicMuted() ? Tr("Mutado", "Muted") : Tr("Ativo", "Active"), false, false, 931});
+  items.push_back({Tr("Supressao IA", "AI Denoise"), VoiceChatGetDenoiseEngineName(VoiceChatGetDenoiseEngine()), false, false, 932});
+  items.push_back({"Silero VAD", VoiceChatGetVadEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 933});
+  items.push_back({Tr("Sensib. VAD", "VAD Sens."), VoiceChatGetVadSensitivityName(VoiceChatGetVadSensitivity()), false, false, 934});
+  items.push_back({"WebRTC AEC3 (Eco)", VoiceChatGetAecEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 935});
+  items.push_back({"WebRTC AGC2 (Ganho)", VoiceChatGetAgcEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 936});
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
 
   selected_idx = 0;
   scroll_top = 0;
@@ -1952,6 +2176,7 @@ void PopulateNetplay() {
   items.push_back({Tr("Hospedar Jogo", "Host Game"), Tr("Porta 55435", "Port 55435"), false, true, 601});
   items.push_back({Tr("Conectar a Host", "Connect to Host"), join_ip_input.c_str(), false, true, 602});
   items.push_back({Tr("Desconectar Netplay", "Disconnect Netplay"), "", false, true, 603});
+  items.push_back({"Karamelo Live (Chat)", ">", false, true, 218});
   items.push_back({Tr("Porta Netplay", "Netplay Port"), "55435", false, false, 0});
   items.push_back({Tr("Voltar", "Back"), "", false, true, 999});
 
@@ -2286,13 +2511,13 @@ void PopulateFavoritesMenu() {
         if (p.id == pid) { label = p.name; break; }
       }
       s_favorites_paths.push_back(fav);
-      items.push_back({label, "[Port]", false, true, 850});
+      items.push_back({label, "[Port]", false, true, 1850});
     } else {
       fs::path p(fav);
       std::string fname = p.stem().string();
       std::string sys = p.parent_path().filename().string();
       s_favorites_paths.push_back(fav);
-      items.push_back({fname, sys, false, true, 850});
+      items.push_back({fname, sys, false, true, 1850});
     }
   }
 
@@ -2668,6 +2893,30 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "neo_memcard", neo_memcard);
   AppendSetting(out, "neo_dip_settings", neo_dip_settings);
   AppendSetting(out, "neo_dip_freeplay", neo_dip_freeplay);
+  AppendSetting(out, "voice_enabled", VoiceChatIsEnabled() ? 1 : 0);
+  AppendSetting(out, "voice_denoise", VoiceChatGetDenoiseEngine());
+  AppendSetting(out, "voice_vad", VoiceChatGetVadEnabled() ? 1 : 0);
+  AppendSetting(out, "voice_vad_sens", VoiceChatGetVadSensitivity());
+  AppendSetting(out, "voice_aec", VoiceChatGetAecEnabled() ? 1 : 0);
+  AppendSetting(out, "voice_agc", VoiceChatGetAgcEnabled() ? 1 : 0);
+  AppendSetting(out, "tray_enabled", TrayManagerIsEnabled() ? 1 : 0);
+  std::vector<int> hidden_copy;
+  {
+    std::lock_guard<std::mutex> lk(s_hidden_mutex);
+    hidden_copy.assign(s_hidden_systems.begin(), s_hidden_systems.end());
+  }
+  std::sort(hidden_copy.begin(), hidden_copy.end()); // ordem estavel no arquivo
+  if (!hidden_copy.empty()) {
+    std::string hstr = "hidden_systems=";
+    bool first = true;
+    for (int hid : hidden_copy) {
+      if (!first) hstr += ",";
+      first = false;
+      hstr += std::to_string(hid);
+    }
+    hstr += "\n";
+    out += hstr;
+  }
 
   out += "netplay_ip=";
   out += join_ip_input;
@@ -2804,6 +3053,32 @@ static void MenuLoadSettings() {
       neo_dip_settings = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "neo_dip_freeplay"))
       neo_dip_freeplay = ClampInt(iv, 0, 1);
+    else if (!strcmp(key, "voice_enabled"))
+      VoiceChatSetEnabled(iv != 0);
+    else if (!strcmp(key, "voice_denoise"))
+      VoiceChatSetDenoiseEngine((VoiceDenoiseEngine)ClampInt(iv, 0, 2));
+    else if (!strcmp(key, "voice_vad"))
+      VoiceChatSetVadEnabled(iv != 0);
+    else if (!strcmp(key, "voice_vad_sens"))
+      VoiceChatSetVadSensitivity((VoiceVadSensitivity)ClampInt(iv, 0, 2));
+    else if (!strcmp(key, "voice_aec"))
+      VoiceChatSetAecEnabled(iv != 0);
+    else if (!strcmp(key, "voice_agc"))
+      VoiceChatSetAgcEnabled(iv != 0);
+    else if (!strcmp(key, "tray_enabled"))
+      TrayManagerSetEnabled(iv != 0);
+    else if (!strcmp(key, "hidden_systems")) {
+      std::lock_guard<std::mutex> lk(s_hidden_mutex);
+      s_hidden_systems.clear();
+      std::stringstream ss(val);
+      std::string token;
+      while (std::getline(ss, token, ',')) {
+        if (!token.empty()) {
+          int hid = atoi(token.c_str());
+          if (hid > 0) s_hidden_systems.insert(hid);
+        }
+      }
+    }
     else if (!strcmp(key, "netplay_ip") && val[0])
       join_ip_input = val;
     else if (!strncmp(key, "coreopt:", 8) && key[8] && val[0])
@@ -2901,6 +3176,109 @@ void MenuJumpToLetter(char c) {
 }
 
 void MenuInit() {
+  CloudSyncInit();
+  WebAdminInit();
+  WebAdminHooks web_hooks{};
+  web_hooks.process_key = [](int k) {
+    MenuEnqueueTask([k]() {
+      MenuProcessKey((MenuKey)k);
+    });
+  };
+  web_hooks.launch_game = [](const std::string& p) {
+    MenuEnqueueTask([p]() {
+      MenuLaunchGamePath(p);
+    });
+    return true;
+  };
+  web_hooks.is_running = CoreIsRunning;
+  web_hooks.get_game_name = CoreGetGameName;
+  web_hooks.get_core_name = CoreGetCoreName;
+  web_hooks.reset = []() {
+    MenuEnqueueTask([]() {
+      CoreReset();
+    });
+  };
+  web_hooks.save_state = [](int slot) -> bool {
+    MenuEnqueueTask([slot]() {
+      CoreSaveState(slot);
+    });
+    return true;
+  };
+  web_hooks.load_state = [](int slot) -> bool {
+    MenuEnqueueTask([slot]() {
+      CoreLoadState(slot);
+    });
+    return true;
+  };
+  web_hooks.screenshot = []() -> bool {
+    MenuEnqueueTask([]() {
+      CoreTakeScreenshot();
+    });
+    return true;
+  };
+  web_hooks.get_volume = CoreGetVolume;
+  web_hooks.set_volume = [](int v) {
+    MenuEnqueueTask([v]() {
+      CoreSetVolume(v);
+    });
+  };
+  web_hooks.get_mute = CoreGetMute;
+  web_hooks.set_mute = [](bool m) {
+    MenuEnqueueTask([m]() {
+      CoreSetMute(m);
+    });
+  };
+  web_hooks.get_recents = MenuGetRecent;
+
+  web_hooks.get_aspect = MenuGetAspectMode;
+  web_hooks.set_aspect = [](int a) {
+    MenuEnqueueTask([a]() {
+      MenuSetAspectMode(a);
+    });
+  };
+  web_hooks.get_filter = MenuGetFilterMode;
+  web_hooks.set_filter = [](int f) {
+    MenuEnqueueTask([f]() {
+      MenuSetFilterMode(f);
+    });
+  };
+  web_hooks.get_vsync = MenuGetVsync;
+  web_hooks.set_vsync = [](int v) {
+    MenuEnqueueTask([v]() {
+      MenuSetVsync(v);
+    });
+  };
+  web_hooks.get_slot = CoreGetSelectedSlot;
+  web_hooks.set_slot = [](int s) {
+    MenuEnqueueTask([s]() {
+      CoreSetSelectedSlot(s);
+    });
+  };
+  web_hooks.save_settings = []() {
+    MenuEnqueueTask([]() {
+      MenuSaveSettingsExport();
+    });
+  };
+
+  web_hooks.ra_get_user = RaGetUserName;
+  web_hooks.ra_get_status = RaGetStatus;
+  web_hooks.ra_get_score = RaGetScore;
+  web_hooks.ra_get_hardcore = RaGetHardcore;
+  web_hooks.ra_has_token = RaHasToken;
+  web_hooks.ra_is_logged_in = RaIsLoggedIn;
+  web_hooks.ra_is_enabled = RaIsEnabled;
+  web_hooks.ra_get_ach_total = RaGetAchievementCount;
+  web_hooks.ra_get_ach_unlocked = RaGetAchievementsUnlocked;
+  web_hooks.ra_set_credentials = RaSetCredentials;
+  web_hooks.is_system_visible = MenuIsSystemVisible;
+  web_hooks.set_system_visible = MenuSetSystemVisible;
+  web_hooks.set_all_systems_visible = MenuSetAllSystemsVisible;
+  web_hooks.hide_empty_systems = MenuHideEmptySystems;
+  web_hooks.hide_category = MenuHideCategory;
+
+  WebAdminRegisterHooks(web_hooks);
+  VoiceChatInit();
+  DesktopChatInit();
   MenuLoadSettings();
   LoadFavoritesAndRecent();
   NetplayInit();
@@ -2916,6 +3294,33 @@ void MenuSetStatus(const char *status) {
 
 void MenuRun() {
   NetplayUpdate();
+
+  // Process tasks enqueued from background threads (Web Studio LAN, RPC, etc.)
+  {
+    std::vector<std::function<void()>> tasks;
+    {
+      std::lock_guard<std::mutex> lk(s_menu_task_mutex);
+      tasks.swap(s_menu_task_queue);
+    }
+    for (auto &t : tasks) {
+      if (t) t();
+    }
+  }
+
+  if (s_systems_dirty.exchange(false)) {
+    MenuSaveSettings();
+    int keep = selected_idx;
+    if (current_state == STATE_MANAGE_SYSTEMS) {
+      PopulateManageSystems();
+      selected_idx = keep;
+    } else if (current_state == STATE_SYSTEMS ||
+               (current_state == STATE_MAIN && !CoreIsRunning())) {
+      PopulateSystemsMenu();
+      selected_idx = keep;
+    }
+    if (!items.empty())
+      selected_idx = ClampInt(selected_idx, 0, (int)items.size() - 1);
+  }
 
   bool core_active_now = CoreIsRunning() || CoreIsLoading();
   static bool s_was_core_active = false;
@@ -3352,6 +3757,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetSelectedSlot(s);
       PopulateMainMenu();
       selected_idx = cur;
+    } else if (current_state == STATE_MANAGE_SYSTEMS && item.action_id >= 8100 && item.action_id <= 8200) {
+      int sys_id = item.action_id - 8000;
+      MenuSetSystemVisible(sys_id, !MenuIsSystemVisible(sys_id));
+      PopulateManageSystems();
+      SelectByAction(item.action_id, 0);
     } else if (current_state == STATE_SAVESTATES && item.action_id >= 850 && item.action_id <= 859) {
       int s = item.action_id - 850;
       CoreSetSelectedSlot(s);
@@ -3561,6 +3971,72 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetVolume(v);
       PopulateAudioSettings();
       SelectByAction(item.action_id, 2);
+    } else if (item.action_id == 930) // Voice Chat P2P Toggle
+    {
+      VoiceChatSetEnabled(!VoiceChatIsEnabled());
+      PopulateAudioSettings();
+      SelectByAction(item.action_id, 4);
+    } else if (item.action_id == 931) // Mic Mute
+    {
+      VoiceChatToggleMicMute();
+      PopulateAudioSettings();
+      SelectByAction(item.action_id, 5);
+    } else if (item.action_id == 932) // AI Denoise Engine
+    {
+      VoiceChatSetDenoiseEngine((VoiceDenoiseEngine)(((int)VoiceChatGetDenoiseEngine() + delta + 3) % 3));
+      PopulateAudioSettings();
+      SelectByAction(item.action_id, 6);
+    } else if (item.action_id == 933) // Silero VAD
+    {
+      VoiceChatSetVadEnabled(!VoiceChatGetVadEnabled());
+      PopulateAudioSettings();
+      SelectByAction(item.action_id, 7);
+    } else if (item.action_id == 934) // VAD Sensitivity
+    {
+      VoiceChatSetVadSensitivity((VoiceVadSensitivity)(((int)VoiceChatGetVadSensitivity() + delta + 3) % 3));
+      PopulateAudioSettings();
+      SelectByAction(item.action_id, 8);
+    } else if (item.action_id == 935) // WebRTC AEC3
+    {
+      VoiceChatSetAecEnabled(!VoiceChatGetAecEnabled());
+      PopulateAudioSettings();
+      SelectByAction(item.action_id, 9);
+    } else if (item.action_id == 936) // WebRTC AGC2
+    {
+      VoiceChatSetAgcEnabled(!VoiceChatGetAgcEnabled());
+      PopulateAudioSettings();
+      SelectByAction(item.action_id, 10);
+    } else if (item.action_id == 901) // Cloud Auto Sync
+    {
+      CloudSyncSetAutoSync(!CloudSyncGetAutoSync());
+      PopulateCloudSettings();
+      SelectByAction(item.action_id, 3);
+    } else if (item.action_id == 910) // Web Admin Toggle
+    {
+      if (WebAdminIsRunning()) WebAdminStop();
+      else WebAdminStart(8080, false);
+      PopulateWebAdminSettings();
+      SelectByAction(item.action_id, 0);
+    } else if (item.action_id == 920) // Live Chat Room
+    {
+      DesktopChatSetRoom((LiveChatRoom)(((int)DesktopChatGetRoom() + delta + 4) % 4));
+      PopulateLiveChatSettings();
+      SelectByAction(item.action_id, 0);
+    } else if (item.action_id == 921) // Presence Status
+    {
+      TrayManagerSetStatus((TrayPresenceStatus)(((int)TrayManagerGetStatus() + delta + 3) % 3));
+      PopulateLiveChatSettings();
+      SelectByAction(item.action_id, 1);
+    } else if (item.action_id == 922) // System Tray Toggle
+    {
+      TrayManagerSetEnabled(!TrayManagerIsEnabled());
+      PopulateLiveChatSettings();
+      SelectByAction(item.action_id, 2);
+    } else if (item.action_id == 924) // In-Game Overlay Toggle
+    {
+      DesktopChatToggleOverlay();
+      PopulateLiveChatSettings();
+      SelectByAction(item.action_id, 3);
     } else if (item.action_id == 501) // System Type
     {
       neo_sys = (neo_sys + delta + 3) % 3;
@@ -3911,6 +4387,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_RECENT;
         PopulateRecentMenu();
       }
+      else if (item.action_id == 225) {
+        current_state = STATE_MANAGE_SYSTEMS;
+        PopulateManageSystems();
+        selected_idx = 0;
+        scroll_top = 0;
+      }
       // "Define Buttons" is on the in-game menu, but its handler only existed
       // under STATE_SETTINGS, so pressing it there did nothing at all.
       else if (item.action_id == 203) {
@@ -3923,7 +4405,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateCoreOptionsSettings();
       }
     } else if (current_state == STATE_SETTINGS) {
-      if (item.action_id == 216) {
+      if (item.action_id == 225) {
+        current_state = STATE_MANAGE_SYSTEMS;
+        PopulateManageSystems();
+        selected_idx = 0;
+        scroll_top = 0;
+      } else if (item.action_id == 216) {
         setting_language = (setting_language == 0) ? 1 : 0;
         MenuSetLanguage(setting_language);
         PopulateSettings();
@@ -3941,6 +4428,15 @@ static void MenuProcessKeyImpl(MenuKey key) {
       } else if (item.action_id == 204) {
         current_state = STATE_NETPLAY;
         PopulateNetplay();
+      } else if (item.action_id == 217) {
+        current_state = STATE_CLOUD;
+        PopulateCloudSettings();
+      } else if (item.action_id == 218) {
+        current_state = STATE_LIVE_CHAT;
+        PopulateLiveChatSettings();
+      } else if (item.action_id == 219) {
+        current_state = STATE_WEB_ADMIN;
+        PopulateWebAdminSettings();
       } else if (item.action_id == 206) {
         current_state = STATE_ABOUT;
         PopulateRetroAchievements();
@@ -3953,6 +4449,89 @@ static void MenuProcessKeyImpl(MenuKey key) {
       } else if (item.action_id == 210) {
         current_state = STATE_RESET_CONFIRM;
         PopulateResetConfirm();
+      }
+    } else if (current_state == STATE_CLOUD) {
+      if (item.action_id == 901) {
+        CloudSyncSetAutoSync(!CloudSyncGetAutoSync());
+        PopulateCloudSettings();
+        SelectByAction(901, 3);
+      } else if (item.action_id == 902) {
+        CloudSyncTriggerAsync();
+        PopulateCloudSettings();
+        SelectByAction(902, 5);
+      } else if (item.action_id == 903) {
+        CloudSyncStartOAuthFlow();
+        PopulateCloudSettings();
+      } else if (item.action_id == 904) {
+        CloudSyncDisconnect();
+        PopulateCloudSettings();
+      }
+    } else if (current_state == STATE_MANAGE_SYSTEMS) {
+      if (item.action_id == 1850) {
+        MenuSetAllSystemsVisible(true);
+        PopulateManageSystems();
+        SelectByAction(1850, 0);
+      } else if (item.action_id == 1851) {
+        MenuHideEmptySystems();
+        PopulateManageSystems();
+        SelectByAction(1851, 1);
+      } else if (item.action_id == 1852) {
+        MenuHideCategory("Computadores");
+        PopulateManageSystems();
+        SelectByAction(1852, 2);
+      } else if (item.action_id == 1853) {
+        MenuSetAllSystemsVisible(false);
+        PopulateManageSystems();
+        SelectByAction(1853, 3);
+      } else if (item.action_id >= 8100 && item.action_id <= 8200) {
+        int sys_id = item.action_id - 8000;
+        MenuSetSystemVisible(sys_id, !MenuIsSystemVisible(sys_id));
+        PopulateManageSystems();
+        SelectByAction(item.action_id, 0);
+      }
+    } else if (current_state == STATE_WEB_ADMIN) {
+      if (item.action_id == 910) {
+        if (WebAdminIsRunning()) WebAdminStop();
+        else WebAdminStart(8080, false);
+        PopulateWebAdminSettings();
+        SelectByAction(910, 0);
+      } else if (item.action_id == 911) {
+        WebAdminRegeneratePin();
+        PopulateWebAdminSettings();
+        SelectByAction(911, 4);
+      } else if (item.action_id == 912) {
+        WebAdminOpenInBrowser();
+        PopulateWebAdminSettings();
+        SelectByAction(912, 1);
+      }
+    } else if (current_state == STATE_LIVE_CHAT) {
+      if (item.action_id == 920) {
+        DesktopChatSetRoom((LiveChatRoom)(((int)DesktopChatGetRoom() + 1) % 4));
+        PopulateLiveChatSettings();
+        SelectByAction(920, 0);
+      } else if (item.action_id == 921) {
+        TrayManagerSetStatus((TrayPresenceStatus)(((int)TrayManagerGetStatus() + 1) % 3));
+        PopulateLiveChatSettings();
+        SelectByAction(921, 1);
+      } else if (item.action_id == 922) {
+        TrayManagerSetEnabled(!TrayManagerIsEnabled());
+        PopulateLiveChatSettings();
+        SelectByAction(922, 2);
+      } else if (item.action_id == 923) {
+        DesktopChatShowWindow();
+        OsdDisable();
+      } else if (item.action_id == 924) {
+        DesktopChatToggleOverlay();
+        PopulateLiveChatSettings();
+        SelectByAction(924, 3);
+      } else if (item.action_id == 925) {
+        DesktopChatSendChallenge(NULL);
+        PopulateLiveChatSettings();
+        SelectByAction(925, 6);
+      } else if (item.action_id == 926) {
+        DesktopChatAcceptLastChallenge();
+        PopulateLiveChatSettings();
+        SelectByAction(926, 7);
       }
     } else if (current_state == STATE_DIAGNOSTICS) {
       if (item.action_id == 520) {
@@ -4087,6 +4666,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
       {
         NetplayDisconnect();
         PopulateNetplay();
+      } else if (item.action_id == 218) // Karamelo Live (Chat)
+      {
+        current_state = STATE_LIVE_CHAT;
+        PopulateLiveChatSettings();
       }
     } else if (current_state == STATE_VIDEO) {
       if (item.action_id == 302) {
@@ -4107,6 +4690,34 @@ static void MenuProcessKeyImpl(MenuKey key) {
         CoreSetMute(!CoreGetMute());
         PopulateAudioSettings();
         SelectByAction(item.action_id, 0);
+      } else if (item.action_id == 930) {
+        VoiceChatSetEnabled(!VoiceChatIsEnabled());
+        PopulateAudioSettings();
+        SelectByAction(item.action_id, 4);
+      } else if (item.action_id == 931) {
+        VoiceChatToggleMicMute();
+        PopulateAudioSettings();
+        SelectByAction(item.action_id, 5);
+      } else if (item.action_id == 932) {
+        VoiceChatSetDenoiseEngine((VoiceDenoiseEngine)(((int)VoiceChatGetDenoiseEngine() + 1) % 3));
+        PopulateAudioSettings();
+        SelectByAction(item.action_id, 6);
+      } else if (item.action_id == 933) {
+        VoiceChatSetVadEnabled(!VoiceChatGetVadEnabled());
+        PopulateAudioSettings();
+        SelectByAction(item.action_id, 7);
+      } else if (item.action_id == 934) {
+        VoiceChatSetVadSensitivity((VoiceVadSensitivity)(((int)VoiceChatGetVadSensitivity() + 1) % 3));
+        PopulateAudioSettings();
+        SelectByAction(item.action_id, 8);
+      } else if (item.action_id == 935) {
+        VoiceChatSetAecEnabled(!VoiceChatGetAecEnabled());
+        PopulateAudioSettings();
+        SelectByAction(item.action_id, 9);
+      } else if (item.action_id == 936) {
+        VoiceChatSetAgcEnabled(!VoiceChatGetAgcEnabled());
+        PopulateAudioSettings();
+        SelectByAction(item.action_id, 10);
       }
     } else if (current_state == STATE_UPDATE) {
       if (item.action_id == 391) {
@@ -4279,7 +4890,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
                current_state == STATE_CONTROLLER ||
                current_state == STATE_NETPLAY || current_state == STATE_ABOUT ||
-               current_state == STATE_DIAGNOSTICS) {
+               current_state == STATE_DIAGNOSTICS ||
+               current_state == STATE_CLOUD ||
+               current_state == STATE_WEB_ADMIN ||
+               current_state == STATE_LIVE_CHAT ||
+               current_state == STATE_MANAGE_SYSTEMS) {
       current_state = STATE_SETTINGS;
       PopulateSettings();
     } else if (current_state == STATE_UPDATE) {

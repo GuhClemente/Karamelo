@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <functional>
 
 enum MenuKey
 {
@@ -24,6 +25,7 @@ enum MenuKey
 
 void MenuInit();
 void MenuRun();
+void MenuEnqueueTask(std::function<void()> task);
 void MenuProcessKey(MenuKey key);
 void MenuJumpToLetter(char c);
 void MenuSetStatus(const char* status);
@@ -33,6 +35,10 @@ bool MenuIsQuitRequested();
 void MenuRequestQuit();
 
 int  MenuGetAspectMode();
+void MenuSetAspectMode(int aspect);
+void MenuSetFilterMode(int filter);
+void MenuSetVsync(int vsync);
+void MenuSaveSettingsExport();
 int  MenuGetFilterMode();
 int  MenuGetWallpaperMode();
 
@@ -88,5 +94,12 @@ std::vector<std::string> MenuGetRecent();
 
 std::string MenuResolveCoreForPath(const std::string& file_path, const std::string& dir_hint);
 bool MenuLaunchGamePath(const std::string& filepath);
+
+// Systems Visibility Management (OSD & Web Studio LAN)
+bool MenuIsSystemVisible(int action_id);
+void MenuSetSystemVisible(int action_id, bool visible);
+void MenuSetAllSystemsVisible(bool visible);
+void MenuHideEmptySystems();
+void MenuHideCategory(const char* category);
 
 #endif

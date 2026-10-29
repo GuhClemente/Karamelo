@@ -36,6 +36,11 @@ namespace fs = std::filesystem;
 #include "hw_render_d3d11.h"
 #include "karamelo_math.h"
 #include "karamelo_icon_png.h"
+#include "cloud_sync.h"
+#include "web_admin.h"
+#include "voice_chat.h"
+#include "tray_manager.h"
+#include "desktop_chat.h"
 
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
@@ -267,6 +272,7 @@ static void RenderFrame()
 		if (EnsurePresentBuffer(win_w, win_h))
 		{
 			CoreRender(present_buffer, present_w, present_h, MenuGetAspectMode(), MenuGetFilterMode());
+			DesktopChatRenderOverlay(present_buffer, present_w, present_h);
 			for (int i = 0; i < present_w * present_h; i++)
 			{
 				present_buffer[i] |= 0xFF000000;
@@ -394,6 +400,7 @@ static void RenderFrame()
 		}
 	}
 
+	DesktopChatRenderOverlay(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT);
 	if (CoreIsToastActive())
 	{
 		DrawToast(pixel_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, theme);
@@ -1261,6 +1268,7 @@ int main(int argc, char* argv[])
 	memset(pixel_buffer, 0, CANVAS_WIDTH * CANVAS_HEIGHT * sizeof(uint32_t));
 
 	MenuInit();
+	TrayManagerInit(nullptr);
 
 	double display_fps = 60.0;
 	SDL_DisplayID display_id = SDL_GetDisplayForWindow(g_window);
@@ -1327,7 +1335,11 @@ int main(int argc, char* argv[])
 				// over and over, F12 flickered the menu. Menu arrows still repeat.
 				const bool key_repeat = event.key.repeat;
 
-				if (sc == SDL_SCANCODE_F12)
+				if (sc == SDL_SCANCODE_F10)
+				{
+					if (!key_repeat) DesktopChatToggleOverlay();
+				}
+				else if (sc == SDL_SCANCODE_F12)
 				{
 					if (!key_repeat) MenuProcessKey(KEY_MENU_TOGGLE);
 				}
@@ -1488,6 +1500,11 @@ int main(int argc, char* argv[])
 	CoreShutdown();
 	RaShutdown();
 	UpdaterShutdown();
+	DesktopChatShutdown();
+	TrayManagerShutdown();
+	WebAdminShutdown();
+	VoiceChatShutdown();
+	CloudSyncShutdown();
 	HwShutdown();
 	VkHwShutdown();
 
