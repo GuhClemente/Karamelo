@@ -42,7 +42,7 @@ public:
 
 		for (const auto& t : tests_)
 		{
-			std::cout << "[ RUN      ] " << t.name << " (" << t.file << ":" << t.line << ")\n";
+			std::cout << "[ RUN      ] " << t.name << " (" << t.file << ":" << t.line << ")\n" << std::flush;
 			current_test_failed_ = false;
 			current_failure_msg_ = "";
 
