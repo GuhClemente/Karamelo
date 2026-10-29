@@ -1455,7 +1455,7 @@ input:checked + .slider:before {
         <div class="brand-sub">
 )raw";
 	h << R"raw(          <span class="badge badge-gold" id="lbl-platform">LAN</span>
-          <span class="badge" id="lbl-version">v0.9.79</span>
+          <span class="badge" id="lbl-version">v0.98</span>
           <span class="badge badge-live"><span class="live-dot pulse"></span> ONLINE</span>
         </div>
       </div>
@@ -2312,7 +2312,7 @@ async function loadStatus(){
   const d=await r.json();
   if(d.csrf_token) csrfToken=d.csrf_token;
   const pEl=document.getElementById('lbl-platform');if(pEl)pEl.textContent=d.platform||'LAN';
-  const vEl=document.getElementById('lbl-version');if(vEl)vEl.textContent='v'+(d.version||'0.9.79');
+  const vEl=document.getElementById('lbl-version');if(vEl)vEl.textContent='v'+(d.version||'0.98');
   const gSt=document.getElementById('lbl-game-status');if(gSt)gSt.textContent=d.game_running?'RODANDO JOGO':'NO MENU OSD';
   
   const gName = d.game_running?(d.game_name||'Jogo Desconhecido'):'Menu Principal OSD';

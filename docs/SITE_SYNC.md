@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.79 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.98 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -2013,3 +2013,36 @@ A interface Web LAN do Karamelo Studio foi totalmente reprojetada com base na id
   - Vermelho Carmesim: `#ef4444` para ações destrutivas (reset, exclusão de ROMs) com confirmação segura.
 - **Controle Remoto Touch Ergonômico**: D-Pad redesenhado com acabamento metálico escuro, setas douradas de alto contraste, e botões de ação dedicados para navegação na TV pelo celular.
 - **Widget Live Console**: Exibição em tempo real do jogo em execução, motor Libretro ativo e pulso verde animado direto na barra lateral.
+
+---
+
+## 50. Lançamento da Versão 0.98 (29/10/2026)
+
+Lançamento da versão **0.98** do Karamelo Emulador consolidando o ecossistema completo de Cloud Sync P2P, redesign total do Web Admin Karamelo Studio, módulo expandido de RetroAchievements e Suíte Social (Live Companion) de nível Steam/Battle.net.
+
+**Contagens Oficiais (Inalteradas)**:
+- **37 Sistemas**, **42 Motores Libretro**
+- **93 PC Ports & Recompilados** (93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎)
+
+### Principais Novidades da v0.98:
+
+1. **Ecossistema Social Nível Steam / Blizzard (Karamelo Live)**:
+   - **KarameloTag**: Identidade única determinística (`Nick#1234`) para descoberta e adição de amigos sem necessidade de trocar endereço IP.
+   - **Códigos de Sala / Partida (`KRM-XXXX`)**: Geração e resolução instantânea de códigos de 6 caracteres para convites e desafios diretos de Netplay.
+   - **Lista de Amigos Persistente (`Config/friends.ini`)**: Cadastro voluntário com favoritos (`★`), sincronização automática de status (Online, Jogando + nome do jogo) e botão de 1 clique para entrar ou desafiar.
+   - **Janela Companion Multiplataforma**: Companion desacoplado em janela independente disponível nativamente em Linux e macOS via SDL3 além do Windows (Win32).
+   - **Privacidade Total**: Mensagens de chat 100% efêmeras em Ring Buffer de memória RAM (zero persistência em disco).
+
+2. **RetroAchievements Aprimorado**:
+   - **Aba Exclusiva & Trophy Viewer**: Aba dedicada no Karamelo Studio com visualizador ao vivo de troféus, títulos de jogos em execução, percentual desbloqueado e pontuações.
+   - **Resiliência de Autenticação**: Cancelamento de tarefas de login assíncronas concorrentes (`rc_client_abort_async`), eliminando erros de `"Login already in progress"`.
+   - **Persistência Segura**: Token ou senha preservados entre sessões com botão de revelar/ocultar (👁️) e desconexão limpa (`rc_client_logout`).
+
+3. **Karamelo Studio Web Admin (Redesign Completo)**:
+   - App Shell moderno alinhado à identidade visual de `karamelo-emu.com` com sidebar lateral fixa (290px), responsividade fluida para celulares (<900px), sem barra de rolagem horizontal.
+   - Controle remoto ergonômico D-Pad touch para celular navegar na TV.
+   - Gerenciamento unificado de visibilidade de sistemas, upload de ROMs/BIOS por arrastar-e-soltar, shaders CRT e slots de savestates.
+
+4. **Karamelo Cloud Sync (Nuvem Pessoal P2P)**:
+   - Sincronização direta com Google Drive (OAuth 2.0 PKCE) e WebDAV (Nextcloud/ownCloud/NAS) para bateria SRAM e savestates com Zero-Storage no servidor do site.
+
