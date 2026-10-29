@@ -233,7 +233,7 @@ O executável localiza `cores/`, `bios/`, `roms/` e `saves/` a partir da própri
 Requisitos: **MSVC BuildTools (C++20 x64)**
 
 ```cmd
-compile_port.bat
+compile.bat
 ```
 * Gera o executável em `app\Karamelo_v<versão>.exe` e executa os testes unitários.
 * Para gerar o pacote de distribuição (`dist/Karamelo_v<versão>_Win64.zip`): `package_release.bat`

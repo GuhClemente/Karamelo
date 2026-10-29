@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.9.78 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.9.79 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -1586,7 +1586,7 @@ Inclusão oficial de dois dos computadores mais icônicos do mercado japonês no
 
 8. **Otimização da Bateria de Testes do PlayStation 2 (Men in Black ➔ Phantasy Star Generation 1)**:
    - Substituição da ROM de estresse em `app/roms/PlayStation2/`: conversão da imagem MODE2/2352 de *Sega Ages 2500 Series Vol. 1: Phantasy Star Generation: 1* para `.iso` padrão ISO9660 de **60 MB** (em substituição à imagem de 943 MB de *Men in Black II*).
-   - Redução drástica no tempo de teste do PS2 no pipeline de build (`compile_port.bat`, `package_release.bat`, `deploy_all.bat`), caindo de ~54s para ~36s por ciclo de driver e liberando quase 900 MB de espaço em disco.
+   - Redução drástica no tempo de teste do PS2 no pipeline de build (`compile.bat`, `package_release.bat`, `deploy_all.bat`), caindo de ~54s para ~36s por ciclo de driver e liberando quase 900 MB de espaço em disco.
 
 ---
 
@@ -1791,3 +1791,225 @@ Novidades para o jogador:
   ParaLLEl N64 fechava o Karamelo inteiro.
 
 ---
+
+
+## 44. Adição de 28/10/2026 — Ecossistema Karamelo Cloud, Live & Social (Zero-Storage)
+
+O Karamelo agora integra uma camada nativa de nuvem pessoal, gerenciamento local via rede (LAN), bate-papo retrô desacoplado do navegador e comunicação de voz P2P com tratamento de áudio por IA — tudo escrito em C++20 nativo, sem Electron e **sem armazenar absolutamente nenhum dado de usuário no servidor `karamelo-emu.com`**.
+
+> **Regra de Ouro para o Site (Privacidade e Zero-Storage):**
+> O site **deve deixar explícito** que o servidor do Karamelo (`karamelo-emu.com`) **não armazena** saves, ROMs, BIOS, listas de amigos, histórico de conversas nem streams de voz. Cada recurso opera direto na infraestrutura do próprio usuário ou ponto-a-ponto (P2P).
+
+### Os 5 Pilares para Destacar no Site
+
+1. **Karamelo Cloud — Bring Your Own Storage (Google Drive `appDataFolder`)**:
+   - **Como funciona**: O jogador vincula sua própria conta Google via OAuth 2.0 Loopback (`127.0.0.1`) com proteção PKCE (`S256`) e criptografia local de credenciais via Windows DPAPI (`0600` no Linux/macOS).
+   - **Onde fica salvo**: Na pasta oculta de aplicativo (`appDataFolder`) do Google Drive do próprio jogador — não polui os arquivos visíveis do Drive dele e não ocupa um único byte no servidor do Karamelo.
+   - **O que sincroniza**: Exclusivamente arquivos leves de bateria nativa (`.srm`, `.sav`, `.eep`, `.fla`, `.sra`, `.mcr`, `.mcd`, `.nv`) e o manifesto `cloud_profile.json` (preferências de shader CRT, aspect ratio, apelido, avatar e lista de amigos). Save States pesados (`.state`), ROMs e BIOS nunca sobem para a nuvem.
+   - **Proteção Anti-Corrupção**: Antes de sobrescrever qualquer save local ou remoto, o Karamelo compara o hash **SHA-256** e o timestamp UTC, mantendo backup automático (`.bak`) em caso de conflito.
+
+2. **Karamelo Web Admin (LAN) — Gerenciador Local pelo Navegador com Auditor de BIOS**:
+   - **Problema que resolve**: Ideal para quem usa o PC na sala de estar (TV / HTPC), mini-PCs ou portáteis rodando Karamelo no sofá e quer enviar jogos ou conferir BIOS a partir de outro PC ou celular na mesma rede Wi-Fi/LAN sem precisar espetar pendrive.
+   - **Como funciona**: Ao ativar `Web Admin (LAN)` no menu OSD, o Karamelo abre um servidor HTTP local (`http://<IP-da-LAN>:8580`) protegido por um **PIN de 4 dígitos** exibido na TV/monitor (com bloqueio contra força bruta, cookies `HttpOnly; SameSite=Strict`, proteção anti-CSRF e Content-Security-Policy estrita).
+   - **Recursos**:
+     - **Upload Drag & Drop**: Arraste ROMs e BIOS direto pela rede local com validação automática de integridade (magic bytes de `.zip`, `.chd`, `.7z` e bloqueio de ponteiros Git LFS corrompidos).
+     - **Auditor de BIOS em Tempo Real**: Painel visual com selos verdes/vermelhos indicando exatamente quais BIOS estão prontos ou faltando (`scph5501.bin`, `dc_boot.bin`, `syscard3.pce`, `neogeo.zip`, `bios7.bin`/`bios9.bin`, etc.).
+
+3. **Karamelo Live — Janela Nativa Desktop (Fora do Navegador) & Salas Efêmeras Estilo Anos 90/2000**:
+   - **Sem navegador e sem Electron**: O bate-papo abre em uma **janela nativa do sistema operacional** (`Karamelo Live — Bate-Papo & Desafio`), totalmente independente da janela do jogo, permitindo posicionar no segundo monitor ou usar ao lado do emulador com consumo quase zero de RAM.
+   - **Salas Temáticas 100% Voláteis em RAM**: Inspiradas nos clássicos bate-papos da internet brasileira (UOL / mIRC / Kaillera), com 4 salas temáticas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`). Nenhuma mensagem é gravada em banco de dados ou disco: fechou ou trocou de sala, o histórico some.
+   - **Desafio 1-Click para Netplay**: A barra lateral mostra quem está online e qual jogo está rodando; clicar em **Desafiar (1-Click)** dispara um convite direto que já abre a sessão P2P de Netplay.
+
+4. **System Tray (Bandeja do Sistema), Presença & Overlay In-Game (`F10`)**:
+   - **Bandeja do Sistema**: O Karamelo pode minimizar para o System Tray mantendo o status de presença (`Disponivel`, `Jogando: <Nome do Jogo>`, `Ocupado - Sem Alertas`) e disparando notificações nativas com alerta sonoro clássico quando chega um convite de partida.
+   - **Overlay Compacto In-Game (`F10`)**: Quem joga em tela cheia com apenas um monitor pode apertar **`F10`** a qualquer momento para abrir ou recolher um painel translúcido do Karamelo Live por cima do jogo, sem sair da partida.
+
+5. **Chat de Voz P2P & Suite Modular de Tratamento de Áudio por IA**:
+   - **100% P2P via UDP**: Assim como o Netplay, a voz trafega diretamente entre o IP dos dois jogadores durante a partida, sem servidor central de áudio.
+   - **Liberdade de Escolha no OSD (Sem Lock-in)**: No menu `Audio` ou `Karamelo Live & Voz`, o jogador escolhe exatamente como quer processar seu microfone conforme o seu hardware:
+     - **Filtro de Ruído IA**: `DeepFilterNet (Pesado/Max)` para isolamento profundo de barulho externo, `RNNoise (Leve/Padrao)` para consumo mínimo de CPU, ou `Desligado (Cru)`.
+     - **Voice Gate Inteligente (`Silero VAD`)**: `Auto (Silero VAD)` com detecção de fala para cortar cliques de botões arcade e respiração, ou sensibilidade manual (`Baixa`, `Media`, `Alta`).
+     - **Cancelamento de Eco (`WebRTC AEC3`)**: `Ligado` / `Desligado` (permite jogar com som na TV/caixas de som sem dar retorno na voz do amigo).
+     - **Ganho Automático (`WebRTC AGC2`)**: `Ligado` / `Desligado` (normaliza o volume da voz automaticamente).
+
+---
+
+
+## 45. Adição de 28/10/2026 — Karamelo Studio (Web Admin), Controle Remoto TV & FTP Visual
+
+O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenciamento web embutido diretamente no binário (100% C++20 limpo, zero dependências de Node.js, Python ou CDNs externas). Ele funciona em qualquer dispositivo conectado à mesma rede Wi-Fi/LAN (celulares, tablets, notebooks ou outro PC) e é acessível tanto pelo IP da rede local quanto por `http://localhost:8080`.
+
+### Principais Funcionalidades do Karamelo Studio:
+
+1. **Painel & Controle Remoto Touch (TV Remote)**:
+   - **Status em Tempo Real**: Mostra o jogo atualmente em execução, motor core Libretro ativo e estado de navegação (atualizado a cada 2,5 segundos via polling assíncrono).
+   - **D-Pad Virtual Touch**: Direcionais táteis (Cima, Baixo, Esquerda, Direita, OK central), botões de ação `[ A / SELECIONAR ]`, `[ B / VOLTAR ]` e `[ MENU OSD (F1) ]` para navegar na TV sentado no sofá pelo celular.
+   - **Controle Master de Volume & Mudo**: Slider interativo de volume (0% a 100%) e botão de alternância de mudo sincronizados diretamente com o backend de áudio do emulador.
+   - **Atalhos de Ação Rápida**: Pausar/Retomar, Salvar Estado (Slot 0), Carregar Estado (Slot 0), Capturar Tela e Reiniciar Jogo.
+   - **Histórico de Recentes**: Lista dos últimos jogos executados com botão de inicialização imediata no PC (`▶ Iniciar`).
+
+2. **ROMs & Jogos — Web FTP Explorer Visual**:
+   - **Navegação pelos 37 Sistemas Retrô**: Pílulas de seleção para todos os sistemas com contadores de jogos em tempo real.
+   - **Busca Instantânea**: Campo de filtro em tempo real (`🔍 Buscar jogo nesta pasta...`) para encontrar qualquer título instantaneamente em bibliotecas com centenas de ROMs.
+   - **▶ Jogar no PC com 1 Toque**: Cada jogo na lista possui um botão direto que instrui o Karamelo a carregar o jogo na tela principal do computador/TV sem precisar encostar no teclado ou controle físico.
+   - **Gerenciamento & Exclusão**: Exclusão segura de ROMs com confirmação direta pelo navegador.
+   - **Upload Drag & Drop Multi-Destino**: Área de envio com barra de progresso animada e seletor de destino (`roms/<sistema>` ou `bios/`), aceitando formatos compactados e imagens de disco (.zip, .7z, .chd, .iso, .sfc, .nes, .bin, .cue, .gba, etc.).
+
+3. **Auditor de BIOS em Tempo Real**:
+   - Diagnóstico percentual de integridade (ex: `100% Saudável (20/20 presentes)`).
+   - Verificação automática da presença e tamanho dos 20 arquivos essenciais de BIOS (PlayStation, PS2, Saturn, Dreamcast, Sega CD, PC Engine CD, 3DO, NeoGeo CD, MSX, FM Towns, PC-98, etc.).
+   - Zona de envio direto para arrastar e soltar arquivos de BIOS ausentes direto para a pasta do emulador pela rede.
+
+4. **Nuvem & Saves (Google Drive Sync)**:
+   - Painel de status da nuvem pessoal (Google Drive `appDataFolder`).
+   - Contagem de arquivos sincronizados e horário da última sincronização.
+   - Botão para acionar a sincronização em segundo plano com um clique.
+
+5. **Ecossistema Multiplataforma & Roadmap**:
+   - Visão consolidada da arquitetura multi-OS do projeto:
+     - 🪟 **Windows (x86_64)**: Win32 puro, Direct3D 11, WASAPI, System Tray com menu completo e Web Studio (Ativo).
+     - 🍎 **macOS (Apple Silicon M1-M4)**: Cocoa, Metal/OpenGL, SDL3 estático sem Homebrew e 42 PC Ports Mach-O ARM64 (Pronto).
+     - 🐧 **Linux (x86_64 / Steam Deck)**: SDL3 nativo, PipeWire/ALSA e 59 PC Ports nativos ELF64 (Pronto).
+     - 📀 **Karamelo OS**: Distro Linux própria minimalista com boot < 3s direto no OSD (Em desenvolvimento).
+     - 🍓 **Raspberry Pi & SBCs (ARM64)**: Suporte nativo e imagem para Raspberry Pi 4/5, Orange Pi e TV Boxes (`docs/RASPBERRY_PI.md`).
+     - 📱 **Android**: Target futuro C++20 via NDK + Vulkan API + touch gamepad overlay (`docs/ANDROID.md`).
+     - 🕹️ **Nintendo Switch**: Target futuro homebrew via libnx / Atmosphère (`docs/SWITCH.md`).
+
+6. **Segurança & Resiliência LAN**:
+   - Pareamento seguro por PIN de 4 dígitos gerado no Menu OSD.
+   - Cookies de sessão protegidos com flags `HttpOnly; SameSite=Strict`.
+   - Token anti-CSRF validado em todas as rotas POST.
+   - Sanitização rigorosa contra ataques de *path traversal* (`../`).
+   - Validação de magic bytes em arquivos compactados (`.zip`, `.chd`, `.7z`) e descarte de stubs vazios de Git LFS.
+
+---
+
+## 46. Benchmark de Engenharia: Karamelo vs. RetroBat & Roadmap de Inovações
+
+### Comparativo Arquitetural: O que são e como operam
+
+* **RetroBat**: É uma distribuição/wrapper para Windows construída em cima do *EmulationStation-DE* combinada com uma coleção extensa de scripts (Python/Batch) que chamam dezenas de emuladores *standalone* externos independentes (PCSX2, Dolphin, RPCS3, DuckStation, Cemu, RetroArch, etc.).
+* **Karamelo**: É um frontend e emulador nativo em **C++20 limpo (clean-room)**, inspirado na experiência e OSD do MiSTer FPGA. É um executável único (~20 MB), sem interpretadores, sem Electron, sem scripts colados, que gerencia seus próprios núcleos Libretro e motores recompilados nativamente no mesmo processo.
+
+### Em que o RetroBat se destaca (Pontos Fortes):
+
+1. **Suporte a Emuladores Standalone de 6ª a 8ª Geração**:
+   - Integração pronta com emuladores 3D complexos que não possuem cores Libretro equivalentes em maturidade: **PS3 (RPCS3)**, **Wii U (Cemu)**, **Switch (Ryujinx/Torzu)**, **Xbox Original (Xemu)**, **Xbox 360 (Xenia)** e **PCSX2 Standalone**.
+2. **Scraping Automatizado de Mídia & Metadados Ricos**:
+   - Integração nativa com APIs públicas como ScreenScraper e TheGamesDB, baixando capas 2D/3D, caixas de mídia física, sinopses em múltiplos idiomas, desenvolvedores, datas e **Video Snaps** (vídeos curtos de gameplay que tocam ao navegar pelas listas).
+3. **Ecossistema Massivo de Temas Visuais**:
+   - Acesso à vasta biblioteca de temas criados pela comunidade do EmulationStation (layouts em carrossel 3D, estilo Netflix, estilo fliperama, arte vetorial animada).
+4. **The Bezel Project (Molduras Decorativas Automáticas)**:
+   - Aplicação de molduras temáticas personalizadas por jogo para preencher as laterais pretas de telas 16:9 em conteúdos 4:3.
+5. **Coleções Inteligentes Dinâmicas**:
+   - Agrupamentos automáticos por gênero ("Luta", "Beat 'em up", "Shmup"), número de jogadores ("Jogos para 4 Players") e coleções de franquias.
+
+### Em que o Karamelo é Superior (Vantagens de Engenharia):
+
+| Critério | RetroBat | Karamelo |
+| :--- | :--- | :--- |
+| **Arquitetura** | Scripts colando dezenas de executáveis de terceiros | **Binário único nativo em C++20 limpo** |
+| **Tempo de Boot** | Vários segundos carregando temas e Python | **Instantâneo (< 1 segundo)** |
+| **Consumo de Memória** | Alto (EmulationStation + scripts + emulador filho) | **Mínimo (~30 MB de RAM em repouso)** |
+| **Multiplataforma** | **Apenas Windows** | **Windows, Linux e macOS Apple Silicon (M1-M4) nativo** |
+| **PC Ports & Recompilados** | Depende de configurações manuais | **93 PC Ports com catalogação e atualização integrada** |
+| **Gerenciamento Remoto** | Não possui | **Karamelo Studio (Web Admin Wi-Fi / TV Remote)** |
+| **Nuvem Pessoal** | Depende de ferramentas externas | **Google Drive Cloud Sync nativo com DPAPI** |
+| **Menu OSD** | Abrir o menu fecha ou minimiza o jogo ativo | **OSD MiSTer integrado que sobrepõe sem perder foco** |
+
+### Roadmap de Inovações para o Karamelo (Inspiradas no RetroBat, mas com Arquitetura Leve):
+
+Para evoluir a experiência do jogador sem comprometer a identidade ágil e limpa do Karamelo:
+
+1. **Scraping Opcional de Metadados e Capas (Zero-Bloat Metadata)**:
+   - Adicionar uma funcionalidade leve no **Karamelo Studio (Web)** e no menu OSD para buscar metadados básicos (capa 2D, ano de lançamento, gênero, produtora e quantidade de jogadores) via API pública do ScreenScraper.
+   - Armazenar de forma compacta em `roms/<sistema>/gamelist.json` e miniaturas em `roms/<sistema>/media/covers/`, sem pesar na inicialização do app.
+2. **Bezels & Molduras Decorativas Widescreen Nativas**:
+   - Implementar no pipeline de renderização Direct3D 11 / SDL3 o desenho opcional de molduras temáticas nas laterais de telas 16:9 durante a execução de jogos 4:3, com resolução de escala inteira mantida.
+3. **Filtros por Jogadores e Gênero no Menu OSD**:
+   - Criar opções de filtro rápido na lista de jogos: `Todos`, `2 Jogadores`, `4 Jogadores`, `Com RetroAchievements` e filtros por gênero básico (Luta, Arcade, Plataforma, RPG).
+4. **Card Visual no Karamelo Studio (Web)**:
+   - Ao selecionar uma ROM no gerenciador web pelo celular, exibir um card retrô com a capa do jogo, resumo da história e botão de ação rápida antes de enviar para a TV.
+5. **Launcher de Emuladores Standalone de Alta Complexidade (Sandboxed)**:
+   - Avaliar a inclusão de um subsistema de inicialização limpa para emuladores pesados (ex.: RPCS3 para PS3 ou PCSX2 standalone), seguindo o mesmo padrão modular de isolamento já utilizado com sucesso para os 93 PC Ports nativos.
+
+---
+
+
+
+## 47. INTEGRAÇÃO WEB STUDIO: RETROACHIEVEMENTS, SHADERS E CONTROLE DE EMULAÇÃO
+
+Para eliminar a necessidade de editar manualmente arquivos de texto ou digitar senhas difíceis pelo controle ou teclado na interface OSD, o **Karamelo Web Studio (LAN Web)** passa a contar com a aba dedicada **"RetroAchievements & Ajustes"**:
+
+1. **Gerenciamento de Conta do RetroAchievements**:
+   - **Formulário Web Completo**: Edição de Usuário, Senha ou Token / Web API Key direto do celular ou navegador do PC.
+   - **Login com Segurança (Token Exchange)**: O Karamelo autentica contra o RetroAchievements.org, troca a senha pelo token de sessão oficial e apaga a senha do disco em `Config/retroachievements.cfg`.
+   - **Alternador de Modo Hardcore**: Opção de ativar ou desativar o Modo Hardcore (bloqueia savestates para pontuação válida nos rankings da comunidade) ou Modo Softcore.
+   - **Monitoramento em Tempo Real**: Exibição do status de login, pontuação total do usuário no site e contagem de conquistas desbloqueadas no jogo atualmente em execução.
+   - **Botão de Desconexão**: Permite trocar de usuário ou desconectar a conta com um único clique.
+
+2. **Ajustes de Vídeo & Shaders CRT no Estilo RetroArch**:
+   - **Aspect Ratio**: Alternância em tempo real entre Original (1:1 PAR), 4:3 Clássico (TV CRT) e 16:9 Widescreen (Preenchimento).
+   - **Catálogo de Shaders CRT**: Seleção instantânea dos 10 modos visuais do Karamelo: *Desligado (Raw)*, *Scanlines Leve*, *CRT Suave (TV)*, *PVM Pro 600TVL*, *Sony Trinitron*, *Arcade Shadow*, *Scanlines 50%*, *NTSC Composto*, *Matriz LCD* e *Tubo Curvado 3D*.
+   - **V-Sync**: Ativação/desativação de sincronização vertical.
+   - **Persistência Imediata**: As preferências são salvas automaticamente em `Config/karamelo.cfg` e aplicadas no renderer Direct3D 11 / SDL3 sem reiniciar o emulador.
+
+3. **Gerenciador de Savestates & Quick Menu**:
+   - **Seletor de Slots de 0 a 9**: Escolha do slot ativo para salvamento de estados.
+   - **Ações Remotas**: Botões para Salvar no Slot, Carregar do Slot, Pausar/Despausar jogo, Reiniciar Jogo (Reset Core) e Capturar Screenshot instantâneo.
+
+
+---
+
+## 48. GERENCIADOR DE SISTEMAS & CORES VISÍVEIS (OSD & WEB STUDIO)
+
+Para garantir uma interface minimalista, rápida e sob medida para o jogador (especialmente em setups de sala na TV, fliperamas, barcade ou PCs portáteis), o Karamelo agora conta com um **Gerenciador de Sistemas & Cores Visíveis**:
+
+### 1. No Menu OSD (TV, Teclado ou Controle)
+- **Acesso Rápido**: Localizado em `Configurações > Gerenciar Sistemas` (ou direto na tela inicial caso todos os sistemas tenham sido ocultados).
+- **Lista Completa dos 38 Sistemas**: Exibe todos os 37 consoles/computadores emulados + PC Ports com indicador de estado `[Visivel]` ou `[Oculto]`.
+- **Alternância com 1 Botão**: Pressionar `A` (ou `Enter` / Setas Esquerda/Direita) liga ou desliga a exibição de cada sistema instantaneamente.
+- **Ações em Lote Inteligentes**:
+  - `[ Exibir Todos os Sistemas ]`: Restaura a exibição de todo o catálogo.
+  - `[ Ocultar Sistemas Sem Jogos ]`: Varre os diretórios de ROMs (`roms/<Sistema>/`) e oculta automaticamente qualquer sistema sem nenhum arquivo ou subpasta de jogo (jogos em pasta própria, como DOS e multidisco, contam). **PC Ports nunca é ocultado por esta ação**, pois sua lista é o catálogo instalável pelo próprio menu.
+  - `[ Ocultar Computadores ]`: Oculta com 1 clique os microcomputadores vintage (MS-DOS, MSX, Amiga, C64, ZX Spectrum, PC-98, FM Towns), deixando apenas videogames e arcades na tela.
+  - `[ Ocultar Todos os Sistemas ]`: Limpa o menu para o jogador habilitar manualmente apenas os 2 ou 3 consoles favoritos.
+- **Restaurar Padrões** também volta a exibir todos os sistemas.
+- **Thread-safe**: alterações feitas pelo Web Studio são aplicadas sob mutex e o `karamelo.cfg` é gravado pela thread principal no frame seguinte; a tela do OSD aberta se atualiza sozinha.
+- **Persistência Limpa**: A lista de sistemas ocultos é gravada em `Config/karamelo.cfg` sob a chave `hidden_systems=<id1>,<id2>,...` e recarregada automaticamente a cada inicialização.
+
+### 2. No Karamelo Studio (Web Admin LAN / Celular)
+- **Aba "🎛️ Gerenciar Sistemas"**: Visual moderno com cards responsivos para todos os 38 sistemas suportados.
+- **Informações por Card**:
+  - Nome do console/sistema e badge de categoria (`Consoles`, `Portáteis`, `Computadores`, `Arcade & Ports`).
+  - Motor / Core Libretro utilizado (ex.: *bsnes*, *Genesis Plus GX*, *Beetle PSX*, *Flycast* — nomes conforme `CREDITS.md`).
+  - Contagem de ROMs instaladas em tempo real com destaque visual (verde quando possui jogos, cinza quando vazio).
+  - Interruptor Toggle Switch dinâmico para ativar/ocultar sem recarregar a página.
+- **Barra de Ferramentas & Filtros**:
+  - Botões de lote: *✨ Exibir Todos*, *🧹 Ocultar Sem ROMs*, *💻 Ocultar Computadores*, *🔕 Ocultar Todos*.
+  - Filtro por Categoria: Pills interativas (*Todos*, *Consoles*, *Portáteis*, *Computadores*, *Arcade & Ports*).
+  - Campo de Busca em Tempo Real: Filtro instantâneo por nome do console, extensão ou nome do core.
+- **Endpoints REST Seguros**:
+  - `GET /api/systems/visibility`: Retorna lista JSON estruturada com metadados, contagem de ROMs e estado de visibilidade.
+  - `POST /api/systems/visibility`: Permite alternar sistemas individuais (`{ "id": 109, "visible": true }`) ou disparar ações em lote protegidas por token CSRF.
+
+---
+
+## 49. REDESIGN COMPLETO DO KARAMELO STUDIO (APP SHELL INSPIRADO NO SITE OFICIAL)
+
+A interface Web LAN do Karamelo Studio foi totalmente reprojetada com base na identidade visual, design tokens e arquitetura de componentes do site oficial `karamelo-emu.com` (`c:\github\Karamelo Site`):
+
+### 1. Eliminação Definitiva da Barra de Rolagem Horizontal
+- **Sidebar Vertical (Desktop & Tablets)**: A barra de abas horizontal que transbordava foi substituída por um menu lateral vertical (*App Shell* fixo de 290px), eliminando completamente qualquer barra de rolagem horizontal.
+- **Responsividade Mobile (< 900px)**: Em telas compactas e smartphones, o menu transmuta-se para um grid flexível de navegação fluida (`flex-wrap: wrap; gap: 8px`), sem corte de tela e com `overflow-x: hidden` rigoroso.
+
+### 2. Identidade Visual e Design Tokens de `karamelo-emu.com`
+- **Fundo Cósmico & Gradientes**: `#050b12` como plano de fundo base, com iluminação radial âmbar/dourada (`rgba(245, 158, 11, 0.12)`) e grade sutil de 32px inspirada na landing page oficial.
+- **Glassmorphism de Alta Fidelidade**: Cards em `rgba(13, 19, 31, 0.82)` com `backdrop-filter: blur(16px)`, bordas sutis `rgba(148, 163, 184, 0.12)`, cantos arredondados modernos (16px) e sombras suaves.
+- **Cores & Acentos**:
+  - Dourado / Âmbar Karamelo: `#fbbf24`, `#f59e0b` e degradês para botões primários e estados ativos.
+  - Verde Esmeralda: `#10b981`, `#34d399` para status online pulsante e BIOS/ROMs presentes.
+  - Ciano / Azul Espacial: `#38bdf8` para tags de sistema e downloads.
+  - Vermelho Carmesim: `#ef4444` para ações destrutivas (reset, exclusão de ROMs) com confirmação segura.
+- **Controle Remoto Touch Ergonômico**: D-Pad redesenhado com acabamento metálico escuro, setas douradas de alto contraste, e botões de ação dedicados para navegação na TV pelo celular.
+- **Widget Live Console**: Exibição em tempo real do jogo em execução, motor Libretro ativo e pulso verde animado direto na barra lateral.

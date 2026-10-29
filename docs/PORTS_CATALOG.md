@@ -28,7 +28,7 @@ corrompido ou antigo é ignorado e o app segue com o embutido.
 3. Atualize as contagens em `CREDITS.md` (tabela e a linha
    "**X de Y têm build Linux** e **Z de Y têm build macOS**"), `docs/SITE_SYNC.md`,
    `CLAUDE.md` e `AGENTS.md`.
-4. Rode `python tools/embed_ports.py` e depois `compile_port.bat`.
+4. Rode `python tools/embed_ports.py` e depois `compile.bat`.
    Os testes (`tests/test_port_catalog.cpp`) reprovam o build se:
    - o JSON for inválido, tiver `id` repetido ou caminho que saia da pasta do port;
    - o cabeçalho embutido estiver diferente de `data/ports.json`;

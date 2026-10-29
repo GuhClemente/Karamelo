@@ -74,7 +74,7 @@ src/
 - **Baixar Cores**: `./download_cores_linux.sh`
 
 ### Windows (x86_64)
-- **Compilar**: `compile_port.bat` (MSVC C++20 x64, gera `app\Karamelo_v<versão>.exe`).
+- **Compilar**: `compile.bat` (MSVC C++20 x64, gera `app\Karamelo_v<versão>.exe`).
 - **Empacotar**: `package_release.bat` (Gera `dist/Karamelo_v<versão>_Win64.zip`).
 - **Deploy**: `deploy_all.bat` ou `upload_to_server.bat`.
 

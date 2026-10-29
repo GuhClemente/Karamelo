@@ -152,7 +152,7 @@ embuta os SHA-256 em texto no executável, como o XenonRecomp faz.
 
 ## Testes
 
-`tests/test_x360_dump.cpp` (roda no `compile_port.bat`/`run_tests.bat`), com
+`tests/test_x360_dump.cpp` (roda no `compile.bat`/`run_tests.bat`), com
 fixtures sintéticos — nenhum dado de jogo entra no repositório: árvore
 XDVDFS com subpasta, recusa de nomes `..`, XEX *basic* cifrado com a chave
 retail, XEX *normal* com um bloco LZX, o portão de hash (aceita a variante

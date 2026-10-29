@@ -72,7 +72,7 @@ This file provides project guidelines, architecture details, and essential comma
 ### Windows (x86_64)
 ```cmd
 :: Build with MSVC (C++20 x64)
-compile_port.bat
+compile.bat
 
 :: Package distribution zip
 package_release.bat
