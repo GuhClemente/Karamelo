@@ -273,6 +273,20 @@ Requisitos: **GCC ou Clang (C++20)**, **CMake**, **Ninja** e os pacotes `-dev` d
 
 ---
 
+## 🕹️ Plataformas & Guias de Porte Técnico
+
+O Karamelo possui uma arquitetura modular em C++20 com SDL3 pronta para rodar em consoles portáteis, mini-PCs e hardware dedicado. Consulte os guias técnicos de cada ecossistema:
+
+* 📊 **[Matriz Geral de Compatibilidade de Consoles](docs/COMPATIBILIDADE_CONSOLES.md)**: Comparativo completo entre todos os consoles (Switch, Vita, PSP, Anbernic, Steam Deck, PCs e Macs).
+* 🕹️ **[Nintendo Switch Homebrew (`.nro`)](docs/SWITCH.md)**: Execução nativa ARM64 em modo híbrido (Dock e Portátil) via Atmosphere / devkitPro.
+* 🎮 **[PlayStation Vita Homebrew (`.vpk`)](docs/PS_VITA.md)**: Porte acelerado via VitaSDK e VitaGL para a tela OLED do PS Vita.
+* 📱 **[Portáteis Retrô Linux & PortMaster](docs/PORTABLES_LINUX.md)**: Empacotamento para consoles Anbernic, Powkiddy, TrimUI e Miyoo.
+* 🍓 **[Raspberry Pi & SBCs ARM64](docs/RASPBERRY_PI.md)**: Modo appliance direto no framebuffer via Linux KMS/DRM.
+* 💿 **[Karamelo OS (ISO de Console) & Docker](docs/KARAMELO_OS_E_DOCKER.md)**: Sistema operacional completo baseado em Linux + Valve Gamescope.
+* 🤖 **[Android & Smart TV Box](docs/ANDROID.md)**: Integração via Android NDK para celulares, Google TV e Fire Stick.
+
+---
+
 ## 📜 Licença, Isenção de Responsabilidade e Créditos
 
 * **Canal do YouTube:** [@GuhClemente](https://youtube.com/@GuhClemente)

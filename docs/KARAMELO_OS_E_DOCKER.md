@@ -259,5 +259,5 @@ sudo mkarchiso -v -w /tmp/archiso-work -o dist/ packaging/os/archiso/
 ## 7. Status e Próximos Passos
 - [x] Binário Linux x86_64 nativo compilável e testado via `compile_linux.sh`.
 - [x] Web Admin LAN com pareamento por PIN e visualizador de troféus.
+- [x] Receita e repositório `Karamelo Linux` criados com perfil completo Archiso (Gamescope, PipeWire, Samba, auto-resize, 43 cores).
 - [ ] Criação dos arquivos de configuração em `packaging/docker/`.
-- [ ] Criação da receita `packaging/os/archiso/` para geração da ISO preliminar `KarameloOS_Preview.iso`.
