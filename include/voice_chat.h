@@ -82,6 +82,15 @@ bool  VoiceChatIsLocalSpeaking();
 bool  VoiceChatIsPeerSpeaking();
 float VoiceChatGetLocalVadProbability();
 
+// What actually went through the session, for the self-test.
+struct VoiceChatCounters {
+	unsigned mic_frames = 0;
+	unsigned sent = 0;
+	unsigned received = 0;
+	int      mic_peak = 0;
+};
+VoiceChatCounters VoiceChatGetCounters();
+
 // Reference game audio for the echo canceller
 void  VoiceChatFeedReferenceAudio(const int16_t* stereo_samples, size_t frame_count);
 

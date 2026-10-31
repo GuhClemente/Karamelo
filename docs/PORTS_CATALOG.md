@@ -27,7 +27,7 @@ corrompido ou antigo é ignorado e o app segue com o embutido.
    para o catálogo novo.
 3. Atualize as contagens em `CREDITS.md` (tabela e a linha
    "**X de Y têm build Linux** e **Z de Y têm build macOS**"), `docs/SITE_SYNC.md`,
-   `CLAUDE.md` e `AGENTS.md`.
+   `src/web_admin.cpp`, `CLAUDE.md` e `AGENTS.md`.
 4. Rode `python tools/embed_ports.py` e depois `compile.bat`.
    Os testes (`tests/test_port_catalog.cpp`) reprovam o build se:
    - o JSON for inválido, tiver `id` repetido ou caminho que saia da pasta do port;
@@ -46,6 +46,23 @@ corrompido ou antigo é ignorado e o app segue com o embutido.
 - `Karamelo.exe --dump-port-catalog arquivo.json` grava o catálogo em uso no
   mesmo formato do `data/ports.json`.
 - `Karamelo.exe --list-ports` lista o que cada port resolveu no disco.
+
+## Port que compila no primeiro uso
+
+O Project Tandem não traz o jogo pronto, e o launcher dele abre o jogo e fecha.
+Quatro campos cobrem esse caso, e todos são opcionais:
+
+| Campo | O que faz |
+|---|---|
+| `setup_relpath` | Instalador do projeto, relativo à pasta do port. |
+| `setup_args` | Argumentos do instalador. Aceita `{iso}`, como `launch_args`. |
+| `setup_done_relpath` | Enquanto este arquivo não existir, o instalador roda antes do launcher, em um console próprio. Se ele falhar, o launcher não inicia. |
+| `detached_process` | Nome do executável do jogo. O Karamelo só volta quando esse processo, rodando de dentro da pasta do port, fechar. |
+
+Os campos só funcionam a partir da v0.98. Um app mais antigo ignora os quatro e
+abriria só o launcher, que recusa por falta de instalação. Por isso, publique um
+catálogo com port desse tipo **junto com a release** do app, e não sozinho com
+`deploy_ports_catalog.bat`.
 
 ## Campo `notes`
 

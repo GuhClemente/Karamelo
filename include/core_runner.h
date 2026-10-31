@@ -47,6 +47,14 @@ void CoreShutdown(bool will_reload = false);
 void CoreRecoverLocksHeldByThread(unsigned long thread_id);
 void CoreReset();
 bool CoreIsRunning();
+// The file the running game came from, as the player opened it.
+std::string CoreGetActiveRomPath();
+// Netplay, from the core thread and between frames only.
+size_t CoreNetStateSize();
+bool CoreNetStateSave(void* data, size_t size);
+bool CoreNetStateLoad(const void* data, size_t size);
+// False once the game is being closed: nothing may keep waiting for the network.
+bool CoreNetKeepWaiting();
 bool CoreGameUsesKeyboard(); // A computer game (DOS, FM Towns...) is running: F10 is the game's
 double CoreGetTargetFps();
 

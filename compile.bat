@@ -221,6 +221,27 @@ if defined USER_DRIVER if not "%USER_DRIVER%"=="0" (
     )
 )
 
+rem Duas instancias de verdade: o Netplay tem que manter os dois jogos iguais e o
+rem chat tem que entregar mensagem e convite pela rede. Teste de funcao nao pega
+rem isso: o chat ja passou em todos eles sem entregar nada.
+rem Compara com zero, e nao "errorlevel 1": o powershell sai com codigo negativo
+rem quando nem consegue abrir o script, e isso passaria como sucesso.
+echo.
+echo ==================================================
+echo [RUNNING NETPLAY AND SOCIAL TESTS]
+echo ==================================================
 copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
-echo [BUILD OK] app\%APP_BASE%.exe atualizado - testes de unidade e bateria de cores passaram.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\test_netplay.ps1" -Frames 300
+if not "%ERRORLEVEL%"=="0" (
+    echo [BUILD FAILED] Netplay: os dois jogos nao ficaram iguais - veja a lista acima.
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\test_social.ps1"
+if not "%ERRORLEVEL%"=="0" (
+    echo [BUILD FAILED] Chat, convite ou voz nao passaram pela rede - veja acima.
+    exit /b 1
+)
+
+copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
+echo [BUILD OK] app\%APP_BASE%.exe atualizado - testes de unidade, bateria de cores, netplay e rede passaram.
 exit /b 0

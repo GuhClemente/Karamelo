@@ -1636,6 +1636,35 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// DLL, and to confirm the engine can still load a *different* core
 	// afterward instead of staying wedged - without needing to reproduce a
 	// real core hang by hand.
+	// "--netplay-selftest host|guest <core> <rom> <ip> <port> <frames> <result>":
+	// see tools/test_netplay.ps1.
+	// "--social-selftest a|b <chat port> <result>" and "--voice-selftest <port>
+	// <seconds> <result>": see tools/test_social.ps1.
+	if (__argc > 4 && _stricmp(__argv[1], "--social-selftest") == 0)
+	{
+		int r = SocialSelfTest(__argv[2], atoi(__argv[3]), 55435, __argv[4]);
+		TerminateProcess(GetCurrentProcess(), (UINT)r);
+		return r;
+	}
+	if (__argc > 4 && _stricmp(__argv[1], "--voice-selftest") == 0)
+	{
+		SDL_Init(SDL_INIT_AUDIO);
+		int r = VoiceSelfTest(atoi(__argv[2]), atoi(__argv[3]), __argv[4]);
+		TerminateProcess(GetCurrentProcess(), (UINT)r);
+		return r;
+	}
+	if (__argc > 8 && _stricmp(__argv[1], "--netplay-selftest") == 0)
+	{
+		HwIsAvailable();
+		HwReleaseCurrent();
+		VkHwIsAvailable();
+		D3D11HwIsAvailable();
+		MenuInit();
+		int r = NetplaySelfTest(__argv[2], __argv[3], __argv[4], __argv[5], atoi(__argv[6]), (unsigned)atoi(__argv[7]), __argv[8]);
+		TerminateProcess(GetCurrentProcess(), (UINT)r);
+		return r;
+	}
+
 	if (__argc > 3 && _stricmp(__argv[1], "--core-selftest") == 0)
 	{
 		FILE* lf = fopen("karamelo.log", "a");
@@ -1892,6 +1921,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	MenuInit();
 	TrayManagerInit(hwnd);
+	if (__argc > 1 && _stricmp(__argv[1], "--chat") == 0)
+		DesktopChatShowWindow();
 
 	// Restore the windowed-mode size/position saved on a previous exit, now
 	// that MenuInit() has loaded it. Guards against a monitor that is no

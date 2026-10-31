@@ -176,6 +176,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Pikmin (Open Nectar) | 🪟🐧 | [SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port](https://github.com/SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port) |
 | Soulcalibur II (Ring Out) | 🪟🐧 | [jackpoison-prog/RingOut](https://github.com/jackpoison-prog/RingOut) |
 | Super Smash Bros. Melee (Melee Unlocked) | 🪟 | [Hero88go/melee-unlocked](https://github.com/Hero88go/melee-unlocked) |
+| Mario Kart: Double Dash!! (Project Tandem) | 🪟 | [badcompany94-rcmp/project-tandem](https://github.com/badcompany94-rcmp/project-tandem) |
 | Monster Hunter Portable 3rd (Yakumo) | 🪟🐧🍎 | [TeamGDB/Yakumo](https://github.com/TeamGDB/Yakumo) |
 | Star Fox Adventures (Foxhollow) | 🪟🐧🍎 | [JackPriceBurns/foxhollow](https://github.com/JackPriceBurns/foxhollow) |
 | Conker's Bad Fur Day | 🪟🐧🍎 | [sciaschi/CBFD-Recompiled](https://github.com/sciaschi/CBFD-Recompiled) |
@@ -214,7 +215,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Crash Team Racing (High Octane) | 🪟 | [Rinnegatamante/Crash-Team-Racing-High-Octane](https://github.com/Rinnegatamante/Crash-Team-Racing-High-Octane) |
 | The Legend of Zelda: The Minish Cap | 🪟🐧🍎 | [999sian/tmc](https://github.com/999sian/tmc) |
 
-**59 de 93 têm build Linux** e **42 de 93 têm build macOS** (Apple Silicon /
+**59 de 94 têm build Linux** e **42 de 94 têm build macOS** (Apple Silicon /
 Universal), verificado em 25/10/2026 contra a release mais recente de cada
 repositório (adicionados 23 ports nas Ondas 1, 2 e 3: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane e Minish Cap; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
@@ -284,6 +285,14 @@ e só usa o que for `GALE01` revisão 2 — então ISOs 1.00, Training Mode ou
 20XX na mesma pasta são ignorados, e se só houver esses o aviso diz que o
 disco é o errado. O ISO é lido no lugar, não copiado. Jogo online exige conta
 Slippi (logada uma vez pelo Slippi Launcher); offline não.
+
+Um detalhe da linha do Project Tandem: recompilação estática de **Mario Kart:
+Double Dash!!** (GameCube) com online de 2 a 8 jogadores, licença MIT, ainda em
+beta e baseada no mariokartdd-recomp e no gcn-recomp de Ethan Nicholas. Só existe
+para Windows. O zip não traz o jogo: no primeiro uso o instalador do projeto
+confere o `.iso` ou `.ciso` USA `GM4E01` do jogador em `roms/GameCube/` (nome
+contendo "kart" e "double") e compila o jogo no próprio PC, o que leva vários
+minutos. Jogar online exige que todos estejam na mesma versão.
 
 Um detalhe da linha do Conker's Bad Fur Day: é o port nativo de **Conker's Bad Fur
 Day** (Nintendo 64) via recompilação estática com RT64 (código por sciaschi,

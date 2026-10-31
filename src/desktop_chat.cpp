@@ -30,6 +30,7 @@
 #endif
 
 #include <algorithm>
+#include <random>
 #include <atomic>
 #include <filesystem>
 #include <fstream>
@@ -145,7 +146,7 @@ static void SeedWelcomeMessagesLocked() {
   for (int r = 0; r < LIVE_ROOM_COUNT; ++r) {
     if (g_room_messages[r].empty()) {
       LiveChatMessage welcome;
-      welcome.sender = "Karamelo Social";
+      welcome.sender = "Karamelo Live";
       welcome.text =
           std::string(Tr("Bem-vindo ao canal ", "Welcome to channel ")) +
           DesktopChatGetRoomName((LiveChatRoom)r) +
@@ -275,7 +276,7 @@ bool DesktopChatJoinByRoomCode(const char* code) {
 void DesktopChatRegisterPeerPresence(const LobbyPresencePeer& peer) {
   std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
   for (auto& p : g_active_peers) {
-    if (p.tag == peer.tag) {
+    if (p.tag == peer.tag && p.host_ip == peer.host_ip) {
       p = peer;
       p.last_seen_utc = (int64_t)time(NULL);
       return;
@@ -477,6 +478,8 @@ bool DesktopChatIsFriend(const char* tag) {
 // Lifecycle
 // =============================================================
 
+static void DesktopChatSetSavedZoom(int percent);
+
 void DesktopChatInit() {
   std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
 #ifdef _WIN32
@@ -487,7 +490,29 @@ void DesktopChatInit() {
     if (!clean.empty())
       g_nickname = clean;
   }
+#else
+  if (const char* user = getenv("USER")) {
+    std::string clean = DesktopChatSanitizeText(user, 20);
+    if (!clean.empty())
+      g_nickname = clean;
+  }
 #endif
+  // A name the player chose wins over the system's user name.
+  std::ifstream saved_nick("Config/chat_nick.txt");
+  std::string nick_line;
+  if (saved_nick && std::getline(saved_nick, nick_line)) {
+    std::string clean = DesktopChatSanitizeText(nick_line, 24);
+    if (!clean.empty()) {
+      g_nickname = clean;
+      g_karamelo_tag.clear();
+    }
+  }
+  std::ifstream saved_zoom("Config/chat_zoom.txt");
+  int zoom = 100;
+  if (saved_zoom >> zoom && zoom >= 70 && zoom <= 250 && zoom % 10 == 0)
+    DesktopChatSetSavedZoom(zoom);
+  else
+    DesktopChatSetSavedZoom(100);
   SeedWelcomeMessagesLocked();
   DesktopChatLoadFriends();
 }
@@ -592,6 +617,78 @@ bool DesktopChatPostMessage(const char *text) {
   return true;
 }
 
+// Answers shown where the player is looking: a toast goes to the main window,
+// which may be on another monitor or minimized.
+static void ChatSystemNote(const std::string& text) {
+  LiveChatMessage note;
+  note.sender = "Karamelo Live";
+  note.text = text;
+  note.timestamp_utc = (int64_t)time(NULL);
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    AppendRoomMessageLocked(g_current_room.load(), note);
+  }
+#ifdef _WIN32
+  g_scroll_offset = 0;
+  RequestChatRepaint();
+#endif
+}
+
+static const char *const kNickFile = "Config/chat_nick.txt";
+
+static const int kZoomMin = 70, kZoomMax = 250, kZoomStep = 10;
+static std::atomic<int> g_chat_zoom{100};
+
+int DesktopChatGetZoomPercent() { return g_chat_zoom.load(); }
+static void DesktopChatSetSavedZoom(int percent) { g_chat_zoom.store(percent); }
+
+int DesktopChatZoomStep(int direction) {
+  int z = direction == 0 ? 100 : g_chat_zoom.load() + direction * kZoomStep;
+  z = std::min(std::max(z, kZoomMin), kZoomMax);
+  g_chat_zoom.store(z);
+  std::error_code ec;
+  std::filesystem::create_directories("Config", ec);
+  std::ofstream("Config/chat_zoom.txt", std::ios::trunc) << z;
+#ifdef _WIN32
+  RequestChatRepaint();
+#endif
+  return z;
+}
+
+// The zoom a window of this size can actually take: past it the side panel and
+// the header buttons would no longer fit. Never below what was asked for 100%.
+static float ChatEffectiveZoom(int win_w, int win_h) {
+  const float wanted = g_chat_zoom.load() / 100.0f;
+  const float fits = std::max(1.0f, std::min(win_w / 700.0f, win_h / 420.0f));
+  return std::min(wanted, fits);
+}
+
+bool DesktopChatSubmitInput(const char *text) {
+  if (!text || !*text)
+    return false;
+  const std::string in = text;
+  if (in.rfind("KRM-", 0) == 0)
+    return DesktopChatJoinByRoomCode(text);
+  for (const char *cmd : {"/nome ", "/name "}) {
+    if (in.rfind(cmd, 0) != 0)
+      continue;
+    const std::string nick = DesktopChatSanitizeText(in.substr(strlen(cmd)), 24);
+    if (nick.empty())
+      return false;
+    DesktopChatSetNickname(nick.c_str());
+    {
+      std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+      g_karamelo_tag.clear(); // it is made from the name
+    }
+    std::error_code ec;
+    std::filesystem::create_directories("Config", ec);
+    std::ofstream(kNickFile, std::ios::trunc) << nick;
+    ChatSystemNote(std::string(Tr("Agora voce e ", "You are now ")) + DesktopChatGetKarameloTag());
+    return true;
+  }
+  return DesktopChatPostMessage(text);
+}
+
 bool DesktopChatSendChallenge(const char *game_title) {
   std::string title = (game_title && game_title[0])
                           ? DesktopChatSanitizeText(game_title, 64)
@@ -602,7 +699,17 @@ bool DesktopChatSendChallenge(const char *game_title) {
                                   : Tr("Partida Netplay", "Netplay Match");
   }
 
-  NetplayStartHost(55435);
+  // Hosting again would drop the player from the match they are in.
+  if (NetplayGetState() == NETPLAY_CONNECTED) {
+    ChatSystemNote(Tr("Voce ja esta em uma partida. Saia dela antes de convidar.",
+                      "You are already in a match. Leave it before inviting."));
+    return false;
+  }
+  if (!NetplayStartHost(55435)) {
+    ChatSystemNote(Tr("Nao deu para abrir a partida: a porta 55435 esta em uso.",
+                      "Could not open the match: port 55435 is in use."));
+    return false;
+  }
   const char *local_ip = NetplayGetLocalIp();
   std::string host_ip_str = (local_ip && local_ip[0]) ? local_ip : "127.0.0.1";
   std::string room_code = DesktopChatGenerateRoomCode(host_ip_str, 55435);
@@ -618,6 +725,7 @@ bool DesktopChatSendChallenge(const char *game_title) {
     msg.text = std::string(Tr("Convite Netplay [", "Netplay Invite [")) +
                room_code + "]: " + title;
     msg.timestamp_utc = (int64_t)time(NULL);
+    msg.from_me = true;
     AppendRoomMessageLocked(g_current_room.load(), msg);
   }
 
@@ -626,8 +734,6 @@ bool DesktopChatSendChallenge(const char *game_title) {
   NetSendDatagram(NetFrame('m', DesktopChatFormatWireMessage((LiveChatRoom)g_current_room.load(), msg)));
 
   TrayManagerSetStatus(TRAY_STATUS_PLAYING, title.c_str());
-  TrayManagerShowNotification("Karamelo Social — Convite Criado",
-                              msg.text.c_str(), true);
   CoreSetToast(
       Tr("CONVITE NETPLAY ENVIADO NO CHAT!", "NETPLAY INVITE POSTED IN CHAT!"),
       180);
@@ -646,7 +752,7 @@ bool DesktopChatAcceptLastChallenge() {
     std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
     const auto &vec = g_room_messages[g_current_room.load()];
     for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
-      if (!it->game_challenge.empty() && (!it->host_ip.empty() || !it->room_code.empty())) {
+      if (!it->from_me && !it->game_challenge.empty() && (!it->host_ip.empty() || !it->room_code.empty())) {
         found = *it;
         has_challenge = true;
         break;
@@ -660,6 +766,16 @@ bool DesktopChatAcceptLastChallenge() {
                  150);
     return false;
   }
+
+  if (NetplayGetState() == NETPLAY_CONNECTED) {
+    ChatSystemNote(Tr("Voce ja esta em uma partida. Saia dela antes de entrar em outra.",
+                      "You are already in a match. Leave it before joining another."));
+    return false;
+  }
+
+  // The invite carries no game: the connection only shares the controllers.
+  ChatSystemNote(Tr("Conectando. O jogo do outro jogador abre aqui sozinho se voce tiver o mesmo arquivo em roms/.",
+                    "Connecting. The other player's game opens here by itself if you have the same file in roms/."));
 
   if (found.host_ip.empty())
     return DesktopChatJoinByRoomCode(found.room_code.c_str());
@@ -715,6 +831,17 @@ static int g_net_sock = -1;
 struct ChatRateWindow { int64_t start = 0; int count = 0; };
 static std::map<std::string, ChatRateWindow> g_chat_rate;
 
+static std::atomic<int> g_broadcast_count{0};
+static char g_extra_peer_ip[64] = {0};
+static int g_extra_peer_port = 0;
+
+void DesktopChatSetExtraPeer(const char* ip, int port) {
+  snprintf(g_extra_peer_ip, sizeof(g_extra_peer_ip), "%s", ip ? ip : "");
+  g_extra_peer_port = port;
+}
+
+int DesktopChatGetBroadcastCount() { return g_broadcast_count.load(); }
+
 static void NetSendDatagram(const std::string& payload) {
   if (!g_net_running.load() || payload.size() > 1400)
     return;
@@ -722,8 +849,35 @@ static void NetSendDatagram(const std::string& payload) {
   sockaddr_in to{};
   to.sin_family = AF_INET;
   to.sin_port = htons((uint16_t)port);
-  to.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-  sendto(g_net_sock, payload.data(), (int)payload.size(), 0, (const sockaddr*)&to, sizeof(to));
+  // 255.255.255.255 leaves through one card only, the one the route table
+  // picks. With a VPN or WSL installed that is not the LAN, and nobody hears it.
+  // The real cards go first: whichever copy arrives first is the one kept, and its
+  // source is the address an invite connects to. The virtual ones stay because
+  // they are how two copies on the same PC find each other.
+  bool sent = false;
+  int accepted = 0;
+  auto nics = NetplayGetLocalInterfaces();
+  std::stable_sort(nics.begin(), nics.end(), [](const NetplayLocalInterface& a, const NetplayLocalInterface& b) {
+    return a.lan_candidate && !b.lan_candidate;
+  });
+  for (const auto& nic : nics) {
+    if (nic.broadcast.empty() || inet_pton(AF_INET, nic.broadcast.c_str(), &to.sin_addr) != 1)
+      continue;
+    if (sendto(g_net_sock, payload.data(), (int)payload.size(), 0, (const sockaddr*)&to, sizeof(to)) > 0)
+      accepted++;
+    sent = true;
+  }
+  g_broadcast_count.store(accepted);
+  if (!sent) {
+    to.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    sendto(g_net_sock, payload.data(), (int)payload.size(), 0, (const sockaddr*)&to, sizeof(to));
+  }
+
+  if (g_extra_peer_port != 0 && inet_pton(AF_INET, g_extra_peer_ip, &to.sin_addr) == 1) {
+    to.sin_port = htons((uint16_t)g_extra_peer_port);
+    sendto(g_net_sock, payload.data(), (int)payload.size(), 0, (const sockaddr*)&to, sizeof(to));
+    to.sin_port = htons((uint16_t)port);
+  }
 
   const char* peer = (NetplayGetState() == NETPLAY_CONNECTED) ? NetplayGetPeerIp() : "";
   if (peer && peer[0] && inet_pton(AF_INET, peer, &to.sin_addr) == 1)
@@ -772,6 +926,18 @@ bool DesktopChatHandleDatagram(const std::string& data, const std::string& from_
   }
 
   if (kind == 'm') {
+    // During a match a message arrives twice on the LAN: broadcast and direct.
+    {
+      static std::vector<std::pair<size_t, int64_t>> recent;
+      const size_t id = std::hash<std::string>()(data);
+      std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+      recent.erase(std::remove_if(recent.begin(), recent.end(),
+                                  [now](const std::pair<size_t, int64_t>& e) { return now - e.second > 5; }),
+                   recent.end());
+      for (const auto& e : recent)
+        if (e.first == id) return false;
+      recent.push_back({id, now});
+    }
     LiveChatRoom room = LIVE_ROOM_ARCADE_FIGHT;
     LiveChatMessage msg;
     if (!DesktopChatParseWireMessage(json, &room, msg))
@@ -889,8 +1055,10 @@ bool DesktopChatStartNetwork(int port) {
 #endif
     return false;
   }
-  if (g_net_instance == 0)
-    g_net_instance = (uint32_t)rand() ^ ((uint32_t)time(NULL) << 8) ^ 0x4B524D31u;
+  // Not rand() and the time: two copies started in the same second got the same
+  // number here, and each threw the other's messages away as its own.
+  while (g_net_instance == 0)
+    g_net_instance = std::random_device{}();
   g_net_sock = s;
   g_net_port.store(port);
   g_net_running.store(true);
@@ -1044,7 +1212,7 @@ static void DrawUtf8TextGdi(HDC hdc, const char *utf8, RECT rc, HFONT font,
   HGDIOBJ old_f = SelectObject(hdc, font);
   SetTextColor(hdc, color);
   SetBkMode(hdc, TRANSPARENT);
-  DrawTextW(hdc, wbuf, -1, &rc, format);
+  DrawTextW(hdc, wbuf, -1, &rc, format | DT_NOPREFIX);
   SelectObject(hdc, old_f);
 }
 
@@ -1076,19 +1244,33 @@ static void FormatTimeHHMM(int64_t ts, char out_buf[16]) {
     snprintf(out_buf, 16, "AGORA");
 }
 
+static float g_chat_paint_zoom = 1.0f;
+
 static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
   EnsureChatFonts();
 
   RECT client;
   GetClientRect(hwnd, &client);
-  int W = client.right - client.left;
-  int H = client.bottom - client.top;
-  if (W <= 0 || H <= 0)
+  const int device_w = client.right - client.left;
+  const int device_h = client.bottom - client.top;
+  if (device_w <= 0 || device_h <= 0)
     return;
 
   HDC hdc = CreateCompatibleDC(target_hdc);
-  HBITMAP hbm = CreateCompatibleBitmap(target_hdc, W, H);
+  HBITMAP hbm = CreateCompatibleBitmap(target_hdc, device_w, device_h);
   HGDIOBJ old_bm = SelectObject(hdc, hbm);
+
+  // Zoom: the layout below keeps its coordinates and the DC scales them, so the
+  // fonts stay vector-sharp. W and H are the size in those coordinates.
+  const float zoom = ChatEffectiveZoom(device_w, device_h);
+  g_chat_paint_zoom = zoom;
+  const int W = (int)(device_w / zoom + 0.5f);
+  const int H = (int)(device_h / zoom + 0.5f);
+  if (zoom != 1.0f) {
+    SetGraphicsMode(hdc, GM_ADVANCED);
+    XFORM xf = {zoom, 0.0f, 0.0f, zoom, 0.0f, 0.0f};
+    SetWorldTransform(hdc, &xf);
+  }
 
   g_hit_rects.clear();
 
@@ -1150,18 +1332,22 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
   RECT rc_status = {58, 42, side_w - 52, 56};
-  DrawUtf8TextGdi(hdc, my_st == TRAY_STATUS_PLAYING ? "Em Jogo" : "Online • BattleTag",
+  DrawUtf8TextGdi(hdc, my_st == TRAY_STATUS_PLAYING ? Tr("Em Jogo", "Playing")
+                       : my_st == TRAY_STATUS_BUSY  ? Tr("Ocupado", "Busy") : "Online",
                   rc_status, g_font_small, st_col,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
   g_hit_rects.push_back({HIT_PROFILE_STATUS, {12, 11, side_w - 52, 55}});
 
   // Mic button
+  // Voice starts off: green would say the microphone is open when it is not.
+  bool voice_on = VoiceChatIsEnabled();
   bool muted = VoiceChatIsMicMuted();
+  COLORREF mic_col = !voice_on ? col_txt_muted : muted ? col_busy_red : col_online_grn;
   RECT rc_mic = {side_w - 46, 15, side_w - 12, 47};
   COLORREF mic_bg = (g_hover_zone == HIT_MIC_MUTE) ? RGB(52, 62, 80) : RGB(32, 38, 50);
-  DrawRoundBoxGdi(hdc, rc_mic.left, rc_mic.top, 34, 32, 6, mic_bg, muted ? col_busy_red : col_online_grn);
-  DrawUtf8TextGdi(hdc, muted ? "MUTE" : "MIC", rc_mic, g_font_small,
-                  muted ? col_busy_red : col_online_grn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+  DrawRoundBoxGdi(hdc, rc_mic.left, rc_mic.top, 34, 32, 6, mic_bg, mic_col);
+  DrawUtf8TextGdi(hdc, !voice_on ? "OFF" : muted ? "MUTE" : "MIC", rc_mic, g_font_small,
+                  mic_col, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   g_hit_rects.push_back({HIT_MIC_MUTE, rc_mic});
 
   // 3. Tab Switcher: [Canais]  [Amigos]
@@ -1172,7 +1358,7 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
 
   DrawRoundBoxGdi(hdc, rc_tab1.left, rc_tab1.top, rc_tab1.right - rc_tab1.left, 26, 6,
                   is_tab_rooms ? col_active_row : RGB(32, 38, 48), is_tab_rooms ? col_accent_blue : col_divider);
-  DrawUtf8TextGdi(hdc, Tr("Lobbies", "Lobbies"), rc_tab1, is_tab_rooms ? g_font_bold : g_font_small,
+  DrawUtf8TextGdi(hdc, Tr("Salas", "Rooms"), rc_tab1, is_tab_rooms ? g_font_bold : g_font_small,
                   is_tab_rooms ? col_txt_white : col_txt_muted, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   g_hit_rects.push_back({HIT_TAB_ROOMS, rc_tab1});
 
@@ -1213,21 +1399,18 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
     ry += 8;
     FillSolidRectGdi(hdc, 14, ry - 4, side_w - 28, 1, col_divider);
     RECT rc_sec2 = {16, ry, side_w - 12, ry + 18};
-    DrawUtf8TextGdi(hdc, Tr("JOGADORES ATIVOS", "ACTIVE PLAYERS"), rc_sec2, g_font_small, col_txt_muted,
+    DrawUtf8TextGdi(hdc, Tr("NA SUA REDE", "ON YOUR NETWORK"), rc_sec2, g_font_small, col_txt_muted,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     ry += 22;
 
+    // HIT_PEER_JOIN_BASE + p indexes this same list: the click looks it up again.
     auto peers = DesktopChatGetActivePeers();
-    if (peers.empty()) {
-      LobbyPresencePeer me_peer;
-      me_peer.tag = my_tag;
-      me_peer.current_game = CoreIsRunning() ? CoreGetGameName() : Tr("No Lobby Karamelo", "In Karamelo Lobby");
-      me_peer.status = CoreIsRunning() ? 2 : 1;
-      peers.push_back(me_peer);
-    }
-
+    const std::string my_ip = NetplayGetLocalIp();
+    bool anyone = false;
     for (size_t p = 0; p < peers.size() && ry + 40 < H - 10; ++p) {
-      RECT rc_p = {10, ry, side_w - 10, ry + 38};
+      if (peers[p].tag == my_tag && peers[p].host_ip == my_ip)
+        continue;
+      anyone = true;
       bool in_g = (peers[p].status == 2);
       DrawRoundBoxGdi(hdc, 14, ry + 4, 30, 30, 6, RGB(36, 46, 62), in_g ? col_playing_grn : col_online_grn);
 
@@ -1237,8 +1420,7 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
       DrawUtf8TextGdi(hdc, p_init, rc_pi, g_font_small, col_txt_white, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
       RECT rc_pn = {50, ry + 3, side_w - 60, ry + 18};
-      DrawUtf8TextGdi(hdc, peers[p].tag.c_str(), rc_pn, g_font_bold,
-                      peers[p].tag == my_tag ? col_amber : col_txt_white,
+      DrawUtf8TextGdi(hdc, peers[p].tag.c_str(), rc_pn, g_font_bold, col_txt_white,
                       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
       RECT rc_pg = {50, ry + 18, side_w - 60, ry + 34};
@@ -1247,7 +1429,7 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
                       in_g ? col_playing_grn : col_online_grn,
                       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-      if (peers[p].has_challenge && peers[p].tag != my_tag) {
+      if (peers[p].has_challenge) {
         RECT rc_join = {side_w - 56, ry + 7, side_w - 12, ry + 31};
         DrawRoundBoxGdi(hdc, rc_join.left, rc_join.top, 44, 24, 4, RGB(45, 125, 70), col_online_grn);
         DrawUtf8TextGdi(hdc, "Entrar", rc_join, g_font_small, col_txt_white, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -1256,10 +1438,15 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
 
       ry += 42;
     }
+    if (!anyone) {
+      RECT rc_none = {16, ry, side_w - 12, ry + 36};
+      DrawUtf8TextGdi(hdc, Tr("Ninguem com o chat aberto na sua rede.", "No one has the chat open on your network."),
+                      rc_none, g_font_small, col_txt_muted, DT_LEFT | DT_WORDBREAK);
+    }
   } else {
     // 4B. LISTA DE AMIGOS PERSISTENTE (BattleTag / Steam Roster)
     RECT rc_sec_f = {16, ry, side_w - 12, ry + 18};
-    DrawUtf8TextGdi(hdc, Tr("ROSTER DE AMIGOS", "FRIENDS ROSTER"), rc_sec_f, g_font_small, col_txt_muted,
+    DrawUtf8TextGdi(hdc, Tr("LISTA DE AMIGOS", "FRIENDS LIST"), rc_sec_f, g_font_small, col_txt_muted,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     ry += 22;
 
@@ -1315,17 +1502,18 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
 
   // 5. Right Chat Header
   LiveChatRoom active_room = DesktopChatGetRoom();
-  RECT rc_ch_title = {side_w + 18, 10, W - 340, 34};
+  const bool narrow = W < 800;
+  const int header_buttons_w = narrow ? 246 : 370;
+  RECT rc_ch_title = {side_w + 18, 10, W - header_buttons_w, 34};
   DrawUtf8TextGdi(hdc, DesktopChatGetRoomName(active_room), rc_ch_title,
                   g_font_title, col_txt_white, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
   char sub_hdr[160];
   snprintf(sub_hdr, sizeof(sub_hdr),
-           "BattleTag: %s  •  Voz P2P: %s  •  Gate: %s",
-           DesktopChatGetKarameloTag(),
-           VoiceChatGetDenoiseEngineName(VoiceChatGetDenoiseEngine()),
-           VoiceChatGetVadSensitivityName(VoiceChatGetVadSensitivity()));
-  RECT rc_ch_sub = {side_w + 18, 34, W - 340, 54};
+           g_chat_zoom.load() == 100 ? "%s" : "%s  •  Zoom %d%%",
+           VoiceChatIsEnabled() ? Tr("Voz ligada", "Voice on") : Tr("Voz desligada", "Voice off"),
+           g_chat_zoom.load());
+  RECT rc_ch_sub = {side_w + 18, 34, W - header_buttons_w, 54};
   DrawUtf8TextGdi(hdc, sub_hdr, rc_ch_sub, g_font_small, col_txt_muted,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
@@ -1340,18 +1528,18 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
   g_hit_rects.push_back({HIT_BTN_CLEAR, rc_btn_clr});
   bx -= 76;
 
-  // [Filtro IA]
+  // [Reducao de ruido da voz]
+  if (!narrow) {
   RECT rc_btn_dsp = {bx - 116, 16, bx, 46};
   DrawRoundBoxGdi(hdc, rc_btn_dsp.left, rc_btn_dsp.top, 116, 30, 6,
                   g_hover_zone == HIT_BTN_DENOISE ? RGB(52, 60, 76) : RGB(36, 42, 54), col_divider);
   char dsp_lbl[48];
-  snprintf(dsp_lbl, sizeof(dsp_lbl), "IA: %s",
-           VoiceChatGetDenoiseEngine() == VOICE_DENOISE_STRONG ? "Forte"
-           : VoiceChatGetDenoiseEngine() == VOICE_DENOISE_LIGHT   ? "Leve"
-                                                                  : "Cru/Off");
+  snprintf(dsp_lbl, sizeof(dsp_lbl), "%s: %s", Tr("Ruído", "Noise"),
+           VoiceChatGetDenoiseEngineName(VoiceChatGetDenoiseEngine()));
   DrawUtf8TextGdi(hdc, dsp_lbl, rc_btn_dsp, g_font_small, col_accent_blue, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   g_hit_rects.push_back({HIT_BTN_DENOISE, rc_btn_dsp});
   bx -= 124;
+  }
 
   // [Desafiar Netplay]
   RECT rc_btn_chal = {bx - 146, 16, bx, 46};
@@ -1366,16 +1554,41 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
   int feed_bot = H - input_h - 1;
   int feed_w = W - side_w;
 
-  HRGN clip_rgn = CreateRectRgn(side_w + 1, feed_top, W, feed_bot);
+  // Clip regions are in device pixels: the DC's zoom does not apply to them.
+  HRGN clip_rgn = CreateRectRgn((int)((side_w + 1) * zoom), (int)(feed_top * zoom),
+                                device_w, (int)(feed_bot * zoom));
   SelectClipRgn(hdc, clip_rgn);
 
   std::vector<LiveChatMessage> msgs = DesktopChatGetRoomMessages();
-  int cur_y = feed_top + 14 - g_scroll_offset;
+
+  // g_scroll_offset is how far above the newest message the view is: a new
+  // message must show up without scrolling, and the wheel must reach the first.
+  int content_h = 28;
+  int last_invite = -1;
+  for (size_t i = 0; i < msgs.size(); ++i) {
+    content_h += 20;
+    if (!msgs[i].game_challenge.empty()) {
+      content_h += 86;
+      if (!msgs[i].from_me)
+        last_invite = (int)i;
+    } else {
+      wchar_t wmsg[512] = {0};
+      MultiByteToWideChar(CP_UTF8, 0, msgs[i].text.c_str(), -1, wmsg, 511);
+      HGDIOBJ old_f = SelectObject(hdc, g_font_body);
+      RECT rc_calc = {side_w + 60, 0, W - 24, 200};
+      DrawTextW(hdc, wmsg, -1, &rc_calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+      SelectObject(hdc, old_f);
+      content_h += std::max(20, (int)(rc_calc.bottom - rc_calc.top)) + 12;
+    }
+  }
+  const int max_scroll = std::max(0, content_h - (feed_bot - feed_top));
+  g_scroll_offset = std::min(std::max(g_scroll_offset, 0), max_scroll);
+  int cur_y = feed_top + 14 - (max_scroll - g_scroll_offset);
 
   for (size_t i = 0; i < msgs.size(); ++i) {
     const auto &m = msgs[i];
-    bool is_sys = (m.sender == "Karamelo Social" || m.sender == "Karamelo Live");
-    bool is_me = (m.sender == my_nick);
+    bool is_sys = (m.sender == "Karamelo Live");
+    bool is_me = m.from_me || (m.sender == my_nick && m.game_challenge.empty());
     bool is_invite = !m.game_challenge.empty();
 
     int ax = side_w + 16;
@@ -1407,7 +1620,7 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
       DrawRoundBoxGdi(hdc, rc_card.left, rc_card.top, card_w, card_h, 8, RGB(26, 42, 36), col_online_grn);
 
       RECT rc_ct1 = {rc_card.left + 12, rc_card.top + 6, rc_card.right - 130, rc_card.top + 22};
-      DrawUtf8TextGdi(hdc, Tr("CONVITE DE PARTIDA — 1-CLICK NETPLAY", "MATCH INVITE — 1-CLICK NETPLAY"),
+      DrawUtf8TextGdi(hdc, Tr("CONVITE DE PARTIDA", "MATCH INVITE"),
                       rc_ct1, g_font_small, col_online_grn, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
       RECT rc_ct2 = {rc_card.left + 12, rc_card.top + 24, rc_card.right - 130, rc_card.top + 46};
@@ -1422,11 +1635,18 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
       DrawUtf8TextGdi(hdc, host_info, rc_ct3, g_font_small, col_txt_muted, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
       RECT rc_join = {rc_card.right - 124, rc_card.top + 18, rc_card.right - 12, rc_card.top + 52};
-      DrawRoundBoxGdi(hdc, rc_join.left, rc_join.top, 112, 34, 6,
-                      g_hover_zone == HIT_BTN_ACCEPT_CARD ? RGB(58, 165, 93) : RGB(45, 125, 70), col_online_grn);
-      DrawUtf8TextGdi(hdc, Tr("Entrar Agora", "Join Match"), rc_join, g_font_bold, col_txt_white,
-                      DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-      g_hit_rects.push_back({HIT_BTN_ACCEPT_CARD, rc_join});
+      if (m.from_me) {
+        DrawUtf8TextGdi(hdc, Tr("Aguardando...", "Waiting..."), rc_join, g_font_small, col_txt_muted,
+                        DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+      } else if ((int)i == last_invite) {
+        // Accepting takes the newest invite, so only that one has the button.
+        DrawRoundBoxGdi(hdc, rc_join.left, rc_join.top, 112, 34, 6,
+                        g_hover_zone == HIT_BTN_ACCEPT_CARD ? RGB(58, 165, 93) : RGB(45, 125, 70), col_online_grn);
+        DrawUtf8TextGdi(hdc, Tr("Entrar Agora", "Join Match"), rc_join, g_font_bold, col_txt_white,
+                        DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        if (rc_join.bottom > feed_top && rc_join.top < feed_bot)
+          g_hit_rects.push_back({HIT_BTN_ACCEPT_CARD, rc_join});
+      }
 
       cur_y += card_h + 14;
     } else {
@@ -1434,13 +1654,13 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
       MultiByteToWideChar(CP_UTF8, 0, m.text.c_str(), -1, wmsg, 511);
       HGDIOBJ old_f = SelectObject(hdc, g_font_body);
       RECT rc_calc = {tx, cur_y, W - 24, cur_y + 200};
-      DrawTextW(hdc, wmsg, -1, &rc_calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT);
+      DrawTextW(hdc, wmsg, -1, &rc_calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
       int text_h = std::max(20, (int)(rc_calc.bottom - rc_calc.top));
 
       RECT rc_draw = {tx, cur_y, W - 24, cur_y + text_h};
       SetTextColor(hdc, is_sys ? RGB(175, 220, 195) : col_txt_white);
       SetBkMode(hdc, TRANSPARENT);
-      DrawTextW(hdc, wmsg, -1, &rc_draw, DT_LEFT | DT_WORDBREAK);
+      DrawTextW(hdc, wmsg, -1, &rc_draw, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
       SelectObject(hdc, old_f);
 
       cur_y += text_h + 12;
@@ -1459,8 +1679,8 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
   DrawRoundBoxGdi(hdc, inp_x, inp_y, inp_w, 36, 6, RGB(18, 22, 30), col_divider);
   RECT rc_inp_txt = {inp_x + 12, inp_y, inp_x + inp_w - 12, inp_y + 36};
   if (g_input_text.empty()) {
-    DrawUtf8TextGdi(hdc, Tr("Digite uma mensagem ou Código (KRM-XXXX)... [Enter]",
-                            "Type a message or Room Code (KRM-XXXX)... [Enter]"),
+    DrawUtf8TextGdi(hdc, Tr("Mensagem ou código KRM-...",
+                            "Message or KRM-... room code"),
                     rc_inp_txt, g_font_body, RGB(100, 115, 135), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
   } else {
     DrawUtf8TextGdi(hdc, g_input_text.c_str(), rc_inp_txt, g_font_body, col_txt_white,
@@ -1474,14 +1694,18 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
                   DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   g_hit_rects.push_back({HIT_BTN_SEND, rc_btn_send});
 
-  BitBlt(target_hdc, 0, 0, W, H, hdc, 0, 0, SRCCOPY);
+  if (zoom != 1.0f)
+    ModifyWorldTransform(hdc, NULL, MWT_IDENTITY);
+  BitBlt(target_hdc, 0, 0, device_w, device_h, hdc, 0, 0, SRCCOPY);
 
   SelectObject(hdc, old_bm);
   DeleteObject(hbm);
   DeleteDC(hdc);
 }
 
-static int HitTestSocialWindow(int x, int y) {
+static int HitTestSocialWindow(int device_x, int device_y) {
+  const int x = (int)(device_x / g_chat_paint_zoom);
+  const int y = (int)(device_y / g_chat_paint_zoom);
   for (auto it = g_hit_rects.rbegin(); it != g_hit_rects.rend(); ++it) {
     if (x >= it->rc.left && x <= it->rc.right && y >= it->rc.top && y <= it->rc.bottom)
       return it->zone;
@@ -1506,9 +1730,11 @@ static LRESULT CALLBACK SocialChatWndProc(HWND hwnd, UINT msg, WPARAM wparam, LP
 
   case WM_MOUSEWHEEL: {
     short delta = GET_WHEEL_DELTA_WPARAM(wparam);
-    g_scroll_offset -= (delta / WHEEL_DELTA) * 28;
-    if (g_scroll_offset < 0) g_scroll_offset = 0;
-    if (g_scroll_offset > 1200) g_scroll_offset = 1200;
+    if (GET_KEYSTATE_WPARAM(wparam) & MK_CONTROL) {
+      DesktopChatZoomStep(delta > 0 ? 1 : -1);
+      return 0;
+    }
+    g_scroll_offset += (delta / WHEEL_DELTA) * 28; // clamped when painting
     InvalidateRect(hwnd, NULL, FALSE);
     return 0;
   }
@@ -1532,7 +1758,14 @@ static LRESULT CALLBACK SocialChatWndProc(HWND hwnd, UINT msg, WPARAM wparam, LP
       DesktopChatAnnouncePresence();
       InvalidateRect(hwnd, NULL, FALSE);
     } else if (hz == HIT_MIC_MUTE) {
-      VoiceChatToggleMicMute();
+      if (VoiceChatIsEnabled()) {
+        VoiceChatToggleMicMute();
+      } else {
+        VoiceChatSetEnabled(true);
+        MenuSaveSettingsExport();
+        ChatSystemNote(Tr("Voz ligada: ela abre sozinha quando a partida conectar.",
+                          "Voice on: it opens by itself when the match connects."));
+      }
       InvalidateRect(hwnd, NULL, FALSE);
     } else if (hz == HIT_BTN_CHALLENGE) {
       DesktopChatSendChallenge(NULL);
@@ -1548,24 +1781,23 @@ static LRESULT CALLBACK SocialChatWndProc(HWND hwnd, UINT msg, WPARAM wparam, LP
       if (!g_input_text.empty()) {
         std::string to_send = g_input_text;
         g_input_text.clear();
-        if (to_send.rfind("KRM-", 0) == 0) {
-          DesktopChatJoinByRoomCode(to_send.c_str());
-        } else {
-          DesktopChatPostMessage(to_send.c_str());
-        }
+        DesktopChatSubmitInput(to_send.c_str());
       }
     } else if (hz == HIT_BTN_ADD_FRIEND) {
       if (!g_input_text.empty() && g_input_text.find('#') != std::string::npos) {
         DesktopChatAddFriend(g_input_text.c_str(), g_input_text.c_str());
         g_input_text.clear();
       } else {
-        DesktopChatAddFriend("Amigo#7777", "Amigo Gamer");
+        ChatSystemNote(Tr("Digite a tag do amigo no campo abaixo (Nome#1234) e clique de novo.",
+                          "Type your friend's tag below (Name#1234) and click again."));
       }
       InvalidateRect(hwnd, NULL, FALSE);
     } else if (hz >= HIT_PEER_JOIN_BASE && hz < HIT_PEER_JOIN_BASE + 50) {
       int idx = hz - HIT_PEER_JOIN_BASE;
       auto peers = DesktopChatGetActivePeers();
       if (idx >= 0 && idx < (int)peers.size()) {
+        ChatSystemNote(Tr("Conectando. O jogo do outro jogador abre aqui sozinho se voce tiver o mesmo arquivo em roms/.",
+                          "Connecting. The other player's game opens here by itself if you have the same file in roms/."));
         if (!peers[idx].room_code.empty())
           DesktopChatJoinByRoomCode(peers[idx].room_code.c_str());
         else if (!peers[idx].host_ip.empty())
@@ -1593,6 +1825,11 @@ static LRESULT CALLBACK SocialChatWndProc(HWND hwnd, UINT msg, WPARAM wparam, LP
   }
 
   case WM_KEYDOWN: {
+    if (GetKeyState(VK_CONTROL) & 0x8000) {
+      if (wparam == VK_OEM_PLUS || wparam == VK_ADD) { DesktopChatZoomStep(1); return 0; }
+      if (wparam == VK_OEM_MINUS || wparam == VK_SUBTRACT) { DesktopChatZoomStep(-1); return 0; }
+      if (wparam == '0' || wparam == VK_NUMPAD0) { DesktopChatZoomStep(0); return 0; }
+    }
     if (wparam == VK_ESCAPE) {
       ShowWindow(hwnd, SW_HIDE);
       return 0;
@@ -1601,11 +1838,7 @@ static LRESULT CALLBACK SocialChatWndProc(HWND hwnd, UINT msg, WPARAM wparam, LP
       if (!g_input_text.empty()) {
         std::string to_send = g_input_text;
         g_input_text.clear();
-        if (to_send.rfind("KRM-", 0) == 0) {
-          DesktopChatJoinByRoomCode(to_send.c_str());
-        } else {
-          DesktopChatPostMessage(to_send.c_str());
-        }
+        DesktopChatSubmitInput(to_send.c_str());
       }
       return 0;
     }
@@ -1672,6 +1905,8 @@ static SDL_Texture* g_chat_sdl_tex = nullptr;
 static std::vector<uint32_t> g_chat_sdl_pixels;
 static int g_chat_sdl_w = 820;
 static int g_chat_sdl_h = 540;
+static float g_chat_sdl_scale = 1.0f; // window pixels per canvas pixel
+static bool g_chat_sdl_has_invite = false;
 
 static void DrawOverlayRectBlend(uint32_t *fb, int fb_w, int fb_h, int rx,
                                  int ry, int rw, int rh, uint32_t rgb,
@@ -1683,7 +1918,7 @@ void DesktopChatShowWindowSdl() {
   DesktopChatStartNetwork();
   if (!g_chat_sdl_win) {
     g_chat_sdl_win = SDL_CreateWindow(
-        "Karamelo Social — Amigos & Bate-Papo",
+        "Karamelo Live - Bate-Papo & Desafio",
         g_chat_sdl_w, g_chat_sdl_h, SDL_WINDOW_RESIZABLE);
     if (g_chat_sdl_win) {
       g_chat_sdl_ren = SDL_CreateRenderer(g_chat_sdl_win, NULL);
@@ -1695,6 +1930,8 @@ void DesktopChatShowWindowSdl() {
   }
   if (g_chat_sdl_win) {
     SDL_ShowWindow(g_chat_sdl_win);
+    // SDL3 delivers no typed text to a window until this is called.
+    SDL_StartTextInput(g_chat_sdl_win);
   }
 }
 
@@ -1728,8 +1965,8 @@ void DesktopChatProcessSdlEvent(const void* raw_event) {
     }
   } else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
     if (event->button.windowID == SDL_GetWindowID(g_chat_sdl_win)) {
-      int mx = (int)event->button.x;
-      int my = (int)event->button.y;
+      int mx = (int)(event->button.x / g_chat_sdl_scale);
+      int my = (int)(event->button.y / g_chat_sdl_scale);
       if (my >= 68 && my <= 94) {
         if (mx >= 10 && mx <= 122) g_sidebar_tab.store(SIDEBAR_ROOMS);
         else if (mx >= 130 && mx <= 244) g_sidebar_tab.store(SIDEBAR_FRIENDS);
@@ -1741,25 +1978,40 @@ void DesktopChatProcessSdlEvent(const void* raw_event) {
       if (mx >= g_chat_sdl_w - 180 && mx <= g_chat_sdl_w - 20 && my >= 16 && my <= 46) {
         DesktopChatSendChallenge(NULL);
       }
+      if (g_chat_sdl_has_invite && mx >= g_chat_sdl_w - 290 && mx <= g_chat_sdl_w - 190 && my >= 16 && my <= 46) {
+        DesktopChatAcceptLastChallenge();
+      }
       if (mx >= g_chat_sdl_w - 100 && my >= g_chat_sdl_h - 50) {
         if (!g_input_text.empty()) {
-          DesktopChatPostMessage(g_input_text.c_str());
+          const std::string to_send = g_input_text;
           g_input_text.clear();
+          DesktopChatSubmitInput(to_send.c_str());
         }
       }
     }
   } else if (event->type == SDL_EVENT_KEY_DOWN) {
     if (event->key.windowID == SDL_GetWindowID(g_chat_sdl_win)) {
-      if (event->key.scancode == SDL_SCANCODE_RETURN) {
+      const SDL_Scancode sc = event->key.scancode;
+      if (event->key.mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) {
+        if (sc == SDL_SCANCODE_EQUALS || sc == SDL_SCANCODE_KP_PLUS) DesktopChatZoomStep(1);
+        else if (sc == SDL_SCANCODE_MINUS || sc == SDL_SCANCODE_KP_MINUS) DesktopChatZoomStep(-1);
+        else if (sc == SDL_SCANCODE_0 || sc == SDL_SCANCODE_KP_0) DesktopChatZoomStep(0);
+      } else if (event->key.scancode == SDL_SCANCODE_RETURN) {
         if (!g_input_text.empty()) {
-          DesktopChatPostMessage(g_input_text.c_str());
+          const std::string to_send = g_input_text;
           g_input_text.clear();
+          DesktopChatSubmitInput(to_send.c_str());
         }
       } else if (event->key.scancode == SDL_SCANCODE_BACKSPACE) {
         if (!g_input_text.empty()) g_input_text.pop_back();
       } else if (event->key.scancode == SDL_SCANCODE_ESCAPE) {
         DesktopChatHideWindowSdl();
       }
+    }
+  } else if (event->type == SDL_EVENT_MOUSE_WHEEL) {
+    if (event->wheel.windowID == SDL_GetWindowID(g_chat_sdl_win) &&
+        (SDL_GetModState() & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) && event->wheel.y != 0) {
+      DesktopChatZoomStep(event->wheel.y > 0 ? 1 : -1);
     }
   } else if (event->type == SDL_EVENT_TEXT_INPUT) {
     if (event->text.windowID == SDL_GetWindowID(g_chat_sdl_win)) {
@@ -1774,6 +2026,27 @@ void DesktopChatRenderSdlWindow() {
   if (!g_chat_sdl_win || !DesktopChatIsWindowVisibleSdl() || !g_chat_sdl_ren || !g_chat_sdl_tex)
     return;
 
+  // The canvas follows the window and the zoom. It used to stay 820x540 and be
+  // stretched, so a resized window bent the text and missed every click.
+  int win_w = 0, win_h = 0;
+  SDL_GetWindowSize(g_chat_sdl_win, &win_w, &win_h);
+  if (win_w > 0 && win_h > 0) {
+    g_chat_sdl_scale = ChatEffectiveZoom(win_w, win_h);
+    const int canvas_w = (int)(win_w / g_chat_sdl_scale + 0.5f);
+    const int canvas_h = (int)(win_h / g_chat_sdl_scale + 0.5f);
+    if (canvas_w != g_chat_sdl_w || canvas_h != g_chat_sdl_h) {
+      SDL_Texture *tex = SDL_CreateTexture(g_chat_sdl_ren, SDL_PIXELFORMAT_ARGB8888,
+                                           SDL_TEXTUREACCESS_STREAMING, canvas_w, canvas_h);
+      if (tex) {
+        SDL_DestroyTexture(g_chat_sdl_tex);
+        g_chat_sdl_tex = tex;
+        g_chat_sdl_w = canvas_w;
+        g_chat_sdl_h = canvas_h;
+        g_chat_sdl_pixels.assign((size_t)canvas_w * canvas_h, 0xFF171A21u);
+      }
+    }
+  }
+
   std::fill(g_chat_sdl_pixels.begin(), g_chat_sdl_pixels.end(), 0xFF171A21u);
 
   DrawOverlayRectBlend(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 0, 0, 254, g_chat_sdl_h, 0x001E232Du, 0x002A3140u);
@@ -1782,11 +2055,11 @@ void DesktopChatRenderSdlWindow() {
 
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, 16, DesktopChatGetNickname(), 0x00FFFFFFu);
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, 28, DesktopChatGetKarameloTag(), 0x0066C0F4u);
-  DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, 42, "Online • BattleTag", 0x0057F287u);
+  DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, 42, "Online", 0x0057F287u);
 
   bool is_rooms = (g_sidebar_tab.load() == SIDEBAR_ROOMS);
   DrawOverlayRectBlend(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 10, 68, 112, 26, is_rooms ? 0x002A475Eu : 0x001E232Du, 0x0066C0F4u);
-  DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 20, 77, "LOBBIES", is_rooms ? 0x00FFFFFFu : 0x008C98A8u);
+  DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 20, 77, Tr("SALAS", "ROOMS"), is_rooms ? 0x00FFFFFFu : 0x008C98A8u);
 
   DrawOverlayRectBlend(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 130, 68, 114, 26, !is_rooms ? 0x002A475Eu : 0x001E232Du, 0x0066C0F4u);
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 142, 77, "AMIGOS", !is_rooms ? 0x00FFFFFFu : 0x008C98A8u);
@@ -1799,9 +2072,26 @@ void DesktopChatRenderSdlWindow() {
       DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 18, ry + 11, DesktopChatGetRoomName((LiveChatRoom)r), 0x00FFFFFFu);
       ry += 35;
     }
+    ry += 6;
+    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry, Tr("NA SUA REDE:", "ON YOUR NETWORK:"), 0x008C98A8u);
+    ry += 14;
+    const std::string my_tag = DesktopChatGetKarameloTag();
+    const std::string my_ip = NetplayGetLocalIp();
+    bool anyone = false;
+    for (const auto& peer : DesktopChatGetActivePeers()) {
+      if ((peer.tag == my_tag && peer.host_ip == my_ip) || ry > g_chat_sdl_h - 30)
+        continue;
+      anyone = true;
+      DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry, peer.tag.substr(0, 26).c_str(), 0x00FFFFFFu);
+      const std::string sub = peer.has_challenge ? std::string(Tr("Convidando", "Inviting")) : (peer.current_game.empty() ? std::string("Online") : peer.current_game.substr(0, 26));
+      DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry + 10, sub.c_str(), 0x0057F287u);
+      ry += 26;
+    }
+    if (!anyone)
+      DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry, Tr("Ninguem por aqui.", "No one here."), 0x008C98A8u);
   } else {
     int fy = 104;
-    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, fy, "ROSTER DE AMIGOS:", 0x008C98A8u);
+    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, fy, Tr("AMIGOS:", "FRIENDS:"), 0x008C98A8u);
     fy += 16;
     auto friends = DesktopChatGetFriends();
     for (size_t i = 0; i < friends.size() && fy < g_chat_sdl_h - 20; ++i) {
@@ -1818,15 +2108,47 @@ void DesktopChatRenderSdlWindow() {
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, g_chat_sdl_w - 168, 27, "DESAFIAR NETPLAY", 0x00FFFFFFu);
 
   auto msgs = DesktopChatGetRoomMessages();
-  int my = 80;
-  for (size_t i = 0; i < msgs.size() && my < g_chat_sdl_h - 80; ++i) {
-    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 270, my, msgs[i].sender.c_str(), 0x0066C0F4u);
-    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 270, my + 10, msgs[i].text.c_str(), 0x00FFFFFFu);
-    my += 26;
+
+  // Accepting takes the newest invite from someone else, so the button says so.
+  g_chat_sdl_has_invite = false;
+  for (const auto& m : msgs)
+    if (!m.game_challenge.empty() && !m.from_me)
+      g_chat_sdl_has_invite = true;
+  if (g_chat_sdl_has_invite) {
+    DrawOverlayRectBlend(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, g_chat_sdl_w - 290, 16, 100, 30, 0x002D7D46u, 0x0057F287u);
+    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, g_chat_sdl_w - 276, 27, Tr("ENTRAR", "JOIN"), 0x00FFFFFFu);
+  }
+
+  // Newest at the bottom and long text wrapped: the first version cut every
+  // line at the window's edge and stopped at the oldest messages that fit.
+  const int columns = std::max(10, (g_chat_sdl_w - 286) / 8);
+  struct ChatLine { std::string text; uint32_t color; };
+  std::vector<ChatLine> lines;
+  for (const auto& m : msgs) {
+    lines.push_back({m.sender, !m.game_challenge.empty() ? 0x0057F287u : 0x0066C0F4u});
+    std::string rest = m.text;
+    while (!rest.empty()) {
+      size_t take = rest.size();
+      if ((int)take > columns) {
+        take = (size_t)columns;
+        const size_t space = rest.rfind(' ', take);
+        if (space != std::string::npos && space > 0) take = space;
+      }
+      lines.push_back({rest.substr(0, take), 0x00FFFFFFu});
+      rest.erase(0, take);
+      while (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
+    }
+  }
+  const int max_lines = std::max(1, (g_chat_sdl_h - 80 - 72) / 11);
+  const size_t first = lines.size() > (size_t)max_lines ? lines.size() - (size_t)max_lines : 0;
+  int my = 74;
+  for (size_t i = first; i < lines.size(); ++i) {
+    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 270, my, lines[i].text.c_str(), lines[i].color);
+    my += 11;
   }
 
   DrawOverlayRectBlend(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 270, g_chat_sdl_h - 48, g_chat_sdl_w - 380, 34, 0x00141821u, 0x002A3140u);
-  std::string in_show = g_input_text.empty() ? "Digite sua mensagem... [Enter envia]" : g_input_text;
+  std::string in_show = g_input_text.empty() ? Tr("Mensagem ou codigo KRM-...", "Message or KRM-... room code") : g_input_text;
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 280, g_chat_sdl_h - 35, in_show.c_str(), g_input_text.empty() ? 0x008C98A8u : 0x00FFFFFFu);
 
   DrawOverlayRectBlend(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, g_chat_sdl_w - 96, g_chat_sdl_h - 48, 80, 34, 0x002A475Eu, 0x0066C0F4u);
@@ -1865,7 +2187,7 @@ void DesktopChatShowWindow() {
     }
 
     g_chat_hwnd = CreateWindowExW(
-        0, L"KarameloSocialChatClass", L"Karamelo Social — Amigos & Bate-Papo",
+        0, L"KarameloSocialChatClass", L"Karamelo Live - Bate-Papo & Desafio",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 820, 540, NULL, NULL,
         hInst, NULL);
 
@@ -1974,32 +2296,43 @@ void DesktopChatRenderOverlayWin32(void *hdc_handle, int win_w, int win_h) {
   if (local_talk) {
     DrawRoundBoxGdi(mem_dc, ow - 78, 9, 30, 18, 4, RGB(34, 120, 60), RGB(87, 242, 135));
     RECT rc_voc = {ow - 78, 9, ow - 48, 27};
-    DrawUtf8TextGdi(mem_dc, "VOCE", rc_voc, g_font_small, RGB(255, 255, 255), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    DrawUtf8TextGdi(mem_dc, "1P", rc_voc, g_font_small, RGB(255, 255, 255), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   }
   if (peer_talk) {
     DrawRoundBoxGdi(mem_dc, ow - 42, 9, 30, 18, 4, RGB(34, 90, 140), RGB(102, 192, 244));
     RECT rc_peer = {ow - 42, 9, ow - 12, 27};
-    DrawUtf8TextGdi(mem_dc, "PEER", rc_peer, g_font_small, RGB(255, 255, 255), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    DrawUtf8TextGdi(mem_dc, "2P", rc_peer, g_font_small, RGB(255, 255, 255), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   }
 
   if (show_panel) {
     FillSolidRectGdi(mem_dc, 8, 32, ow - 16, 1, RGB(42, 54, 72));
     std::vector<LiveChatMessage> msgs = DesktopChatGetRoomMessages();
-    int ty = 38;
-    size_t start = msgs.size() > 4 ? msgs.size() - 4 : 0;
-    for (size_t i = start; i < msgs.size() && ty < oh - 26; ++i) {
-      char mline[256];
-      snprintf(mline, sizeof(mline), "%s: %s", msgs[i].sender.c_str(), msgs[i].text.c_str());
-      RECT rc_m = {12, ty, ow - 12, ty + 24};
-      DrawUtf8TextGdi(mem_dc, mline, rc_m, g_font_small,
-                      !msgs[i].game_challenge.empty() ? RGB(144, 210, 80) : RGB(220, 228, 238),
-                      DT_LEFT | DT_WORDBREAK);
-      ty += 32;
+    // Newest at the bottom, and only what fits whole: a fixed row height cut
+    // longer messages in the middle of a line.
+    const int list_top = 38;
+    int ty = oh - 26;
+    HGDIOBJ old_mf = SelectObject(mem_dc, g_font_small);
+    for (size_t i = msgs.size(); i-- > 0;) {
+      std::string mline = msgs[i].sender + ": " + msgs[i].text;
+      wchar_t wline[512] = {0};
+      MultiByteToWideChar(CP_UTF8, 0, mline.c_str(), -1, wline, 511);
+      RECT rc_calc = {12, 0, ow - 12, 0};
+      DrawTextW(mem_dc, wline, -1, &rc_calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+      const int line_h = (int)(rc_calc.bottom - rc_calc.top);
+      if (ty - line_h < list_top)
+        break;
+      ty -= line_h;
+      RECT rc_m = {12, ty, ow - 12, ty + line_h};
+      SetBkMode(mem_dc, TRANSPARENT);
+      SetTextColor(mem_dc, !msgs[i].game_challenge.empty() ? RGB(144, 210, 80) : RGB(220, 228, 238));
+      DrawTextW(mem_dc, wline, -1, &rc_m, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+      ty -= 6;
     }
+    SelectObject(mem_dc, old_mf);
 
     RECT rc_foot = {12, oh - 22, ow - 12, oh - 4};
-    DrawUtf8TextGdi(mem_dc, Tr("F10: Fechar Overlay  •  F11: Janela Completa",
-                               "F10: Close Overlay  •  F11: Full Window"),
+    DrawUtf8TextGdi(mem_dc, Tr("F10: Fechar  •  Shift+F10: Janela do chat",
+                               "F10: Close  •  Shift+F10: Chat window"),
                     rc_foot, g_font_small, RGB(130, 145, 165), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
   }
 

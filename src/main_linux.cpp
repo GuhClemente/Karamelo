@@ -930,6 +930,28 @@ int main(int argc, char* argv[])
 	// -------------------------------------------------------------
 	// 1. Headless Core Self-Test Mode (--core-selftest)
 	// -------------------------------------------------------------
+	// "--netplay-selftest host|guest <core> <rom> <ip> <port> <frames> <result>":
+	// see tools/test_netplay.ps1.
+	// "--social-selftest a|b <chat port> <result>" and "--voice-selftest <port>
+	// <seconds> <result>": see tools/test_social.ps1.
+	if (argc > 4 && strcmp(argv[1], "--social-selftest") == 0)
+		_exit(SocialSelfTest(argv[2], atoi(argv[3]), 55435, argv[4]));
+	if (argc > 4 && strcmp(argv[1], "--voice-selftest") == 0)
+	{
+		SDL_Init(SDL_INIT_AUDIO);
+		_exit(VoiceSelfTest(atoi(argv[2]), atoi(argv[3]), argv[4]));
+	}
+	if (argc > 8 && strcmp(argv[1], "--netplay-selftest") == 0)
+	{
+		if (!SDL_Init(SDL_INIT_GAMEPAD | SDL_INIT_AUDIO)) return 4;
+		HwIsAvailable();
+		HwReleaseCurrent();
+		VkHwIsAvailable();
+		MenuInit();
+		int r = NetplaySelfTest(argv[2], argv[3], argv[4], argv[5], atoi(argv[6]), (unsigned)atoi(argv[7]), argv[8]);
+		_exit(r);
+	}
+
 	if (argc > 3 && strcmp(argv[1], "--core-selftest") == 0)
 	{
 		FILE* lf = fopen("karamelo.log", "a");
@@ -1269,6 +1291,8 @@ int main(int argc, char* argv[])
 
 	MenuInit();
 	TrayManagerInit(nullptr);
+	if (argc > 1 && strcmp(argv[1], "--chat") == 0)
+		DesktopChatShowWindow();
 
 	double display_fps = 60.0;
 	SDL_DisplayID display_id = SDL_GetDisplayForWindow(g_window);

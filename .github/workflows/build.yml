@@ -53,6 +53,8 @@ jobs:
           key: sdl3-linux-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_linux.sh') }}
       - name: Build and test
         run: ./compile_linux.sh
+      - name: Chat, invite, voice and netplay between two real processes
+        run: bash tools/test_netplay_unix.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -73,6 +75,8 @@ jobs:
           key: sdl3-macos-${{ hashFiles('third_party/SDL3/CMakeLists.txt', 'compile_macos.sh') }}
       - name: Build and test
         run: ./compile_macos.sh
+      - name: Chat, invite, voice and netplay between two real processes
+        run: bash tools/test_netplay_unix.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

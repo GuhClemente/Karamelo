@@ -200,7 +200,7 @@ Karamelo/
 │   ├── chd_reader.cpp          Leitura de imagens CHD (para RetroAchievements)
 │   ├── hw_render.cpp           Contexto OpenGL para cores com renderização por hardware
 │   ├── input_map.cpp           Mapeamento de teclado/controle
-│   ├── netplay.cpp             Netplay via UDP
+│   ├── netplay.cpp             Netplay em lockstep via TCP
 │   ├── netplay_protocol.cpp    Framing do protocolo de rede do netplay
 │   ├── port_runner.cpp         Download e execução de PC Ports (.exe, Linux e Mach-O macOS)
 │   ├── retroachievements.cpp   Integração com rcheevos

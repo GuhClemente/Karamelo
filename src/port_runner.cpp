@@ -1,6 +1,7 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <tlhelp32.h>
 #else
 #include <spawn.h>
 #include <sys/wait.h>
@@ -1656,6 +1657,37 @@ static bool SetupBlackGame(const PortDefinition& def, const std::string& port_di
     return true;
 }
 
+#ifdef _WIN32
+// Waits until no process with this file name is running from inside the port
+// folder. The name alone is not enough: another copy of the game installed
+// elsewhere must not keep Karamelo minimized.
+static void WaitForDetachedGame(const std::wstring& exe_name, const std::wstring& port_dir) {
+    for (;;) {
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snap == INVALID_HANDLE_VALUE) return;
+        HANDLE found = NULL;
+        PROCESSENTRY32W pe = {};
+        pe.dwSize = sizeof(pe);
+        for (BOOL more = Process32FirstW(snap, &pe); more && !found; more = Process32NextW(snap, &pe)) {
+            if (_wcsicmp(pe.szExeFile, exe_name.c_str()) != 0) continue;
+            HANDLE h = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
+            if (!h) continue;
+            wchar_t path[1024];
+            DWORD len = 1024;
+            if (QueryFullProcessImageNameW(h, 0, path, &len) &&
+                _wcsnicmp(path, port_dir.c_str(), port_dir.size()) == 0)
+                found = h;
+            else
+                CloseHandle(h);
+        }
+        CloseHandle(snap);
+        if (!found) return;
+        WaitForSingleObject(found, INFINITE);
+        CloseHandle(found);
+    }
+}
+#endif
+
 // Does the actual OS-level work of launching an already-installed port:
 // ROM auto-copy, stopping any running libretro core, minimizing the window,
 // launching the process, and spawning the exit-monitor thread. Must only
@@ -1669,22 +1701,38 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
     // 1b. Resolve "{iso}" in the launch arguments before anything is torn
     // down or minimized - a missing disc image has to leave the menu as it was.
-    std::vector<std::string> extra_args = def ? def->launch_args : std::vector<std::string>{};
-    for (auto& a : extra_args) {
-        size_t at = a.find("{iso}");
-        if (at == std::string::npos) continue;
-        bool wrong_disc = false;
-        std::string iso = FindUserIso(*def, ResolvePortDir(port_id), &wrong_disc);
-        if (iso.empty()) {
-            std::string where = def->iso_dirs.empty() ? "roms" : "roms/" + def->iso_dirs.front();
-            if (wrong_disc && !def->iso_disc_label.empty())
-                CoreSetToast((Tr("ISO ENCONTRADO NAO E ", "ISO FOUND IS NOT ") + def->iso_disc_label + Tr(" - VEJA ", " - SEE ") + where).c_str(), 360);
-            else
-                CoreSetToast((Tr("COLOQUE SEU ISO DE ", "PUT YOUR ISO OF ") + def->display_name + Tr(" EM ", " IN ") + where).c_str(), 300);
-            return false;
+    auto resolve_iso = [&](std::vector<std::string>& args) {
+        for (auto& a : args) {
+            size_t at = a.find("{iso}");
+            if (at == std::string::npos) continue;
+            bool wrong_disc = false;
+            std::string iso = FindUserIso(*def, ResolvePortDir(port_id), &wrong_disc);
+            if (iso.empty()) {
+                std::string where = def->iso_dirs.empty() ? "roms" : "roms/" + def->iso_dirs.front();
+                if (wrong_disc && !def->iso_disc_label.empty())
+                    CoreSetToast((Tr("ISO ENCONTRADO NAO E ", "ISO FOUND IS NOT ") + def->iso_disc_label + Tr(" - VEJA ", " - SEE ") + where).c_str(), 360);
+                else
+                    CoreSetToast((Tr("COLOQUE SEU ISO DE ", "PUT YOUR ISO OF ") + def->display_name + Tr(" EM ", " IN ") + where).c_str(), 300);
+                return false;
+            }
+            std::error_code aec;
+            a.replace(at, 5, fs::absolute(iso, aec).string());
         }
-        std::error_code aec;
-        a.replace(at, 5, fs::absolute(iso, aec).string());
+        return true;
+    };
+    std::vector<std::string> extra_args = def ? def->launch_args : std::vector<std::string>{};
+    if (!resolve_iso(extra_args)) return false;
+
+    // 1b2. First use of a port that compiles itself from the user's disc.
+    std::vector<std::string> setup_args;
+    bool run_setup = false;
+    if (def && !def->setup_relpath.empty() && !def->setup_done_relpath.empty()) {
+        std::error_code sec;
+        run_setup = !fs::exists(fs::path(ResolvePortDir(port_id)) / def->setup_done_relpath, sec);
+        if (run_setup) {
+            setup_args = def->setup_args;
+            if (!resolve_iso(setup_args)) return false;
+        }
     }
 
     // 1c. Resolve "{rom}" in the launch arguments
@@ -1784,7 +1832,15 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         // filename containing &, |, or ^ able to inject a second command. The
         // doubled quotes survive that one strip, so the path stays inside its
         // own quoted token instead of being reparsed as bare command text.
-        std::wstring cmdline = L"cmd.exe /c \"\"" + wexe + L"\"\"";
+        std::wstring cmdline = L"cmd.exe /c \"";
+        if (run_setup) {
+            // Every argument quoted: a disc named "A&B.iso" has no space, but
+            // cmd.exe would still split the command there.
+            cmdline += L"\"" + (abs_dir / def->setup_relpath).make_preferred().wstring() + L"\"";
+            for (const auto& a : setup_args) cmdline += L" \"" + fs::path(a).wstring() + L"\"";
+            cmdline += L" && ";
+        }
+        cmdline += L"\"" + wexe + L"\"\"";
         std::vector<wchar_t> buf(cmdline.begin(), cmdline.end());
         buf.push_back(L'\0');
         ok = CreateProcessW(NULL, buf.data(), NULL, NULL, FALSE, 0, NULL, wdir.c_str(), &si, &pi);
@@ -1849,6 +1905,12 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
     HANDLE hProcess = pi.hProcess;
     HANDLE hThread = pi.hThread;
+    std::wstring detached_name;
+    std::wstring detached_dir;
+    if (def && !def->detached_process.empty()) {
+        detached_name = fs::path(def->detached_process).wstring();
+        detached_dir = abs_dir.wstring() + L"\\";
+    }
 #else
     // No .bat/.cmd-style script launcher exists here - every port definition
     // in KnownPortDefs() resolves to a real binary (FindBestExecutable() only
@@ -1902,13 +1964,16 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 #endif
 
     s_port_running.store(true);
-    CoreSetToast(Tr("INICIANDO PORT NATIVO...", "STARTING NATIVE PORT..."), 300); // 5 s
+    if (run_setup)
+        CoreSetToast(Tr("COMPILANDO O JOGO DO SEU ISO - PODE LEVAR VARIOS MINUTOS", "BUILDING THE GAME FROM YOUR ISO - THIS MAY TAKE SEVERAL MINUTES"), 600);
+    else
+        CoreSetToast(Tr("INICIANDO PORT NATIVO...", "STARTING NATIVE PORT..."), 300); // 5 s
 
     // 5. Monitor in background thread
     try {
     std::thread([
 #ifdef _WIN32
-        hProcess, hThread
+        hProcess, hThread, detached_name, detached_dir
 #else
         pid
 #endif
@@ -1921,6 +1986,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         // indirectly toast_lock through it) a hung-core recovery could race.
 #ifdef _WIN32
         WaitForSingleObject(hProcess, INFINITE);
+        if (!detached_name.empty()) WaitForDetachedGame(detached_name, detached_dir);
         s_active_bg_threads.fetch_add(1);
         CloseHandle(hThread);
         CloseHandle(hProcess);

@@ -1818,12 +1818,13 @@ void PopulateCloudSettings() {
   current_title = "Karamelo Cloud";
   OsdSetSize(10);
 
-  items.push_back({"Status", CloudSyncGetStatusString(), false, false, 0});
+  // No "Status" label: these messages need the whole row.
+  items.push_back({CloudSyncGetStatusString(), "", false, false, 0});
   char cnt_buf[32];
   snprintf(cnt_buf, sizeof(cnt_buf), "%d", CloudSyncGetSyncedFileCount());
   items.push_back({Tr("Arquivos Salvos", "Saved Files"), cnt_buf, false, false, 0});
-  items.push_back({Tr("Ultimo Sync", "Last Sync"), CloudSyncGetLastSyncTimeStr(), false, false, 0});
-  items.push_back({Tr("Sync Automatico", "Auto Sync"), CloudSyncGetAutoSync() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 901});
+  items.push_back({"Sync", CloudSyncGetLastSyncTimeStr(), false, false, 0});
+  items.push_back({Tr("Sync Auto", "Auto Sync"), CloudSyncGetAutoSync() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 901});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Sincronizar Agora", "Sync Now"), ">", false, true, 902});
   if (CloudSyncIsConnected()) {
@@ -1867,9 +1868,10 @@ void PopulateWebAdminSettings() {
   OsdSetSize(10);
 
   bool running = WebAdminIsRunning();
-  items.push_back({Tr("Servidor Local", "Local Server"), running ? Tr("Ativo (LAN)", "Active (LAN)") : Tr("Desligado", "Stopped"), false, true, 910});
-  items.push_back({Tr("Abrir no Navegador (PC)", "Open in Browser (PC)"), running ? WebAdminGetLocalUrl() : Tr("(Iniciar e Abrir)", "(Start & Open)"), false, true, 912});
-  items.push_back({Tr("URL Wi-Fi (Celular)", "Wi-Fi URL (Mobile)"), running ? WebAdminGetUrl() : Tr("(Inativo)", "(Stopped)"), false, false, 0});
+  items.push_back({Tr("Servidor", "Server"), running ? Tr("Ativo (LAN)", "Active (LAN)") : Tr("Desligado", "Stopped"), false, true, 910});
+  items.push_back({Tr("Abrir no Navegador", "Open in Browser"), ">", false, true, 912});
+  // The address the phone needs takes the whole row: it is what the player reads.
+  items.push_back({running ? WebAdminGetUrl() : Tr("Endereco: servidor parado", "Address: server stopped"), "", false, false, 0});
   items.push_back({Tr("PIN de Acesso", "Access PIN"), WebAdminGetPin(), false, false, 0});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Gerar Novo PIN", "Regenerate PIN"), ">", false, true, 911});
@@ -1885,16 +1887,16 @@ void PopulateLiveChatSettings() {
   current_title = "Karamelo Live";
   OsdSetSize(11);
 
-  items.push_back({Tr("Sala Ativa", "Active Room"), DesktopChatGetRoomName(DesktopChatGetRoom()), false, false, 920});
-  items.push_back({Tr("Status Presenca", "Presence Status"), TrayManagerGetStatusName(TrayManagerGetStatus()), false, false, 921});
+  items.push_back({Tr("Sala", "Room"), DesktopChatGetRoomName(DesktopChatGetRoom()), false, false, 920});
+  items.push_back({"Status", TrayManagerGetStatusName(TrayManagerGetStatus()), false, false, 921});
 #ifdef _WIN32
-  items.push_back({Tr("Bandeja Sistema", "System Tray"), TrayManagerIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 922});
+  items.push_back({Tr("Bandeja", "Tray"), TrayManagerIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 922});
 #endif
-  items.push_back({Tr("Overlay em Jogo", "In-Game Overlay"), DesktopChatIsOverlayVisible() ? Tr("Visivel [F10]", "Visible [F10]") : Tr("Oculto [F10]", "Hidden [F10]"), false, true, 924});
+  items.push_back({"Overlay", DesktopChatIsOverlayVisible() ? Tr("Visivel [F10]", "Visible [F10]") : Tr("Oculto [F10]", "Hidden [F10]"), false, true, 924});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Abrir Janela Chat", "Open Chat Window"), ">", false, true, 923});
-  items.push_back({Tr("Desafiar 1-Click", "1-Click Challenge"), ">", false, true, 925});
-  items.push_back({Tr("Aceitar Desafio", "Accept Challenge"), ">", false, true, 926});
+  items.push_back({Tr("Convidar p/ Partida", "Invite to Match"), ">", false, true, 925});
+  items.push_back({Tr("Aceitar Convite", "Accept Invite"), ">", false, true, 926});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
 
@@ -2108,13 +2110,13 @@ void PopulateAudioSettings() {
   items.push_back({Tr("Volume", "Volume"), vol_str, false, false, 403});
 
   items.push_back({" ", "", false, false, 0});
-  items.push_back({Tr("Chat de Voz P2P", "P2P Voice Chat"), VoiceChatIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 930});
+  items.push_back({Tr("Chat de Voz", "Voice Chat"), VoiceChatIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 930});
   items.push_back({Tr("Microfone", "Microphone"), VoiceChatIsMicMuted() ? Tr("Mutado", "Muted") : Tr("Ativo", "Active"), false, false, 931});
-  items.push_back({Tr("Reducao de Ruido", "Noise Reduction"), VoiceChatGetDenoiseEngineName(VoiceChatGetDenoiseEngine()), false, false, 932});
-  items.push_back({Tr("Corte de Silencio", "Silence Gate"), VoiceChatGetVadEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 933});
+  items.push_back({Tr("Reducao Ruido", "Noise Filter"), VoiceChatGetDenoiseEngineName(VoiceChatGetDenoiseEngine()), false, false, 932});
+  items.push_back({Tr("Corte de Som", "Silence Gate"), VoiceChatGetVadEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 933});
   items.push_back({Tr("Sensib. do Corte", "Gate Sens."), VoiceChatGetVadSensitivityName(VoiceChatGetVadSensitivity()), false, false, 934});
   items.push_back({Tr("Cancelar Eco", "Echo Cancel"), VoiceChatGetAecEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 935});
-  items.push_back({Tr("Ganho Automatico", "Auto Gain"), VoiceChatGetAgcEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 936});
+  items.push_back({Tr("Ganho Auto", "Auto Gain"), VoiceChatGetAgcEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 936});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
 
@@ -2173,10 +2175,10 @@ void PopulateNetplay() {
                                                   : Tr("Conectado (Cliente)", "Connected (Client)");
   }
 
-  items.push_back({Tr("Status da Rede", "Network Status"), role_str, false, false, 0});
+  items.push_back({Tr("Rede", "Network"), role_str, false, false, 0});
   items.push_back({Tr("IP Local", "Local IP"), NetplayGetLocalIp(), false, false, 0});
-  items.push_back({Tr("Hospedar Jogo", "Host Game"), Tr("Porta 55435", "Port 55435"), false, true, 601});
-  items.push_back({Tr("Conectar a Host", "Connect to Host"), join_ip_input.c_str(), false, true, 602});
+  items.push_back({Tr("Hospedar", "Host"), Tr("Porta 55435", "Port 55435"), false, true, 601});
+  items.push_back({Tr("Conectar", "Connect"), join_ip_input.c_str(), false, true, 602});
   items.push_back({Tr("Desconectar Netplay", "Disconnect Netplay"), "", false, true, 603});
   items.push_back({"Karamelo Live (Chat)", ">", false, true, 218});
   items.push_back({Tr("Porta Netplay", "Netplay Port"), "55435", false, false, 0});

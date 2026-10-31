@@ -1,5 +1,5 @@
 {
-  "catalog_version": 5,
+  "catalog_version": 6,
   "ports": [
     {
       "id": "DrMario64",
@@ -1475,6 +1475,28 @@
         "tmc-multi-windows-x86_64-v0.9.6.tar.gz": "5e30fc0068b827a5fe526f744438ec729c297d9315b1c4254d8db79ba7197498"
       },
       "notes": "The Legend of Zelda: The Minish Cap GBA native port. Supports Windows, Linux and macOS."
+    },
+    {
+      "id": "ProjectTandem",
+      "display_name": "Mario Kart: Double Dash!! (Project Tandem)",
+      "repo": "badcompany94-rcmp/project-tandem",
+      "exe_hint": "Launch-Tandem.cmd",
+      "exe_relpath": "Launch-Tandem.cmd",
+      "iso_keywords": ["kart", "double"],
+      "iso_dirs": ["GameCube", "GC"],
+      "iso_exts": [".iso", ".ciso"],
+      "iso_disc_id": "GM4E01",
+      "iso_disc_label": "MARIO KART DOUBLE DASH USA (GM4E01)",
+      "release_tag": "v0.1.0-beta.3",
+      "setup_relpath": "Setup-Tandem.cmd",
+      "setup_args": ["-GameImage", "{iso}"],
+      "setup_done_relpath": "local-data/settings.json",
+      "detached_process": "mkdd.exe",
+      "asset_sha256": {
+        "Project-Tandem-Public-Beta-3-Cumulative-Update.zip": "6fff3edd55684077441d252795483cd8d2b92c923bc8e39d9a6c254a010d28b5",
+        "Project-Tandem-Windows-Public-Beta-3.zip": "02166ef948ab89667b2056d56d07266ba2786276d75173d40fb2abbd7db93a0f"
+      },
+      "notes": "GameCube static recomp (MIT) with 2-8 player online, prerelease-only repo. Windows only, checked 30/10/2026: only a Windows zip is released and the setup and launcher are PowerShell, so has_linux_build and has_macos_build stay false. The zip has no game: Setup-Tandem.cmd checks main.dol of the user's USA GM4E01 ISO/CISO and compiles with the bundled toolchain, which is why the first launch runs it. Launch-Tandem.cmd starts mkdd.exe and exits, so detached_process keeps Karamelo minimized until the game closes. Online requires everyone on the same build: keep the pin current."
     }
   ]
 }

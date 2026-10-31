@@ -513,6 +513,19 @@ static void CopyRecentReference(int16_t* out, size_t count)
 		out[i] = g_ref_ring[(wp - (uint32_t)count + (uint32_t)i) & 4095u];
 }
 
+static std::atomic<unsigned> g_count_mic{ 0 }, g_count_sent{ 0 }, g_count_received{ 0 };
+static std::atomic<int> g_count_peak{ 0 };
+
+VoiceChatCounters VoiceChatGetCounters()
+{
+	VoiceChatCounters c;
+	c.mic_frames = g_count_mic.load();
+	c.sent = g_count_sent.load();
+	c.received = g_count_received.load();
+	c.mic_peak = g_count_peak.load();
+	return c;
+}
+
 static void VoiceSessionLoop(sockaddr_in peer_addr, SDL_AudioStream* mic, SDL_AudioStream* spk)
 {
 	uint32_t tx_seq = 0;
@@ -547,6 +560,7 @@ static void VoiceSessionLoop(sockaddr_in peer_addr, SDL_AudioStream* mic, SDL_Au
 				{
 					have_rx_seq = true;
 					last_rx_seq = seq;
+					g_count_received.fetch_add(1);
 					if (vad) last_rx_voice_ms = SDL_GetTicks();
 					if (spk)
 					{
@@ -565,6 +579,12 @@ static void VoiceSessionLoop(sockaddr_in peer_addr, SDL_AudioStream* mic, SDL_Au
 			int16_t frame[kVoiceFrameSamples];
 			int16_t reference[kVoiceFrameSamples];
 			if (SDL_GetAudioStreamData(mic, frame, sizeof(frame)) != (int)sizeof(frame)) break;
+			g_count_mic.fetch_add(1);
+			for (int16_t v : frame)
+			{
+				const int level = v < 0 ? -(int)v : (int)v;
+				if (level > g_count_peak.load()) g_count_peak.store(level);
+			}
 			CopyRecentReference(reference, kVoiceFrameSamples);
 
 			VoiceChatConfig cfg = VoiceChatGetConfig();
@@ -573,6 +593,7 @@ static void VoiceSessionLoop(sockaddr_in peer_addr, SDL_AudioStream* mic, SDL_Au
 			{
 				sendto(g_voice_sock, (const char*)tx_packet.data(), (int)tx_packet.size(), 0,
 				       (const sockaddr*)&peer_addr, sizeof(peer_addr));
+				g_count_sent.fetch_add(1);
 			}
 		}
 	}

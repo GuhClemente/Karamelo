@@ -30,6 +30,7 @@ struct LiveChatMessage
 	std::string host_ip;        // Peer IP for 1-Click Netplay accept
 	int         host_port = 55435;
 	int64_t     timestamp_utc = 0;
+	bool        from_me = false; // Never sent: an invite of ours cannot be accepted here
 };
 
 // Friends & Persistent Roster (Steam / Battle.net style)
@@ -118,6 +119,17 @@ void                        DesktopChatSaveFriends();
 bool         DesktopChatPostMessage(const char* text);
 bool         DesktopChatSendChallenge(const char* game_title);
 bool         DesktopChatAcceptLastChallenge();
+// For the self-test: also send to this address, because two copies on one PC only
+// hear each other's broadcast if the network drivers happen to loop it back.
+void         DesktopChatSetExtraPeer(const char* ip, int port);
+// How many network cards took the last broadcast.
+int          DesktopChatGetBroadcastCount();
+// What the player typed in the chat box: a message, a KRM- code or "/nome X".
+bool         DesktopChatSubmitInput(const char* text);
+// Chat window zoom, as in a browser: Ctrl + / Ctrl - / Ctrl 0 / Ctrl + wheel.
+// direction: 1 bigger, -1 smaller, 0 back to 100%. Kept for the next start.
+int          DesktopChatZoomStep(int direction); // returns the new percentage
+int          DesktopChatGetZoomPercent();
 std::vector<LiveChatMessage> DesktopChatGetRoomMessages();
 void         DesktopChatClearRoomMessages();
 

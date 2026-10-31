@@ -543,7 +543,7 @@ static std::string WebAdminBuildStatusJson(const std::string& csrf_token = "")
 	ss << ",\"arch\":" << JsonQuote(APP_ARCH);
 	ss << ",\"systems_count\":" << APP_SYSTEM_COUNT;
 	ss << ",\"core_engines\":" << APP_CORE_ENGINES;
-	ss << ",\"ports_count\":93";
+	ss << ",\"ports_count\":94";
 
 	bool running = (g_hooks.is_running ? g_hooks.is_running() : false);
 	ss << ",\"game_running\":" << (running ? "true" : "false");
@@ -1710,7 +1710,7 @@ input:checked + .slider:before {
             </div>
           </div>
           <div style="margin-top:12px;font-size:12px;color:var(--text-dim);">
-            * Shaders executados nativamente via HLSL/Direct3D 11 / Metal com zero perda de frames e fidelidade analógica de 15kHz.
+            * Os shaders rodam no próprio Karamelo, na placa de vídeo deste computador.
           </div>
         </div>
 
@@ -1819,10 +1819,10 @@ input:checked + .slider:before {
         <div class="card">
           <div class="card-title">
             <span>🛡️ Auditor Canônico de BIOS &amp; Firmwares</span>
-            <span id="lbl-bios-health" class="badge-ok">100% Saudável</span>
+            <span id="lbl-bios-health" class="badge-ok">-</span>
           </div>
           <p class="card-desc">
-            Auditoria em tempo real com hash MD5 contra a base canônica. Arraste qualquer BIOS ausente aqui para enviá-la para a pasta correta automaticamente.
+            Confere se cada arquivo está na pasta e com o tamanho certo. Arraste qualquer BIOS ausente aqui para enviá-la para a pasta correta automaticamente.
           </p>
           <div style="background:rgba(245,158,11,0.06);border-left:3px solid var(--gold-primary);padding:10px 14px;border-radius:6px;margin-bottom:16px;font-size:12.5px;color:var(--text-main);">
             <strong>Importante:</strong> Consoles de cartucho puro (SNES, Mega Drive, NES, N64, Game Boy, GBA, Atari) não necessitam de BIOS. Apenas sistemas de CD/disco e computadores clássicos exigem firmware.
@@ -1839,7 +1839,7 @@ input:checked + .slider:before {
         <div class="card">
           <div class="card-title">
             <span>☁️ Karamelo Cloud Sync (Google Drive)</span>
-            <span id="lbl-cloud-badge" class="badge-ok">Conectado</span>
+            <span id="lbl-cloud-badge" class="badge-missing">-</span>
           </div>
           <div style="margin:14px 0;line-height:1.7;">
             <p>Destino Remoto: <b>Google Drive (appDataFolder segura e oculta)</b></p>
@@ -1861,7 +1861,7 @@ input:checked + .slider:before {
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
             <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">37 Sistemas Retrô</div>
             <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">42 Motores Libretro</div>
-            <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">93 PC Ports &amp; Recompilados</div>
+            <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">94 PC Ports &amp; Recompilados</div>
           </div>
           <p class="card-desc">
             Arquitetura C++20 limpa (clean-room), inspirada no visual e OSD do MiSTer FPGA, porém 100% nativa para PC e dispositivos modernos.
@@ -1881,20 +1881,20 @@ input:checked + .slider:before {
               <p>SDL3 nativo, OpenGL, PipeWire/ALSA, 59 PC Ports nativos ELF64, pronto para Steam Deck e mini PCs de sala de estar.</p>
             </div>
             <div class="eco-card">
-              <h4><span>📀 Karamelo OS</span><span class="badge badge-gold">Distro</span></h4>
-              <p>Nossa distribuição Linux dedicada minimalista. Boot direto no OSD do Karamelo em menos de 3 segundos, ideal para consoles portáteis e pendrives bootáveis.</p>
+              <h4><span>📀 Karamelo OS (Futuro)</span><span class="badge" style="color:var(--text-muted);border-color:var(--border-subtle);">Planejado</span></h4>
+              <p>Ideia de uma distribuição Linux mínima que inicia direto no OSD do Karamelo, para portáteis e pendrives.</p>
             </div>
             <div class="eco-card">
-              <h4><span>🍓 Raspberry Pi &amp; SBCs</span><span class="badge badge-gold">ARM64</span></h4>
-              <p>Suporte nativo aarch64 para Raspberry Pi 4/5, Orange Pi e TV Boxes. Renderização direta no framebuffer via SDL3 KMS/DRM com latência zero e boot em 1 segundo.</p>
+              <h4><span>🍓 Raspberry Pi &amp; SBCs (Futuro)</span><span class="badge" style="color:var(--text-muted);border-color:var(--border-subtle);">Planejado</span></h4>
+              <p>Ideia de um build ARM64 para Raspberry Pi 4/5 e placas parecidas. Ainda não existe.</p>
             </div>
             <div class="eco-card">
               <h4><span>📱 Android (Futuro)</span><span class="badge" style="color:var(--text-muted);border-color:var(--border-subtle);">Planejado</span></h4>
-              <p>Arquitetura C++20 pronta para compilação via Android NDK + Vulkan API + controles touch overlay com háptico.</p>
+              <p>Ideia de um build via Android NDK, com controles na tela. Ainda não existe.</p>
             </div>
             <div class="eco-card">
               <h4><span>🕹️ Nintendo Switch (Futuro)</span><span class="badge" style="color:var(--text-muted);border-color:var(--border-subtle);">Planejado</span></h4>
-              <p>Build homebrew via libnx (Atmosphère) aproveitando a portabilidade C++20 e renderização por hardware.</p>
+              <p>Ideia de um build homebrew via libnx. Ainda não existe.</p>
             </div>
           </div>
           <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border-subtle);display:flex;gap:18px;flex-wrap:wrap;font-size:13px;">
@@ -2325,7 +2325,11 @@ async function loadStatus(){
 
   const cc=document.getElementById('lbl-cloud-count');if(cc)cc.textContent=(d.cloud_synced||0)+' arquivos salvos';
 )raw";
-	h << R"raw(  const ct=document.getElementById('lbl-cloud-time');if(ct)ct.textContent=d.cloud_last_sync||'Agora';
+	h << R"raw(  const ct=document.getElementById('lbl-cloud-time');if(ct)ct.textContent=d.cloud_last_sync||'Nunca';
+  const sb=document.getElementById('btn-sync-now');if(sb){
+    sb.disabled=!d.cloud_connected;
+    sb.textContent=d.cloud_connected?'☁️ Sincronizar Saves Agora':'Conecte no Karamelo: Configurações > Karamelo Cloud';
+  }
   const cb=document.getElementById('lbl-cloud-badge');if(cb){
     cb.textContent=d.cloud_connected?'Conectado':'Desconectado';
     cb.className=d.cloud_connected?'badge-ok':'badge-missing';
@@ -2486,6 +2490,7 @@ document.querySelectorAll('#sys-category-pills .filter-pill').forEach(pill=>{
 });
 document.getElementById('btn-browse-roms')?.addEventListener('click',()=>document.getElementById('rom-file-input')?.click());
 document.getElementById('rom-file-input')?.addEventListener('change',e=>{if(e.target.files.length)uploadFiles(e.target.files,getChosenUploadTarget());});
+document.getElementById('pin-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('btn-login').click();});
 document.getElementById('btn-login')?.addEventListener('click',async()=>{
   const pin=document.getElementById('pin-input')?.value||'';
   const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
@@ -3317,7 +3322,13 @@ bool WebAdminStart(int port, bool loopback_only)
 #endif
 
 		int opt = 1;
+#ifdef _WIN32
+		// On Windows SO_REUSEADDR lets a bind take a port another program is
+		// listening on: the browser could land on that program instead of here.
+		setsockopt(srv, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (const char*)&opt, sizeof(opt));
+#else
 		setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+#endif
 
 		sockaddr_in addr{};
 		addr.sin_family = AF_INET;

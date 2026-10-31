@@ -404,7 +404,25 @@ TEST_CASE(DesktopChat_WireFormatEphemeralRamAndChallenge)
     ASSERT_TRUE(DesktopChatPostMessage("Salve galera do Arcade!"));
     ASSERT_TRUE(DesktopChatSendChallenge("Street Fighter III: 3rd Strike"));
     ASSERT_TRUE(DesktopChatGetRoomMessages().size() >= 2);
+    // An invite of ours is not one to accept: that would connect this PC to itself.
+    ASSERT_FALSE(DesktopChatAcceptLastChallenge());
+    // One from the network is, and it arrives only once even if it came twice.
+    const std::string incoming = "KRMC1 0badf00d m " + wire;
+    const size_t before_invite = DesktopChatGetRoomMessages().size();
+    ASSERT_TRUE(DesktopChatHandleDatagram(incoming, "192.168.1.50"));
+    ASSERT_FALSE(DesktopChatHandleDatagram(incoming, "192.168.1.50"));
+    ASSERT_EQ(DesktopChatGetRoomMessages().size(), before_invite + 1);
     ASSERT_TRUE(DesktopChatAcceptLastChallenge());
+
+    // Typing a name changes it, and it survives the next start.
+    std::error_code nick_ec;
+    std::filesystem::remove("Config/chat_nick.txt", nick_ec);
+    ASSERT_TRUE(DesktopChatSubmitInput("/nome Guh Teste"));
+    ASSERT_STR_EQ(DesktopChatGetNickname(), "Guh Teste");
+    DesktopChatShutdown();
+    DesktopChatInit();
+    ASSERT_STR_EQ(DesktopChatGetNickname(), "Guh Teste");
+    std::filesystem::remove("Config/chat_nick.txt", nick_ec);
 
     // Verify In-Game Overlay renders cleanly onto a 640x360 canvas
     std::vector<uint32_t> canvas(640 * 360, 0);
@@ -916,6 +934,34 @@ TEST_CASE(CloudSync_RealSyncAgainstDriveApi)
     drive.Stop();
     fs::remove_all(root, ec);
     CloudSyncSetEndpointsForTest("https://oauth2.googleapis.com/token", "https://www.googleapis.com", "", 0);
+}
+
+TEST_CASE(DesktopChat_ZoomStepsStopAtTheLimitsAndSurviveARestart)
+{
+    std::error_code ec;
+    std::filesystem::remove("Config/chat_zoom.txt", ec);
+    ASSERT_EQ(DesktopChatZoomStep(0), 100);
+    ASSERT_EQ(DesktopChatZoomStep(1), 110);
+    ASSERT_EQ(DesktopChatZoomStep(-1), 100);
+    for (int i = 0; i < 50; i++) DesktopChatZoomStep(1);
+    ASSERT_EQ(DesktopChatGetZoomPercent(), 250);
+    for (int i = 0; i < 50; i++) DesktopChatZoomStep(-1);
+    ASSERT_EQ(DesktopChatGetZoomPercent(), 70);
+
+    DesktopChatZoomStep(1);
+    DesktopChatSetNetworkAllowed(false);
+    DesktopChatShutdown();
+    DesktopChatInit();
+    ASSERT_EQ(DesktopChatGetZoomPercent(), 80);
+
+    // A damaged file must not leave the window unusable.
+    { std::ofstream("Config/chat_zoom.txt", std::ios::trunc) << "99999"; }
+    DesktopChatShutdown();
+    DesktopChatInit();
+    ASSERT_EQ(DesktopChatGetZoomPercent(), 100);
+
+    DesktopChatZoomStep(0);
+    std::filesystem::remove("Config/chat_zoom.txt", ec);
 }
 
 // F10 opens the chat overlay, but on a computer the key belongs to the game.

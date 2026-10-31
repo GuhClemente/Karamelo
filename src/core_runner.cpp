@@ -40,6 +40,7 @@
 #include "karamelo_math.h"
 #include "osd.h"
 #include "netplay.h"
+#include "netplay_protocol.h"
 #include "hw_render.h"
 #include "hw_render_vulkan.h"
 #include "hw_render_d3d11.h"
@@ -1975,6 +1976,11 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "ppsspp_auto_frameskip") == 0) var->value = "disabled";
 			else if (strcmp(var->key, "ppsspp_frameskip") == 0) var->value = "disabled";
 
+			// mGBA skips the wait loops it finds while running, and what it found is not in
+			// a savestate: two machines at the same state then take different paths. It
+			// costs almost nothing, and netplay needs it from before the game opens.
+			else if (strcmp(var->key, "mgba_idle_optimization") == 0) var->value = "ignore";
+
 			// FM Towns (Geartowns) core options:
 			// Mute buzzer volume by default so holding keyboard keys does not produce loud speaker clicks.
 			else if (strcmp(var->key, "geartowns_buzzer_volume") == 0) var->value = "0";
@@ -2516,7 +2522,10 @@ static SHORT ProbeAwareKeyState(int vk)
 }
 #define GetAsyncKeyState ProbeAwareKeyState
 
-static void CB_InputPoll(void)
+static bool s_np_frame_ready = false;
+static NetInput s_np_port1, s_np_port2;
+
+static void PollLocalInput(void)
 {
 	s_probe_polls.fetch_add(1);
 
@@ -2820,18 +2829,41 @@ static void CB_InputPoll(void)
 	InterlockedExchange(&g_mouse_rel_x, (LONG)mouse_dx);
 	InterlockedExchange(&g_mouse_rel_y, (LONG)mouse_dy);
 	InterlockedExchange(&g_mouse_buttons, (LONG)mouse_btns);
+}
 
-	// 4. Netplay: ship this frame's local input and take the peer's as P2.
-	//
-	// This call did not exist anywhere in the project. Sessions connected, said
-	// "Player 2 connected", and then exchanged nothing - the remote player's
-	// input never reached the core. Here is the only place with both the local
-	// input already assembled and the frame not yet run.
-	if (NetplayGetState() == NETPLAY_CONNECTED)
+// Polling must not change what a netplay frame plays: this machine's OSD or lost
+// focus cuts the local input short, and the other machine would not know.
+static void CB_InputPoll(void)
+{
+	PollLocalInput();
+	if (s_np_frame_ready)
 	{
-		NetplaySyncInputs(joypad_buttons[0], analog_sticks[0],
-		                  joypad_buttons[1], analog_sticks[1]);
+		memset(joypad_buttons, 0, sizeof(joypad_buttons));
+		memset(analog_sticks, 0, sizeof(analog_sticks));
+		memcpy(joypad_buttons[0], s_np_port1.buttons, sizeof(s_np_port1.buttons));
+		memcpy(analog_sticks[0], s_np_port1.analog, sizeof(s_np_port1.analog));
+		memcpy(joypad_buttons[1], s_np_port2.buttons, sizeof(s_np_port2.buttons));
+		memcpy(analog_sticks[1], s_np_port2.analog, sizeof(s_np_port2.analog));
 	}
+}
+
+// Between two frames, on the core thread: what this player holds goes to the
+// session, and the frame only starts once both players' input for it is here.
+// Each machine used to treat its own player as port 1 and the other as port 2,
+// so the same button moved a different character on each screen.
+static void NetplayBeforeFrame()
+{
+	if (NetplayGetState() != NETPLAY_CONNECTED)
+	{
+		s_np_frame_ready = false;
+		return;
+	}
+	PollLocalInput();
+
+	NetInput local;
+	memcpy(local.buttons, joypad_buttons[0], sizeof(local.buttons));
+	memcpy(local.analog, analog_sticks[0], sizeof(local.analog));
+	s_np_frame_ready = NetplayLockstepFrame(local, s_np_port1, s_np_port2);
 }
 
 // Where the game image actually sits inside the presented buffer. The mouse
@@ -2969,6 +3001,11 @@ static int RetroKeyToVK(unsigned id)
 
 static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, unsigned id)
 {
+	// Only the two pads are shared between the machines. A keyboard or mouse read
+	// here would differ from the other player's and split the two games apart.
+	if (s_np_frame_ready && device != RETRO_DEVICE_JOYPAD && device != RETRO_DEVICE_ANALOG)
+		return 0;
+
 	if (port >= 4) return 0;
 
 	if (device == RETRO_DEVICE_JOYPAD)
@@ -2978,11 +3015,11 @@ static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, 
 			int16_t mask = 0;
 			for (int b = 0; b < 16; b++)
 			{
-				if (joypad_buttons[port][b] || s_injected_buttons[port][b]) mask |= (int16_t)(1 << b);
+				if (joypad_buttons[port][b] || (!s_np_frame_ready && s_injected_buttons[port][b])) mask |= (int16_t)(1 << b);
 			}
 			return mask;
 		}
-		if (id < 16) return (joypad_buttons[port][id] || s_injected_buttons[port][id]) ? 1 : 0;
+		if (id < 16) return (joypad_buttons[port][id] || (!s_np_frame_ready && s_injected_buttons[port][id])) ? 1 : 0;
 	}
 	else if (device == RETRO_DEVICE_KEYBOARD && port == 0)
 	{
@@ -3087,7 +3124,7 @@ static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, 
 	{
 		if (index < 2 && id < 2)
 		{
-			if (s_injected_analog[port][index][id] != 0) return s_injected_analog[port][index][id];
+			if (!s_np_frame_ready && s_injected_analog[port][index][id] != 0) return s_injected_analog[port][index][id];
 			return analog_sticks[port][index][id];
 		}
 	}
@@ -3884,6 +3921,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 
 	while (InterlockedCompareExchange(&core_thread_running, 0, 0) && is_game_loaded)
 	{
+		NetplayBeforeFrame();
 		FrameRunResult run = RunOneFrameGuarded();
 		if (!run.ok)
 		{
@@ -4398,6 +4436,19 @@ static bool RetroUnserializeGuarded(const void* data, size_t size)
 {
 	__try { return p_retro_unserialize ? p_retro_unserialize(data, size) : false; }
 	__except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+size_t CoreNetStateSize() { return RetroSerializeSizeGuarded(); }
+bool CoreNetStateSave(void* data, size_t size) { return RetroSerializeGuarded(data, size); }
+bool CoreNetStateLoad(const void* data, size_t size) { return RetroUnserializeGuarded(data, size); }
+bool CoreNetKeepWaiting() { return InterlockedCompareExchange(&core_thread_running, 0, 0) && is_game_loaded; }
+
+std::string CoreGetActiveRomPath()
+{
+	EnterCriticalSection(&name_lock);
+	std::string path = s_active_rom_path;
+	LeaveCriticalSection(&name_lock);
+	return path;
 }
 
 static bool CoreLoad(const char* core_dll_path)

@@ -181,6 +181,10 @@ bool PortCatalogParse(const std::string& json, PortCatalog& out, std::string& er
             !GetString(e, "psp_game_dir", d.psp_game_dir, error, where) ||
             !GetString(e, "release_tag", d.release_tag, error, where) ||
             !GetHashes(e, "asset_sha256", d.asset_sha256, error, where) ||
+            !GetString(e, "setup_relpath", d.setup_relpath, error, where) ||
+            !GetList(e, "setup_args", d.setup_args, error, where) ||
+            !GetString(e, "setup_done_relpath", d.setup_done_relpath, error, where) ||
+            !GetString(e, "detached_process", d.detached_process, error, where) ||
             !GetString(e, "notes", d.notes, error, where))
             return false;
 
@@ -189,7 +193,9 @@ bool PortCatalogParse(const std::string& json, PortCatalog& out, std::string& er
         if (!seen.insert(d.id).second) { error = where + ": id duplicado"; return false; }
         if (!RelPathIsSafe(d.exe_relpath) || !RelPathIsSafe(d.console_log_relpath) ||
             !RelPathIsSafe(d.x360_game_dir) || !RelPathIsSafe(d.psp_game_dir) ||
-            !RelPathIsSafe(d.exe_hint)) {
+            !RelPathIsSafe(d.exe_hint) || !RelPathIsSafe(d.setup_relpath) ||
+            !RelPathIsSafe(d.setup_done_relpath) ||
+            d.detached_process.find_first_of("/\\") != std::string::npos) {
             error = where + ": caminho fora da pasta do port";
             return false;
         }
@@ -236,6 +242,10 @@ std::string PortCatalogToJson(const PortCatalog& catalog)
         PutBool(o, first, "iso_keywords_whole_word", d.iso_keywords_whole_word, false);
         PutString(o, first, "psp_game_dir", d.psp_game_dir);
         PutString(o, first, "release_tag", d.release_tag);
+        PutString(o, first, "setup_relpath", d.setup_relpath);
+        PutList(o, first, "setup_args", d.setup_args);
+        PutString(o, first, "setup_done_relpath", d.setup_done_relpath);
+        PutString(o, first, "detached_process", d.detached_process);
         if (!d.asset_sha256.empty()) {
             o += first ? "\n" : ",\n";
             first = false;

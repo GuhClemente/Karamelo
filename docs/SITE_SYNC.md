@@ -381,8 +381,8 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 25/10/2026 (Ondas 1, 2 e 3):** são **93** jogos de "Ports & Recomp" (93 🪟, 59 🐧, 42 🍎) — 42 até
-11/09, +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
+**Atualizado em 30/10/2026:** são **94** jogos de "Ports & Recomp" (94 🪟, 59 🐧, 42 🍎) — 42 até
+11/09, +1 em 30/10 (Project Tandem — ver seção 51), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
 nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 61, 62, 70, 80, 89, 96) de outra página no futuro. É coincidência
@@ -480,7 +480,7 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **93** jogos de Ports & Recomp (atualizado em 25/10/2026 — ver seções
+- Os **94** jogos de Ports & Recomp (atualizado em 30/10/2026 — ver seções
   10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40 e 41),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
@@ -622,7 +622,7 @@ Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
   Rush 2: Extreme Racing USA — adicionado em 18/10/2026, ver seção 33,
   Automobili Lamborghini — adicionado em 18/10/2026, ver seção 33, e
   Road Rash 64 — adicionado em 18/10/2026, ver seção 33.
-- **🪟 apenas (24 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
+- **🪟 apenas (25 jogos, somente Windows):** Dr. Mario 64, Dinosaur Planet,
   Pokemon Stadium, Chameleon Twist, Quest 64, OutRun (CannonBall DX),
   Animal Crossing (GC), Banjo-Kazooie: Nuts & Bolts, DBZ Budokai,
   Jak & Daxter, LoD: Severed Chains, Castlevania: SotN, Sonic 1 Forever,
@@ -631,7 +631,8 @@ Confira sempre no [CREDITS.md](../CREDITS.md) antes de publicar:
   Super Smash Bros. Melee (Melee Unlocked) — adicionado em 27/09/2026, ver seção 18,
   BLACK (BLACK-XBERecomp) — adicionado em 17/10/2026, ver seção 30,
   Wayne Gretzky's 3D Hockey — adicionado em 18/10/2026, ver seção 33,
-  Jungle Strike — adicionado em 18/10/2026, ver seção 33, e
+  Jungle Strike — adicionado em 18/10/2026, ver seção 33,
+  Mario Kart: Double Dash!! (Project Tandem) — adicionado em 30/10/2026, ver seção 51, e
   Star Wars Battlefront: Renegade Squadron — adicionado em 18/10/2026, ver seção 33. (The Darkness **não** entra — ver seção 19.)
 
 ---
@@ -1599,7 +1600,7 @@ arquivo `data/ports.json` do repositório, publicado em
 > **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
 > arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
 > `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
-> Hoje: **93 jogos — 93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram).
+> Hoje: **94 jogos — 94 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem).
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
@@ -1807,7 +1808,7 @@ O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via re
    - **Onde fica salvo**: Na pasta oculta de aplicativo (`appDataFolder`) do Google Drive do próprio jogador — não polui os arquivos visíveis do Drive dele e não ocupa um único byte no servidor do Karamelo.
    - **O que sincroniza**: Só os saves de bateria e cartões de memória em `saves/<sistema>/` (`.srm`, `.sav`, `.eep`, `.fla`, `.sra`, `.mcr`, `.mcd`, `.nv`). Savestates, ROMs, BIOS e configurações **não** vão para a nuvem.
    - **Proteção contra perda**: Todo download confere o SHA-256 antes de trocar o save, e o save anterior fica como `.bak`. Se o mesmo save mudou em dois PCs, nenhum lado se perde: o deste PC continua valendo e o do outro fica ao lado como `.conflito`.
-   - **Pré-requisito do lançamento**: precisa de um Client ID OAuth do Google registrado pelo projeto. **Sem ele, o botão de conectar pede um Client ID em `Config/cloud.cfg`. Só divulgue a nuvem depois de o projeto registrar o dele.**
+   - **Pré-requisito do lançamento**: precisa de um Client ID OAuth do Google registrado pelo projeto (passo a passo em `docs/CLOUD_GOOGLE.md`). **Sem ele, o botão de conectar pede um Client ID em `Config/cloud.cfg`. Só divulgue a nuvem depois de o projeto registrar o dele.**
 
 2. **Karamelo Web Admin (LAN) — Gerenciador Local pelo Navegador com Auditor de BIOS**:
    - **Problema que resolve**: Ideal para quem usa o PC na sala de estar (TV / HTPC), mini-PCs ou portáteis rodando Karamelo no sofá e quer enviar jogos ou conferir BIOS a partir de outro PC ou celular na mesma rede Wi-Fi/LAN sem precisar espetar pendrive.
@@ -1817,10 +1818,12 @@ O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via re
      - **Auditor de BIOS em Tempo Real**: Painel visual com selos verdes/vermelhos indicando exatamente quais BIOS estão prontos ou faltando (`scph5501.bin`, `dc_boot.bin`, `syscard3.pce`, `neogeo.zip`, `bios7.bin`/`bios9.bin`, etc.).
 
 3. **Karamelo Live — Janela Própria & Salas na Rede Local**:
-   - **Sem navegador e sem Electron**: O bate-papo abre em uma **janela nativa do sistema operacional** (`Karamelo Live — Bate-Papo & Desafio`), totalmente independente da janela do jogo, permitindo posicionar no segundo monitor ou usar ao lado do emulador com consumo quase zero de RAM.
+   - **Sem navegador e sem Electron**: O bate-papo abre em uma **janela nativa do sistema operacional** (`Karamelo Live - Bate-Papo & Desafio`), totalmente independente da janela do jogo, permitindo posicionar no segundo monitor ou usar ao lado do emulador com consumo quase zero de RAM.
    - **Alcance real, sem servidor**: As 4 salas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`) falam com **quem está na mesma rede local** e com **o outro jogador da partida de Netplay**. **Não existe sala mundial pela internet**: não prometa encontrar desconhecidos online. As mensagens ficam só na memória e somem ao fechar.
-   - **Privacidade**: A rede do chat só liga quando o jogador abre o chat, porque ela anuncia o apelido na rede local.
-   - **Desafio para Netplay**: A lista mostra quem está na rede local e o que está jogando; o convite abre a sessão direto. Fora da rede local, o jogador manda o código de sala (`KRM-XXXXX-XXXXX`, que contém o endereço) e o outro digita; pela internet ainda depende de porta aberta no roteador ou VPN.
+   - **Zoom**: A janela do chat aumenta e diminui como um navegador: `Ctrl +`, `Ctrl -`, `Ctrl 0` e `Ctrl` + roda do mouse (de 70% a 250%), e guarda a escolha.
+   - **Privacidade**: A rede do chat só liga quando o jogador abre o chat, porque ela anuncia o apelido na rede local. O apelido começa com o nome de usuário do sistema e muda com `/nome Fulano` na caixa do chat.
+   - **Convite para Netplay**: A lista mostra quem está na rede local e o que está jogando. Ao aceitar, o jogo do anfitrião abre sozinho no outro PC, desde que ele tenha **o mesmo arquivo** em `roms/`; o arquivo do jogo nunca é enviado. Fora da rede local, o jogador manda o código de sala (`KRM-XXXXX-XXXXX`, que contém o endereço) e o outro digita; pela internet ainda depende de porta aberta no roteador ou VPN.
+   - **Como a partida funciona (seção 52)**: Os dois PCs rodam o mesmo jogo quadro a quadro, e o anfitrião é o Jogador 1. A partida espera o jogador mais lento, então funciona melhor em rede local. Não publique como netplay com rollback.
 
 4. **System Tray (Bandeja do Sistema), Presença & Overlay In-Game (`F10`)**:
    - **Bandeja do Sistema (só Windows)**: Ícone na bandeja com menu rápido e status de presença (`Disponivel`, `Jogando`, `Ocupado`), e notificação com som quando chega um convite de partida (em `Ocupado` não avisa). A janela não some ao minimizar: não prometa "minimizar para a bandeja". Linux e macOS não têm ícone de bandeja nem notificação; o status de presença funciona igual.
@@ -1914,7 +1917,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
 | **Tempo de Boot** | Vários segundos carregando temas e Python | **Instantâneo (< 1 segundo)** |
 | **Consumo de Memória** | Alto (EmulationStation + scripts + emulador filho) | **Mínimo (~30 MB de RAM em repouso)** |
 | **Multiplataforma** | **Apenas Windows** | **Windows, Linux e macOS Apple Silicon (M1-M4) nativo** |
-| **PC Ports & Recompilados** | Depende de configurações manuais | **93 PC Ports com catalogação e atualização integrada** |
+| **PC Ports & Recompilados** | Depende de configurações manuais | **94 PC Ports com catalogação e atualização integrada** |
 | **Gerenciamento Remoto** | Não possui | **Karamelo Studio (Web Admin Wi-Fi / TV Remote)** |
 | **Nuvem Pessoal** | Depende de ferramentas externas | **Sincronização de saves com o Google Drive do jogador** |
 | **Menu OSD** | Abrir o menu fecha ou minimiza o jogo ativo | **OSD MiSTer integrado que sobrepõe sem perder foco** |
@@ -2024,7 +2027,7 @@ Lançamento da versão **0.98** do Karamelo Emulador: nuvem pessoal no Google Dr
 
 **Contagens Oficiais (Inalteradas)**:
 - **37 Sistemas**, **42 Motores Libretro**
-- **93 PC Ports & Recompilados** (93 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎)
+- **94 PC Ports & Recompilados** (94 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎)
 
 ### Principais Novidades da v0.98:
 
@@ -2048,3 +2051,51 @@ Lançamento da versão **0.98** do Karamelo Emulador: nuvem pessoal no Google Dr
 4. **Karamelo Cloud (Nuvem Pessoal)**:
    - Sincronização direta com o Google Drive do jogador (OAuth 2.0 PKCE) para saves de bateria e cartões de memória, sem nada no servidor do site. **WebDAV e savestates não fazem parte.** Requer o Client ID do projeto (ver seção 44).
 
+---
+
+## 51. Adição de 30/10/2026 — Mario Kart: Double Dash!! (Project Tandem)
+
+Novo jogo em Ports & Recomp. **Totais: 94 jogos — 94 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎.** Pode publicar
+no site junto com a versão que trouxer este port, não antes.
+
+- **Projeto**: [badcompany94-rcmp/project-tandem](https://github.com/badcompany94-rcmp/project-tandem), licença MIT, baseado no mariokartdd-recomp e no gcn-recomp de Ethan Nicholas.
+- **Sistema**: **somente Windows 🪟** (Windows 10 ou 11, 64 bits, com OpenGL 3.3). O projeto não publica build de Linux nem de macOS, e o instalador e o launcher dele são em PowerShell. Não publique Linux nem macOS para este jogo.
+- **Estado**: beta (`v0.1.0-beta.3`).
+- **Recursos que pode citar**: online de 2 a 8 jogadores com código de sala, kart solo ou dividido, widescreen 16:9, mouse e teclado ou controle.
+- **O que o jogador precisa**: o `.iso` ou `.ciso` **USA (`GM4E01`)** do próprio disco em `roms/GameCube/`, com "kart" e "double" no nome. Outras regiões e `.rvz`/`.gcz` não funcionam. O download não traz o jogo.
+- **Primeira vez demora**: o jogo é compilado no PC do jogador a partir do disco, em uma janela de console, e leva vários minutos. O download tem 226 MB, e a compilação usa as ferramentas que vêm nele. Da segunda vez em diante abre direto.
+- **Online**: todos precisam estar na mesma versão. Isso depende do Karamelo acompanhar as versões do projeto, então não prometa online entre instalações de versões diferentes.
+
+Texto sugerido:
+
+> **Mario Kart: Double Dash!! — Project Tandem** *(GameCube · beta · Windows)* —
+> Recompilação nativa com online de 2 a 8 jogadores, kart solo ou dividido,
+> widescreen e mouse e teclado. Requer o seu próprio disco USA; na primeira vez o
+> jogo é compilado no seu PC, o que leva vários minutos.
+
+---
+
+## 52. Adição de 31/10/2026 — Netplay de verdade
+
+O Netplay foi refeito. O texto abaixo é o que ele faz; não publique além disso.
+
+- **Antes**: só trocava os controles, cada PC tratava o próprio jogador como Jogador 1 e nada mantinha os jogos iguais.
+- **Agora**:
+  1. O anfitrião abre o jogo e o convidado conecta, por convite ou código de sala.
+  2. O jogo abre sozinho no convidado, procurado pelo nome e tamanho do arquivo em `roms/`. Sem o arquivo, ele recebe um aviso; o jogo nunca é enviado pela rede.
+  3. O anfitrião envia o estado do jogo, e os dois começam do mesmo ponto, mesmo que ele já estivesse jogando.
+  4. Cada quadro só roda quando os dois controles daquele quadro chegaram. Anfitrião é Jogador 1, convidado é Jogador 2, nos dois PCs.
+  5. A cada segundo os dois comparam o estado do jogo. Se ele se separar de verdade, o anfitrião reenvia o estado.
+- **Pode divulgar**: partida para dois jogadores nos sistemas testados (Game Boy, GBA, NES, SNES, Mega Drive, Master System), voz durante a partida, jogo que abre sozinho.
+- **Não divulgue**:
+  - Rollback, "sem atraso" ou "qualquer jogo". É lockstep: a partida anda no ritmo do mais lento, com pelo menos 2 quadros de atraso nos comandos, e os outros sistemas não foram testados.
+  - Teclado, mouse e pistola em partida: só os dois controles são compartilhados, os demais leem como nada.
+  - Mistura de sistemas operacionais como recurso: Windows com Linux conectou e jogou em teste, mas o estado salvo de cada build difere, então vale só como "pode funcionar".
+- **GBA**: o mGBA não se repete com exatidão, então o anfitrião reenvia o estado de tempos em tempos. Para o jogador pode aparecer um pequeno salto.
+- **Pela internet**: continua precisando de porta aberta no roteador ou VPN no anfitrião. Não há servidor intermediário.
+
+Também nesta data:
+- `Karamelo --chat` abre direto na janela do chat.
+- Na caixa do chat, `/nome Fulano` troca o apelido.
+- A voz no OSD e na janela vem desligada e é ligada pelo botão `OFF` da janela do chat.
+- Linux e macOS: a janela do chat agora aceita digitação, quebra as linhas, mostra quem está na rede e tem o botão `ENTRAR` para convite.

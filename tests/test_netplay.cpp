@@ -138,3 +138,194 @@ TEST_CASE(NetplayRespectsOutputCapacity)
 	ASSERT_EQ(count, (size_t)4);
 	ASSERT_EQ(used, sizeof(NetPacket) * 4);
 }
+
+static NetPacket MakeBlobHeader(uint32_t kind, uint32_t size)
+{
+	NetPacket p;
+	memset(&p, 0, sizeof(p));
+	p.magic = NET_MAGIC;
+	p.type = NET_TYPE_BLOB;
+	p.frame_seq = kind;
+	p.send_tick = size;
+	return p;
+}
+
+TEST_CASE(NetStreamWaitsForAWholeBlobAndKeepsThePacketsAfterIt)
+{
+	NetPacket blob_hdr = MakeBlobHeader(NET_BLOB_STATE, 1000);
+	std::vector<uint8_t> payload(1000, NET_MAGIC); // full of bytes that look like packets
+	NetPacket after;
+	memset(&after, 0, sizeof(after));
+	after.magic = NET_MAGIC;
+	after.type = NET_TYPE_READY;
+
+	NetStream st;
+	NetPacket got;
+	std::vector<uint8_t> blob;
+	st.Feed((const uint8_t*)&blob_hdr, sizeof(blob_hdr));
+	ASSERT_FALSE(st.Next(got, blob));
+	st.Feed(payload.data(), 400);
+	ASSERT_FALSE(st.Next(got, blob));
+	st.Feed(payload.data() + 400, 600);
+	st.Feed((const uint8_t*)&after, sizeof(after));
+	ASSERT_TRUE(st.Next(got, blob));
+	ASSERT_EQ((int)got.type, NET_TYPE_BLOB);
+	ASSERT_EQ(blob.size(), (size_t)1000);
+	ASSERT_TRUE(st.Next(got, blob));
+	ASSERT_EQ((int)got.type, NET_TYPE_READY);
+	ASSERT_FALSE(st.Next(got, blob));
+}
+
+TEST_CASE(NetStreamRefusesAnAbsurdBlobSize)
+{
+	NetPacket bad = MakeBlobHeader(NET_BLOB_STATE, NET_MAX_BLOB + 1);
+	NetStream st;
+	NetPacket got;
+	std::vector<uint8_t> blob;
+	st.Feed((const uint8_t*)&bad, sizeof(bad));
+	ASSERT_FALSE(st.Next(got, blob));
+}
+
+static NetInput InputOf(int16_t v)
+{
+	NetInput in;
+	memset(&in, 0, sizeof(in));
+	in.buttons[0] = v;
+	return in;
+}
+
+// Two machines through the same logic, messages delivered late on purpose: the
+// same input must run on the same frame on both, whichever arrives first.
+TEST_CASE(NetLockstepBothSidesRunTheSameInputOnTheSameFrame)
+{
+	NetLockstep a, b;
+	a.Start(3);
+	b.Start(3);
+	std::vector<std::pair<uint32_t, NetInput>> to_a, to_b;
+	std::vector<int> a_saw_b, b_saw_b, a_saw_a, b_saw_a;
+
+	for (int step = 0; step < 300; step++)
+	{
+		for (int side = 0; side < 2; side++)
+		{
+			NetLockstep& me = side == 0 ? a : b;
+			auto& outbox = side == 0 ? to_b : to_a;
+			const NetInput in = InputOf((int16_t)(side * 1000 + step));
+			const uint32_t n = me.QueueLocal(in);
+			for (uint32_t i = 0; i < n; i++)
+				outbox.push_back({ me.NextToSend() - n + i, in });
+			NetInput mine, theirs;
+			while (me.Get(me.Frame(), mine, theirs))
+			{
+				(side == 0 ? a_saw_a : b_saw_a).push_back(side == 0 ? mine.buttons[0] : theirs.buttons[0]);
+				(side == 0 ? a_saw_b : b_saw_b).push_back(side == 0 ? theirs.buttons[0] : mine.buttons[0]);
+				me.Advance();
+				const uint32_t again = me.QueueLocal(in);
+				for (uint32_t i = 0; i < again; i++)
+					outbox.push_back({ me.NextToSend() - again + i, in });
+			}
+		}
+		// Delivery lags behind the sender and differs per direction.
+		if (step % 2 == 0)
+		{
+			for (auto& m : to_a) a.SetRemote(m.first, m.second);
+			to_a.clear();
+		}
+		if (step % 3 == 0)
+		{
+			for (auto& m : to_b) b.SetRemote(m.first, m.second);
+			to_b.clear();
+		}
+	}
+	const size_t common = a_saw_a.size() < b_saw_a.size() ? a_saw_a.size() : b_saw_a.size();
+	ASSERT_TRUE(common > 200);
+	for (size_t i = 0; i < common; i++)
+	{
+		ASSERT_EQ(a_saw_a[i], b_saw_a[i]);
+		ASSERT_EQ(a_saw_b[i], b_saw_b[i]);
+	}
+}
+
+TEST_CASE(NetLockstepFirstFramesAreEmptyAndNothingRunsWithoutTheOtherInput)
+{
+	NetLockstep ls;
+	ls.Start(2);
+	NetInput mine, theirs;
+	ASSERT_TRUE(ls.Get(0, mine, theirs));
+	ASSERT_EQ((int)mine.buttons[0], 0);
+	ASSERT_TRUE(ls.Get(1, mine, theirs));
+	ls.QueueLocal(InputOf(7));
+	ASSERT_EQ(ls.NextToSend(), (uint32_t)3);
+	ASSERT_FALSE(ls.Ready(2));
+	ls.SetRemote(2, InputOf(9));
+	ASSERT_TRUE(ls.Get(2, mine, theirs));
+	ASSERT_EQ((int)mine.buttons[0], 7);
+	ASSERT_EQ((int)theirs.buttons[0], 9);
+}
+
+TEST_CASE(NetplayStateMaskIgnoresOnlyWhatChangedBetweenTwoSaves)
+{
+	std::vector<uint8_t> a(4096, 7), b(4096, 7);
+	b[1001] = 9; // a clock inside the state
+	const std::vector<uint32_t> mask = NetplayStateMask(a.data(), b.data(), a.size());
+	ASSERT_EQ(mask.size(), (size_t)3);
+
+	// The same game with another clock compares equal...
+	std::vector<uint8_t> x = a, y = a;
+	y[1001] = 200;
+	NetplayApplyStateMask(x.data(), x.size(), mask);
+	NetplayApplyStateMask(y.data(), y.size(), mask);
+	ASSERT_EQ(NetplayHashState(x.data(), x.size()), NetplayHashState(y.data(), y.size()));
+
+	// ...and a real difference anywhere else still counts.
+	y[3000] = 1;
+	NetplayApplyStateMask(y.data(), y.size(), mask);
+	ASSERT_TRUE(NetplayHashState(x.data(), x.size()) != NetplayHashState(y.data(), y.size()));
+
+	// Nothing changed, nothing left out.
+	ASSERT_EQ(NetplayStateMask(a.data(), a.data(), a.size()).size(), (size_t)0);
+}
+
+TEST_CASE(NetplayLearnsAClockButNotARealSplit)
+{
+	std::vector<uint8_t> host(64 * 1024, 5), guest(64 * 1024, 5);
+	guest[1145] = 0x0e; // the three bytes gambatte's clock moved in a real run
+	guest[1690] = 0x01;
+	guest[1815] = 0x02;
+	std::vector<uint32_t> mask, previous;
+	ASSERT_TRUE(NetplayLearnStateMask(host.data(), guest.data(), host.size(), mask, previous));
+	NetplayApplyStateMask(host.data(), host.size(), mask);
+	NetplayApplyStateMask(guest.data(), guest.size(), mask);
+	ASSERT_EQ(NetplayHashState(host.data(), host.size()), NetplayHashState(guest.data(), guest.size()));
+
+	// A game that went another way differs all over: never learned, the host resends.
+	std::vector<uint32_t> before = mask;
+	for (size_t i = 0; i < guest.size(); i += 97) guest[i] = (uint8_t)(i * 31);
+	ASSERT_FALSE(NetplayLearnStateMask(host.data(), guest.data(), host.size(), mask, previous));
+	ASSERT_EQ(mask.size(), before.size());
+
+	// Unless the very same blocks differ again: pointers, which stay put. Here they
+	// fit under the ceiling; a game that split would have moved by now.
+	std::vector<uint8_t> p(64 * 1024, 0), q(64 * 1024, 0);
+	for (size_t i = 0; i < 40; i++) q[i * 800] = 1;
+	std::vector<uint32_t> ptr_mask, ptr_previous;
+	ASSERT_FALSE(NetplayLearnStateMask(p.data(), q.data(), p.size(), ptr_mask, ptr_previous));
+	ASSERT_TRUE(NetplayLearnStateMask(p.data(), q.data(), p.size(), ptr_mask, ptr_previous));
+	ASSERT_TRUE(ptr_mask.size() > 32);
+
+	// Nor can small differences grow it without end.
+	std::vector<uint32_t> full;
+	for (uint32_t i = 0; i < kNetMaskMaxBlocks; i++) full.push_back(i + 4096);
+	std::vector<uint8_t> x(64 * 1024, 0), y(64 * 1024, 0);
+	y[8] = 1;
+	std::vector<uint32_t> none;
+	ASSERT_FALSE(NetplayLearnStateMask(x.data(), y.data(), x.size(), full, none));
+}
+
+TEST_CASE(NetplayStateHashSeesAnyDifference)
+{
+	std::vector<uint8_t> x(4096, 0);
+	const uint32_t h = NetplayHashState(x.data(), x.size());
+	x[2000] = 1;
+	ASSERT_TRUE(NetplayHashState(x.data(), x.size()) != h);
+}

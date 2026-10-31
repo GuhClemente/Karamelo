@@ -73,6 +73,13 @@ TEST_CASE(PortCatalogCountsMatchCredits)
 	ASSERT_EQ(std::stoi(m[2].str()), visible);
 	ASSERT_EQ(std::stoi(m[3].str()), mac_n);
 	ASSERT_EQ(std::stoi(m[4].str()), visible);
+
+	// The Karamelo Studio page and API carry the same counts as plain text.
+	std::string web = ReadFileText("src/web_admin.cpp");
+	ASSERT_TRUE(web.find("\\\"ports_count\\\":" + std::to_string(visible)) != std::string::npos);
+	ASSERT_TRUE(web.find(">" + std::to_string(visible) + " PC Ports") != std::string::npos);
+	ASSERT_TRUE(web.find(std::to_string(linux_n) + " PC Ports nativos ELF64") != std::string::npos);
+	ASSERT_TRUE(web.find(std::to_string(mac_n) + " PC Ports compilados em Mach-O") != std::string::npos);
 }
 
 TEST_CASE(PortCatalogRejectsUnsafeEntries)
@@ -94,6 +101,31 @@ TEST_CASE(PortCatalogRejectsUnsafeEntries)
 	ASSERT_FALSE(PortCatalogParse("{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"a\",\"needs_rom\":\"yes\"}]}", cat, err));
 	// Unknown fields are fine (a newer catalog read by an older app).
 	ASSERT_TRUE(PortCatalogParse("{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"a\",\"future_field\":1}]}", cat, err));
+}
+
+// Project Tandem compiles itself on first use and its launcher exits at once.
+TEST_CASE(PortCatalogKeepsSetupAndDetachedGameFields)
+{
+	PortCatalog cat;
+	std::string err;
+	const std::string good =
+		"{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"A\","
+		"\"setup_relpath\":\"Setup.cmd\",\"setup_args\":[\"-GameImage\",\"{iso}\"],"
+		"\"setup_done_relpath\":\"local-data/settings.json\",\"detached_process\":\"mkdd.exe\"}]}";
+	ASSERT_TRUE(PortCatalogParse(good, cat, err));
+	PortCatalog again;
+	ASSERT_TRUE(PortCatalogParse(PortCatalogToJson(cat), again, err));
+	ASSERT_TRUE(again.ports[0].setup_relpath == "Setup.cmd");
+	ASSERT_TRUE(again.ports[0].setup_args.size() == 2 && again.ports[0].setup_args[1] == "{iso}");
+	ASSERT_TRUE(again.ports[0].setup_done_relpath == "local-data/settings.json");
+	ASSERT_TRUE(again.ports[0].detached_process == "mkdd.exe");
+
+	const std::string escaping_setup =
+		"{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"A\",\"setup_relpath\":\"../evil.cmd\"}]}";
+	ASSERT_FALSE(PortCatalogParse(escaping_setup, cat, err));
+	const std::string path_as_process =
+		"{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"A\",\"detached_process\":\"bin/mkdd.exe\"}]}";
+	ASSERT_FALSE(PortCatalogParse(path_as_process, cat, err));
 }
 
 TEST_CASE(JsonMiniParsesEscapesAndRejectsGarbage)

@@ -118,6 +118,17 @@ struct PortDefinition {
     // or whose hash differs is refused and deleted - a swapped release file
     // or a hijacked repository never reaches the player's machine.
     std::vector<std::pair<std::string, std::string>> asset_sha256;
+    // A port that compiles itself from the user's disc on first use (Project
+    // Tandem). While setup_done_relpath (relative to the port folder) does not
+    // exist, setup_relpath runs in its own console with setup_args ("{iso}"
+    // works as in launch_args) and the launcher only starts if it succeeds.
+    std::string setup_relpath;
+    std::vector<std::string> setup_args;
+    std::string setup_done_relpath;
+    // File name of the real game when the launcher script starts it and exits.
+    // Without this the exit monitor would bring Karamelo back over the game.
+    // Only a process running from inside the port folder counts.
+    std::string detached_process;
     // Free text for whoever maintains the catalog - why a flag is what it is,
     // when a release was last checked. Never read by the launcher.
     std::string notes;

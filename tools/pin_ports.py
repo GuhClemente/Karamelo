@@ -46,7 +46,8 @@ FIELDS = [
     ("iso_dirs", "list"), ("iso_exts", "list"), ("iso_disc_id", "str"), ("iso_disc_rev", "int"),
     ("iso_disc_label", "str"), ("hidden", "bool"), ("downloads_json_url", "str"),
     ("rom_exclude_keywords", "list"), ("iso_keywords_whole_word", "bool"), ("psp_game_dir", "str"),
-    ("release_tag", "str"), ("asset_sha256", "map"), ("notes", "str"),
+    ("release_tag", "str"), ("setup_relpath", "str"), ("setup_args", "list"),
+    ("setup_done_relpath", "str"), ("detached_process", "str"), ("asset_sha256", "map"), ("notes", "str"),
 ]
 
 
