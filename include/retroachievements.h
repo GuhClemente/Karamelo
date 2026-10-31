@@ -38,7 +38,6 @@ int         RaGetAchievementsUnlocked();
 uint32_t    RaGetScore();
 bool        RaGetHardcore();
 bool        RaHasToken();
-const char* RaGetTokenOrPassword();
 const char* RaGetGameTitle();
 void        RaUpdate();
 bool        RaSetCredentials(const char* username, const char* password_or_token, bool is_token, bool hardcore, bool logout);

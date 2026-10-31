@@ -65,6 +65,7 @@ static NetplayRole  net_role = NETPLAY_NONE;
 static NetplayState net_state = NETPLAY_DISCONNECTED;
 static SOCKET       listen_sock = INVALID_SOCKET;
 static SOCKET       peer_sock = INVALID_SOCKET;
+static std::string  peer_ip_str;
 static std::string  local_ip_str = "127.0.0.1";
 static std::string  status_str = "Disconnected";
 static int          ping_ms = 0;
@@ -172,6 +173,14 @@ void NetplayShutdown()
 // lock is the same dangling-pointer-on-reallocation hazard already fixed for
 // core_runner.cpp's loaded_game_name/loaded_rom_dir - copy into a thread_local
 // buffer under the lock instead.
+const char* NetplayGetPeerIp()
+{
+	static thread_local char buf[64];
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	strncpy_s(buf, sizeof(buf), peer_ip_str.c_str(), _TRUNCATE);
+	return buf;
+}
+
 const char* NetplayGetLocalIp()
 {
 	static thread_local char buf[64];
@@ -276,6 +285,7 @@ bool NetplayStartClient(const char* host_ip, int port)
 
 		connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
 
+		peer_ip_str = host_ip;
 		net_role = NETPLAY_CLIENT;
 		net_state = NETPLAY_CONNECTING;
 		status_str = "Connecting to Host (" + std::string(host_ip) + ")...";
@@ -299,6 +309,7 @@ void NetplayDisconnect()
 		listen_sock = INVALID_SOCKET;
 	}
 
+	peer_ip_str.clear();
 	net_role = NETPLAY_NONE;
 	net_state = NETPLAY_DISCONNECTED;
 	status_str = "Disconnected";
@@ -328,8 +339,9 @@ void NetplayUpdate()
 			closesocket(listen_sock);
 			listen_sock = INVALID_SOCKET;
 
+			peer_ip_str = inet_ntoa(client_addr.sin_addr);
 			net_state = NETPLAY_CONNECTED;
-			status_str = "Connected with Player 2 (" + std::string(inet_ntoa(client_addr.sin_addr)) + ")";
+			status_str = "Connected with Player 2 (" + peer_ip_str + ")";
 			CoreSetToast(Tr("JOGADOR 2 CONECTADO VIA NETPLAY!", "PLAYER 2 CONNECTED VIA NETPLAY!"), 180);
 		}
 	}

@@ -3,6 +3,7 @@
 #include "netplay.h"
 #include "core_runner.h"
 #include "menu.h"
+#include <iterator>
 #include "cloud_sync.h"
 #include "tray_manager.h"
 #include "app_info.h"
@@ -340,6 +341,7 @@ static std::string             g_web_url = "http://127.0.0.1:8080";
 static std::map<std::string, WebSession> g_sessions;
 static int                     g_failed_login_count = 0;
 static int64_t                 g_lockout_until_utc = 0;
+static int                     g_lockout_rounds = 0;
 
 #ifdef _WIN32
 static SOCKET                  g_listen_sock = INVALID_SOCKET;
@@ -1842,10 +1844,10 @@ input:checked + .slider:before {
           <div style="margin:14px 0;line-height:1.7;">
             <p>Destino Remoto: <b>Google Drive (appDataFolder segura e oculta)</b></p>
 )raw";
-	h << R"raw(            <p>Saves Sincronizados: <b id="lbl-cloud-count">7 arquivos</b></p>
-            <p>Última Sincronização: <b id="lbl-cloud-time">Agora</b></p>
+	h << R"raw(            <p>Saves Sincronizados: <b id="lbl-cloud-count">-</b></p>
+            <p>Última Sincronização: <b id="lbl-cloud-time">-</b></p>
             <p style="font-size:12px;color:var(--text-dim);margin-top:8px;">
-              Tokens armazenados localmente com criptografia de ponta (Windows DPAPI). Zero envio para servidores terceiros.
+              O token do Google fica neste computador (no Windows, protegido pelo DPAPI). Os saves vao direto para o seu Google Drive, sem passar pelo site do Karamelo.
             </p>
           </div>
           <button id="btn-sync-now" class="btn-primary" style="padding:11px 22px;">☁️ Sincronizar Saves Agora</button>
@@ -1984,9 +1986,7 @@ async function loadRaConfig(){
     const uEl=document.getElementById('ra-username');
     if(uEl && document.activeElement !== uEl) uEl.value=d.username||'';
     const pEl=document.getElementById('ra-password');
-    if(pEl && d.token && document.activeElement !== pEl) pEl.value=d.token;
-    const tokEl=document.getElementById('ra-is-token');
-    if(tokEl) tokEl.checked=!!d.has_token || (d.token && d.token.length > 0);
+    if(pEl) pEl.placeholder=d.has_token?'Credencial salva neste aparelho - digite so para trocar':'Senha do site ou token...';
     const hcEl=document.getElementById('ra-hardcore');
     if(hcEl) hcEl.checked=!!d.hardcore;
     const badge=document.getElementById('lbl-ra-badge');
@@ -2599,8 +2599,22 @@ static void SendHttpResponse(
 	    << "Connection: close\r\n\r\n"
 	    << body;
 
+	// send() may take only part of a large page, and on Linux writing to a
+	// connection the phone already closed raises SIGPIPE, which ends the whole
+	// app unless the call opts out.
 	std::string raw = oss.str();
-	send(cli, raw.c_str(), (int)raw.size(), 0);
+#ifdef MSG_NOSIGNAL
+	const int send_flags = MSG_NOSIGNAL;
+#else
+	const int send_flags = 0;
+#endif
+	size_t sent = 0;
+	while (sent < raw.size())
+	{
+		int n = send(cli, raw.data() + sent, (int)(raw.size() - sent), send_flags);
+		if (n <= 0) break;
+		sent += (size_t)n;
+	}
 }
 
 static void HandleClientConnection(
@@ -2611,14 +2625,32 @@ static void HandleClientConnection(
 #endif
 )
 {
+	// One connection is served at a time, on the thread WebAdminStop() joins. A
+	// device that connected and sent nothing used to hold recv() forever: the
+	// panel stopped answering and closing the app hung. An idle connection now
+	// gets 10 s, a whole request 3 min (a 64 MB ROM over slow Wi-Fi).
+#ifdef _WIN32
+	DWORD io_timeout = 10000;
+#else
+	timeval io_timeout{ 10, 0 };
+#endif
+	setsockopt(cli, SOL_SOCKET, SO_RCVTIMEO, (const char*)&io_timeout, sizeof(io_timeout));
+	setsockopt(cli, SOL_SOCKET, SO_SNDTIMEO, (const char*)&io_timeout, sizeof(io_timeout));
+#ifdef SO_NOSIGPIPE
+	int no_sigpipe = 1;
+	setsockopt(cli, SOL_SOCKET, SO_NOSIGPIPE, (const char*)&no_sigpipe, sizeof(no_sigpipe));
+#endif
+	const int64_t request_deadline = (int64_t)time(NULL) + 180;
+
 	std::string req;
 	req.reserve(8192);
 	char chunk[4096];
 	size_t header_end = std::string::npos;
 	size_t content_len = 0;
 
-	while (req.size() < 65u * 1024u * 1024u)
+	while (req.size() < 65u * 1024u * 1024u && g_web_running.load())
 	{
+		if ((int64_t)time(NULL) > request_deadline) return;
 		int n = recv(cli, chunk, sizeof(chunk), 0);
 		if (n <= 0) break;
 		req.append(chunk, (size_t)n);
@@ -2653,6 +2685,13 @@ static void HandleClientConnection(
 	std::string headers = req.substr(0, header_end);
 	std::string body = req.substr(header_end + 4);
 	if (body.size() > content_len) body.resize(content_len);
+	// A connection that dropped mid-upload must not be handled as if the part
+	// that arrived were the whole file: it would land in roms/ as a broken game.
+	if (body.size() < content_len)
+	{
+		SendHttpResponse(cli, "400 Bad Request", "application/json", "{\"error\":\"incomplete_request\"}");
+		return;
+	}
 
 	size_t line_end = headers.find("\r\n");
 	std::string req_line = headers.substr(0, line_end);
@@ -2723,10 +2762,15 @@ static void HandleClientConnection(
 		if (!ConstantTimeEquals(user_pin, expected_pin))
 		{
 			std::lock_guard<std::mutex> lk(g_web_mutex);
+			// A 4-digit PIN is only as good as this limit. A fixed 60 s per 5
+			// tries still falls to a script overnight, so each lockout doubles,
+			// up to an hour, until someone gets it right.
 			g_failed_login_count++;
 			if (g_failed_login_count >= 5)
 			{
-				g_lockout_until_utc = now_utc + 60;
+				int64_t wait = (int64_t)60 << (g_lockout_rounds < 6 ? g_lockout_rounds : 6);
+				g_lockout_rounds++;
+				g_lockout_until_utc = now_utc + wait;
 				g_failed_login_count = 0;
 			}
 			SendHttpResponse(cli, "401 Unauthorized", "application/json", "{\"error\":\"invalid_pin\"}");
@@ -2741,6 +2785,9 @@ static void HandleClientConnection(
 		{
 			std::lock_guard<std::mutex> lk(g_web_mutex);
 			g_failed_login_count = 0;
+			g_lockout_rounds = 0;
+			for (auto it = g_sessions.begin(); it != g_sessions.end();)
+				it = (it->second.expires_utc <= now_utc) ? g_sessions.erase(it) : std::next(it);
 			g_sessions[sess.session_id] = sess;
 		}
 
@@ -2811,7 +2858,6 @@ static void HandleClientConnection(
 		const char* st = g_hooks.ra_get_status ? g_hooks.ra_get_status() : "Desconectado";
 		bool hc = g_hooks.ra_get_hardcore ? g_hooks.ra_get_hardcore() : false;
 		bool tok = g_hooks.ra_has_token ? g_hooks.ra_has_token() : false;
-		const char* tok_val = g_hooks.ra_get_token ? g_hooks.ra_get_token() : "";
 		bool in = g_hooks.ra_is_logged_in ? g_hooks.ra_is_logged_in() : false;
 		bool en = g_hooks.ra_is_enabled ? g_hooks.ra_is_enabled() : false;
 		uint32_t sc = g_hooks.ra_get_score ? g_hooks.ra_get_score() : 0;
@@ -2822,7 +2868,6 @@ static void HandleClientConnection(
 		ss << "{\"username\":" << JsonQuote(user ? user : "")
 		   << ",\"hardcore\":" << (hc ? "true" : "false")
 		   << ",\"has_token\":" << (tok ? "true" : "false")
-		   << ",\"token\":" << JsonQuote(tok_val ? tok_val : "")
 		   << ",\"logged_in\":" << (in ? "true" : "false")
 		   << ",\"enabled\":" << (en ? "true" : "false")
 		   << ",\"status\":" << JsonQuote(st ? st : "")
@@ -3118,7 +3163,7 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 			{
 				if (g_hooks.set_slot) g_hooks.set_slot(s);
 				if (g_hooks.save_state) g_hooks.save_state(s);
-				CoreSetToast("ESTADO SALVO", 120);
+				CoreSetToast(Tr("ESTADO SALVO", "STATE SAVED"), 120);
 			}
 		}
 		else if (action == "load_slot")
@@ -3128,7 +3173,7 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 			{
 				if (g_hooks.set_slot) g_hooks.set_slot(s);
 				if (g_hooks.load_state) g_hooks.load_state(s);
-				CoreSetToast("ESTADO CARREGADO", 120);
+				CoreSetToast(Tr("ESTADO CARREGADO", "STATE LOADED"), 120);
 			}
 		}
 		else if (action == "screenshot")
@@ -3251,7 +3296,11 @@ bool WebAdminStart(int port, bool loopback_only)
 	int candidates[] = { port, 8080, 8081, 8082, 8088, 8888, 0 };
 	int num_candidates = (int)(sizeof(candidates) / sizeof(candidates[0]));
 
+#ifdef _WIN32
 	SOCKET srv = INVALID_SOCKET;
+#else
+	int srv = -1;
+#endif
 	int bound_port = 0;
 
 	for (int i = 0; i < num_candidates; i++)

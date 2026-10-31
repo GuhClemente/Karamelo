@@ -46,6 +46,8 @@
 #include "crash_reporter.h"
 #include "cloud_sync.h"
 #include "tray_manager.h"
+#include "voice_chat.h"
+#include "system_registry.h"
 
 namespace fs = std::filesystem;
 
@@ -191,6 +193,7 @@ static std::string loaded_system_dir = "";
 // a plain flag rather than a string comparison, and it is decided once when the
 // game loads.
 static volatile bool keyboard_bridge_active = false;
+static volatile bool game_uses_keyboard = false;
 
 // Which arcade core actually ran a given romset, keyed by the original ROM
 // path. Only ever touched from the core thread, during load. See the comment
@@ -2447,6 +2450,7 @@ static size_t CB_AudioSampleBatch(const int16_t* data, size_t frames)
 {
 	if (g_audio_tap_callback && data && frames > 0) g_audio_tap_callback(data, frames);
 	SendAudioSamples(data, frames);
+	if (VoiceChatIsActive()) VoiceChatFeedReferenceAudio(data, frames);
 	return frames;
 }
 
@@ -3604,6 +3608,7 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			loaded_system_dir = init_p.stem().string();
 		}
 		keyboard_bridge_active = SystemNeedsKeyboardBridge(loaded_system_dir);
+		game_uses_keyboard = SystemIsKeyboardComputer(loaded_system_dir);
 		CrashReporterSetLastGameInfo(loaded_core_name.c_str(), loaded_game_stem.c_str());
 		LeaveCriticalSection(&name_lock);
 	}
@@ -6114,6 +6119,7 @@ int  CoreGetVolume() { return master_volume; }
 void CoreSetMute(bool mute) { audio_muted = mute; }
 bool CoreGetMute() { return audio_muted; }
 bool CoreIsRunning() { return (is_core_loaded && is_game_loaded); }
+bool CoreGameUsesKeyboard() { return CoreIsRunning() && game_uses_keyboard; }
 
 static void ApplyDisplaySync()
 {

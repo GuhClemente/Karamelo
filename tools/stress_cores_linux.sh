@@ -51,6 +51,9 @@ MAP=(
 # ROMs sinteticas (tools/generate_test_roms.py) para quem nao tem ROM em roms/.
 declare -A TESTROM=( [Atari5200]=atari5200.a52 [Lynx]=lynx.lnx [WonderSwan]=wswan.ws [NGP]=ngp.ngp [PCFX]=pcfx.cue [3DO]=3do.iso )
 
+# Bateria muda: o audio roda igual, mas nao sai na caixa de som.
+export SDL_AUDIO_DRIVER=dummy
+
 cd "$APP" || exit 2
 ok=0; fail=0; crash=0; leak=0; untested=0; skipped=()
 failed=(); crashed=(); leaked=(); not_tested=()

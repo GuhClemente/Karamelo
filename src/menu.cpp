@@ -1774,8 +1774,8 @@ static void ResetAllSettingsToDefault() {
   InputBindResetDefaults();
   CoreSetVolume(100);
   CoreSetMute(false);
-  VoiceChatSetEnabled(true);
-  VoiceChatSetDenoiseEngine(VOICE_DENOISE_DEEPFILTERNET);
+  VoiceChatSetEnabled(false);
+  VoiceChatSetDenoiseEngine(VOICE_DENOISE_STRONG);
   VoiceChatSetVadEnabled(true);
   VoiceChatSetVadSensitivity(VOICE_VAD_MEDIUM);
   VoiceChatSetAecEnabled(true);
@@ -1887,7 +1887,9 @@ void PopulateLiveChatSettings() {
 
   items.push_back({Tr("Sala Ativa", "Active Room"), DesktopChatGetRoomName(DesktopChatGetRoom()), false, false, 920});
   items.push_back({Tr("Status Presenca", "Presence Status"), TrayManagerGetStatusName(TrayManagerGetStatus()), false, false, 921});
+#ifdef _WIN32
   items.push_back({Tr("Bandeja Sistema", "System Tray"), TrayManagerIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 922});
+#endif
   items.push_back({Tr("Overlay em Jogo", "In-Game Overlay"), DesktopChatIsOverlayVisible() ? Tr("Visivel [F10]", "Visible [F10]") : Tr("Oculto [F10]", "Hidden [F10]"), false, true, 924});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Abrir Janela Chat", "Open Chat Window"), ">", false, true, 923});
@@ -2108,11 +2110,11 @@ void PopulateAudioSettings() {
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Chat de Voz P2P", "P2P Voice Chat"), VoiceChatIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 930});
   items.push_back({Tr("Microfone", "Microphone"), VoiceChatIsMicMuted() ? Tr("Mutado", "Muted") : Tr("Ativo", "Active"), false, false, 931});
-  items.push_back({Tr("Supressao IA", "AI Denoise"), VoiceChatGetDenoiseEngineName(VoiceChatGetDenoiseEngine()), false, false, 932});
-  items.push_back({"Silero VAD", VoiceChatGetVadEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 933});
-  items.push_back({Tr("Sensib. VAD", "VAD Sens."), VoiceChatGetVadSensitivityName(VoiceChatGetVadSensitivity()), false, false, 934});
-  items.push_back({"WebRTC AEC3 (Eco)", VoiceChatGetAecEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 935});
-  items.push_back({"WebRTC AGC2 (Ganho)", VoiceChatGetAgcEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 936});
+  items.push_back({Tr("Reducao de Ruido", "Noise Reduction"), VoiceChatGetDenoiseEngineName(VoiceChatGetDenoiseEngine()), false, false, 932});
+  items.push_back({Tr("Corte de Silencio", "Silence Gate"), VoiceChatGetVadEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 933});
+  items.push_back({Tr("Sensib. do Corte", "Gate Sens."), VoiceChatGetVadSensitivityName(VoiceChatGetVadSensitivity()), false, false, 934});
+  items.push_back({Tr("Cancelar Eco", "Echo Cancel"), VoiceChatGetAecEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 935});
+  items.push_back({Tr("Ganho Automatico", "Auto Gain"), VoiceChatGetAgcEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 936});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
 
@@ -3271,7 +3273,6 @@ void MenuInit() {
   web_hooks.ra_get_ach_unlocked = RaGetAchievementsUnlocked;
   web_hooks.ra_set_credentials = RaSetCredentials;
   web_hooks.ra_update = RaUpdate;
-  web_hooks.ra_get_token = RaGetTokenOrPassword;
   web_hooks.ra_get_game_title = RaGetGameTitle;
   web_hooks.ra_get_achievements = RaGetAchievements;
   web_hooks.is_system_visible = MenuIsSystemVisible;
@@ -3298,6 +3299,7 @@ void MenuSetStatus(const char *status) {
 
 void MenuRun() {
   NetplayUpdate();
+  VoiceChatSyncWithNetplay(NetplayGetState() == NETPLAY_CONNECTED, NetplayGetPeerIp());
   RaUpdate();
 
   // Process tasks enqueued from background threads (Web Studio LAN, RPC, etc.)
@@ -3991,7 +3993,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       VoiceChatSetDenoiseEngine((VoiceDenoiseEngine)(((int)VoiceChatGetDenoiseEngine() + delta + 3) % 3));
       PopulateAudioSettings();
       SelectByAction(item.action_id, 6);
-    } else if (item.action_id == 933) // Silero VAD
+    } else if (item.action_id == 933) // Corte de silencio
     {
       VoiceChatSetVadEnabled(!VoiceChatGetVadEnabled());
       PopulateAudioSettings();
@@ -4001,12 +4003,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
       VoiceChatSetVadSensitivity((VoiceVadSensitivity)(((int)VoiceChatGetVadSensitivity() + delta + 3) % 3));
       PopulateAudioSettings();
       SelectByAction(item.action_id, 8);
-    } else if (item.action_id == 935) // WebRTC AEC3
+    } else if (item.action_id == 935) // Cancelar eco
     {
       VoiceChatSetAecEnabled(!VoiceChatGetAecEnabled());
       PopulateAudioSettings();
       SelectByAction(item.action_id, 9);
-    } else if (item.action_id == 936) // WebRTC AGC2
+    } else if (item.action_id == 936) // Ganho automatico
     {
       VoiceChatSetAgcEnabled(!VoiceChatGetAgcEnabled());
       PopulateAudioSettings();

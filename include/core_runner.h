@@ -47,6 +47,7 @@ void CoreShutdown(bool will_reload = false);
 void CoreRecoverLocksHeldByThread(unsigned long thread_id);
 void CoreReset();
 bool CoreIsRunning();
+bool CoreGameUsesKeyboard(); // A computer game (DOS, FM Towns...) is running: F10 is the game's
 double CoreGetTargetFps();
 
 // Slave the core's frame rate to the display's, so a 59.19fps core stops

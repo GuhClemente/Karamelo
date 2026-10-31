@@ -1795,7 +1795,7 @@ Novidades para o jogador:
 
 ## 44. Adição de 28/10/2026 — Ecossistema Karamelo Cloud, Live & Social (Zero-Storage)
 
-O Karamelo agora integra uma camada nativa de nuvem pessoal, gerenciamento local via rede (LAN), bate-papo retrô desacoplado do navegador e comunicação de voz P2P com tratamento de áudio por IA — tudo escrito em C++20 nativo, sem Electron e **sem armazenar absolutamente nenhum dado de usuário no servidor `karamelo-emu.com`**.
+O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via rede (LAN), bate-papo em janela própria e voz durante o Netplay. **Atenção: a descrição abaixo é a do que o aplicativo faz de verdade (revisada em 30/10/2026). Não publique nada além disso.**
 
 > **Regra de Ouro para o Site (Privacidade e Zero-Storage):**
 > O site **deve deixar explícito** que o servidor do Karamelo (`karamelo-emu.com`) **não armazena** saves, ROMs, BIOS, listas de amigos, histórico de conversas nem streams de voz. Cada recurso opera direto na infraestrutura do próprio usuário ou ponto-a-ponto (P2P).
@@ -1805,32 +1805,34 @@ O Karamelo agora integra uma camada nativa de nuvem pessoal, gerenciamento local
 1. **Karamelo Cloud — Bring Your Own Storage (Google Drive `appDataFolder`)**:
    - **Como funciona**: O jogador vincula sua própria conta Google via OAuth 2.0 Loopback (`127.0.0.1`) com proteção PKCE (`S256`) e criptografia local de credenciais via Windows DPAPI (`0600` no Linux/macOS).
    - **Onde fica salvo**: Na pasta oculta de aplicativo (`appDataFolder`) do Google Drive do próprio jogador — não polui os arquivos visíveis do Drive dele e não ocupa um único byte no servidor do Karamelo.
-   - **O que sincroniza**: Exclusivamente arquivos leves de bateria nativa (`.srm`, `.sav`, `.eep`, `.fla`, `.sra`, `.mcr`, `.mcd`, `.nv`) e o manifesto `cloud_profile.json` (preferências de shader CRT, aspect ratio, apelido, avatar e lista de amigos). Save States pesados (`.state`), ROMs e BIOS nunca sobem para a nuvem.
-   - **Proteção Anti-Corrupção**: Antes de sobrescrever qualquer save local ou remoto, o Karamelo compara o hash **SHA-256** e o timestamp UTC, mantendo backup automático (`.bak`) em caso de conflito.
+   - **O que sincroniza**: Só os saves de bateria e cartões de memória em `saves/<sistema>/` (`.srm`, `.sav`, `.eep`, `.fla`, `.sra`, `.mcr`, `.mcd`, `.nv`). Savestates, ROMs, BIOS e configurações **não** vão para a nuvem.
+   - **Proteção contra perda**: Todo download confere o SHA-256 antes de trocar o save, e o save anterior fica como `.bak`. Se o mesmo save mudou em dois PCs, nenhum lado se perde: o deste PC continua valendo e o do outro fica ao lado como `.conflito`.
+   - **Pré-requisito do lançamento**: precisa de um Client ID OAuth do Google registrado pelo projeto. **Sem ele, o botão de conectar pede um Client ID em `Config/cloud.cfg`. Só divulgue a nuvem depois de o projeto registrar o dele.**
 
 2. **Karamelo Web Admin (LAN) — Gerenciador Local pelo Navegador com Auditor de BIOS**:
    - **Problema que resolve**: Ideal para quem usa o PC na sala de estar (TV / HTPC), mini-PCs ou portáteis rodando Karamelo no sofá e quer enviar jogos ou conferir BIOS a partir de outro PC ou celular na mesma rede Wi-Fi/LAN sem precisar espetar pendrive.
-   - **Como funciona**: Ao ativar `Web Admin (LAN)` no menu OSD, o Karamelo abre um servidor HTTP local (`http://<IP-da-LAN>:8580`) protegido por um **PIN de 4 dígitos** exibido na TV/monitor (com bloqueio contra força bruta, cookies `HttpOnly; SameSite=Strict`, proteção anti-CSRF e Content-Security-Policy estrita).
+   - **Como funciona**: Ao ativar `Web Admin (LAN)` no menu OSD, o Karamelo abre um servidor HTTP local (`http://<IP-da-LAN>:8080`) protegido por um **PIN de 4 dígitos** exibido na TV/monitor (com bloqueio contra força bruta, cookies `HttpOnly; SameSite=Strict`, proteção anti-CSRF e Content-Security-Policy estrita).
    - **Recursos**:
      - **Upload Drag & Drop**: Arraste ROMs e BIOS direto pela rede local com validação automática de integridade (magic bytes de `.zip`, `.chd`, `.7z` e bloqueio de ponteiros Git LFS corrompidos).
      - **Auditor de BIOS em Tempo Real**: Painel visual com selos verdes/vermelhos indicando exatamente quais BIOS estão prontos ou faltando (`scph5501.bin`, `dc_boot.bin`, `syscard3.pce`, `neogeo.zip`, `bios7.bin`/`bios9.bin`, etc.).
 
-3. **Karamelo Live — Janela Nativa Desktop (Fora do Navegador) & Salas Efêmeras Estilo Anos 90/2000**:
+3. **Karamelo Live — Janela Própria & Salas na Rede Local**:
    - **Sem navegador e sem Electron**: O bate-papo abre em uma **janela nativa do sistema operacional** (`Karamelo Live — Bate-Papo & Desafio`), totalmente independente da janela do jogo, permitindo posicionar no segundo monitor ou usar ao lado do emulador com consumo quase zero de RAM.
-   - **Salas Temáticas 100% Voláteis em RAM**: Inspiradas nos clássicos bate-papos da internet brasileira (UOL / mIRC / Kaillera), com 4 salas temáticas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`). Nenhuma mensagem é gravada em banco de dados ou disco: fechou ou trocou de sala, o histórico some.
-   - **Desafio 1-Click para Netplay**: A barra lateral mostra quem está online e qual jogo está rodando; clicar em **Desafiar (1-Click)** dispara um convite direto que já abre a sessão P2P de Netplay.
+   - **Alcance real, sem servidor**: As 4 salas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`) falam com **quem está na mesma rede local** e com **o outro jogador da partida de Netplay**. **Não existe sala mundial pela internet**: não prometa encontrar desconhecidos online. As mensagens ficam só na memória e somem ao fechar.
+   - **Privacidade**: A rede do chat só liga quando o jogador abre o chat, porque ela anuncia o apelido na rede local.
+   - **Desafio para Netplay**: A lista mostra quem está na rede local e o que está jogando; o convite abre a sessão direto. Fora da rede local, o jogador manda o código de sala (`KRM-XXXXX-XXXXX`, que contém o endereço) e o outro digita; pela internet ainda depende de porta aberta no roteador ou VPN.
 
 4. **System Tray (Bandeja do Sistema), Presença & Overlay In-Game (`F10`)**:
-   - **Bandeja do Sistema**: O Karamelo pode minimizar para o System Tray mantendo o status de presença (`Disponivel`, `Jogando: <Nome do Jogo>`, `Ocupado - Sem Alertas`) e disparando notificações nativas com alerta sonoro clássico quando chega um convite de partida.
-   - **Overlay Compacto In-Game (`F10`)**: Quem joga em tela cheia com apenas um monitor pode apertar **`F10`** a qualquer momento para abrir ou recolher um painel translúcido do Karamelo Live por cima do jogo, sem sair da partida.
+   - **Bandeja do Sistema (só Windows)**: Ícone na bandeja com menu rápido e status de presença (`Disponivel`, `Jogando`, `Ocupado`), e notificação com som quando chega um convite de partida (em `Ocupado` não avisa). A janela não some ao minimizar: não prometa "minimizar para a bandeja". Linux e macOS não têm ícone de bandeja nem notificação; o status de presença funciona igual.
+   - **Overlay Compacto In-Game (`F10`)**: Quem joga em tela cheia com apenas um monitor pode apertar **`F10`** para abrir ou recolher um painel translúcido do Karamelo Live por cima do jogo, sem sair da partida. Nos computadores (DOS, FM Towns, PC-98, Amiga, C64, MSX, ZX Spectrum) o `F10` fica com o jogo, e o painel abre pelo menu OSD.
 
-5. **Chat de Voz P2P & Suite Modular de Tratamento de Áudio por IA**:
-   - **100% P2P via UDP**: Assim como o Netplay, a voz trafega diretamente entre o IP dos dois jogadores durante a partida, sem servidor central de áudio.
-   - **Liberdade de Escolha no OSD (Sem Lock-in)**: No menu `Audio` ou `Karamelo Live & Voz`, o jogador escolhe exatamente como quer processar seu microfone conforme o seu hardware:
-     - **Filtro de Ruído IA**: `DeepFilterNet (Pesado/Max)` para isolamento profundo de barulho externo, `RNNoise (Leve/Padrao)` para consumo mínimo de CPU, ou `Desligado (Cru)`.
-     - **Voice Gate Inteligente (`Silero VAD`)**: `Auto (Silero VAD)` com detecção de fala para cortar cliques de botões arcade e respiração, ou sensibilidade manual (`Baixa`, `Media`, `Alta`).
-     - **Cancelamento de Eco (`WebRTC AEC3`)**: `Ligado` / `Desligado` (permite jogar com som na TV/caixas de som sem dar retorno na voz do amigo).
-     - **Ganho Automático (`WebRTC AGC2`)**: `Ligado` / `Desligado` (normaliza o volume da voz automaticamente).
+5. **Chat de Voz no Netplay**:
+   - **Direto entre os dois jogadores via UDP** (porta 55436), sem servidor. Vem **desligado**: o jogador liga em `Audio & Voz`, e ela acompanha a partida, abrindo e fechando sozinha com o Netplay. Pela internet precisa da mesma condição do Netplay (porta aberta ou VPN).
+   - **Ajustes no menu `Audio & Voz`** (filtros simples escritos no próprio Karamelo; **não publique como "IA", DeepFilterNet, RNNoise, Silero ou WebRTC**, porque nada disso é usado):
+     - **Redução de Ruído**: `Forte`, `Leve` ou `Desligado`.
+     - **Corte de Silêncio**: liga/desliga, com sensibilidade `Baixa`, `Media` ou `Alta`.
+     - **Cancelar Eco**: `Ligado` / `Desligado` (ajuda quem joga com som na TV ou em caixas de som).
+     - **Ganho Automático**: `Ligado` / `Desligado`.
 
 ---
 
@@ -1914,7 +1916,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
 | **Multiplataforma** | **Apenas Windows** | **Windows, Linux e macOS Apple Silicon (M1-M4) nativo** |
 | **PC Ports & Recompilados** | Depende de configurações manuais | **93 PC Ports com catalogação e atualização integrada** |
 | **Gerenciamento Remoto** | Não possui | **Karamelo Studio (Web Admin Wi-Fi / TV Remote)** |
-| **Nuvem Pessoal** | Depende de ferramentas externas | **Google Drive Cloud Sync nativo com DPAPI** |
+| **Nuvem Pessoal** | Depende de ferramentas externas | **Sincronização de saves com o Google Drive do jogador** |
 | **Menu OSD** | Abrir o menu fecha ou minimiza o jogo ativo | **OSD MiSTer integrado que sobrepõe sem perder foco** |
 
 ### Roadmap de Inovações para o Karamelo (Inspiradas no RetroBat, mas com Arquitetura Leve):
@@ -2018,7 +2020,7 @@ A interface Web LAN do Karamelo Studio foi totalmente reprojetada com base na id
 
 ## 50. Lançamento da Versão 0.98 (29/10/2026)
 
-Lançamento da versão **0.98** do Karamelo Emulador consolidando o ecossistema completo de Cloud Sync P2P, redesign total do Web Admin Karamelo Studio, módulo expandido de RetroAchievements e Suíte Social (Live Companion) de nível Steam/Battle.net.
+Lançamento da versão **0.98** do Karamelo Emulador: nuvem pessoal no Google Drive, redesign do Web Admin Karamelo Studio, RetroAchievements expandido e chat na rede local.
 
 **Contagens Oficiais (Inalteradas)**:
 - **37 Sistemas**, **42 Motores Libretro**
@@ -2026,23 +2028,23 @@ Lançamento da versão **0.98** do Karamelo Emulador consolidando o ecossistema 
 
 ### Principais Novidades da v0.98:
 
-1. **Ecossistema Social Nível Steam / Blizzard (Karamelo Live)**:
-   - **KarameloTag**: Identidade única determinística (`Nick#1234`) para descoberta e adição de amigos sem necessidade de trocar endereço IP.
-   - **Códigos de Sala / Partida (`KRM-XXXX`)**: Geração e resolução instantânea de códigos de 6 caracteres para convites e desafios diretos de Netplay.
-   - **Lista de Amigos Persistente (`Config/friends.ini`)**: Cadastro voluntário com favoritos (`★`), sincronização automática de status (Online, Jogando + nome do jogo) e botão de 1 clique para entrar ou desafiar.
+1. **Karamelo Live (rede local e partida de Netplay)**:
+   - **KarameloTag**: Identificação (`Nick#1234`) para reconhecer e favoritar amigos na lista.
+   - **Códigos de Sala (`KRM-XXXXX-XXXXX`)**: O código contém o endereço do anfitrião, então funciona no PC do amigo sem servidor. Pela internet ainda depende de porta aberta ou VPN.
+   - **Lista de Amigos (`Config/friends.ini`)**: Com favoritos (`★`); o status (online, jogando) aparece para quem está na mesma rede local.
    - **Janela Companion Multiplataforma**: Companion desacoplado em janela independente disponível nativamente em Linux e macOS via SDL3 além do Windows (Win32).
-   - **Privacidade Total**: Mensagens de chat 100% efêmeras em Ring Buffer de memória RAM (zero persistência em disco).
+   - **Privacidade**: Mensagens só na memória, nada salvo em disco. A rede do chat só liga quando o jogador abre o chat.
 
 2. **RetroAchievements Aprimorado**:
    - **Aba Exclusiva & Trophy Viewer**: Aba dedicada no Karamelo Studio com visualizador ao vivo de troféus, títulos de jogos em execução, percentual desbloqueado e pontuações.
    - **Resiliência de Autenticação**: Cancelamento de tarefas de login assíncronas concorrentes (`rc_client_abort_async`), eliminando erros de `"Login already in progress"`.
-   - **Persistência Segura**: Token ou senha preservados entre sessões com botão de revelar/ocultar (👁️) e desconexão limpa (`rc_client_logout`).
+   - **Credencial protegida**: Fica salva no computador e **nunca é enviada** ao Karamelo Studio; a tela só informa que existe uma salva.
 
 3. **Karamelo Studio Web Admin (Redesign Completo)**:
    - App Shell moderno alinhado à identidade visual de `karamelo-emu.com` com sidebar lateral fixa (290px), responsividade fluida para celulares (<900px), sem barra de rolagem horizontal.
    - Controle remoto ergonômico D-Pad touch para celular navegar na TV.
    - Gerenciamento unificado de visibilidade de sistemas, upload de ROMs/BIOS por arrastar-e-soltar, shaders CRT e slots de savestates.
 
-4. **Karamelo Cloud Sync (Nuvem Pessoal P2P)**:
-   - Sincronização direta com Google Drive (OAuth 2.0 PKCE) e WebDAV (Nextcloud/ownCloud/NAS) para bateria SRAM e savestates com Zero-Storage no servidor do site.
+4. **Karamelo Cloud (Nuvem Pessoal)**:
+   - Sincronização direta com o Google Drive do jogador (OAuth 2.0 PKCE) para saves de bateria e cartões de memória, sem nada no servidor do site. **WebDAV e savestates não fazem parte.** Requer o Client ID do projeto (ver seção 44).
 

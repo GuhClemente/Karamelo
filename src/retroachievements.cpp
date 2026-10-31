@@ -1071,14 +1071,6 @@ bool RaHasToken()
 	return !g_token.empty();
 }
 
-const char* RaGetTokenOrPassword()
-{
-	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
-	if (!g_token.empty()) return g_token.c_str();
-	if (!g_password.empty()) return g_password.c_str();
-	return "";
-}
-
 const char* RaGetGameTitle()
 {
 	std::lock_guard<std::recursive_mutex> lock(g_client_lock);

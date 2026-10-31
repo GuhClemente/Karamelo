@@ -8,15 +8,16 @@
 #include <string>
 
 // =============================================================
-// Karamelo Modular P2P Voice & Audio Processing Suite
-// 100% P2P UDP transport; user-selectable AI Denoise, VAD, AEC3, AGC2
+// Voice between the two players of a Netplay match: direct UDP, no server.
+// Mic and speakers through SDL3, G.711 mu-law on the wire, and a small
+// hand-written DSP chain (echo cancel, voice detect, noise gate, gain).
 // =============================================================
 
 enum VoiceDenoiseEngine
 {
-	VOICE_DENOISE_DEEPFILTERNET = 0, // Studio quality (ERB harmonic deep filter)
-	VOICE_DENOISE_RNNOISE       = 1, // Ultra-light (Bark-scale recurrent envelope)
-	VOICE_DENOISE_OFF           = 2  // Raw microphone signal
+	VOICE_DENOISE_STRONG = 0, // Noise-floor gate, cuts more
+	VOICE_DENOISE_LIGHT  = 1, // Envelope suppression, cheaper
+	VOICE_DENOISE_OFF    = 2  // Raw microphone signal
 };
 
 enum VoiceVadSensitivity
@@ -28,9 +29,11 @@ enum VoiceVadSensitivity
 
 struct VoiceChatConfig
 {
-	bool               enabled         = true;
+	// Off until the player turns it on: this opens the microphone and sends it
+	// to whoever is on the other end of the match.
+	bool               enabled         = false;
 	bool               mic_muted       = false;
-	VoiceDenoiseEngine denoise_engine  = VOICE_DENOISE_DEEPFILTERNET;
+	VoiceDenoiseEngine denoise_engine  = VOICE_DENOISE_STRONG;
 	bool               vad_enabled     = true;
 	VoiceVadSensitivity vad_sensitivity = VOICE_VAD_MEDIUM;
 	bool               aec_enabled     = true;
@@ -42,6 +45,9 @@ void VoiceChatInit();
 void VoiceChatShutdown();
 bool VoiceChatStartP2P(const char* peer_ip, int port = 55436);
 void VoiceChatStopP2P();
+// Called every UI frame: voice follows the match. Starts when Netplay is
+// connected and voice is enabled, stops when either stops being true.
+void VoiceChatSyncWithNetplay(bool connected, const char* peer_ip);
 bool VoiceChatIsActive();
 
 // Configuration Getters & Setters (persisted in Config/karamelo.cfg)
@@ -76,11 +82,11 @@ bool  VoiceChatIsLocalSpeaking();
 bool  VoiceChatIsPeerSpeaking();
 float VoiceChatGetLocalVadProbability();
 
-// Reference Game Audio Feed for AEC3 Echo Cancellation
+// Reference game audio for the echo canceller
 void  VoiceChatFeedReferenceAudio(const int16_t* stereo_samples, size_t frame_count);
 
 // Pure / Testable DSP Pipeline & Packet Framing
-// Processes a 20ms frame (320 samples @ 16kHz mono) through AEC3 -> Silero VAD -> Denoise -> AGC2.
+// Processes a 20ms frame (320 samples @ 16kHz mono): echo cancel, voice detect, denoise, gain.
 // Returns true if voice activity is detected (frame should be transmitted).
 bool  VoiceChatProcessFrame(int16_t* pcm_inout,
                             size_t sample_count,
@@ -88,7 +94,7 @@ bool  VoiceChatProcessFrame(int16_t* pcm_inout,
                             const VoiceChatConfig& cfg,
                             float* out_vad_prob = nullptr);
 
-// P2P Packet Serialization ("KVC1" framing with sequence, VAD flag & ADPCM/Opus payload)
+// P2P Packet Serialization ("KVC1" framing with sequence, VAD flag & G.711 mu-law payload)
 bool  VoiceChatBuildPacket(uint32_t seq,
                            bool vad_active,
                            const int16_t* pcm_samples,

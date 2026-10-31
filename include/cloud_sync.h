@@ -68,6 +68,21 @@ bool           CloudSyncStartOAuthFlow();
 void           CloudSyncDisconnect();
 void           CloudSyncTriggerAsync();
 
+// One full sync, on the calling thread. False = it did not finish (error_out says
+// why) and nothing may be reported as synced. root_dir "" is the app folder.
+struct CloudSyncReport
+{
+	int uploaded = 0;
+	int downloaded = 0;
+	int conflicts = 0; // changed on two machines: both kept, other side as <save>.conflito
+	int skipped = 0;   // left for later because a game is running
+	int total = 0;
+};
+bool           CloudSyncRunNow(const std::string& root_dir, CloudSyncReport* report, std::string* error_out);
+// Points the sync at a local test server.
+void           CloudSyncSetEndpointsForTest(const std::string& token_url, const std::string& api_base,
+                                            const std::string& refresh_token, int64_t last_sync_utc);
+
 // Game Session Hooks (called by CoreRunner on load/unload)
 void           CloudSyncOnGameLoad(const char* system_dir, const char* game_stem);
 void           CloudSyncOnGameUnload(const char* system_dir, const char* game_stem, uint64_t session_seconds);

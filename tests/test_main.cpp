@@ -8,6 +8,7 @@ const char* Tr(const char* pt, const char* en) { (void)en; return pt; }
 bool CoreIsRunning() { return false; }
 const char* CoreGetGameName() { return "Street Fighter III: 3rd Strike"; }
 const char* NetplayGetLocalIp() { return "127.0.0.1"; }
+const char* NetplayGetPeerIp() { return ""; }
 bool NetplayStartHost(int port) { (void)port; return true; }
 bool NetplayStartClient(const char* ip, int port) { (void)ip; (void)port; return true; }
 #include "netplay.h"

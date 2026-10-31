@@ -26,7 +26,7 @@ struct LiveChatMessage
 	std::string sender;
 	std::string text;
 	std::string game_challenge; // Non-empty if this is a 1-Click Netplay challenge
-	std::string room_code;      // 6-char Room Code (e.g. "KRM-59A2")
+	std::string room_code;      // Room Code with the host address in it ("KRM-XXXXX-XXXXX")
 	std::string host_ip;        // Peer IP for 1-Click Netplay accept
 	int         host_port = 55435;
 	int64_t     timestamp_utc = 0;
@@ -39,7 +39,7 @@ struct KarameloFriend
 	std::string alias;        // friendly display name
 	std::string current_game; // active game (or empty if in menu)
 	std::string last_game;    // last played/active game
-	std::string room_code;    // e.g. "KRM-7912" or host IP
+	std::string room_code;    // "KRM-XXXXX-XXXXX" while hosting
 	int         status = 0;   // 0 = Offline, 1 = Online, 2 = Jogando, 3 = Ocupado
 	bool        online = false;
 	int64_t     last_seen_utc = 0;
@@ -51,7 +51,7 @@ struct LobbyPresencePeer
 {
 	std::string tag;          // e.g. "Guh#1337"
 	std::string current_game; // e.g. "Street Fighter Alpha 2"
-	std::string room_code;    // e.g. "KRM-7812"
+	std::string room_code;    // "KRM-XXXXX-XXXXX" while hosting
 	std::string host_ip;      // IP for P2P connect
 	int         host_port = 55435;
 	int         status = 1;   // 1 = Online, 2 = Jogando
@@ -93,6 +93,15 @@ bool         DesktopChatJoinByRoomCode(const char* code);
 
 // Global & LAN Presence Discovery
 void         DesktopChatAnnouncePresence();
+
+// Network: UDP on the LAN plus the other player of a Netplay match. Starts when
+// the chat is opened. Without a server this is all "online" means: nobody
+// outside the network (or the match) is reachable.
+bool         DesktopChatStartNetwork(int port = 55437);
+void         DesktopChatStopNetwork();
+void         DesktopChatSetNetworkAllowed(bool allowed);
+// One received datagram; from_ip is the packet's source. Exposed for the tests.
+bool         DesktopChatHandleDatagram(const std::string& data, const std::string& from_ip);
 std::vector<LobbyPresencePeer> DesktopChatGetActivePeers();
 void         DesktopChatRegisterPeerPresence(const LobbyPresencePeer& peer);
 

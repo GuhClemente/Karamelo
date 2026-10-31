@@ -82,7 +82,6 @@ struct WebAdminHooks {
 	int         (*ra_get_ach_unlocked)() = nullptr;
 	bool        (*ra_set_credentials)(const char* user, const char* pass, bool is_tok, bool hc, bool logout) = nullptr;
 	void        (*ra_update)() = nullptr;
-	const char* (*ra_get_token)() = nullptr;
 	const char* (*ra_get_game_title)() = nullptr;
 	int         (*ra_get_achievements)(struct RaAchievementInfo* out, int max_out) = nullptr;
 

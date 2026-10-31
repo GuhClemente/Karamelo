@@ -43,6 +43,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+# Bateria muda: o audio roda igual, mas nao sai na caixa de som.
+$env:SDL_AUDIO_DRIVER = "dummy"
+
 $app  = Join-Path $root "app"
 $exe  = Get-ChildItem (Join-Path $app "Karamelo_v*.exe") -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1

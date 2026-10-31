@@ -15,11 +15,18 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <windowsx.h>
 #include <dwmapi.h>
 #else
 #include <SDL3/SDL.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #endif
 
 #include <algorithm>
@@ -30,7 +37,9 @@
 #include <mutex>
 #include <sstream>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <thread>
 #include <time.h>
 
 // =============================================================
@@ -38,6 +47,8 @@
 // =============================================================
 
 static std::recursive_mutex g_chat_mutex;
+static void NetSendDatagram(const std::string& payload);
+static std::string NetFrame(char kind, const std::string& json);
 static std::atomic<int> g_current_room{LIVE_ROOM_ARCADE_FIGHT};
 static std::atomic<bool> g_overlay_visible{false};
 static std::string g_nickname = "Player1";
@@ -52,7 +63,6 @@ enum SidebarTab {
 };
 static std::atomic<int> g_sidebar_tab{SIDEBAR_ROOMS};
 
-static std::map<std::string, std::pair<std::string, int>> g_room_code_table;
 static std::vector<LobbyPresencePeer> g_active_peers;
 static std::vector<KarameloFriend> g_friends;
 
@@ -139,8 +149,8 @@ static void SeedWelcomeMessagesLocked() {
       welcome.text =
           std::string(Tr("Bem-vindo ao canal ", "Welcome to channel ")) +
           DesktopChatGetRoomName((LiveChatRoom)r) +
-          Tr(". Historico 100% volatil em RAM — convites via Código e Amigos!",
-             ". 100% volatile RAM chat — Match Codes & Friends Roster!");
+          Tr(". Fala com quem esta na sua rede local e com o outro jogador da partida. Nada fica salvo.",
+             ". Reaches people on your local network and the other player of your match. Nothing is saved.");
       welcome.timestamp_utc = (int64_t)time(NULL);
       g_room_messages[r].push_back(welcome);
     }
@@ -172,37 +182,62 @@ void DesktopChatSetKarameloTag(const char* tag) {
   }
 }
 
+// A room code IS the address: IPv4 + port + 2 check bits in 10 base-32 letters
+// ("KRM-XXXXX-XXXXX"). There is no server to look a code up in, so a code kept
+// in a table on the machine that made it (as it was) meant nothing on the
+// friend's machine, which is the only place a code is ever typed.
+static const char kRoomCodeChars[] = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+static uint32_t RoomCodeCheck(uint64_t bits) {
+  uint32_t c = 0;
+  for (int i = 0; i < 24; i++)
+    c ^= (uint32_t)((bits >> (i * 2)) & 3u);
+  return c;
+}
+
 std::string DesktopChatGenerateRoomCode(const std::string& host_ip, int port) {
-  std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
-  uint32_t r = (uint32_t)rand() ^ (uint32_t)time(NULL);
-  static const char kChars[] = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-  char code_buf[16];
-  snprintf(code_buf, sizeof(code_buf), "KRM-%c%c%c%c",
-           kChars[(r >> 15) % 32],
-           kChars[(r >> 10) % 32],
-           kChars[(r >> 5) % 32],
-           kChars[r % 32]);
-  std::string code = code_buf;
-  g_room_code_table[code] = {host_ip.empty() ? "127.0.0.1" : host_ip, port};
+  in_addr addr{};
+  if (port <= 0 || port > 65535 || inet_pton(AF_INET, host_ip.c_str(), &addr) != 1)
+    return "";
+  uint64_t bits = ((uint64_t)ntohl(addr.s_addr) << 16) | (uint64_t)(uint16_t)port;
+  bits = (bits << 2) | RoomCodeCheck(bits);
+  std::string code = "KRM-";
+  for (int i = 9; i >= 0; i--) {
+    code += kRoomCodeChars[(bits >> (i * 5)) & 31u];
+    if (i == 5)
+      code += '-';
+  }
   return code;
 }
 
 bool DesktopChatResolveRoomCode(const std::string& code, std::string& out_ip, int& out_port) {
-  std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
-  auto it = g_room_code_table.find(code);
-  if (it != g_room_code_table.end()) {
-    out_ip = it->second.first;
-    out_port = it->second.second;
-    return true;
+  std::string letters;
+  for (char c : code) {
+    if (c == '-' || c == ' ')
+      continue;
+    letters += (char)toupper((unsigned char)c);
   }
-  for (const auto& peer : g_active_peers) {
-    if (peer.room_code == code && !peer.host_ip.empty()) {
-      out_ip = peer.host_ip;
-      out_port = peer.host_port;
-      return true;
-    }
+  if (letters.size() != 13 || letters.compare(0, 3, "KRM") != 0)
+    return false;
+  uint64_t bits = 0;
+  for (size_t i = 3; i < letters.size(); i++) {
+    const char* p = strchr(kRoomCodeChars, letters[i]);
+    if (!p || !*p)
+      return false;
+    bits = (bits << 5) | (uint64_t)(p - kRoomCodeChars);
   }
-  return false;
+  const uint32_t check = (uint32_t)(bits & 3u);
+  bits >>= 2;
+  if (RoomCodeCheck(bits) != check)
+    return false;
+  in_addr addr{};
+  addr.s_addr = htonl((uint32_t)(bits >> 16));
+  char ip[64];
+  if (!inet_ntop(AF_INET, &addr, ip, sizeof(ip)))
+    return false;
+  out_ip = ip;
+  out_port = (int)(bits & 0xFFFFu);
+  return out_port > 0;
 }
 
 bool DesktopChatJoinByRoomCode(const char* code) {
@@ -210,6 +245,7 @@ bool DesktopChatJoinByRoomCode(const char* code) {
   std::string ip;
   int port = 55435;
   if (!DesktopChatResolveRoomCode(code, ip, port)) {
+    // Not a code: an address typed by hand ("ip" or "ip:port").
     std::string raw = code;
     size_t colon = raw.find(':');
     if (colon != std::string::npos) {
@@ -218,11 +254,14 @@ bool DesktopChatJoinByRoomCode(const char* code) {
     } else {
       ip = raw;
     }
+    in_addr check{};
+    if (port <= 0 || port > 65535 || inet_pton(AF_INET, ip.c_str(), &check) != 1) {
+      CoreSetToast(Tr("CODIGO DE SALA INVALIDO", "INVALID ROOM CODE"), 180);
+      return false;
+    }
   }
 
   bool ok = NetplayStartClient(ip.c_str(), port);
-  if (VoiceChatIsEnabled())
-    VoiceChatStartP2P(ip.c_str(), port + 1);
 
   TrayManagerSetStatus(TRAY_STATUS_PLAYING, "Netplay Match");
   CoreSetToast(Tr("CONECTANDO A PARTIDA...", "CONNECTING TO MATCH..."), 180);
@@ -247,7 +286,7 @@ void DesktopChatRegisterPeerPresence(const LobbyPresencePeer& peer) {
   g_active_peers.push_back(p);
 }
 
-void DesktopChatAnnouncePresence() {
+static LobbyPresencePeer BuildLocalPresence() {
   LobbyPresencePeer me;
   me.tag = DesktopChatGetKarameloTag();
   me.current_game = CoreIsRunning() ? CoreGetGameName() : "";
@@ -256,8 +295,14 @@ void DesktopChatAnnouncePresence() {
   me.host_port = 55435;
   me.status = CoreIsRunning() ? 2 : 1;
   me.has_challenge = (NetplayGetRole() == NETPLAY_HOST && NetplayGetState() != NETPLAY_DISCONNECTED);
+  if (me.has_challenge)
+    me.room_code = DesktopChatGenerateRoomCode(me.host_ip, me.host_port);
   me.last_seen_utc = (int64_t)time(NULL);
-  DesktopChatRegisterPeerPresence(me);
+  return me;
+}
+
+void DesktopChatAnnouncePresence() {
+  DesktopChatRegisterPeerPresence(BuildLocalPresence());
 }
 
 std::vector<LobbyPresencePeer> DesktopChatGetActivePeers() {
@@ -448,6 +493,7 @@ void DesktopChatInit() {
 }
 
 void DesktopChatShutdown() {
+  DesktopChatStopNetwork();
   VoiceChatStopP2P();
   DesktopChatHideWindow();
 #ifdef _WIN32
@@ -537,6 +583,8 @@ bool DesktopChatPostMessage(const char *text) {
     msg.timestamp_utc = (int64_t)time(NULL);
     AppendRoomMessageLocked(g_current_room.load(), msg);
   }
+  DesktopChatStartNetwork();
+  NetSendDatagram(NetFrame('m', DesktopChatFormatWireMessage((LiveChatRoom)g_current_room.load(), msg)));
 #ifdef _WIN32
   g_scroll_offset = 0;
   RequestChatRepaint();
@@ -551,7 +599,7 @@ bool DesktopChatSendChallenge(const char *game_title) {
   if (title.empty()) {
     const char *loaded = CoreGetGameName();
     title = (loaded && loaded[0]) ? DesktopChatSanitizeText(loaded, 64)
-                                  : "Street Fighter Alpha 2 (Arcade)";
+                                  : Tr("Partida Netplay", "Netplay Match");
   }
 
   NetplayStartHost(55435);
@@ -574,6 +622,8 @@ bool DesktopChatSendChallenge(const char *game_title) {
   }
 
   DesktopChatAnnouncePresence();
+  DesktopChatStartNetwork();
+  NetSendDatagram(NetFrame('m', DesktopChatFormatWireMessage((LiveChatRoom)g_current_room.load(), msg)));
 
   TrayManagerSetStatus(TRAY_STATUS_PLAYING, title.c_str());
   TrayManagerShowNotification("Karamelo Social — Convite Criado",
@@ -611,12 +661,10 @@ bool DesktopChatAcceptLastChallenge() {
     return false;
   }
 
-  if (!found.room_code.empty())
+  if (found.host_ip.empty())
     return DesktopChatJoinByRoomCode(found.room_code.c_str());
 
   bool ok = NetplayStartClient(found.host_ip.c_str(), found.host_port);
-  if (VoiceChatIsEnabled())
-    VoiceChatStartP2P(found.host_ip.c_str(), found.host_port + 1);
 
   TrayManagerSetStatus(TRAY_STATUS_PLAYING, found.game_challenge.c_str());
   CoreSetToast(
@@ -643,6 +691,234 @@ void DesktopChatClearRoomMessages() {
   g_scroll_offset = 0;
   RequestChatRepaint();
 #endif
+}
+
+// =============================================================
+// Network: UDP on the local network, plus the other player of a match
+// =============================================================
+//
+// No server. Messages and presence are broadcast on the LAN and, during a
+// Netplay match, also sent straight to the other player. It stays off until
+// the player opens the chat: presence announces the nickname to the network.
+
+static const char* const kChatMagic = "KRMC1";
+static std::atomic<bool> g_net_running{false};
+static std::atomic<bool> g_net_allowed{true};
+static std::thread g_net_thread;
+static std::atomic<int> g_net_port{0};
+static uint32_t g_net_instance = 0;
+#ifdef _WIN32
+static SOCKET g_net_sock = INVALID_SOCKET;
+#else
+static int g_net_sock = -1;
+#endif
+struct ChatRateWindow { int64_t start = 0; int count = 0; };
+static std::map<std::string, ChatRateWindow> g_chat_rate;
+
+static void NetSendDatagram(const std::string& payload) {
+  if (!g_net_running.load() || payload.size() > 1400)
+    return;
+  const int port = g_net_port.load();
+  sockaddr_in to{};
+  to.sin_family = AF_INET;
+  to.sin_port = htons((uint16_t)port);
+  to.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+  sendto(g_net_sock, payload.data(), (int)payload.size(), 0, (const sockaddr*)&to, sizeof(to));
+
+  const char* peer = (NetplayGetState() == NETPLAY_CONNECTED) ? NetplayGetPeerIp() : "";
+  if (peer && peer[0] && inet_pton(AF_INET, peer, &to.sin_addr) == 1)
+    sendto(g_net_sock, payload.data(), (int)payload.size(), 0, (const sockaddr*)&to, sizeof(to));
+}
+
+static std::string NetFrame(char kind, const std::string& json) {
+  char head[32];
+  snprintf(head, sizeof(head), "%s %08x %c ", kChatMagic, g_net_instance, kind);
+  return head + json;
+}
+
+static std::string BuildPresenceJson(const LobbyPresencePeer& me) {
+  std::ostringstream oss;
+  oss << "{\"tag\":" << JsonQuote(DesktopChatSanitizeText(me.tag, 32))
+      << ",\"game\":" << JsonQuote(DesktopChatSanitizeText(me.current_game, 64))
+      << ",\"code\":" << JsonQuote(DesktopChatSanitizeText(me.room_code, 16))
+      << ",\"port\":" << me.host_port
+      << ",\"status\":" << me.status
+      << ",\"challenge\":" << (me.has_challenge ? "true" : "false") << "}";
+  return oss.str();
+}
+
+bool DesktopChatHandleDatagram(const std::string& data, const std::string& from_ip) {
+  // "KRMC1 <instance> <kind> <json>"
+  if (data.size() < 17 || data.compare(0, 6, "KRMC1 ") != 0 || data[14] != ' ' || data[16] != ' ')
+    return false;
+  if ((uint32_t)strtoul(data.substr(6, 8).c_str(), NULL, 16) == g_net_instance)
+    return false; // our own broadcast coming back
+  const char kind = data[15];
+  const std::string json = data.substr(17);
+  const int64_t now = (int64_t)time(NULL);
+
+  {
+    // Anyone on the network can send here: a flood must not fill the rooms.
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    if (g_chat_rate.size() > 256)
+      g_chat_rate.clear();
+    ChatRateWindow& w = g_chat_rate[from_ip];
+    if (now - w.start >= 5) {
+      w.start = now;
+      w.count = 0;
+    }
+    if (++w.count > 20)
+      return false;
+  }
+
+  if (kind == 'm') {
+    LiveChatRoom room = LIVE_ROOM_ARCADE_FIGHT;
+    LiveChatMessage msg;
+    if (!DesktopChatParseWireMessage(json, &room, msg))
+      return false;
+    msg.timestamp_utc = now; // the sender's clock is not ours
+    // Where to connect comes from the packet's source, not from its text: a
+    // message must not be able to point an invite at a third machine.
+    msg.host_ip = from_ip;
+    if (msg.host_port <= 0 || msg.host_port > 65535)
+      msg.host_port = 55435;
+    if (!msg.game_challenge.empty()) {
+      msg.room_code = DesktopChatGenerateRoomCode(from_ip, msg.host_port);
+    }
+    {
+      std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+      AppendRoomMessageLocked((int)room, msg);
+    }
+    if (!msg.game_challenge.empty() && TrayManagerGetStatus() != TRAY_STATUS_BUSY) {
+      const std::string alert = msg.sender + ": " + msg.game_challenge;
+      TrayManagerShowNotification(Tr("Convite de partida", "Match invite"), alert.c_str(), true);
+    }
+#ifdef _WIN32
+    RequestChatRepaint();
+#endif
+    return true;
+  }
+
+  if (kind == 'p') {
+    JsonValue root;
+    std::string err;
+    if (!JsonParse(json, root, err) || root.type != JsonValue::Object)
+      return false;
+    const JsonValue* tag = root.Find("tag");
+    if (!tag || tag->type != JsonValue::String)
+      return false;
+    LobbyPresencePeer peer;
+    peer.tag = DesktopChatSanitizeText(tag->str, 32);
+    if (peer.tag.empty())
+      return false;
+    if (const JsonValue* v = root.Find("game"))
+      if (v->type == JsonValue::String) peer.current_game = DesktopChatSanitizeText(v->str, 64);
+    if (const JsonValue* v = root.Find("code"))
+      if (v->type == JsonValue::String) peer.room_code = DesktopChatSanitizeText(v->str, 16);
+    if (const JsonValue* v = root.Find("port"))
+      if (v->type == JsonValue::Number && v->number > 0 && v->number <= 65535) peer.host_port = (int)v->number;
+    if (const JsonValue* v = root.Find("status"))
+      if (v->type == JsonValue::Number) peer.status = (int)v->number;
+    if (const JsonValue* v = root.Find("challenge"))
+      peer.has_challenge = v->type == JsonValue::Bool && v->boolean;
+    peer.host_ip = from_ip;
+    DesktopChatRegisterPeerPresence(peer);
+#ifdef _WIN32
+    RequestChatRepaint();
+#endif
+    return true;
+  }
+  return false;
+}
+
+static void NetThreadProc() {
+  int64_t last_presence = 0;
+  while (g_net_running.load()) {
+    const int64_t now = (int64_t)time(NULL);
+    if (now - last_presence >= 5) {
+      last_presence = now;
+      LobbyPresencePeer me = BuildLocalPresence();
+      NetSendDatagram(NetFrame('p', BuildPresenceJson(me)));
+    }
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(g_net_sock, &fds);
+    timeval tv{0, 200000};
+    if (select((int)g_net_sock + 1, &fds, NULL, NULL, &tv) <= 0)
+      continue;
+    char buf[1500];
+    sockaddr_in from{};
+    socklen_t flen = sizeof(from);
+    int r = recvfrom(g_net_sock, buf, sizeof(buf), 0, (sockaddr*)&from, &flen);
+    if (r <= 0)
+      continue;
+    char ip[64] = {0};
+    if (inet_ntop(AF_INET, &from.sin_addr, ip, sizeof(ip)))
+      DesktopChatHandleDatagram(std::string(buf, (size_t)r), ip);
+  }
+}
+
+bool DesktopChatStartNetwork(int port) {
+  if (g_net_running.load())
+    return true;
+  if (!g_net_allowed.load())
+    return false;
+#ifdef _WIN32
+  WSADATA wsa;
+  WSAStartup(MAKEWORD(2, 2), &wsa);
+  SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (s == INVALID_SOCKET)
+    return false;
+#else
+  int s = socket(AF_INET, SOCK_DGRAM, 0);
+  if (s < 0)
+    return false;
+#endif
+  int on = 1;
+  setsockopt(s, SOL_SOCKET, SO_BROADCAST, (const char*)&on, sizeof(on));
+  setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on));
+  sockaddr_in addr{};
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  addr.sin_port = htons((uint16_t)port);
+  if (bind(s, (sockaddr*)&addr, sizeof(addr)) != 0) {
+#ifdef _WIN32
+    closesocket(s);
+#else
+    close(s);
+#endif
+    return false;
+  }
+  if (g_net_instance == 0)
+    g_net_instance = (uint32_t)rand() ^ ((uint32_t)time(NULL) << 8) ^ 0x4B524D31u;
+  g_net_sock = s;
+  g_net_port.store(port);
+  g_net_running.store(true);
+  g_net_thread = std::thread(NetThreadProc);
+  return true;
+}
+
+void DesktopChatStopNetwork() {
+  g_net_running.store(false);
+  if (g_net_thread.joinable())
+    g_net_thread.join();
+#ifdef _WIN32
+  if (g_net_sock != INVALID_SOCKET) {
+    closesocket(g_net_sock);
+    g_net_sock = INVALID_SOCKET;
+  }
+#else
+  if (g_net_sock >= 0) {
+    close(g_net_sock);
+    g_net_sock = -1;
+  }
+#endif
+}
+
+void DesktopChatSetNetworkAllowed(bool allowed) {
+  g_net_allowed.store(allowed);
+  if (!allowed)
+    DesktopChatStopNetwork();
 }
 
 // =============================================================
@@ -1070,8 +1346,8 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
                   g_hover_zone == HIT_BTN_DENOISE ? RGB(52, 60, 76) : RGB(36, 42, 54), col_divider);
   char dsp_lbl[48];
   snprintf(dsp_lbl, sizeof(dsp_lbl), "IA: %s",
-           VoiceChatGetDenoiseEngine() == VOICE_DENOISE_DEEPFILTERNET ? "DeepFilter"
-           : VoiceChatGetDenoiseEngine() == VOICE_DENOISE_RNNOISE   ? "RNNoise"
+           VoiceChatGetDenoiseEngine() == VOICE_DENOISE_STRONG ? "Forte"
+           : VoiceChatGetDenoiseEngine() == VOICE_DENOISE_LIGHT   ? "Leve"
                                                                   : "Cru/Off");
   DrawUtf8TextGdi(hdc, dsp_lbl, rc_btn_dsp, g_font_small, col_accent_blue, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   g_hit_rects.push_back({HIT_BTN_DENOISE, rc_btn_dsp});
@@ -1404,6 +1680,7 @@ static void DrawOverlayText8x8(uint32_t *fb, int fb_w, int fb_h, int px, int py,
                                const char *text, uint32_t color);
 
 void DesktopChatShowWindowSdl() {
+  DesktopChatStartNetwork();
   if (!g_chat_sdl_win) {
     g_chat_sdl_win = SDL_CreateWindow(
         "Karamelo Social — Amigos & Bate-Papo",
@@ -1420,6 +1697,8 @@ void DesktopChatShowWindowSdl() {
     SDL_ShowWindow(g_chat_sdl_win);
   }
 }
+
+bool DesktopChatIsWindowVisibleSdl();
 
 void DesktopChatHideWindowSdl() {
   if (g_chat_sdl_win) {
@@ -1564,6 +1843,7 @@ void DesktopChatRenderSdlWindow() {
 // =============================================================
 
 void DesktopChatShowWindow() {
+  DesktopChatStartNetwork();
 #ifdef _WIN32
   if (!g_chat_hwnd) {
     HINSTANCE hInst = GetModuleHandle(NULL);
@@ -1637,10 +1917,13 @@ bool DesktopChatIsWindowVisible() {
 bool DesktopChatIsOverlayVisible() { return g_overlay_visible.load(); }
 
 void DesktopChatSetOverlayVisible(bool visible) {
+  if (visible)
+    DesktopChatStartNetwork();
   g_overlay_visible.store(visible);
 }
 
 void DesktopChatToggleOverlay() {
+  DesktopChatStartNetwork();
   bool next = !g_overlay_visible.load();
   g_overlay_visible.store(next);
 }

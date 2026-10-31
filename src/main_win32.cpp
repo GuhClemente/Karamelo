@@ -1299,7 +1299,7 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 		{
 			if (GetKeyState(VK_SHIFT) & 0x8000)
 				DesktopChatToggleWindow();
-			else
+			else if (!CoreGameUsesKeyboard() || DesktopChatIsOverlayVisible())
 				DesktopChatToggleOverlay();
 			InvalidateRect(hwnd, NULL, FALSE);
 			return false;
@@ -1319,7 +1319,7 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 			{
 				if (GetKeyState(VK_SHIFT) & 0x8000)
 					DesktopChatToggleWindow();
-				else
+				else if (!CoreGameUsesKeyboard() || DesktopChatIsOverlayVisible())
 					DesktopChatToggleOverlay();
 			}
 			InvalidateRect(hwnd, NULL, FALSE);

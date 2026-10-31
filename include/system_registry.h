@@ -80,6 +80,22 @@ inline const SystemDef* FindSystemById(const std::string& id_or_alt) {
   return nullptr;
 }
 
+// Computers are played on the keyboard, so their games may need any key,
+// F10 included. Folder names may come in any case.
+inline bool SystemIsKeyboardComputer(const std::string& system_dir) {
+  auto lower = [](std::string text) {
+    for (char& c : text)
+      if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+    return text;
+  };
+  const std::string wanted = lower(system_dir);
+  for (size_t i = 0; i < kSystemRegistryCount; ++i) {
+    if (wanted == lower(kSystemRegistry[i].id) || wanted == lower(kSystemRegistry[i].alt_dir))
+      return std::string(kSystemRegistry[i].category) == "Computadores";
+  }
+  return false;
+}
+
 // Canonical resolution of system ROM directory across root and app/
 inline std::filesystem::path ResolveSystemRomDir(const std::string& id_or_dir) {
   namespace fs = std::filesystem;

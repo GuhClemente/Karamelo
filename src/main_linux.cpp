@@ -1338,7 +1338,8 @@ int main(int argc, char* argv[])
 
 				if (sc == SDL_SCANCODE_F10)
 				{
-					if (!key_repeat) DesktopChatToggleOverlay();
+					if (!key_repeat && (!CoreGameUsesKeyboard() || DesktopChatIsOverlayVisible()))
+						DesktopChatToggleOverlay();
 				}
 				else if (sc == SDL_SCANCODE_F12)
 				{

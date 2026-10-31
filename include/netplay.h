@@ -34,6 +34,8 @@ NetplayState NetplayGetState();
 const char*  NetplayGetStatusString();
 int          NetplayGetPingMs();
 const char*  NetplayGetLocalIp();
+// IPv4 of the other player while a session exists, "" otherwise.
+const char*  NetplayGetPeerIp();
 
 // Input synchronization per frame
 void NetplaySyncInputs(int16_t local_p1_buttons[16], int16_t local_p1_analog[2][2],

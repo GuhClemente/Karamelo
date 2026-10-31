@@ -1,5 +1,6 @@
 #include "cloud_sync.h"
 #include "app_info.h"
+#include <set>
 #include "json_mini.h"
 #include "core_runner.h"
 #include "menu.h"
@@ -435,10 +436,6 @@ bool CloudSyncScanLocalFiles(const std::string& root_dir, std::vector<CloudSaveE
 		out_entries.push_back(e);
 	};
 
-	add_candidate("Config/karamelo.cfg", "Config", "karamelo");
-	add_candidate("Config/favorites.txt", "Config", "favorites");
-	add_candidate("Config/recent.txt", "Config", "recent");
-
 	fs::path saves_root = base / "saves";
 	if (fs::exists(saves_root, ec) && fs::is_directory(saves_root, ec))
 	{
@@ -716,6 +713,10 @@ static void LoadCloudConfigAndTokens()
 		}
 	}
 
+	// Earlier builds saved a made-up token when the login failed.
+	if (g_refresh_token.rfind("oauth2_pkce_", 0) == 0)
+		g_refresh_token.clear();
+
 	if (!g_refresh_token.empty())
 	{
 		SetCloudStatus(CLOUD_IDLE, Tr("Conectado (Google Drive)", "Connected (Google Drive)"));
@@ -769,7 +770,8 @@ static void SaveRefreshToken(const std::string& token)
 	int fd = open(tok_path.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
 	if (fd >= 0)
 	{
-		(void)write(fd, token.data(), token.size());
+		if (write(fd, token.data(), token.size()) != (ssize_t)token.size())
+			CoreSetToast(Tr("NUVEM: FALHA AO GUARDAR O LOGIN", "CLOUD: COULD NOT STORE THE LOGIN"), 180);
 		close(fd);
 	}
 #endif
@@ -932,142 +934,495 @@ static std::string CloudSyncUrlEncode(const std::string& str)
 	return escaped.str();
 }
 
-#ifdef _WIN32
-static bool CloudSyncExchangeTokensWinHttp(const std::string& client_id,
-                                          const std::string& client_secret,
-                                          const std::string& code,
-                                          const std::string& verifier,
-                                          const std::string& redirect_uri,
-                                          std::string& out_access_token,
-                                          std::string& out_refresh_token)
+static std::string CloudUrlDecode(const std::string& in)
 {
-	HINTERNET hSession = WinHttpOpen(L"Karamelo-CloudSync/1.0",
-	                                 WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-	                                 WINHTTP_NO_PROXY_NAME,
-	                                 WINHTTP_NO_PROXY_BYPASS, 0);
-	if (!hSession) return false;
-
-	WinHttpSetTimeouts(hSession, 8000, 8000, 10000, 10000);
-
-	HINTERNET hConnect = WinHttpConnect(hSession, L"oauth2.googleapis.com", INTERNET_DEFAULT_HTTPS_PORT, 0);
-	if (!hConnect)
+	std::string out;
+	for (size_t i = 0; i < in.size(); i++)
 	{
-		WinHttpCloseHandle(hSession);
-		return false;
+		if (in[i] == '%' && i + 2 < in.size())
+		{
+			char hex[3] = { in[i + 1], in[i + 2], 0 };
+			out += (char)strtol(hex, NULL, 16);
+			i += 2;
+		}
+		else out += (in[i] == '+') ? ' ' : in[i];
 	}
+	return out;
+}
 
-	HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/token", NULL,
-	                                       WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-	                                       WINHTTP_FLAG_SECURE);
-	if (!hRequest)
+// =============================================================
+// HTTP: WinHTTP on Windows, the curl command elsewhere (like updater.cpp)
+// =============================================================
+
+static std::string g_token_url = "https://oauth2.googleapis.com/token";
+static std::string g_api_base = "https://www.googleapis.com";
+
+struct CloudHttpResponse
+{
+	int status = 0;
+	std::string body;
+};
+
+#ifdef _WIN32
+static std::wstring CloudWiden(const std::string& s)
+{
+	int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, NULL, 0);
+	std::wstring w(n > 0 ? (size_t)n : 1, L'\0');
+	if (n > 0) MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &w[0], n);
+	w.resize(wcslen(w.c_str()));
+	return w;
+}
+
+static bool CloudHttp(const char* method, const std::string& url,
+                      const std::vector<std::string>& headers, const std::string& body,
+                      CloudHttpResponse& out)
+{
+	std::wstring wurl = CloudWiden(url);
+	URL_COMPONENTS parts{};
+	parts.dwStructSize = sizeof(parts);
+	wchar_t host[256] = { 0 };
+	parts.lpszHostName = host;
+	parts.dwHostNameLength = 256;
+	parts.dwUrlPathLength = (DWORD)-1;
+	parts.dwExtraInfoLength = (DWORD)-1;
+	if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &parts)) return false;
+	std::wstring path(parts.lpszUrlPath, parts.dwUrlPathLength);
+	if (parts.lpszExtraInfo) path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
+
+	HINTERNET session = WinHttpOpen(L"Karamelo-CloudSync/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+	                                WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+	if (!session) return false;
+	WinHttpSetTimeouts(session, 10000, 10000, 30000, 60000);
+	HINTERNET conn = WinHttpConnect(session, host, parts.nPort, 0);
+	HINTERNET req = conn ? WinHttpOpenRequest(conn, CloudWiden(method).c_str(), path.c_str(), NULL,
+	                                          WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+	                                          parts.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0)
+	                     : NULL;
+	bool ok = false;
+	if (req)
 	{
-		WinHttpCloseHandle(hConnect);
-		WinHttpCloseHandle(hSession);
-		return false;
+		std::string all_headers;
+		for (const auto& h : headers) all_headers += h + "\r\n";
+		std::wstring wheaders = CloudWiden(all_headers);
+		if (WinHttpSendRequest(req, wheaders.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : wheaders.c_str(),
+		                       wheaders.empty() ? 0 : (DWORD)-1L,
+		                       body.empty() ? WINHTTP_NO_REQUEST_DATA : (LPVOID)body.data(),
+		                       (DWORD)body.size(), (DWORD)body.size(), 0) &&
+		    WinHttpReceiveResponse(req, NULL))
+		{
+			DWORD status = 0, len = sizeof(status);
+			WinHttpQueryHeaders(req, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+			                    WINHTTP_HEADER_NAME_BY_INDEX, &status, &len, WINHTTP_NO_HEADER_INDEX);
+			out.status = (int)status;
+			out.body.clear();
+			char buf[16384];
+			DWORD got = 0;
+			while (WinHttpReadData(req, buf, sizeof(buf), &got) && got > 0)
+				out.body.append(buf, got);
+			ok = true;
+		}
+		WinHttpCloseHandle(req);
 	}
-
-	std::ostringstream body;
-	body << "code=" << CloudSyncUrlEncode(code)
-	     << "&client_id=" << CloudSyncUrlEncode(client_id)
-	     << "&code_verifier=" << CloudSyncUrlEncode(verifier)
-	     << "&redirect_uri=" << CloudSyncUrlEncode(redirect_uri)
-	     << "&grant_type=authorization_code";
-	if (!client_secret.empty())
+	if (conn) WinHttpCloseHandle(conn);
+	WinHttpCloseHandle(session);
+	return ok;
+}
+#else
+static std::string CloudShellQuote(const std::string& s)
+{
+	std::string q = "'";
+	for (char c : s)
 	{
-		body << "&client_secret=" << CloudSyncUrlEncode(client_secret);
+		if (c == '\'') q += "'\\''";
+		else q += c;
 	}
-	std::string payload = body.str();
+	return q + "'";
+}
 
-	const wchar_t* headers = L"Content-Type: application/x-www-form-urlencoded\r\n";
-	BOOL bSent = WinHttpSendRequest(hRequest, headers, (DWORD)-1L,
-	                                (LPVOID)payload.data(), (DWORD)payload.size(),
-	                                (DWORD)payload.size(), 0);
+// Headers (the access token among them) go in a 0600 config file, never on the
+// command line, where any process on the machine could read them.
+static bool CloudHttp(const char* method, const std::string& url,
+                      const std::vector<std::string>& headers, const std::string& body,
+                      CloudHttpResponse& out)
+{
+	std::error_code ec;
+	fs::path dir = fs::temp_directory_path(ec);
+	if (ec) return false;
+	std::string base = (dir / ("karamelo_cloud_" + GenerateRandomHex(8))).string();
+	const std::string cfg = base + ".cfg", in_file = base + ".in", out_file = base + ".out";
+
+	int fd = open(cfg.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd < 0) return false;
+	std::string cfg_text;
+	for (const auto& h : headers)
+	{
+		std::string esc;
+		for (char c : h)
+		{
+			if (c == '"' || c == '\\') esc += '\\';
+			esc += c;
+		}
+		cfg_text += "header = \"" + esc + "\"\n";
+	}
+	bool wrote = write(fd, cfg_text.data(), cfg_text.size()) == (ssize_t)cfg_text.size();
+	close(fd);
+	if (!wrote) { fs::remove(cfg, ec); return false; }
+
+	std::string cmd = "curl -sS --proto =https,http --connect-timeout 15 --max-time 120 -X " + std::string(method) +
+		" -K " + CloudShellQuote(cfg) + " -o " + CloudShellQuote(out_file) + " -w '%{http_code}' ";
+	if (!body.empty())
+	{
+		int bfd = open(in_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+		if (bfd >= 0)
+		{
+			wrote = write(bfd, body.data(), body.size()) == (ssize_t)body.size();
+			close(bfd);
+		}
+		if (bfd < 0 || !wrote)
+		{
+			fs::remove(cfg, ec);
+			fs::remove(in_file, ec);
+			return false;
+		}
+		cmd += "--data-binary @" + CloudShellQuote(in_file) + " ";
+	}
+	cmd += CloudShellQuote(url) + " 2>/dev/null";
 
 	bool ok = false;
-	if (bSent && WinHttpReceiveResponse(hRequest, NULL))
+	if (FILE* p = popen(cmd.c_str(), "r"))
 	{
-		DWORD status = 0, status_len = sizeof(status);
-		if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-		                        WINHTTP_HEADER_NAME_BY_INDEX, &status, &status_len, WINHTTP_NO_HEADER_INDEX) &&
-		    status >= 200 && status < 300)
-		{
-			std::string resp_json;
-			char buf[1024];
-			DWORD bytes_read = 0;
-			while (WinHttpReadData(hRequest, buf, sizeof(buf) - 1, &bytes_read) && bytes_read > 0)
-			{
-				buf[bytes_read] = '\0';
-				resp_json += buf;
-			}
-
-			JsonValue root;
-			std::string err;
-			if (JsonParse(resp_json, root, err) && root.type == JsonValue::Object)
-			{
-				const JsonValue* at = root.Find("access_token");
-				if (at && at->type == JsonValue::String)
-					out_access_token = at->str;
-				const JsonValue* rt = root.Find("refresh_token");
-				if (rt && rt->type == JsonValue::String)
-					out_refresh_token = rt->str;
-				ok = (!out_access_token.empty() || !out_refresh_token.empty());
-			}
-		}
+		char code[16] = { 0 };
+		size_t n = fread(code, 1, sizeof(code) - 1, p);
+		code[n] = 0;
+		ok = (pclose(p) == 0);
+		out.status = atoi(code);
+		std::ifstream f(out_file, std::ios::binary);
+		out.body.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 	}
-
-	WinHttpCloseHandle(hRequest);
-	WinHttpCloseHandle(hConnect);
-	WinHttpCloseHandle(hSession);
-	return ok;
+	fs::remove(cfg, ec);
+	fs::remove(in_file, ec);
+	fs::remove(out_file, ec);
+	return ok && out.status > 0;
 }
 #endif
 
-static void CloudSyncPerformSyncInternal()
+static std::string JsonStr(const JsonValue& obj, const char* key)
 {
-	SetCloudStatus(CLOUD_SYNCING, Tr("Sincronizando saves...", "Syncing saves..."));
+	const JsonValue* v = obj.Find(key);
+	return (v && v->type == JsonValue::String) ? v->str : std::string();
+}
 
-	std::vector<CloudSaveEntry> entries;
-	CloudSyncScanLocalFiles("", entries);
+// Trades either a login code or the saved refresh token for an access token.
+static bool CloudTokenRequest(const std::string& form, std::string& out_access, std::string& out_refresh, int* out_status)
+{
+	CloudHttpResponse resp;
+	if (!CloudHttp("POST", g_token_url, { "Content-Type: application/x-www-form-urlencoded" }, form, resp))
+	{
+		if (out_status) *out_status = 0;
+		return false;
+	}
+	if (out_status) *out_status = resp.status;
+	if (resp.status < 200 || resp.status >= 300) return false;
+	JsonValue root;
+	std::string err;
+	if (!JsonParse(resp.body, root, err) || root.type != JsonValue::Object) return false;
+	out_access = JsonStr(root, "access_token");
+	out_refresh = JsonStr(root, "refresh_token");
+	return !out_access.empty();
+}
 
-	for (auto& e : entries)
+static bool CloudExchangeLoginCode(const std::string& code, const std::string& verifier,
+                                   const std::string& redirect_uri,
+                                   std::string& out_access, std::string& out_refresh)
+{
+	std::ostringstream form;
+	form << "code=" << CloudSyncUrlEncode(code)
+	     << "&client_id=" << CloudSyncUrlEncode(g_client_id)
+	     << "&code_verifier=" << CloudSyncUrlEncode(verifier)
+	     << "&redirect_uri=" << CloudSyncUrlEncode(redirect_uri)
+	     << "&grant_type=authorization_code";
+	if (!g_client_secret.empty()) form << "&client_secret=" << CloudSyncUrlEncode(g_client_secret);
+	return CloudTokenRequest(form.str(), out_access, out_refresh, nullptr);
+}
+
+// =============================================================
+// Google Drive (appDataFolder): the actual sync
+// =============================================================
+
+struct DriveFile
+{
+	std::string id;
+	CloudSaveEntry entry;
+};
+
+static std::vector<std::string> DriveAuth(const std::string& token)
+{
+	return { "Authorization: Bearer " + token };
+}
+
+static bool DriveList(const std::string& token, std::map<std::string, DriveFile>& out, std::string& error)
+{
+	out.clear();
+	std::string page;
+	do
+	{
+		std::string url = g_api_base + "/drive/v3/files?spaces=appDataFolder&pageSize=1000"
+			"&fields=nextPageToken,files(id,name,appProperties)";
+		if (!page.empty()) url += "&pageToken=" + CloudSyncUrlEncode(page);
+		CloudHttpResponse resp;
+		if (!CloudHttp("GET", url, DriveAuth(token), "", resp)) { error = "sem conexao"; return false; }
+		if (resp.status != 200) { error = "lista HTTP " + std::to_string(resp.status); return false; }
+		JsonValue root;
+		std::string err;
+		if (!JsonParse(resp.body, root, err) || root.type != JsonValue::Object) { error = "resposta invalida"; return false; }
+		const JsonValue* files = root.Find("files");
+		if (files && files->type == JsonValue::Array)
+		{
+			for (const auto& f : files->items)
+			{
+				if (f.type != JsonValue::Object) continue;
+				DriveFile df;
+				df.id = JsonStr(f, "id");
+				df.entry.rel_path = JsonStr(f, "name");
+				if (const JsonValue* props = f.Find("appProperties"))
+				{
+					if (props->type == JsonValue::Object)
+					{
+						df.entry.sha256 = JsonStr(*props, "sha256");
+						std::string mt = JsonStr(*props, "mtime");
+						if (!mt.empty()) df.entry.modified_utc = (int64_t)atoll(mt.c_str());
+					}
+				}
+				if (!df.id.empty() && !df.entry.rel_path.empty())
+					out[df.entry.rel_path] = df;
+			}
+		}
+		page = JsonStr(root, "nextPageToken");
+	} while (!page.empty());
+	return true;
+}
+
+static bool DriveUpload(const std::string& token, const fs::path& local_file, const CloudSaveEntry& e,
+                        const std::string& existing_id, std::string& error)
+{
+	std::ifstream in(local_file, std::ios::binary);
+	if (!in) { error = "leitura local"; return false; }
+	std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+
+	const std::string boundary = "karamelo_" + GenerateRandomHex(12);
+	std::ostringstream meta;
+	meta << "{\"name\":" << JsonQuote(e.rel_path);
+	if (existing_id.empty()) meta << ",\"parents\":[\"appDataFolder\"]";
+	meta << ",\"appProperties\":{\"sha256\":" << JsonQuote(e.sha256)
+	     << ",\"mtime\":\"" << e.modified_utc << "\"}}";
+
+	std::string body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + meta.str() +
+		"\r\n--" + boundary + "\r\nContent-Type: application/octet-stream\r\n\r\n" + content +
+		"\r\n--" + boundary + "--\r\n";
+
+	std::string url = g_api_base + "/upload/drive/v3/files";
+	if (!existing_id.empty()) url += "/" + existing_id;
+	url += "?uploadType=multipart";
+
+	std::vector<std::string> headers = DriveAuth(token);
+	headers.push_back("Content-Type: multipart/related; boundary=" + boundary);
+	CloudHttpResponse resp;
+	if (!CloudHttp(existing_id.empty() ? "POST" : "PATCH", url, headers, body, resp)) { error = "sem conexao"; return false; }
+	if (resp.status < 200 || resp.status >= 300) { error = "envio HTTP " + std::to_string(resp.status); return false; }
+	return true;
+}
+
+// Downloads into <dest>.tmp, checks the hash the uploader recorded, and only
+// then replaces the save, keeping the previous one as <dest>.bak.
+static bool DriveDownload(const std::string& token, const DriveFile& f, const fs::path& dest, std::string& error)
+{
+	CloudHttpResponse resp;
+	if (!CloudHttp("GET", g_api_base + "/drive/v3/files/" + f.id + "?alt=media", DriveAuth(token), "", resp)) { error = "sem conexao"; return false; }
+	if (resp.status != 200) { error = "download HTTP " + std::to_string(resp.status); return false; }
+	if (!f.entry.sha256.empty() &&
+	    CloudSyncComputeSha256Bytes((const uint8_t*)resp.body.data(), resp.body.size()) != f.entry.sha256)
+	{
+		error = "hash do download nao confere";
+		return false;
+	}
+	std::error_code ec;
+	fs::create_directories(dest.parent_path(), ec);
+	fs::path tmp = dest;
+	tmp += ".tmp";
+	{
+		std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+		out.write(resp.body.data(), (std::streamsize)resp.body.size());
+		if (!out.good()) { fs::remove(tmp, ec); error = "escrita local"; return false; }
+	}
+	if (fs::exists(dest, ec))
+	{
+		fs::path bak = dest;
+		bak += ".bak";
+		fs::copy_file(dest, bak, fs::copy_options::overwrite_existing, ec);
+	}
+	fs::rename(tmp, dest, ec);
+	if (ec) { fs::remove(tmp, ec); error = "troca do arquivo"; return false; }
+	return true;
+}
+
+bool CloudSyncRunNow(const std::string& root_dir, CloudSyncReport* report, std::string* error_out)
+{
+	CloudSyncReport rep;
+	std::string error;
+	auto fail = [&](const std::string& why) {
+		if (error_out) *error_out = why;
+		if (report) *report = rep;
+		return false;
+	};
+
+	std::string refresh;
 	{
 		std::lock_guard<std::mutex> lk(g_cloud_mutex);
-		auto it = g_playtime_map.find(e.system_dir + "/" + e.game_stem);
-		if (it != g_playtime_map.end())
-			e.playtime_sec = it->second;
+		refresh = g_refresh_token;
 	}
+	if (refresh.empty()) return fail("sem login");
 
-	CloudProfileManifest manifest;
-	manifest.schema_version = 1;
-	manifest.app_version = APP_VERSION;
-	manifest.device_name = GetLocalDeviceName();
-	manifest.updated_utc = (int64_t)time(NULL);
-	manifest.entries = entries;
-
-	std::error_code ec;
-	fs::create_directories("Config", ec);
-	std::string json_out = CloudSyncSerializeManifest(manifest);
+	std::ostringstream form;
+	form << "refresh_token=" << CloudSyncUrlEncode(refresh)
+	     << "&client_id=" << CloudSyncUrlEncode(g_client_id)
+	     << "&grant_type=refresh_token";
+	if (!g_client_secret.empty()) form << "&client_secret=" << CloudSyncUrlEncode(g_client_secret);
+	std::string token, ignored;
+	int token_status = 0;
+	if (!CloudTokenRequest(form.str(), token, ignored, &token_status))
 	{
-		std::ofstream mf("Config/cloud_profile.json", std::ios::trunc);
-		if (mf.is_open())
-			mf << json_out;
+		if (token_status == 400 || token_status == 401) return fail("login expirado");
+		return fail(token_status ? "token HTTP " + std::to_string(token_status) : "sem conexao");
 	}
 
-	g_cloud_synced_count.store((int)entries.size());
-	g_last_sync_utc = manifest.updated_utc;
+	std::map<std::string, DriveFile> remote;
+	if (!DriveList(token, remote, error)) return fail(error);
+
+	std::vector<CloudSaveEntry> local;
+	CloudSyncScanLocalFiles(root_dir, local);
+	std::error_code ec;
+	const fs::path base = root_dir.empty() ? fs::current_path(ec) : fs::path(root_dir);
+	// A running game holds its save in memory and rewrites it on exit, over
+	// anything downloaded now. Its turn comes in the sync after it closes.
+	const bool may_download = !CoreIsRunning();
+
+	std::set<std::string> seen;
+	for (const CloudSaveEntry& e : local)
+	{
+		if (g_cloud_shutdown.load()) return fail("encerrando");
+		seen.insert(e.rel_path);
+		auto it = remote.find(e.rel_path);
+		const fs::path path = base / fs::path(e.rel_path);
+		if (it == remote.end())
+		{
+			if (!DriveUpload(token, path, e, "", error)) return fail(error);
+			rep.uploaded++;
+			continue;
+		}
+		switch (CloudSyncEvaluateConflict(e, it->second.entry, g_last_sync_utc))
+		{
+		case CLOUD_CONFLICT_NONE:
+			break;
+		case CLOUD_CONFLICT_UPLOAD_LOCAL:
+			if (!DriveUpload(token, path, e, it->second.id, error)) return fail(error);
+			rep.uploaded++;
+			break;
+		case CLOUD_CONFLICT_DOWNLOAD_REMOTE:
+			if (!may_download) { rep.skipped++; break; }
+			if (!DriveDownload(token, it->second, path, error)) return fail(error);
+			rep.downloaded++;
+			break;
+		case CLOUD_CONFLICT_DIVERGED:
+		{
+			// Changed on two machines. No side is thrown away: this machine's
+			// save stays and goes up, and the other one lands next to it.
+			if (!may_download) { rep.skipped++; break; }
+			fs::path other = path;
+			other += ".conflito";
+			if (!DriveDownload(token, it->second, other, error)) return fail(error);
+			if (!DriveUpload(token, path, e, it->second.id, error)) return fail(error);
+			rep.conflicts++;
+			break;
+		}
+		}
+	}
+
+	for (const auto& kv : remote)
+	{
+		if (seen.count(kv.first)) continue;
+		// The name comes from the network: it decides where a file is written.
+		if (!CloudSyncIsAllowedSyncPath(kv.first) || kv.first.rfind("saves/", 0) != 0) continue;
+		if (!may_download) { rep.skipped++; continue; }
+		if (g_cloud_shutdown.load()) return fail("encerrando");
+		if (!DriveDownload(token, kv.second, base / fs::path(kv.first), error)) return fail(error);
+		rep.downloaded++;
+	}
+
+	rep.total = (int)seen.size() + rep.downloaded;
+	if (report) *report = rep;
+	return true;
+}
+
+static void CloudSyncPerformSyncInternal()
+{
+	{
+		std::lock_guard<std::mutex> lk(g_cloud_mutex);
+		if (g_refresh_token.empty())
+		{
+			g_cloud_state.store(CLOUD_DISCONNECTED);
+			g_cloud_status_str = Tr("Desconectado", "Disconnected");
+			return;
+		}
+	}
+	SetCloudStatus(CLOUD_SYNCING, Tr("Sincronizando saves...", "Syncing saves..."));
+
+	CloudSyncReport rep;
+	std::string error;
+	if (!CloudSyncRunNow("", &rep, &error))
+	{
+		if (error == "login expirado")
+		{
+			{
+				std::lock_guard<std::mutex> lk(g_cloud_mutex);
+				g_refresh_token.clear();
+				g_access_token.clear();
+			}
+			SaveRefreshToken("");
+			SetCloudStatus(CLOUD_DISCONNECTED, Tr("Login expirado - conecte de novo", "Login expired - connect again"));
+			CoreSetToast(Tr("NUVEM: LOGIN EXPIRADO, CONECTE DE NOVO", "CLOUD: LOGIN EXPIRED, CONNECT AGAIN"), 240);
+		}
+		else if (!g_cloud_shutdown.load())
+		{
+			SetCloudStatus(CLOUD_ERROR, std::string(Tr("Falha: ", "Failed: ")) + error);
+			CoreSetToast(Tr("NUVEM: FALHA AO SINCRONIZAR", "CLOUD: SYNC FAILED"), 180);
+		}
+		return;
+	}
+
+	g_cloud_synced_count.store(rep.total);
+	g_last_sync_utc = (int64_t)time(NULL);
 	UpdateLastSyncTimestampStr(g_last_sync_utc);
 	SaveCloudConfig();
 
-	if (!g_refresh_token.empty())
+	if (rep.conflicts > 0)
 	{
-		SetCloudStatus(CLOUD_IDLE, Tr("Sincronizado (appDataFolder)", "Synced (appDataFolder)"));
-		CoreSetToast(Tr("CLOUD SYNC: SAVES ATUALIZADOS", "CLOUD SYNC: SAVES UPDATED"), 120);
+		SetCloudStatus(CLOUD_CONFLICT, Tr("Conflito: copia salva como .conflito", "Conflict: copy saved as .conflito"));
+		CoreSetToast(Tr("NUVEM: SAVE ALTERADO EM 2 PCS - COPIA .conflito CRIADA", "CLOUD: SAVE CHANGED ON 2 PCS - .conflito COPY MADE"), 300);
+		return;
 	}
-	else
-	{
-		SetCloudStatus(CLOUD_DISCONNECTED, Tr("Manifesto local atualizado", "Local manifest updated"));
-		CoreSetToast(Tr("MANIFESTO DE SAVES ATUALIZADO", "SAVE MANIFEST UPDATED"), 120);
-	}
+	SetCloudStatus(CLOUD_IDLE, Tr("Sincronizado", "Synced"));
+	if (rep.uploaded + rep.downloaded > 0)
+		CoreSetToast(Tr("NUVEM: SAVES SINCRONIZADOS", "CLOUD: SAVES SYNCED"), 120);
+}
+
+void CloudSyncSetEndpointsForTest(const std::string& token_url, const std::string& api_base,
+                                  const std::string& refresh_token, int64_t last_sync_utc)
+{
+	g_token_url = token_url;
+	g_api_base = api_base;
+	g_last_sync_utc = last_sync_utc;
+	std::lock_guard<std::mutex> lk(g_cloud_mutex);
+	g_refresh_token = refresh_token;
 }
 
 bool CloudSyncStartOAuthFlow()
@@ -1138,17 +1493,18 @@ bool CloudSyncStartOAuthFlow()
 		         << "&redirect_uri=http%3A%2F%2F127.0.0.1%3A" << port << "%2Fauth"
 		         << "&response_type=code"
 		         << "&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.appdata"
+		         << "&access_type=offline&prompt=consent" // or Google sends no refresh token and the login dies in an hour
 		         << "&code_challenge=" << challenge
 		         << "&code_challenge_method=S256"
 		         << "&state=" << state_tok;
 
 		OpenBrowserUrl(auth_url.str());
 
-		// Wait up to 60 seconds for OAuth callback on 127.0.0.1
+		// Wait up to 3 minutes for OAuth callback on 127.0.0.1
 		fd_set fds;
 		FD_ZERO(&fds);
 		FD_SET(srv, &fds);
-		timeval tv{ 60, 0 };
+		timeval tv{ 180, 0 };
 		int sel = select((int)srv + 1, &fds, NULL, NULL, &tv);
 		if (sel <= 0 || g_cloud_shutdown.load())
 		{
@@ -1181,11 +1537,23 @@ bool CloudSyncStartOAuthFlow()
 		std::string req(rlen > 0 ? req_buf : "");
 
 		bool state_ok = (req.find("state=" + state_tok) != std::string::npos);
-		bool has_code = (req.find("code=") != std::string::npos);
+		size_t code_at = req.find("code=");
+		bool has_code = state_ok && code_at != std::string::npos;
 
-		std::string nonce = GenerateRandomHex(8);
+		// The page says "connected" only after Google really gave the tokens.
+		std::string acc_tok, ref_tok;
+		bool exchanged = false;
+		if (has_code)
+		{
+			size_t cpos = code_at + 5;
+			size_t cend = req.find_first_of(" &\r\n", cpos);
+			std::string auth_code = CloudUrlDecode(req.substr(cpos, cend - cpos));
+			std::string red_uri = "http://127.0.0.1:" + std::to_string(port) + "/auth";
+			exchanged = CloudExchangeLoginCode(auth_code, verifier, red_uri, acc_tok, ref_tok) && !ref_tok.empty();
+		}
+
 		std::ostringstream resp;
-		std::string body = (state_ok && has_code)
+		std::string body = exchanged
 			? "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Karamelo Cloud</title></head>"
 			  "<body style=\"background:#12100e;color:#f5c26b;font-family:monospace;text-align:center;padding-top:80px;\">"
 			  "<h2>KARAMELO CLOUD CONECTADO!</h2><p>Voce ja pode fechar esta aba e voltar ao Karamelo.</p></body></html>"
@@ -1193,7 +1561,7 @@ bool CloudSyncStartOAuthFlow()
 			  "<body style=\"background:#12100e;color:#ff6b6b;font-family:monospace;text-align:center;padding-top:80px;\">"
 			  "<h2>FALHA NA AUTENTICACAO</h2><p>Verifique o estado OAuth e tente novamente pelo OSD.</p></body></html>";
 
-		resp << "HTTP/1.1 " << ((state_ok && has_code) ? "200 OK" : "400 Bad Request") << "\r\n"
+		resp << "HTTP/1.1 " << (exchanged ? "200 OK" : "400 Bad Request") << "\r\n"
 		     << "Content-Type: text/html; charset=utf-8\r\n"
 		     << "Content-Length: " << body.size() << "\r\n"
 		     << "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none';\r\n"
@@ -1211,32 +1579,13 @@ bool CloudSyncStartOAuthFlow()
 		close(cli);
 #endif
 
-		if (state_ok && has_code)
+		if (exchanged)
 		{
-			size_t cpos = req.find("code=") + 5;
-			size_t cend = req.find_first_of(" &\r\n", cpos);
-			std::string auth_code = req.substr(cpos, cend - cpos);
-
-			std::string acc_tok, ref_tok;
-#ifdef _WIN32
-			std::string red_uri = "http://127.0.0.1:" + std::to_string(port) + "/auth";
-			if (CloudSyncExchangeTokensWinHttp(g_client_id, g_client_secret, auth_code, verifier, red_uri, acc_tok, ref_tok))
 			{
 				std::lock_guard<std::mutex> lk(g_cloud_mutex);
-				if (!acc_tok.empty()) g_access_token = acc_tok;
-				if (!ref_tok.empty()) g_refresh_token = ref_tok;
+				g_access_token = acc_tok;
+				g_refresh_token = ref_tok;
 			}
-			else
-			{
-				std::lock_guard<std::mutex> lk(g_cloud_mutex);
-				g_refresh_token = "oauth2_pkce_" + CloudSyncComputeSha256Bytes((const uint8_t*)auth_code.data(), auth_code.size());
-			}
-#else
-			{
-				std::lock_guard<std::mutex> lk(g_cloud_mutex);
-				g_refresh_token = "oauth2_pkce_" + CloudSyncComputeSha256Bytes((const uint8_t*)auth_code.data(), auth_code.size());
-			}
-#endif
 			SaveRefreshToken(g_refresh_token);
 			g_last_sync_utc = (int64_t)time(NULL);
 			UpdateLastSyncTimestampStr(g_last_sync_utc);
@@ -1247,7 +1596,7 @@ bool CloudSyncStartOAuthFlow()
 		}
 		else
 		{
-			SetCloudStatus(CLOUD_ERROR, Tr("Autenticacao recusada", "Authentication refused"));
+			SetCloudStatus(CLOUD_ERROR, Tr("Google recusou o login", "Google refused the login"));
 		}
 	});
 
