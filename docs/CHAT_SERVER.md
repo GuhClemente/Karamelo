@@ -18,39 +18,53 @@ Nome e e-mail nunca chegam: o login só pede o escopo `openid`. O ID anônimo do
 também não é gravado nem enviado a ninguém. O login do jogador é um token assinado que
 fica no PC dele, por isso reiniciar o servidor não desconecta ninguém.
 
-## Publicar no Coolify
+## Como está publicado
 
-1. **DNS:** crie o registro `A` de `chat.karamelo-emu.com` para o IP do servidor.
-2. **Client ID:** registre o escopo `openid` na tela de consentimento
-   (`docs/CLOUD_GOOGLE.md`). Sem o Client ID embutido no aplicativo ou em
-   `Config/cloud.cfg`, o botão de entrar avisa que falta.
-3. **Novo recurso no Coolify:** tipo Dockerfile, repositório deste projeto, pasta
-   `server/chat`, domínio `https://chat.karamelo-emu.com`, porta `8787`.
-4. **Volume:** monte um volume em `/data`, ou os banimentos se perdem a cada deploy.
-5. **Variáveis de ambiente** (nunca no git):
+Desde 31/10/2026 em `https://chat.karamelo-emu.com`, no mesmo servidor do site
+(`187.127.59.127`), com registro `A` `chat` na Hostinger.
 
-| Variável | Valor |
+**É um container à parte, `karamelo-chat`, fora do painel do Coolify.** Ele usa o proxy
+do Coolify (a rede `coolify` e os labels do Traefik), que também cuida do certificado.
+Portanto ele não aparece na lista de aplicações do Coolify e não recebe deploy
+automático a cada push.
+
+| Em `/data/karamelo-chat/` | O que é |
 |---|---|
-| `CHAT_GOOGLE_CLIENT_IDS` | o Client ID do aplicativo; vários, separados por vírgula |
-| `CHAT_HASH_SECRET` | segredo aleatório (`openssl rand -hex 32`) |
-| `CHAT_ADMIN_TOKEN` | outro segredo aleatório, para moderar |
+| `src/` | `server.mjs`, `Dockerfile` e `deploy.sh`, copiados deste repositório |
+| `client_ids` | os Client IDs aceitos; vários, separados por vírgula |
+| `.env` | `CHAT_HASH_SECRET` e `CHAT_ADMIN_TOKEN`, gerados no servidor (modo 600) |
+| `data/bans.json` | a lista de banidos |
 
-**Nunca troque o `CHAT_HASH_SECRET`:** todos os jogadores seriam desconectados, os
-números das tags mudariam e os banidos voltariam.
+**Nunca apague nem troque o `CHAT_HASH_SECRET`:** todos os jogadores seriam desconectados,
+os números das tags mudariam e os banidos voltariam.
 
-6. **Conferir:** `https://chat.karamelo-emu.com/healthz` responde `{"ok":true}`.
-7. **Antes de divulgar:** atualize a privacidade e os termos do site (`docs/SITE_SYNC.md`,
-   seção 53).
+## Atualizar
 
-O Dockerfile já liga `CHAT_TRUST_PROXY=1`. Ele só é seguro com um proxy na frente, como
-o do Coolify, que acrescenta o endereço real ao `X-Forwarded-For`. Sem proxy, deixe em
-`0`, ou qualquer um escolhe o IP que quiser.
+```bash
+scp server/chat/server.mjs server/chat/Dockerfile server/chat/deploy.sh root@187.127.59.127:/data/karamelo-chat/src/
+ssh root@187.127.59.127 "sed -i 's/\r$//' /data/karamelo-chat/src/deploy.sh; bash /data/karamelo-chat/src/deploy.sh tls"
+```
+
+Conferir: `https://chat.karamelo-emu.com/healthz` responde `{"ok":true}`.
+
+O `CHAT_TRUST_PROXY=1` do Dockerfile só é seguro com um proxy na frente, que acrescenta
+o endereço real ao `X-Forwarded-For`. Sem proxy, deixe em `0`, ou qualquer um escolhe o
+IP que quiser.
+
+## Antes de divulgar
+
+1. **Client ID no aplicativo:** hoje ele só existe em `Config/google_credentials.json` do
+   PC do projeto. Sem ele no aplicativo distribuído, o jogador vê que o login não está ativo.
+2. **Tela de consentimento do Google:** escopo `openid` registrado e app publicado, ou só
+   as contas de teste conseguem entrar (`docs/CLOUD_GOOGLE.md`).
+3. **Site:** privacidade, termos, idade mínima e regras das salas (`docs/SITE_SYNC.md`, seção 53).
 
 ## Moderar
 
 Ver denúncias:
 
 ```bash
+source /data/karamelo-chat/.env   # no servidor
 curl -H "Authorization: Bearer $CHAT_ADMIN_TOKEN" https://chat.karamelo-emu.com/v1/admin/reports
 ```
 

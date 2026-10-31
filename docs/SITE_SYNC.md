@@ -1819,7 +1819,7 @@ O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via re
 
 3. **Karamelo Live — Janela Própria & Salas na Rede Local**:
    - **Sem navegador e sem Electron**: O bate-papo abre em uma **janela nativa do sistema operacional** (`Karamelo Live - Bate-Papo & Desafio`), totalmente independente da janela do jogo, permitindo posicionar no segundo monitor ou usar ao lado do emulador com consumo quase zero de RAM.
-   - **Alcance real**: As 4 salas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`) falam com **quem está na mesma rede local** e com **o outro jogador da partida de Netplay**, sem servidor e sem login. **Pela internet, só depois de o servidor do chat estar no ar e com login Google (seção 53)**. Não divulgue a sala da internet antes disso.
+   - **Alcance real**: As 4 salas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`) falam com **quem está na mesma rede local** e com **o outro jogador da partida de Netplay**, sem servidor e sem login. **Pela internet, com login Google (seção 53)**. Não divulgue a sala da internet antes de a seção 53 dizer que está aberta ao público.
    - **Zoom**: A janela do chat aumenta e diminui como um navegador: `Ctrl +`, `Ctrl -`, `Ctrl 0` e `Ctrl` + roda do mouse (de 70% a 250%), e guarda a escolha.
    - **Privacidade**: A rede do chat só liga quando o jogador abre o chat, porque ela anuncia o apelido na rede local. O apelido começa com o nome de usuário do sistema e muda com `/nome Fulano` na caixa do chat.
    - **Convite para Netplay**: A lista mostra quem está na rede local e o que está jogando. Ao aceitar, o jogo do anfitrião abre sozinho no outro PC, desde que ele tenha **o mesmo arquivo** em `roms/`; o arquivo do jogo nunca é enviado. Fora da rede local, o jogador manda o código de sala (`KRM-XXXXX-XXXXX`, que contém o endereço) e o outro digita; pela internet ainda depende de porta aberta no roteador ou VPN.
@@ -2104,7 +2104,7 @@ Também nesta data:
 
 ## 53. Adição de 31/10/2026 — Salas de chat pela internet (Karamelo Live)
 
-**Estado: o aplicativo e o servidor estão prontos e testados, mas o servidor ainda não foi publicado.** Enquanto `chat.karamelo-emu.com` não responder, o chat mostra "servidor fora do ar" e segue funcionando na rede local. **Não anuncie antes da publicação** (passo a passo em `docs/CHAT_SERVER.md`).
+**Estado: o servidor está no ar em `https://chat.karamelo-emu.com` desde 31/10/2026, mas o recurso ainda não está aberto ao público:** o Client ID do Google não vai na versão distribuída, então o jogador comum vê que o login não está ativo. **Não anuncie antes dos itens de "Antes de divulgar" em `docs/CHAT_SERVER.md`.** Se o servidor cair, o chat avisa e segue funcionando na rede local.
 
 **O que o jogador tem:**
 
@@ -2122,7 +2122,7 @@ Também nesta data:
 - O disco do servidor guarda só a lista de banidos, em hash com chave, sem o ID do Google.
 - O endereço IP de quem convida fica na memória por até 10 minutos e vai para quem aceitar o convite. É necessário: a partida é direta entre os dois PCs.
 
-**Antes de publicar, o site precisa:** atualizar a página de privacidade e os termos com a lista acima (hoje dizem que nada passa por servidor) e definir a idade mínima e as regras das salas, porque é conversa aberta entre desconhecidos.
+**Antes de divulgar, o site precisa:** atualizar a página de privacidade e os termos com a lista acima (hoje dizem que nada passa por servidor) e definir a idade mínima e as regras das salas, porque é conversa aberta entre desconhecidos.
 
 **O que NÃO prometer:**
 
