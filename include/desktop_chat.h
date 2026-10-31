@@ -149,8 +149,10 @@ void         DesktopChatClearRoomMessages();
 
 // Pure / Testable Wire Framing Helpers
 std::string  DesktopChatSanitizeText(const std::string& raw_text, size_t max_len = 200);
-// For the 8x8 font of the overlay and the SDL window: letters without their accents.
-std::string  DesktopChatToFontText(const std::string& utf8);
+// The 8x8 font of the overlay and the SDL window, accents included.
+void         DesktopChatDrawText8x8(uint32_t* fb, int fb_w, int fb_h, int px, int py, const char* text, uint32_t color);
+// Lines of at most this many letters, not bytes, broken at spaces when it can.
+std::vector<std::string> DesktopChatWrapText(const std::string& text, int columns);
 std::string  DesktopChatFormatWireMessage(LiveChatRoom room, const LiveChatMessage& msg);
 bool         DesktopChatParseWireMessage(const std::string& json_str, LiveChatRoom* out_room, LiveChatMessage& out_msg);
 

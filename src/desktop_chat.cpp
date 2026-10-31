@@ -148,31 +148,34 @@ std::string DesktopChatSanitizeText(const std::string &raw_text,
   return out;
 }
 
-std::string DesktopChatToFontText(const std::string &utf8) {
-  // U+00C0 to U+00FF, each by the letter it is based on.
-  static const char kLatin1[] = "AAAAAAACEEEEIIIIDNOOOOOxOUUUUYTs"
-                                "aaaaaaaceeeeiiiidnooooo/ouuuuyty";
-  std::string out;
-  out.reserve(utf8.size());
-  for (size_t i = 0; i < utf8.size();) {
-    const unsigned char c = (unsigned char)utf8[i];
-    if (c < 0x80) {
-      out.push_back((char)c);
-      i++;
-      continue;
+// How many bytes the letter starting with this byte takes in UTF-8.
+static size_t Utf8Length(unsigned char c) {
+  return c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
+}
+
+std::vector<std::string> DesktopChatWrapText(const std::string &text, int columns) {
+  std::vector<std::string> lines;
+  size_t start = 0;
+  while (start < text.size()) {
+    size_t i = start, last_space = std::string::npos;
+    int letters = 0;
+    while (i < text.size() && letters < columns) {
+      if (text[i] == ' ' && i > start)
+        last_space = i;
+      i += Utf8Length((unsigned char)text[i]);
+      letters++;
     }
-    if (c < 0xC0) { // half of a letter, from a cut elsewhere
-      i++;
-      continue;
-    }
-    const size_t len = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : 2;
-    if (i + len > utf8.size())
+    if (i >= text.size()) {
+      lines.push_back(text.substr(start));
       break;
-    const unsigned code = len == 2 ? ((c & 0x1Fu) << 6) | ((unsigned char)utf8[i + 1] & 0x3Fu) : 0;
-    out.push_back(code >= 0xC0 && code <= 0xFF ? kLatin1[code - 0xC0] : '?');
-    i += len;
+    }
+    const size_t cut = text[i] == ' ' || last_space == std::string::npos ? i : last_space;
+    lines.push_back(text.substr(start, cut - start));
+    start = cut;
+    while (start < text.size() && text[start] == ' ')
+      start++;
   }
-  return out;
+  return lines;
 }
 
 const char *DesktopChatGetRoomName(LiveChatRoom room) {
@@ -2780,18 +2783,8 @@ void DesktopChatRenderSdlWindow() {
   std::vector<ChatLine> lines;
   for (const auto& m : msgs) {
     lines.push_back({m.sender, !m.game_challenge.empty() ? 0x0057F287u : 0x0066C0F4u});
-    std::string rest = DesktopChatToFontText(m.text);
-    while (!rest.empty()) {
-      size_t take = rest.size();
-      if ((int)take > columns) {
-        take = (size_t)columns;
-        const size_t space = rest.rfind(' ', take);
-        if (space != std::string::npos && space > 0) take = space;
-      }
-      lines.push_back({rest.substr(0, take), 0x00FFFFFFu});
-      rest.erase(0, take);
-      while (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
-    }
+    for (const auto& line : DesktopChatWrapText(m.text, columns))
+      lines.push_back({line, 0x00FFFFFFu});
   }
   const int max_lines = std::max(1, (g_chat_sdl_h - 80 - 72) / 11);
   const size_t first = lines.size() > (size_t)max_lines ? lines.size() - (size_t)max_lines : 0;
@@ -3035,17 +3028,26 @@ static void DrawOverlayRectBlend(uint32_t *fb, int fb_w, int fb_h, int rx,
   }
 }
 
-static void DrawOverlayText8x8(uint32_t *fb, int fb_w, int fb_h, int px, int py,
-                               const char *text, uint32_t color) {
+void DesktopChatDrawText8x8(uint32_t *fb, int fb_w, int fb_h, int px, int py,
+                            const char *text, uint32_t color) {
   if (!text)
     return;
-  // The 8x8 font stops at ASCII: anything else would come out as a blank.
-  const std::string drawn = DesktopChatToFontText(text);
   int cur_x = px;
-  for (const unsigned char *p = (const unsigned char *)drawn.c_str(); *p; ++p) {
+  for (const unsigned char *p = (const unsigned char *)text; *p;) {
     if (cur_x + 8 > fb_w)
       break;
-    const unsigned char *glyph = charfont[*p];
+    if (*p >= 0x80 && *p < 0xC0) { // half of a letter, from a cut elsewhere
+      ++p;
+      continue;
+    }
+    const size_t len = Utf8Length(*p);
+    if (strnlen((const char *)p, len) < len) // the string ends inside this letter
+      break;
+    const unsigned code = len == 2 ? ((p[0] & 0x1Fu) << 6) | (p[1] & 0x3Fu) : 0;
+    const unsigned char *glyph = len == 1 ? charfont[*p]
+                                : code >= 0xC0 && code <= 0xFF ? charfont_latin1[code - 0xC0]
+                                : charfont['?'];
+    p += len;
     for (int col = 0; col < 8; ++col) {
       unsigned char col_bits = glyph[col];
       int gx = cur_x + col;
@@ -3061,6 +3063,11 @@ static void DrawOverlayText8x8(uint32_t *fb, int fb_w, int fb_h, int px, int py,
     }
     cur_x += 8;
   }
+}
+
+static void DrawOverlayText8x8(uint32_t *fb, int fb_w, int fb_h, int px, int py,
+                               const char *text, uint32_t color) {
+  DesktopChatDrawText8x8(fb, fb_w, fb_h, px, py, text, color);
 }
 
 void DesktopChatRenderOverlay(uint32_t *fb, int fb_w, int fb_h) {

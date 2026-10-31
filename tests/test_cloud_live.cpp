@@ -977,15 +977,49 @@ TEST_CASE(DesktopChat_F10StaysWithComputerGames)
     ASSERT_TRUE(!SystemIsKeyboardComputer(""));
 }
 
-TEST_CASE(ChatTextForTheFontKeepsTheLetterOfAnAccent)
+static std::vector<uint32_t> DrawForTest(const char* text)
 {
-    // "ação Ç ñ" and an emoji, written by their bytes.
-    const std::string text = std::string("a\xC3\xA7") + "\xC3\xA3" "o \xC3\x87 \xC3\xB1 \xF0\x9F\x98\x80!";
-    ASSERT_TRUE(DesktopChatToFontText(text) == "acao C n ?!");
-    ASSERT_TRUE(DesktopChatToFontText("plain") == "plain");
-    // Half a letter, from a cut somewhere else, draws nothing rather than garbage.
-    ASSERT_TRUE(DesktopChatToFontText("a\xC3") == "a");
-    ASSERT_TRUE(DesktopChatToFontText("\xA7" "a") == "a");
+    std::vector<uint32_t> fb(64 * 16, 0);
+    DesktopChatDrawText8x8(fb.data(), 64, 16, 0, 4, text, 1);
+    return fb;
+}
+
+TEST_CASE(ChatFontHasTheAccentedLetters)
+{
+    const auto plain = DrawForTest("a");
+    const auto tilde = DrawForTest("\xC3\xA3");  // a with tilde
+    const auto acute = DrawForTest("\xC3\xA1");  // a with acute
+    ASSERT_FALSE(plain == tilde);
+    ASSERT_FALSE(tilde == acute);
+    ASSERT_FALSE(DrawForTest("c") == DrawForTest("\xC3\xA7"));   // cedilla
+    ASSERT_FALSE(DrawForTest("A") == DrawForTest("\xC3\x83"));   // capital with tilde
+    ASSERT_FALSE(DrawForTest("\xC3\x89") == DrawForTest("\xC3\x88")); // capitals: acute, grave
+    // Each letter takes one cell, however many bytes it has.
+    const auto two = DrawForTest("\xC3\xA3" "a");
+    for (int y = 4; y < 12; y++)
+        for (int x = 0; x < 8; x++)
+            ASSERT_EQ(two[(size_t)y * 64 + x + 8], plain[(size_t)y * 64 + x]);
+    // Half a letter draws nothing rather than garbage, and the rest still shows.
+    ASSERT_TRUE(DrawForTest("a\xC3") == plain);
+    ASSERT_TRUE(DrawForTest("\xA7" "a") == plain);
+    // What the font does not have is marked, not skipped.
+    ASSERT_TRUE(DrawForTest("\xF0\x9F\x98\x80") == DrawForTest("?"));
+}
+
+TEST_CASE(ChatWrapCountsLettersAndNeverCutsOne)
+{
+    const std::string acao = std::string("a\xC3\xA7") + "\xC3\xA3" "o"; // 4 letters, 6 bytes
+    ASSERT_EQ(DesktopChatWrapText(acao, 4).size(), (size_t)1);
+    const auto cut = DesktopChatWrapText(acao, 2);
+    ASSERT_EQ(cut.size(), (size_t)2);
+    ASSERT_TRUE(cut[0] == std::string("a\xC3\xA7"));
+    ASSERT_TRUE(cut[1] == std::string("\xC3\xA3" "o"));
+    const auto words = DesktopChatWrapText("uma " + acao + " boa", 6);
+    ASSERT_EQ(words.size(), (size_t)3);
+    ASSERT_TRUE(words[0] == "uma");
+    ASSERT_TRUE(words[1] == acao);
+    ASSERT_TRUE(words[2] == "boa");
+    ASSERT_EQ(DesktopChatWrapText("", 10).size(), (size_t)0);
 }
 
 TEST_CASE(ChatSanitizeDoesNotCutAnAccentedLetterInHalf)
