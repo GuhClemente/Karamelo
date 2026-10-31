@@ -2038,10 +2038,9 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
 
     // HIT_PEER_JOIN_BASE + p indexes this same list: the click looks it up again.
     auto peers = DesktopChatGetActivePeers();
-    const std::string my_ip = NetplayGetLocalIp();
     bool anyone = false;
     for (size_t p = 0; p < peers.size() && ry + 40 < H - 10; ++p) {
-      if (peers[p].tag == my_tag && peers[p].host_ip == my_ip)
+      if (peers[p].tag == my_tag) // by name: the address changes when a VPN comes up
         continue;
       anyone = true;
       bool in_g = (peers[p].status == 2);
@@ -2624,7 +2623,7 @@ void DesktopChatProcessSdlEvent(const void* raw_event) {
       if (mx >= g_chat_sdl_w - 180 && mx <= g_chat_sdl_w - 20 && my >= 16 && my <= 46) {
         DesktopChatSendChallenge(NULL);
       }
-      if (mx >= 270 && mx < g_chat_sdl_w - 300 && my >= 40 && my <= 54) {
+      if (mx >= 262 && mx < g_chat_sdl_w - 300 && my >= 16 && my <= 60) {
         DesktopChatInternetStatusClicked();
       }
       if (g_chat_sdl_has_invite && mx >= g_chat_sdl_w - 290 && mx <= g_chat_sdl_w - 190 && my >= 16 && my <= 46) {
@@ -2731,10 +2730,9 @@ void DesktopChatRenderSdlWindow() {
     DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry, Tr("ONLINE:", "ONLINE:"), 0x008C98A8u);
     ry += 14;
     const std::string my_tag = DesktopChatGetKarameloTag();
-    const std::string my_ip = NetplayGetLocalIp();
     bool anyone = false;
     for (const auto& peer : DesktopChatGetActivePeers()) {
-      if ((peer.tag == my_tag && peer.host_ip == my_ip) || ry > g_chat_sdl_h - 30)
+      if (peer.tag == my_tag || ry > g_chat_sdl_h - 30)
         continue;
       anyone = true;
       DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry, peer.tag.substr(0, 26).c_str(), 0x00FFFFFFu);
@@ -2899,6 +2897,10 @@ void DesktopChatToggleOverlay() {
   DesktopChatStartNetwork();
   bool next = !g_overlay_visible.load();
   g_overlay_visible.store(next);
+}
+
+bool DesktopChatOverlayHasContent() {
+  return g_overlay_visible.load() || VoiceChatIsLocalSpeaking() || VoiceChatIsPeerSpeaking();
 }
 
 void DesktopChatRenderOverlayWin32(void *hdc_handle, int win_w, int win_h) {

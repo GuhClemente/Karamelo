@@ -1203,20 +1203,45 @@ static void BlitToDc(HDC hdc, HWND hwnd)
 	RECT client;
 	GetClientRect(hwnd, &client);
 
-	SetStretchBltMode(hdc, COLORONCOLOR);
+	// With the chat panel on, the frame and the panel are put together off screen.
+	// Drawn straight to the window, the frame wiped the panel every time, and it
+	// flickered for as long as it was open. Without it, this extra copy is not needed.
+	static HDC s_compose_dc = NULL;
+	static HBITMAP s_compose_bmp = NULL;
+	static int s_compose_w = 0, s_compose_h = 0;
+	HDC target = hdc;
+	if (hwnd == g_hwnd && DesktopChatOverlayHasContent())
+	{
+		if (!s_compose_dc) s_compose_dc = CreateCompatibleDC(hdc);
+		if (s_compose_dc && (!s_compose_bmp || s_compose_w != client.right || s_compose_h != client.bottom))
+		{
+			HBITMAP bmp = CreateCompatibleBitmap(hdc, client.right, client.bottom);
+			if (bmp)
+			{
+				SelectObject(s_compose_dc, bmp);
+				if (s_compose_bmp) DeleteObject(s_compose_bmp);
+				s_compose_bmp = bmp;
+				s_compose_w = client.right;
+				s_compose_h = client.bottom;
+			}
+		}
+		if (s_compose_dc && s_compose_bmp) target = s_compose_dc;
+	}
+
+	SetStretchBltMode(target, COLORONCOLOR);
 
 	if (g_use_present && h_present_dc)
 	{
 		if (present_w == client.right && present_h == client.bottom)
-			BitBlt(hdc, 0, 0, client.right, client.bottom, h_present_dc, 0, 0, SRCCOPY);
+			BitBlt(target, 0, 0, client.right, client.bottom, h_present_dc, 0, 0, SRCCOPY);
 		else
-			StretchBlt(hdc, 0, 0, client.right, client.bottom,
+			StretchBlt(target, 0, 0, client.right, client.bottom,
 				h_present_dc, 0, 0, present_w, present_h, SRCCOPY);
 	}
 	else
 	{
 		StretchBlt(
-			hdc, 0, 0, client.right, client.bottom,
+			target, 0, 0, client.right, client.bottom,
 			h_mem_dc, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
 			SRCCOPY
 		);
@@ -1224,8 +1249,10 @@ static void BlitToDc(HDC hdc, HWND hwnd)
 
 	if (hwnd == g_hwnd)
 	{
-		DesktopChatRenderOverlayWin32((void*)hdc, client.right, client.bottom);
+		DesktopChatRenderOverlayWin32((void*)target, client.right, client.bottom);
 	}
+	if (target != hdc)
+		BitBlt(hdc, 0, 0, client.right, client.bottom, target, 0, 0, SRCCOPY);
 }
 
 // dev-sdl3: PresentFrame calls this directly, once per frame, instead of the

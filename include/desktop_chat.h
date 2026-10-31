@@ -77,6 +77,7 @@ void         DesktopChatSetOverlayVisible(bool visible);
 void         DesktopChatToggleOverlay();
 void         DesktopChatRenderOverlay(uint32_t* fb, int fb_w, int fb_h);
 void         DesktopChatRenderOverlayWin32(void* hdc_handle, int win_w, int win_h);
+bool         DesktopChatOverlayHasContent(); // the panel, or the voice indicator
 
 // Ephemeral Rooms & Nickname
 LiveChatRoom DesktopChatGetRoom();
