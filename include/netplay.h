@@ -75,7 +75,7 @@ NetplayStats NetplayGetStats();
 int SocialSelfTest(const char* role, int chat_port, int match_port, const char* result_path);
 // Two processes through a running chat server (tools/test_chat_internet.mjs): login,
 // message, who is online, invite and the match. Role "bad" expects its token refused.
-// 0 ok, 1 a check failed, 10 no folder, 11 no socket, 12 login refused.
+// 0 ok, 1 a check failed, 10 no folder, 11 no socket, 12 login refused, 13 no login config.
 int InternetChatSelfTest(const char* role, const char* server_url, const char* id_token, int chat_port, const char* result_path);
 // One process, the voice session against itself: the default microphone and
 // speaker (whatever SDL_AUDIO_DRIVER says), a real UDP socket, and packets from

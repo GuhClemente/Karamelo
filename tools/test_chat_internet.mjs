@@ -36,7 +36,7 @@ function idToken(sub, key = privateKey) {
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "karamelo-netchat-"));
 const server = createChatServer({
-  clientIds: [CLIENT_ID], hashSecret: "selftest", dataDir: path.join(work, "server"),
+  clientIds: [CLIENT_ID], clientSecret: "selftest-secret", hashSecret: "selftest", dataDir: path.join(work, "server"),
   getKey: async (kid) => (kid === "k1" ? jwk : undefined), log: () => {},
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

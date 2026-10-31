@@ -28,6 +28,7 @@ if [ ! -f "$BASE/.env" ]; then
 fi
 CLIENT_IDS="$(tr -d '\r\n' < "$BASE/client_ids")"
 [ -n "$CLIENT_IDS" ] || { echo "no client id in $BASE/client_ids"; exit 1; }
+grep -q '^CHAT_GOOGLE_CLIENT_SECRET=.' "$BASE/.env" || { echo "no CHAT_GOOGLE_CLIENT_SECRET in $BASE/.env"; exit 1; }
 
 docker build -q -t "$NAME:latest" . >/dev/null
 

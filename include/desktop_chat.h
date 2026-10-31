@@ -116,6 +116,8 @@ std::string  DesktopChatInternetStatus();
 void         DesktopChatInternetStatusClicked();
 // The second half of the login, which the self-test calls with its own token.
 bool         DesktopChatInternetLoginWithIdToken(const char* id_token);
+// Which Google client the server accepts: not in this public code, see docs/CHAT_SERVER.md.
+bool         DesktopChatInternetFetchLoginConfig(std::string& out_client_id, std::string& out_client_secret);
 void         DesktopChatInternetSetServer(const char* url);
 
 // Friends Management (Saved in Config/friends.ini)

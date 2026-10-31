@@ -70,8 +70,9 @@ void           CloudSyncDisconnect();
 void           CloudSyncTriggerAsync();
 
 // For the chat rooms (desktop_chat.cpp): the same Google login and HTTP as the cloud.
-bool           CloudSyncHasClientId();
-bool           CloudSyncGoogleIdToken(std::string& out_id_token, std::string& out_error, const std::atomic<bool>* cancel);
+void           CloudSyncGetLocalClient(std::string& out_id, std::string& out_secret); // from Config/, usually empty
+bool           CloudSyncGoogleIdToken(const std::string& client_id, const std::string& client_secret,
+                                      std::string& out_id_token, std::string& out_error, const std::atomic<bool>* cancel);
 bool           CloudSyncHttpRequest(const char* method, const std::string& url, const std::vector<std::string>& headers,
                                     const std::string& body, int timeout_seconds, int* out_status, std::string* out_body);
 // A login kept on disk: DPAPI on Windows, a 0600 file elsewhere.

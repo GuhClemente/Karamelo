@@ -1461,7 +1461,7 @@ enum CloudLoginResult
 
 using CloudCodeExchange = std::function<bool(const std::string& code, const std::string& verifier, const std::string& redirect_uri)>;
 
-static CloudLoginResult CloudBrowserLogin(const char* scope_params, const char* ok_heading,
+static CloudLoginResult CloudBrowserLogin(const std::string& client_id, const char* scope_params, const char* ok_heading,
                                           const std::atomic<bool>* cancel, const CloudCodeExchange& exchange)
 {
 #ifdef _WIN32
@@ -1503,7 +1503,7 @@ static CloudLoginResult CloudBrowserLogin(const char* scope_params, const char* 
 
 	std::ostringstream auth_url;
 	auth_url << "https://accounts.google.com/o/oauth2/v2/auth"
-	         << "?client_id=" << g_client_id
+	         << "?client_id=" << client_id
 	         << "&redirect_uri=http%3A%2F%2F127.0.0.1%3A" << port << "%2Fauth"
 	         << "&response_type=code"
 	         << "&scope=" << scope_params
@@ -1580,30 +1580,27 @@ static CloudLoginResult CloudBrowserLogin(const char* scope_params, const char* 
 	return exchanged ? CLOUD_LOGIN_OK : CLOUD_LOGIN_REFUSED;
 }
 
-bool CloudSyncHasClientId()
+void CloudSyncGetLocalClient(std::string& out_id, std::string& out_secret)
 {
-	return !g_client_id.empty();
+	out_id = g_client_id;
+	out_secret = g_client_secret;
 }
 
-bool CloudSyncGoogleIdToken(std::string& out_id_token, std::string& out_error, const std::atomic<bool>* cancel)
+bool CloudSyncGoogleIdToken(const std::string& client_id, const std::string& client_secret,
+                            std::string& out_id_token, std::string& out_error, const std::atomic<bool>* cancel)
 {
-	if (g_client_id.empty())
-	{
-		out_error = "no_client_id";
-		return false;
-	}
 	// Only "openid": Google answers with an anonymous account id and nothing else,
 	// no name and no e-mail.
-	const CloudLoginResult result = CloudBrowserLogin("openid&prompt=select_account", "KARAMELO LIVE CONECTADO!", cancel,
+	const CloudLoginResult result = CloudBrowserLogin(client_id, "openid&prompt=select_account", "KARAMELO LIVE CONECTADO!", cancel,
 		[&](const std::string& code, const std::string& verifier, const std::string& redirect)
 		{
 			std::ostringstream form;
 			form << "code=" << CloudSyncUrlEncode(code)
-			     << "&client_id=" << CloudSyncUrlEncode(g_client_id)
+			     << "&client_id=" << CloudSyncUrlEncode(client_id)
 			     << "&code_verifier=" << CloudSyncUrlEncode(verifier)
 			     << "&redirect_uri=" << CloudSyncUrlEncode(redirect)
 			     << "&grant_type=authorization_code";
-			if (!g_client_secret.empty()) form << "&client_secret=" << CloudSyncUrlEncode(g_client_secret);
+			if (!client_secret.empty()) form << "&client_secret=" << CloudSyncUrlEncode(client_secret);
 			CloudHttpResponse resp;
 			if (!CloudHttp("POST", g_token_url, { "Content-Type: application/x-www-form-urlencoded" }, form.str(), resp) ||
 			    resp.status < 200 || resp.status >= 300)
@@ -1650,7 +1647,7 @@ bool CloudSyncStartOAuthFlow()
 	g_auth_worker = std::thread([]()
 	{
 		std::string acc_tok, ref_tok;
-		const CloudLoginResult result = CloudBrowserLogin(
+		const CloudLoginResult result = CloudBrowserLogin(g_client_id,
 			"https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.appdata"
 			"&access_type=offline&prompt=consent", // or Google sends no refresh token and the login dies in an hour
 			"KARAMELO CLOUD CONECTADO!", nullptr,

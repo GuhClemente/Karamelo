@@ -2104,7 +2104,7 @@ Também nesta data:
 
 ## 53. Adição de 31/10/2026 — Salas de chat pela internet (Karamelo Live)
 
-**Estado: o servidor está no ar em `https://chat.karamelo-emu.com` desde 31/10/2026, mas o recurso ainda não está aberto ao público:** o Client ID do Google não vai na versão distribuída, então o jogador comum vê que o login não está ativo. **Não anuncie antes dos itens de "Antes de divulgar" em `docs/CHAT_SERVER.md`.** Se o servidor cair, o chat avisa e segue funcionando na rede local.
+**Estado: o servidor está no ar em `https://chat.karamelo-emu.com` desde 31/10/2026, mas o recurso ainda não está aberto ao público:** ele chega aos jogadores com a próxima versão do aplicativo, e o login depende de o app estar publicado no Google. **Não anuncie antes dos itens de "Antes de divulgar" em `docs/CHAT_SERVER.md`.** Se o servidor cair, o chat avisa e segue funcionando na rede local.
 
 **O que o jogador tem:**
 

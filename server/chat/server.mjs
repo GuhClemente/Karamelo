@@ -10,6 +10,7 @@
 // No dependencies: Node 20 or newer. TLS is done by the proxy in front of it.
 //
 //   CHAT_GOOGLE_CLIENT_IDS  comma-separated OAuth client ids accepted (required)
+//   CHAT_GOOGLE_CLIENT_SECRET  secret of the first id, handed to the app for its login
 //   CHAT_HASH_SECRET        key for tags and the ban list (required, keep it stable)
 //   CHAT_ADMIN_TOKEN        enables /v1/admin/*
 //   CHAT_DATA_DIR           where bans.json lives (default ./data)
@@ -127,6 +128,7 @@ function overLimit(map, key, windowMs, max, now) {
 export function createChatServer(config) {
   const {
     clientIds,
+    clientSecret = "",
     hashSecret,
     adminToken = "",
     dataDir = "data",
@@ -410,6 +412,11 @@ export function createChatServer(config) {
       if (!adminToken || !bearer || !safeEqual(bearer, adminToken)) return [404, { error: "not_found" }];
       return admin(req, body);
     }
+    // Google does not treat a desktop app's secret as confidential: every copy of an
+    // app has it. It lives here so that it stays out of a public repository and can
+    // be replaced without a new release.
+    if (route === "POST /v1/login-config")
+      return [200, { client_id: clientIds[0], client_secret: clientSecret }];
     const fn = routes[route];
     if (!fn) return [404, { error: "not_found" }];
     if (route === "POST /v1/login") return fn(req, body, ip);
@@ -454,6 +461,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const port = Number(process.env.PORT || 8787);
   const server = createChatServer({
     clientIds: String(process.env.CHAT_GOOGLE_CLIENT_IDS || "").split(",").map((s) => s.trim()).filter(Boolean),
+    clientSecret: process.env.CHAT_GOOGLE_CLIENT_SECRET || "",
     hashSecret: process.env.CHAT_HASH_SECRET || "",
     adminToken: process.env.CHAT_ADMIN_TOKEN || "",
     dataDir: process.env.CHAT_DATA_DIR || "data",

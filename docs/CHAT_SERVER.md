@@ -32,7 +32,7 @@ automático a cada push.
 |---|---|
 | `src/` | `server.mjs`, `Dockerfile` e `deploy.sh`, copiados deste repositório |
 | `client_ids` | os Client IDs aceitos; vários, separados por vírgula |
-| `.env` | `CHAT_HASH_SECRET` e `CHAT_ADMIN_TOKEN`, gerados no servidor (modo 600) |
+| `.env` | `CHAT_HASH_SECRET` e `CHAT_ADMIN_TOKEN`, gerados no servidor, e `CHAT_GOOGLE_CLIENT_SECRET` (modo 600) |
 | `data/bans.json` | a lista de banidos |
 
 **Nunca apague nem troque o `CHAT_HASH_SECRET`:** todos os jogadores seriam desconectados,
@@ -53,8 +53,10 @@ IP que quiser.
 
 ## Antes de divulgar
 
-1. **Client ID no aplicativo:** hoje ele só existe em `Config/google_credentials.json` do
-   PC do projeto. Sem ele no aplicativo distribuído, o jogador vê que o login não está ativo.
+1. **Lançar a versão nova do aplicativo:** é ela que busca o Client ID e o segredo neste
+   servidor (`/v1/login-config`) na hora do login. Eles não ficam no código, que é público,
+   e podem ser trocados aqui sem novo lançamento. O Google não trata o segredo de um app
+   instalado como confidencial, então entregá-lo assim não piora nada.
 2. **Tela de consentimento do Google:** escopo `openid` registrado e app publicado, ou só
    as contas de teste conseguem entrar (`docs/CLOUD_GOOGLE.md`).
 3. **Site:** privacidade, termos, idade mínima e regras das salas (`docs/SITE_SYNC.md`, seção 53).

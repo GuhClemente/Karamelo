@@ -28,7 +28,7 @@ let server, base, dataDir;
 
 function startServer(loginMax = 100000) {
   const s = createChatServer({
-    clientIds: [CLIENT_ID], hashSecret: "secret", adminToken: "admin-token", dataDir,
+    clientIds: [CLIENT_ID], clientSecret: "desktop-secret", hashSecret: "secret", adminToken: "admin-token", dataDir,
     getKey: async (kid) => (kid === "k1" ? jwk : undefined), log: () => {}, loginMax,
   });
   return new Promise((resolve) => s.listen(0, "127.0.0.1", () => resolve(s)));
@@ -94,6 +94,12 @@ test("messages reach the other player, in order and only once", async () => {
   assert.equal((await call("/v1/poll", { room: 1, since: first.seq }, b.session)).body.messages.length, 0);
   const other = await call("/v1/poll", { room: 2, since: 0 }, b.session);
   assert.ok(!other.body.messages.some((m) => m.text === "oi"), "rooms are separate");
+});
+
+test("the app gets what it needs to start a login, and nothing else", async () => {
+  const r = await call("/v1/login-config");
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { client_id: CLIENT_ID, client_secret: "desktop-secret" });
 });
 
 test("everything but login needs a session", async () => {

@@ -1247,6 +1247,10 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 	// matter, and Windows reserves ranges that change from one machine to the next.
 	if (!DesktopChatStartNetwork(chat_port) && !DesktopChatStartNetwork(0)) return 11;
 
+	// A copy with no credentials of its own learns them from the server.
+	std::string login_id, login_secret;
+	if (!DesktopChatInternetFetchLoginConfig(login_id, login_secret) || login_secret.empty()) return 13;
+
 	const bool logged_in = DesktopChatInternetLoginWithIdToken(id_token);
 	if (is_bad)
 	{

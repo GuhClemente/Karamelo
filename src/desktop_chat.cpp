@@ -1525,23 +1525,38 @@ bool DesktopChatInternetLoginWithIdToken(const char* id_token) {
   return true;
 }
 
+bool DesktopChatInternetFetchLoginConfig(std::string& out_client_id, std::string& out_client_secret) {
+  int status = 0;
+  JsonValue out;
+  if (!InternetCall("/v1/login-config", "{}", status, out) || status != 200)
+    return false;
+  out_client_id = InternetStr(out, "client_id");
+  out_client_secret = InternetStr(out, "client_secret");
+  return !out_client_id.empty();
+}
+
 bool DesktopChatInternetLogin() {
   if (g_inet_running.load() || g_inet_state.load() == INET_LOGGING_IN)
     return false;
-  if (!CloudSyncHasClientId()) {
-    ChatSystemNote(Tr("O login Google ainda nao esta ativo nesta versao (falta o Client ID do projeto).",
-                      "Google login is not active in this version yet (the project's Client ID is missing)."));
-    return false;
-  }
   if (g_inet_login_thread.joinable())
     g_inet_login_thread.join();
   g_inet_login_cancel.store(false);
   g_inet_state.store(INET_LOGGING_IN);
-  ChatSystemNote(Tr("Abrindo o navegador. O login so informa um ID anonimo: nem seu nome nem seu e-mail chegam ao Karamelo.",
-                    "Opening the browser. The login only gives an anonymous ID: neither your name nor your e-mail reach Karamelo."));
   g_inet_login_thread = std::thread([]() {
+    std::string client_id, client_secret;
+    // The server says which Google client it accepts; a local one is only for when
+    // it cannot be asked, as on a development machine.
+    if (!DesktopChatInternetFetchLoginConfig(client_id, client_secret))
+      CloudSyncGetLocalClient(client_id, client_secret);
+    if (client_id.empty()) {
+      g_inet_state.store(INET_OFF);
+      ChatSystemNote(Tr("O servidor do chat nao respondeu. O chat segue na sua rede.", "The chat server did not answer. Chat continues on your network."));
+      return;
+    }
+    ChatSystemNote(Tr("Abrindo o navegador. O login so informa um ID anonimo: nem seu nome nem seu e-mail chegam ao Karamelo.",
+                      "Opening the browser. The login only gives an anonymous ID: neither your name nor your e-mail reach Karamelo."));
     std::string id_token, error;
-    if (CloudSyncGoogleIdToken(id_token, error, &g_inet_login_cancel)) {
+    if (CloudSyncGoogleIdToken(client_id, client_secret, id_token, error, &g_inet_login_cancel)) {
       DesktopChatInternetLoginWithIdToken(id_token.c_str());
     } else {
       g_inet_state.store(INET_OFF);
