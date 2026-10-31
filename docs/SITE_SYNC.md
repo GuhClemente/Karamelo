@@ -1799,7 +1799,7 @@ Novidades para o jogador:
 O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via rede (LAN), bate-papo em janela própria e voz durante o Netplay. **Atenção: a descrição abaixo é a do que o aplicativo faz de verdade (revisada em 30/10/2026). Não publique nada além disso.**
 
 > **Regra de Ouro para o Site (Privacidade e Zero-Storage):**
-> O site **deve deixar explícito** que o servidor do Karamelo (`karamelo-emu.com`) **não armazena** saves, ROMs, BIOS, listas de amigos, histórico de conversas nem streams de voz. Cada recurso opera direto na infraestrutura do próprio usuário ou ponto-a-ponto (P2P).
+> O site **deve deixar explícito** que o servidor do Karamelo (`karamelo-emu.com`) **não armazena em disco** saves, ROMs, BIOS, listas de amigos, histórico de conversas nem streams de voz. A exceção é a sala de chat pela internet (seção 53): as últimas mensagens ficam só na memória do servidor do chat, e o disco guarda só a lista de banidos, em hash. **Não publique "não guardamos nada" sem essa ressalva.**
 
 ### Os 5 Pilares para Destacar no Site
 
@@ -1819,7 +1819,7 @@ O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via re
 
 3. **Karamelo Live — Janela Própria & Salas na Rede Local**:
    - **Sem navegador e sem Electron**: O bate-papo abre em uma **janela nativa do sistema operacional** (`Karamelo Live - Bate-Papo & Desafio`), totalmente independente da janela do jogo, permitindo posicionar no segundo monitor ou usar ao lado do emulador com consumo quase zero de RAM.
-   - **Alcance real, sem servidor**: As 4 salas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`) falam com **quem está na mesma rede local** e com **o outro jogador da partida de Netplay**. **Não existe sala mundial pela internet**: não prometa encontrar desconhecidos online. As mensagens ficam só na memória e somem ao fechar.
+   - **Alcance real**: As 4 salas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`) falam com **quem está na mesma rede local** e com **o outro jogador da partida de Netplay**, sem servidor e sem login. **Pela internet, só depois de o servidor do chat estar no ar e com login Google (seção 53)**. Não divulgue a sala da internet antes disso.
    - **Zoom**: A janela do chat aumenta e diminui como um navegador: `Ctrl +`, `Ctrl -`, `Ctrl 0` e `Ctrl` + roda do mouse (de 70% a 250%), e guarda a escolha.
    - **Privacidade**: A rede do chat só liga quando o jogador abre o chat, porque ela anuncia o apelido na rede local. O apelido começa com o nome de usuário do sistema e muda com `/nome Fulano` na caixa do chat.
    - **Convite para Netplay**: A lista mostra quem está na rede local e o que está jogando. Ao aceitar, o jogo do anfitrião abre sozinho no outro PC, desde que ele tenha **o mesmo arquivo** em `roms/`; o arquivo do jogo nunca é enviado. Fora da rede local, o jogador manda o código de sala (`KRM-XXXXX-XXXXX`, que contém o endereço) e o outro digita; pela internet ainda depende de porta aberta no roteador ou VPN.
@@ -2099,3 +2099,33 @@ Também nesta data:
 - Na caixa do chat, `/nome Fulano` troca o apelido.
 - A voz no OSD e na janela vem desligada e é ligada pelo botão `OFF` da janela do chat.
 - Linux e macOS: a janela do chat agora aceita digitação, quebra as linhas, mostra quem está na rede e tem o botão `ENTRAR` para convite.
+
+---
+
+## 53. Adição de 31/10/2026 — Salas de chat pela internet (Karamelo Live)
+
+**Estado: o aplicativo e o servidor estão prontos e testados, mas o servidor ainda não foi publicado.** Enquanto `chat.karamelo-emu.com` não responder, o chat mostra "servidor fora do ar" e segue funcionando na rede local. **Não anuncie antes da publicação** (passo a passo em `docs/CHAT_SERVER.md`).
+
+**O que o jogador tem:**
+
+- As mesmas 4 salas do chat, agora também com gente fora da rede local, na janela do chat e no overlay.
+- Login com Google, por clique em "Internet" no alto do chat ou com `/entrar`. Fica guardado por 30 dias; `/sair` encerra.
+- Lista de quem está online e o que está jogando.
+- Convite de Netplay na sala: o IP de quem convida **não aparece na sala**, só vai para quem aceitar.
+- Moderação: `/ignorar Nome#ABC123` esconde a pessoa neste PC, `/denunciar Nome#ABC123` avisa o administrador, que pode banir a conta.
+
+**O que publicar sobre privacidade (e é verdade):**
+
+- O login pede só o escopo `openid`: um ID anônimo da conta. **O Karamelo não recebe nome, e-mail nem foto.** O apelido é o que o jogador escolhe, seguido de um número derivado da conta (`Ana#3F2A1C`), que impede alguém de se passar por outra pessoa.
+- As últimas 100 mensagens de cada sala ficam **só na memória** do servidor do chat e somem quando ele reinicia. Não há histórico em disco.
+- Uma denúncia guarda na memória as últimas mensagens da pessoa denunciada, para o administrador avaliar.
+- O disco do servidor guarda só a lista de banidos, em hash com chave, sem o ID do Google.
+- O endereço IP de quem convida fica na memória por até 10 minutos e vai para quem aceitar o convite. É necessário: a partida é direta entre os dois PCs.
+
+**Antes de publicar, o site precisa:** atualizar a página de privacidade e os termos com a lista acima (hoje dizem que nada passa por servidor) e definir a idade mínima e as regras das salas, porque é conversa aberta entre desconhecidos.
+
+**O que NÃO prometer:**
+
+- **Partida pela internet sem configurar nada.** O chat e o convite atravessam a internet, a partida não: quem convida ainda precisa da porta 55435 (UDP) aberta no roteador, ou de VPN. O chat avisa isso ao convidar. Não há servidor retransmitindo a partida.
+- Não é uma sala pela qual passa voz: a voz continua direta entre os dois jogadores da partida.
+- Login só com Google. Não prometa Discord, Steam ou outros.

@@ -1,6 +1,8 @@
 #ifdef _WIN32
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
+#include <algorithm>
+#include <filesystem>
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -1222,6 +1224,105 @@ int SocialSelfTest(const char* role, int chat_port, int match_port, const char* 
 	const bool nics_exist = !NetplayGetLocalInterfaces().empty();
 	const bool ok = got_message && got_presence && connected && !wrong_host &&
 	                (!nics_exist || DesktopChatGetBroadcastCount() > 0);
+	DesktopChatStopNetwork();
+	NetplayDisconnect();
+	return ok ? 0 : 1;
+}
+
+int InternetChatSelfTest(const char* role, const char* server_url, const char* id_token, int chat_port, const char* result_path)
+{
+	const bool is_a = strcmp(role, "a") == 0;
+	const bool is_bad = strcmp(role, "bad") == 0;
+	// The app has moved to its own folder by now, and each side keeps its login in
+	// Config/: without this they would share one, and with the player's own.
+	std::error_code dir_error;
+	std::filesystem::current_path(std::filesystem::path(result_path).parent_path(), dir_error);
+	if (dir_error) return 1;
+	NetplayInit();
+	DesktopChatInit();
+	DesktopChatInternetSetServer(server_url);
+	DesktopChatSetNickname(is_a ? "NetA" : "NetB");
+	// Each on its own UDP port and no extra peer: nothing here can arrive by the
+	// LAN road, so whatever arrives came through the server.
+	if (!DesktopChatStartNetwork(chat_port)) return 1;
+
+	const bool logged_in = DesktopChatInternetLoginWithIdToken(id_token);
+	if (is_bad)
+	{
+		// A token the server refuses: no session, on screen or on disk.
+		const bool clean = !logged_in && !DesktopChatInternetIsOnline() && DesktopChatInternetGetTag().empty() &&
+		                   !std::filesystem::exists("Config/chat_session.bin");
+		DesktopChatStopNetwork();
+		return clean ? 0 : 1;
+	}
+	if (!logged_in) return 1;
+
+	const std::string mine = is_a ? "internet hello from a" : "internet hello from b";
+	const std::string theirs = is_a ? "internet hello from b" : "internet hello from a";
+	const std::string other_nick = is_a ? "NetB#" : "NetA#";
+
+	bool got_message = false, got_presence = false, invited = false, accepted = false;
+	bool connected = false, saw_invite = false, wrong_host = false;
+	unsigned copies_of_mine = 0, posts = 0;
+	const auto started = std::chrono::steady_clock::now();
+	auto seconds = [&started]() {
+		return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+	};
+	double last_post = -10, connected_at = 0;
+	while (seconds() < 45)
+	{
+		NetplayUpdate();
+		// Under the server's limit of five in ten seconds.
+		if (DesktopChatInternetIsOnline() && seconds() - last_post > 2.5)
+		{
+			DesktopChatPostMessage(mine.c_str());
+			last_post = seconds();
+			posts++;
+		}
+		unsigned mine_now = 0;
+		for (const auto& m : DesktopChatGetRoomMessages())
+		{
+			if (m.text == mine) mine_now++;
+			if (m.sender.rfind(other_nick, 0) != 0) continue;
+			if (m.text == theirs) got_message = true;
+			if (!m.game_challenge.empty())
+			{
+				saw_invite = true;
+				// The room must not learn the host's address.
+				if (!m.host_ip.empty() || !m.room_code.empty() || m.invite_id.empty()) wrong_host = true;
+			}
+		}
+		if (mine_now > copies_of_mine) copies_of_mine = mine_now;
+		for (const auto& p : DesktopChatGetActivePeers())
+			if (p.tag.rfind(other_nick, 0) == 0 && p.host_ip.empty()) got_presence = true;
+
+		if (is_a && got_message && got_presence && !invited)
+			invited = DesktopChatSendChallenge("Internet Match");
+		if (!is_a && saw_invite && !accepted)
+			accepted = DesktopChatAcceptLastChallenge();
+
+		if (NetplayGetState() == NETPLAY_CONNECTED && !connected)
+		{
+			connected = true;
+			connected_at = seconds();
+		}
+		// Long enough for the other side to finish its own checks.
+		if (connected && got_message && got_presence && seconds() - connected_at > 5.0) break;
+		std::this_thread::sleep_for(std::chrono::milliseconds(20));
+	}
+
+	const bool session_kept = std::filesystem::exists("Config/chat_session.bin");
+	FILE* f = fopen(result_path, "w");
+	if (f)
+	{
+		fprintf(f, "role=%s tag=%s message=%d presence=%d invite=%d connected=%d posts=%u copies_of_mine=%u session_kept=%d wrong_host=%d seconds=%.1f\n",
+		        role, DesktopChatInternetGetTag().c_str(), got_message ? 1 : 0, got_presence ? 1 : 0,
+		        (is_a ? invited : saw_invite) ? 1 : 0, connected ? 1 : 0, posts, copies_of_mine,
+		        session_kept ? 1 : 0, wrong_host ? 1 : 0, seconds());
+		fclose(f);
+	}
+	// The server sends our own messages back: they must not show up twice.
+	const bool ok = got_message && got_presence && connected && !wrong_host && session_kept && copies_of_mine <= posts;
 	DesktopChatStopNetwork();
 	NetplayDisconnect();
 	return ok ? 0 : 1;

@@ -1640,6 +1640,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// see tools/test_netplay.ps1.
 	// "--social-selftest a|b <chat port> <result>" and "--voice-selftest <port>
 	// <seconds> <result>": see tools/test_social.ps1.
+	if (__argc > 6 && strcmp(__argv[1], "--internet-chat-selftest") == 0)
+	{
+		int r = InternetChatSelfTest(__argv[2], __argv[3], __argv[4], atoi(__argv[5]), __argv[6]);
+		TerminateProcess(GetCurrentProcess(), (UINT)r);
+		return r;
+	}
 	if (__argc > 4 && _stricmp(__argv[1], "--social-selftest") == 0)
 	{
 		int r = SocialSelfTest(__argv[2], atoi(__argv[3]), 55435, __argv[4]);

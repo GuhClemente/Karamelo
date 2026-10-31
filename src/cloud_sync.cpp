@@ -1,5 +1,8 @@
 #include "cloud_sync.h"
 #include "app_info.h"
+#include <algorithm>
+#include <atomic>
+#include <functional>
 #include <set>
 #include "json_mini.h"
 #include "core_runner.h"
@@ -692,26 +695,7 @@ static void LoadCloudConfigAndTokens()
 	}
 
 	// Load encrypted/protected refresh token if present
-	fs::path tok_path = "Config/cloud_token.bin";
-	if (fs::exists(tok_path, ec))
-	{
-		std::ifstream tf(tok_path, std::ios::binary);
-		std::vector<uint8_t> enc((std::istreambuf_iterator<char>(tf)), std::istreambuf_iterator<char>());
-		if (!enc.empty())
-		{
-#ifdef _WIN32
-			DATA_BLOB in_blob{ (DWORD)enc.size(), enc.data() };
-			DATA_BLOB out_blob{ 0, NULL };
-			if (CryptUnprotectData(&in_blob, NULL, NULL, NULL, NULL, CRYPTPROTECT_UI_FORBIDDEN, &out_blob))
-			{
-				g_refresh_token.assign((const char*)out_blob.pbData, out_blob.cbData);
-				LocalFree(out_blob.pbData);
-			}
-#else
-			g_refresh_token.assign((const char*)enc.data(), enc.size());
-#endif
-		}
-	}
+	g_refresh_token = CloudSyncLoadSecret("Config/cloud_token.bin");
 
 	// Earlier builds saved a made-up token when the login failed.
 	if (g_refresh_token.rfind("oauth2_pkce_", 0) == 0)
@@ -742,11 +726,33 @@ static void SaveCloudConfig()
 	}
 }
 
-static void SaveRefreshToken(const std::string& token)
+std::string CloudSyncLoadSecret(const std::string& path)
+{
+	std::error_code ec;
+	std::string value;
+	if (!fs::exists(path, ec)) return value;
+	std::ifstream tf(path, std::ios::binary);
+	std::vector<uint8_t> enc((std::istreambuf_iterator<char>(tf)), std::istreambuf_iterator<char>());
+	if (enc.empty()) return value;
+#ifdef _WIN32
+	DATA_BLOB in_blob{ (DWORD)enc.size(), enc.data() };
+	DATA_BLOB out_blob{ 0, NULL };
+	if (CryptUnprotectData(&in_blob, NULL, NULL, NULL, NULL, CRYPTPROTECT_UI_FORBIDDEN, &out_blob))
+	{
+		value.assign((const char*)out_blob.pbData, out_blob.cbData);
+		LocalFree(out_blob.pbData);
+	}
+#else
+	value.assign((const char*)enc.data(), enc.size());
+#endif
+	return value;
+}
+
+void CloudSyncSaveSecret(const std::string& path, const std::string& token)
 {
 	std::error_code ec;
 	fs::create_directories("Config", ec);
-	fs::path tok_path = "Config/cloud_token.bin";
+	fs::path tok_path = path;
 	if (token.empty())
 	{
 		fs::remove(tok_path, ec);
@@ -775,6 +781,11 @@ static void SaveRefreshToken(const std::string& token)
 		close(fd);
 	}
 #endif
+}
+
+static void SaveRefreshToken(const std::string& token)
+{
+	CloudSyncSaveSecret("Config/cloud_token.bin", token);
 }
 
 static void UpdateLastSyncTimestampStr(int64_t ts)
@@ -975,7 +986,7 @@ static std::wstring CloudWiden(const std::string& s)
 
 static bool CloudHttp(const char* method, const std::string& url,
                       const std::vector<std::string>& headers, const std::string& body,
-                      CloudHttpResponse& out)
+                      CloudHttpResponse& out, int timeout_seconds = 0)
 {
 	std::wstring wurl = CloudWiden(url);
 	URL_COMPONENTS parts{};
@@ -992,7 +1003,15 @@ static bool CloudHttp(const char* method, const std::string& url,
 	HINTERNET session = WinHttpOpen(L"Karamelo-CloudSync/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
 	                                WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
 	if (!session) return false;
-	WinHttpSetTimeouts(session, 10000, 10000, 30000, 60000);
+	if (timeout_seconds > 0)
+	{
+		const int ms = timeout_seconds * 1000;
+		WinHttpSetTimeouts(session, ms, ms, ms, ms);
+	}
+	else
+	{
+		WinHttpSetTimeouts(session, 10000, 10000, 30000, 60000);
+	}
 	HINTERNET conn = WinHttpConnect(session, host, parts.nPort, 0);
 	HINTERNET req = conn ? WinHttpOpenRequest(conn, CloudWiden(method).c_str(), path.c_str(), NULL,
 	                                          WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
@@ -1043,7 +1062,7 @@ static std::string CloudShellQuote(const std::string& s)
 // command line, where any process on the machine could read them.
 static bool CloudHttp(const char* method, const std::string& url,
                       const std::vector<std::string>& headers, const std::string& body,
-                      CloudHttpResponse& out)
+                      CloudHttpResponse& out, int timeout_seconds = 0)
 {
 	std::error_code ec;
 	fs::path dir = fs::temp_directory_path(ec);
@@ -1068,7 +1087,9 @@ static bool CloudHttp(const char* method, const std::string& url,
 	close(fd);
 	if (!wrote) { fs::remove(cfg, ec); return false; }
 
-	std::string cmd = "curl -sS --proto =https,http --connect-timeout 15 --max-time 120 -X " + std::string(method) +
+	const int max_time = timeout_seconds > 0 ? timeout_seconds : 120;
+	std::string cmd = "curl -sS --proto =https,http --connect-timeout " + std::to_string(std::min(15, max_time)) +
+		" --max-time " + std::to_string(max_time) + " -X " + std::string(method) +
 		" -K " + CloudShellQuote(cfg) + " -o " + CloudShellQuote(out_file) + " -w '%{http_code}' ";
 	if (!body.empty())
 	{
@@ -1425,6 +1446,189 @@ void CloudSyncSetEndpointsForTest(const std::string& token_url, const std::strin
 	g_refresh_token = refresh_token;
 }
 
+// The browser half of a Google login: a one-shot page on 127.0.0.1 that Google
+// sends the player back to. The page says "connected" only after exchange() got
+// what it wanted from Google.
+enum CloudLoginResult
+{
+	CLOUD_LOGIN_OK,
+	CLOUD_LOGIN_NO_SOCKET,
+	CLOUD_LOGIN_NO_PORT,
+	CLOUD_LOGIN_TIMEOUT,
+	CLOUD_LOGIN_NO_CALLBACK,
+	CLOUD_LOGIN_REFUSED
+};
+
+using CloudCodeExchange = std::function<bool(const std::string& code, const std::string& verifier, const std::string& redirect_uri)>;
+
+static CloudLoginResult CloudBrowserLogin(const char* scope_params, const char* ok_heading,
+                                          const std::atomic<bool>* cancel, const CloudCodeExchange& exchange)
+{
+#ifdef _WIN32
+	WSADATA wsa;
+	WSAStartup(MAKEWORD(2, 2), &wsa);
+	SOCKET srv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (srv == INVALID_SOCKET) return CLOUD_LOGIN_NO_SOCKET;
+#else
+	int srv = socket(AF_INET, SOCK_STREAM, 0);
+	if (srv < 0) return CLOUD_LOGIN_NO_SOCKET;
+#endif
+	auto close_socket = [](decltype(srv) sock)
+	{
+#ifdef _WIN32
+		closesocket(sock);
+#else
+		close(sock);
+#endif
+	};
+
+	sockaddr_in addr{};
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Strictly 127.0.0.1
+	addr.sin_port = 0; // Ephemeral port
+
+	if (bind(srv, (sockaddr*)&addr, sizeof(addr)) != 0 || listen(srv, 1) != 0)
+	{
+		close_socket(srv);
+		return CLOUD_LOGIN_NO_PORT;
+	}
+
+	socklen_t alen = sizeof(addr);
+	getsockname(srv, (sockaddr*)&addr, &alen);
+	int port = ntohs(addr.sin_port);
+
+	std::string verifier = GenerateRandomHex(32);
+	std::string challenge = CloudSyncBuildPkceChallenge(verifier);
+	std::string state_tok = GenerateRandomHex(16);
+
+	std::ostringstream auth_url;
+	auth_url << "https://accounts.google.com/o/oauth2/v2/auth"
+	         << "?client_id=" << g_client_id
+	         << "&redirect_uri=http%3A%2F%2F127.0.0.1%3A" << port << "%2Fauth"
+	         << "&response_type=code"
+	         << "&scope=" << scope_params
+	         << "&code_challenge=" << challenge
+	         << "&code_challenge_method=S256"
+	         << "&state=" << state_tok;
+
+	OpenBrowserUrl(auth_url.str());
+
+	// Wait up to 3 minutes for OAuth callback on 127.0.0.1
+	int sel = 0;
+	for (int waited = 0; waited < 180 && sel == 0; waited++)
+	{
+		if (g_cloud_shutdown.load() || (cancel && cancel->load())) break;
+		fd_set fds;
+		FD_ZERO(&fds);
+		FD_SET(srv, &fds);
+		timeval tv{ 1, 0 };
+		sel = select((int)srv + 1, &fds, NULL, NULL, &tv);
+	}
+	if (sel <= 0)
+	{
+		close_socket(srv);
+		return CLOUD_LOGIN_TIMEOUT;
+	}
+
+	sockaddr_in cli_addr{};
+	socklen_t cli_len = sizeof(cli_addr);
+	auto cli = accept(srv, (sockaddr*)&cli_addr, &cli_len);
+	close_socket(srv);
+#ifdef _WIN32
+	if (cli == INVALID_SOCKET) return CLOUD_LOGIN_NO_CALLBACK;
+#else
+	if (cli < 0) return CLOUD_LOGIN_NO_CALLBACK;
+#endif
+
+	char req_buf[2048] = { 0 };
+	int rlen = recv(cli, req_buf, sizeof(req_buf) - 1, 0);
+	std::string req(rlen > 0 ? req_buf : "");
+
+	bool state_ok = (req.find("state=" + state_tok) != std::string::npos);
+	size_t code_at = req.find("code=");
+	bool exchanged = false;
+	if (state_ok && code_at != std::string::npos)
+	{
+		size_t cpos = code_at + 5;
+		size_t cend = req.find_first_of(" &\r\n", cpos);
+		std::string auth_code = CloudUrlDecode(req.substr(cpos, cend - cpos));
+		exchanged = exchange(auth_code, verifier, "http://127.0.0.1:" + std::to_string(port) + "/auth");
+	}
+
+	std::ostringstream resp;
+	std::string body = exchanged
+		? std::string("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Karamelo</title></head>"
+		  "<body style=\"background:#12100e;color:#f5c26b;font-family:monospace;text-align:center;padding-top:80px;\">"
+		  "<h2>") + ok_heading + "</h2><p>Voce ja pode fechar esta aba e voltar ao Karamelo.</p></body></html>"
+		: std::string("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Karamelo</title></head>"
+		  "<body style=\"background:#12100e;color:#ff6b6b;font-family:monospace;text-align:center;padding-top:80px;\">"
+		  "<h2>FALHA NA AUTENTICACAO</h2><p>Volte ao Karamelo e tente de novo.</p></body></html>");
+
+	resp << "HTTP/1.1 " << (exchanged ? "200 OK" : "400 Bad Request") << "\r\n"
+	     << "Content-Type: text/html; charset=utf-8\r\n"
+	     << "Content-Length: " << body.size() << "\r\n"
+	     << "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none';\r\n"
+	     << "X-Content-Type-Options: nosniff\r\n"
+	     << "X-Frame-Options: DENY\r\n"
+	     << "Cache-Control: no-store\r\n"
+	     << "Connection: close\r\n\r\n"
+	     << body;
+
+	std::string resp_str = resp.str();
+	send(cli, resp_str.c_str(), (int)resp_str.size(), 0);
+	close_socket(cli);
+	return exchanged ? CLOUD_LOGIN_OK : CLOUD_LOGIN_REFUSED;
+}
+
+bool CloudSyncHasClientId()
+{
+	return !g_client_id.empty();
+}
+
+bool CloudSyncGoogleIdToken(std::string& out_id_token, std::string& out_error, const std::atomic<bool>* cancel)
+{
+	if (g_client_id.empty())
+	{
+		out_error = "no_client_id";
+		return false;
+	}
+	// Only "openid": Google answers with an anonymous account id and nothing else,
+	// no name and no e-mail.
+	const CloudLoginResult result = CloudBrowserLogin("openid&prompt=select_account", "KARAMELO LIVE CONECTADO!", cancel,
+		[&](const std::string& code, const std::string& verifier, const std::string& redirect)
+		{
+			std::ostringstream form;
+			form << "code=" << CloudSyncUrlEncode(code)
+			     << "&client_id=" << CloudSyncUrlEncode(g_client_id)
+			     << "&code_verifier=" << CloudSyncUrlEncode(verifier)
+			     << "&redirect_uri=" << CloudSyncUrlEncode(redirect)
+			     << "&grant_type=authorization_code";
+			if (!g_client_secret.empty()) form << "&client_secret=" << CloudSyncUrlEncode(g_client_secret);
+			CloudHttpResponse resp;
+			if (!CloudHttp("POST", g_token_url, { "Content-Type: application/x-www-form-urlencoded" }, form.str(), resp) ||
+			    resp.status < 200 || resp.status >= 300)
+				return false;
+			JsonValue root;
+			std::string err;
+			if (!JsonParse(resp.body, root, err) || root.type != JsonValue::Object) return false;
+			out_id_token = JsonStr(root, "id_token");
+			return !out_id_token.empty();
+		});
+	if (result == CLOUD_LOGIN_OK) return true;
+	out_error = result == CLOUD_LOGIN_TIMEOUT ? "timeout" : "refused";
+	return false;
+}
+
+bool CloudSyncHttpRequest(const char* method, const std::string& url, const std::vector<std::string>& headers,
+                          const std::string& body, int timeout_seconds, int* out_status, std::string* out_body)
+{
+	CloudHttpResponse resp;
+	if (!CloudHttp(method, url, headers, body, resp, timeout_seconds)) return false;
+	if (out_status) *out_status = resp.status;
+	if (out_body) *out_body = resp.body;
+	return true;
+}
+
 bool CloudSyncStartOAuthFlow()
 {
 	if (g_client_id.empty())
@@ -1445,139 +1649,36 @@ bool CloudSyncStartOAuthFlow()
 
 	g_auth_worker = std::thread([]()
 	{
-#ifdef _WIN32
-		WSADATA wsa;
-		WSAStartup(MAKEWORD(2, 2), &wsa);
-		SOCKET srv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (srv == INVALID_SOCKET)
+		std::string acc_tok, ref_tok;
+		const CloudLoginResult result = CloudBrowserLogin(
+			"https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.appdata"
+			"&access_type=offline&prompt=consent", // or Google sends no refresh token and the login dies in an hour
+			"KARAMELO CLOUD CONECTADO!", nullptr,
+			[&](const std::string& code, const std::string& verifier, const std::string& redirect)
+			{
+				return CloudExchangeLoginCode(code, verifier, redirect, acc_tok, ref_tok) && !ref_tok.empty();
+			});
+		if (result == CLOUD_LOGIN_NO_SOCKET)
 		{
 			SetCloudStatus(CLOUD_ERROR, Tr("Erro de socket loopback", "Loopback socket error"));
 			return;
 		}
-#else
-		int srv = socket(AF_INET, SOCK_STREAM, 0);
-		if (srv < 0)
+		if (result == CLOUD_LOGIN_NO_PORT)
 		{
-			SetCloudStatus(CLOUD_ERROR, Tr("Erro de socket loopback", "Loopback socket error"));
-			return;
-		}
-#endif
-
-		sockaddr_in addr{};
-		addr.sin_family = AF_INET;
-		addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Strictly 127.0.0.1
-		addr.sin_port = 0; // Ephemeral port
-
-		if (bind(srv, (sockaddr*)&addr, sizeof(addr)) != 0 || listen(srv, 1) != 0)
-		{
-#ifdef _WIN32
-			closesocket(srv);
-#else
-			close(srv);
-#endif
 			SetCloudStatus(CLOUD_ERROR, Tr("Falha ao abrir porta local", "Failed to bind local port"));
 			return;
 		}
-
-		socklen_t alen = sizeof(addr);
-		getsockname(srv, (sockaddr*)&addr, &alen);
-		int port = ntohs(addr.sin_port);
-
-		std::string verifier = GenerateRandomHex(32);
-		std::string challenge = CloudSyncBuildPkceChallenge(verifier);
-		std::string state_tok = GenerateRandomHex(16);
-
-		std::ostringstream auth_url;
-		auth_url << "https://accounts.google.com/o/oauth2/v2/auth"
-		         << "?client_id=" << g_client_id
-		         << "&redirect_uri=http%3A%2F%2F127.0.0.1%3A" << port << "%2Fauth"
-		         << "&response_type=code"
-		         << "&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.appdata"
-		         << "&access_type=offline&prompt=consent" // or Google sends no refresh token and the login dies in an hour
-		         << "&code_challenge=" << challenge
-		         << "&code_challenge_method=S256"
-		         << "&state=" << state_tok;
-
-		OpenBrowserUrl(auth_url.str());
-
-		// Wait up to 3 minutes for OAuth callback on 127.0.0.1
-		fd_set fds;
-		FD_ZERO(&fds);
-		FD_SET(srv, &fds);
-		timeval tv{ 180, 0 };
-		int sel = select((int)srv + 1, &fds, NULL, NULL, &tv);
-		if (sel <= 0 || g_cloud_shutdown.load())
+		if (result == CLOUD_LOGIN_TIMEOUT)
 		{
-#ifdef _WIN32
-			closesocket(srv);
-#else
-			close(srv);
-#endif
 			SetCloudStatus(CLOUD_DISCONNECTED, Tr("Login expirado", "Login timed out"));
 			return;
 		}
-
-		sockaddr_in cli_addr{};
-		socklen_t cli_len = sizeof(cli_addr);
-		auto cli = accept(srv, (sockaddr*)&cli_addr, &cli_len);
-#ifdef _WIN32
-		closesocket(srv);
-		if (cli == INVALID_SOCKET)
-#else
-		close(srv);
-		if (cli < 0)
-#endif
+		if (result == CLOUD_LOGIN_NO_CALLBACK)
 		{
 			SetCloudStatus(CLOUD_ERROR, Tr("Erro no retorno OAuth", "OAuth callback error"));
 			return;
 		}
-
-		char req_buf[2048] = { 0 };
-		int rlen = recv(cli, req_buf, sizeof(req_buf) - 1, 0);
-		std::string req(rlen > 0 ? req_buf : "");
-
-		bool state_ok = (req.find("state=" + state_tok) != std::string::npos);
-		size_t code_at = req.find("code=");
-		bool has_code = state_ok && code_at != std::string::npos;
-
-		// The page says "connected" only after Google really gave the tokens.
-		std::string acc_tok, ref_tok;
-		bool exchanged = false;
-		if (has_code)
-		{
-			size_t cpos = code_at + 5;
-			size_t cend = req.find_first_of(" &\r\n", cpos);
-			std::string auth_code = CloudUrlDecode(req.substr(cpos, cend - cpos));
-			std::string red_uri = "http://127.0.0.1:" + std::to_string(port) + "/auth";
-			exchanged = CloudExchangeLoginCode(auth_code, verifier, red_uri, acc_tok, ref_tok) && !ref_tok.empty();
-		}
-
-		std::ostringstream resp;
-		std::string body = exchanged
-			? "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Karamelo Cloud</title></head>"
-			  "<body style=\"background:#12100e;color:#f5c26b;font-family:monospace;text-align:center;padding-top:80px;\">"
-			  "<h2>KARAMELO CLOUD CONECTADO!</h2><p>Voce ja pode fechar esta aba e voltar ao Karamelo.</p></body></html>"
-			: "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Karamelo Cloud</title></head>"
-			  "<body style=\"background:#12100e;color:#ff6b6b;font-family:monospace;text-align:center;padding-top:80px;\">"
-			  "<h2>FALHA NA AUTENTICACAO</h2><p>Verifique o estado OAuth e tente novamente pelo OSD.</p></body></html>";
-
-		resp << "HTTP/1.1 " << (exchanged ? "200 OK" : "400 Bad Request") << "\r\n"
-		     << "Content-Type: text/html; charset=utf-8\r\n"
-		     << "Content-Length: " << body.size() << "\r\n"
-		     << "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none';\r\n"
-		     << "X-Content-Type-Options: nosniff\r\n"
-		     << "X-Frame-Options: DENY\r\n"
-		     << "Cache-Control: no-store\r\n"
-		     << "Connection: close\r\n\r\n"
-		     << body;
-
-		std::string resp_str = resp.str();
-		send(cli, resp_str.c_str(), (int)resp_str.size(), 0);
-#ifdef _WIN32
-		closesocket(cli);
-#else
-		close(cli);
-#endif
+		const bool exchanged = result == CLOUD_LOGIN_OK;
 
 		if (exchanged)
 		{

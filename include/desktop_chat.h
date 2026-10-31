@@ -27,6 +27,7 @@ struct LiveChatMessage
 	std::string text;
 	std::string game_challenge; // Non-empty if this is a 1-Click Netplay challenge
 	std::string room_code;      // Room Code with the host address in it ("KRM-XXXXX-XXXXX")
+	std::string invite_id;      // Invite held by the chat server: it gives the address on accept
 	std::string host_ip;        // Peer IP for 1-Click Netplay accept
 	int         host_port = 55435;
 	int64_t     timestamp_utc = 0;
@@ -96,8 +97,7 @@ bool         DesktopChatJoinByRoomCode(const char* code);
 void         DesktopChatAnnouncePresence();
 
 // Network: UDP on the LAN plus the other player of a Netplay match. Starts when
-// the chat is opened. Without a server this is all "online" means: nobody
-// outside the network (or the match) is reachable.
+// the chat is opened. Beyond that, the internet rooms below need a login.
 bool         DesktopChatStartNetwork(int port = 55437);
 void         DesktopChatStopNetwork();
 void         DesktopChatSetNetworkAllowed(bool allowed);
@@ -105,6 +105,18 @@ void         DesktopChatSetNetworkAllowed(bool allowed);
 bool         DesktopChatHandleDatagram(const std::string& data, const std::string& from_ip);
 std::vector<LobbyPresencePeer> DesktopChatGetActivePeers();
 void         DesktopChatRegisterPeerPresence(const LobbyPresencePeer& peer);
+
+// Internet rooms, through the chat server (docs/CHAT_SERVER.md). Stay off until the
+// player logs in with Google; the login is then kept for the next start.
+bool         DesktopChatInternetLogin();
+void         DesktopChatInternetLogout();
+bool         DesktopChatInternetIsOnline();
+std::string  DesktopChatInternetGetTag();
+std::string  DesktopChatInternetStatus();
+void         DesktopChatInternetStatusClicked();
+// The second half of the login, which the self-test calls with its own token.
+bool         DesktopChatInternetLoginWithIdToken(const char* id_token);
+void         DesktopChatInternetSetServer(const char* url);
 
 // Friends Management (Saved in Config/friends.ini)
 bool                        DesktopChatAddFriend(const char* tag, const char* alias);

@@ -242,6 +242,24 @@ if not "%ERRORLEVEL%"=="0" (
     exit /b 1
 )
 
+rem O servidor das salas da internet e dois Karamelo de verdade falando por ele.
+where node >nul 2>&1
+if not "%ERRORLEVEL%"=="0" (
+    echo [AVISO] Node nao encontrado: testes das salas da internet NAO rodaram.
+    goto :after_internet_chat
+)
+node --test "%~dp0server\chat\server.test.mjs"
+if not "%ERRORLEVEL%"=="0" (
+    echo [BUILD FAILED] Servidor do chat - veja acima.
+    exit /b 1
+)
+node "%~dp0tools\test_chat_internet.mjs"
+if not "%ERRORLEVEL%"=="0" (
+    echo [BUILD FAILED] Salas da internet: login, mensagem ou convite falharam - veja acima.
+    exit /b 1
+)
+:after_internet_chat
+
 copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
 echo [BUILD OK] app\%APP_BASE%.exe atualizado - testes de unidade, bateria de cores, netplay e rede passaram.
 exit /b 0

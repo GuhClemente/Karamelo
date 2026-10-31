@@ -11,7 +11,8 @@ isso, porque depende da conta dele e do aceite dos termos do Google.
 2. Em **APIs e serviços > Biblioteca**, ative a **Google Drive API**.
 3. Em **APIs e serviços > Tela de permissão OAuth**, escolha **Externo** e preencha
    nome, e-mail de suporte e o site `https://karamelo-emu.com`.
-4. Em **Escopos**, adicione só `https://www.googleapis.com/auth/drive.appdata`. É a
+4. Em **Escopos**, adicione `openid` (o login das salas de chat: só um ID anônimo, sem
+   nome nem e-mail; ver `docs/CHAT_SERVER.md`) e `https://www.googleapis.com/auth/drive.appdata`. É a
    pasta oculta do aplicativo: o Karamelo não enxerga os outros arquivos do Drive.
 5. Em **Credenciais > Criar credenciais > ID do cliente OAuth**, escolha o tipo
    **App para computador** e copie o ID. Ele termina em `.apps.googleusercontent.com`.

@@ -936,6 +936,8 @@ int main(int argc, char* argv[])
 	// <seconds> <result>": see tools/test_social.ps1.
 	if (argc > 4 && strcmp(argv[1], "--social-selftest") == 0)
 		_exit(SocialSelfTest(argv[2], atoi(argv[3]), 55435, argv[4]));
+	if (argc > 6 && strcmp(argv[1], "--internet-chat-selftest") == 0)
+		_exit(InternetChatSelfTest(argv[2], argv[3], argv[4], atoi(argv[5]), argv[6]));
 	if (argc > 4 && strcmp(argv[1], "--voice-selftest") == 0)
 	{
 		SDL_Init(SDL_INIT_AUDIO);

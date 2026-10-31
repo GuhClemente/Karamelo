@@ -1,6 +1,7 @@
 #ifndef CLOUD_SYNC_H_INCLUDED
 #define CLOUD_SYNC_H_INCLUDED
 
+#include <atomic>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -67,6 +68,15 @@ const char*    CloudSyncGetLastSyncTimeStr();
 bool           CloudSyncStartOAuthFlow();
 void           CloudSyncDisconnect();
 void           CloudSyncTriggerAsync();
+
+// For the chat rooms (desktop_chat.cpp): the same Google login and HTTP as the cloud.
+bool           CloudSyncHasClientId();
+bool           CloudSyncGoogleIdToken(std::string& out_id_token, std::string& out_error, const std::atomic<bool>* cancel);
+bool           CloudSyncHttpRequest(const char* method, const std::string& url, const std::vector<std::string>& headers,
+                                    const std::string& body, int timeout_seconds, int* out_status, std::string* out_body);
+// A login kept on disk: DPAPI on Windows, a 0600 file elsewhere.
+std::string    CloudSyncLoadSecret(const std::string& path);
+void           CloudSyncSaveSecret(const std::string& path, const std::string& value); // empty removes it
 
 // One full sync, on the calling thread. False = it did not finish (error_out says
 // why) and nothing may be reported as synced. root_dir "" is the app folder.

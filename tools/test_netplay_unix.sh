@@ -71,6 +71,18 @@ VC=$?
 if [ "$VC" = 0 ]; then echo "  voice: PASSED"; else echo "  voice: FAILED ($VC)"; FAILED=$((FAILED + 1)); fi
 cat "$OUT/v" 2>/dev/null | sed 's/^/      /'
 
+# The internet rooms: the real chat server and two Karamelo processes through it.
+if command -v node >/dev/null 2>&1; then
+    node --test "$ROOT/server/chat/server.test.mjs" >"$OUT/server.log" 2>&1
+    SC=$?
+    if [ "$SC" = 0 ]; then echo "  chat server: PASSED"; else echo "  chat server: FAILED"; cat "$OUT/server.log"; FAILED=$((FAILED + 1)); fi
+    node "$ROOT/tools/test_chat_internet.mjs"
+    IC=$?
+    [ "$IC" = 0 ] || FAILED=$((FAILED + 1))
+else
+    echo "  WARNING: no node here, the internet rooms were NOT tested"
+fi
+
 rm -rf "$OUT"
 echo "  $TESTED games tested, $FAILED failed"
 [ "$FAILED" = 0 ]

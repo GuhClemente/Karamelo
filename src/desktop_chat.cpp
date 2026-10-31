@@ -1,5 +1,6 @@
 #include "desktop_chat.h"
 #include "charrom.h"
+#include "cloud_sync.h"
 #include "core_runner.h"
 #include "json_mini.h"
 #include "menu.h"
@@ -32,10 +33,13 @@
 #include <algorithm>
 #include <random>
 #include <atomic>
+#include <condition_variable>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,6 +54,12 @@
 static std::recursive_mutex g_chat_mutex;
 static void NetSendDatagram(const std::string& payload);
 static std::string NetFrame(char kind, const std::string& json);
+struct InternetJob;
+static void InternetEnqueue(int kind, int room, const std::string& text);
+static void InternetResume();
+static void InternetStop();
+static bool InternetCommand(const std::string& in);
+enum { INET_JOB_SEND, INET_JOB_INVITE, INET_JOB_REPORT, INET_JOB_NICK, INET_JOB_LOGOUT };
 static std::atomic<int> g_current_room{LIVE_ROOM_ARCADE_FIGHT};
 static std::atomic<bool> g_overlay_visible{false};
 static std::string g_nickname = "Player1";
@@ -92,6 +102,7 @@ enum ChatHitZone {
   HIT_BTN_SEND = 23,
   HIT_BTN_ACCEPT_CARD = 24,
   HIT_BTN_ADD_FRIEND = 25,
+  HIT_BTN_INTERNET = 26,
   HIT_PEER_JOIN_BASE = 150,     // 150 .. 199
   HIT_FRIEND_ROW_BASE = 200,    // 200 .. 249
   HIT_FRIEND_CHAL_BASE = 250    // 250 .. 299
@@ -150,8 +161,8 @@ static void SeedWelcomeMessagesLocked() {
       welcome.text =
           std::string(Tr("Bem-vindo ao canal ", "Welcome to channel ")) +
           DesktopChatGetRoomName((LiveChatRoom)r) +
-          Tr(". Fala com quem esta na sua rede local e com o outro jogador da partida. Nada fica salvo.",
-             ". Reaches people on your local network and the other player of your match. Nothing is saved.");
+          Tr(". Fala com a sua rede local e o outro jogador da partida. Para a internet, clique em Internet no alto ou digite /entrar.",
+             ". Reaches your local network and the other player of your match. For the internet, click Internet above or type /login.");
       welcome.timestamp_utc = (int64_t)time(NULL);
       g_room_messages[r].push_back(welcome);
     }
@@ -593,6 +604,22 @@ static void AppendRoomMessageLocked(int room_idx, const LiveChatMessage &msg) {
     vec.erase(vec.begin());
 }
 
+// A player both on the LAN and logged in reaches a neighbour twice: by broadcast
+// as "Ana" and through the server as "Ana#3F2A1C".
+static bool SameMessageOtherRoadLocked(int room, const LiveChatMessage& m, int64_t now) {
+  const std::string nick = m.sender.substr(0, m.sender.find('#'));
+  const std::string& body = m.game_challenge.empty() ? m.text : m.game_challenge;
+  const auto& vec = g_room_messages[room];
+  for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
+    if (now - it->timestamp_utc > 15)
+      break;
+    if (it->sender != m.sender && it->sender.substr(0, it->sender.find('#')) == nick &&
+        (it->game_challenge.empty() ? it->text : it->game_challenge) == body)
+      return true;
+  }
+  return false;
+}
+
 bool DesktopChatPostMessage(const char *text) {
   if (!text)
     return false;
@@ -610,6 +637,7 @@ bool DesktopChatPostMessage(const char *text) {
   }
   DesktopChatStartNetwork();
   NetSendDatagram(NetFrame('m', DesktopChatFormatWireMessage((LiveChatRoom)g_current_room.load(), msg)));
+  InternetEnqueue(INET_JOB_SEND, g_current_room.load(), clean);
 #ifdef _WIN32
   g_scroll_offset = 0;
   RequestChatRepaint();
@@ -683,9 +711,12 @@ bool DesktopChatSubmitInput(const char *text) {
     std::error_code ec;
     std::filesystem::create_directories("Config", ec);
     std::ofstream(kNickFile, std::ios::trunc) << nick;
+    InternetEnqueue(INET_JOB_NICK, 0, nick);
     ChatSystemNote(std::string(Tr("Agora voce e ", "You are now ")) + DesktopChatGetKarameloTag());
     return true;
   }
+  if (InternetCommand(in))
+    return true;
   return DesktopChatPostMessage(text);
 }
 
@@ -732,6 +763,7 @@ bool DesktopChatSendChallenge(const char *game_title) {
   DesktopChatAnnouncePresence();
   DesktopChatStartNetwork();
   NetSendDatagram(NetFrame('m', DesktopChatFormatWireMessage((LiveChatRoom)g_current_room.load(), msg)));
+  InternetEnqueue(INET_JOB_INVITE, g_current_room.load(), title);
 
   TrayManagerSetStatus(TRAY_STATUS_PLAYING, title.c_str());
   CoreSetToast(
@@ -745,6 +777,8 @@ bool DesktopChatSendChallenge(const char *game_title) {
   return true;
 }
 
+static bool InternetResolveInvite(const std::string& invite, std::string& out_ip, int& out_port);
+
 bool DesktopChatAcceptLastChallenge() {
   LiveChatMessage found;
   bool has_challenge = false;
@@ -752,7 +786,8 @@ bool DesktopChatAcceptLastChallenge() {
     std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
     const auto &vec = g_room_messages[g_current_room.load()];
     for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
-      if (!it->from_me && !it->game_challenge.empty() && (!it->host_ip.empty() || !it->room_code.empty())) {
+      if (!it->from_me && !it->game_challenge.empty() &&
+          (!it->host_ip.empty() || !it->room_code.empty() || !it->invite_id.empty())) {
         found = *it;
         has_challenge = true;
         break;
@@ -776,6 +811,9 @@ bool DesktopChatAcceptLastChallenge() {
   // The invite carries no game: the connection only shares the controllers.
   ChatSystemNote(Tr("Conectando. O jogo do outro jogador abre aqui sozinho se voce tiver o mesmo arquivo em roms/.",
                     "Connecting. The other player's game opens here by itself if you have the same file in roms/."));
+
+  if (!found.invite_id.empty() && !InternetResolveInvite(found.invite_id, found.host_ip, found.host_port))
+    return false;
 
   if (found.host_ip.empty())
     return DesktopChatJoinByRoomCode(found.room_code.c_str());
@@ -953,6 +991,8 @@ bool DesktopChatHandleDatagram(const std::string& data, const std::string& from_
     }
     {
       std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+      if (SameMessageOtherRoadLocked((int)room, msg, now))
+        return false;
       AppendRoomMessageLocked((int)room, msg);
     }
     if (!msg.game_challenge.empty() && TrayManagerGetStatus() != TRAY_STATUS_BUSY) {
@@ -1025,10 +1065,11 @@ static void NetThreadProc() {
 }
 
 bool DesktopChatStartNetwork(int port) {
-  if (g_net_running.load())
-    return true;
   if (!g_net_allowed.load())
     return false;
+  InternetResume();
+  if (g_net_running.load())
+    return true;
 #ifdef _WIN32
   WSADATA wsa;
   WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -1067,6 +1108,7 @@ bool DesktopChatStartNetwork(int port) {
 }
 
 void DesktopChatStopNetwork() {
+  InternetStop();
   g_net_running.store(false);
   if (g_net_thread.joinable())
     g_net_thread.join();
@@ -1088,6 +1130,536 @@ void DesktopChatSetNetworkAllowed(bool allowed) {
   if (!allowed)
     DesktopChatStopNetwork();
 }
+
+// =============================================================
+// Internet rooms: the chat server (server/chat, docs/CHAT_SERVER.md)
+// =============================================================
+//
+// Plain HTTPS asked every couple of seconds, so it crosses any router and proxy.
+// The login stays on disk as a session of the server, never as a Google token.
+
+static const char* const kDefaultChatServer = "https://chat.karamelo-emu.com";
+static const char* const kChatSessionFile = "Config/chat_session.bin";
+static const char* const kChatIgnoreFile = "Config/chat_ignored.txt";
+static const int kInternetPollSeconds = 2;
+static const int kInternetHttpSeconds = 6;
+
+enum { INET_OFF, INET_LOGGING_IN, INET_CONNECTING, INET_ONLINE, INET_UNREACHABLE };
+
+struct InternetJob {
+  int kind;
+  int room;
+  std::string text;
+};
+
+static std::atomic<int> g_inet_state{INET_OFF};
+static std::atomic<bool> g_inet_running{false};
+static std::atomic<bool> g_inet_login_cancel{false};
+static std::thread g_inet_thread;
+static std::thread g_inet_login_thread;
+static std::mutex g_inet_wake_mutex;
+static std::condition_variable g_inet_wake;
+static bool g_inet_wake_flag = false;
+// Below, all under g_chat_mutex.
+static std::string g_inet_server;
+static std::string g_inet_session;
+static std::string g_inet_tag;
+static int64_t g_inet_since[LIVE_ROOM_COUNT] = {0};
+static bool g_inet_room_loaded[LIVE_ROOM_COUNT] = {false};
+static std::deque<InternetJob> g_inet_jobs;
+static std::set<std::string> g_inet_ignored;
+static bool g_inet_ignored_loaded = false;
+
+static void InternetWake() {
+  {
+    std::lock_guard<std::mutex> lk(g_inet_wake_mutex);
+    g_inet_wake_flag = true;
+  }
+  g_inet_wake.notify_all();
+}
+
+static std::string InternetServerLocked() {
+  if (!g_inet_server.empty())
+    return g_inet_server;
+  std::string url = kDefaultChatServer;
+  std::ifstream saved("Config/chat_server.txt");
+  std::string line;
+  if (saved && std::getline(saved, line)) {
+    while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+      line.pop_back();
+    // Plain http only to this PC: the session must not cross the internet in clear.
+    if (line.rfind("https://", 0) == 0 || line.rfind("http://127.0.0.1", 0) == 0)
+      url = line;
+  }
+  g_inet_server = url;
+  return url;
+}
+
+void DesktopChatInternetSetServer(const char* url) {
+  std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+  g_inet_server = url ? url : "";
+}
+
+static bool InternetCall(const std::string& route, const std::string& body, int& status, JsonValue& out) {
+  std::string url, session;
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    url = InternetServerLocked() + route;
+    session = g_inet_session;
+  }
+  std::vector<std::string> headers = {"Content-Type: application/json"};
+  if (!session.empty())
+    headers.push_back("Authorization: Bearer " + session);
+  std::string text;
+  status = 0;
+  if (!CloudSyncHttpRequest("POST", url, headers, body, kInternetHttpSeconds, &status, &text))
+    return false;
+  std::string err;
+  return JsonParse(text, out, err) && out.type == JsonValue::Object;
+}
+
+static std::string InternetStr(const JsonValue& obj, const char* key) {
+  const JsonValue* v = obj.Find(key);
+  return (v && v->type == JsonValue::String) ? v->str : std::string();
+}
+
+static int64_t InternetInt(const JsonValue& obj, const char* key) {
+  const JsonValue* v = obj.Find(key);
+  return (v && v->type == JsonValue::Number) ? (int64_t)v->number : 0;
+}
+
+static void InternetForgetSession() {
+  CloudSyncSaveSecret(kChatSessionFile, "");
+  std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+  g_inet_session.clear();
+  g_inet_tag.clear();
+  g_inet_jobs.clear();
+  for (int r = 0; r < LIVE_ROOM_COUNT; ++r) {
+    g_inet_since[r] = 0;
+    g_inet_room_loaded[r] = false;
+  }
+  g_active_peers.erase(std::remove_if(g_active_peers.begin(), g_active_peers.end(),
+                                      [](const LobbyPresencePeer& p) { return p.host_ip.empty(); }),
+                       g_active_peers.end());
+}
+
+static void InternetSignedOut(const char* why) {
+  InternetForgetSession();
+  g_inet_state.store(INET_OFF);
+  g_inet_running.store(false);
+  if (why)
+    ChatSystemNote(why);
+#ifdef _WIN32
+  RequestChatRepaint();
+#endif
+}
+
+static void InternetRunJob(const InternetJob& job) {
+  std::ostringstream body;
+  std::string route;
+  switch (job.kind) {
+  case INET_JOB_SEND:
+    route = "/v1/send";
+    body << "{\"room\":" << job.room << ",\"text\":" << JsonQuote(job.text) << "}";
+    break;
+  case INET_JOB_INVITE:
+    route = "/v1/invite";
+    body << "{\"room\":" << job.room << ",\"game\":" << JsonQuote(job.text) << ",\"port\":55435}";
+    break;
+  case INET_JOB_REPORT:
+    route = "/v1/report";
+    body << "{\"room\":" << job.room << ",\"tag\":" << JsonQuote(job.text) << "}";
+    break;
+  case INET_JOB_NICK:
+    route = "/v1/nick";
+    body << "{\"nick\":" << JsonQuote(job.text) << "}";
+    break;
+  default:
+    route = "/v1/logout";
+    body << "{}";
+    break;
+  }
+  int status = 0;
+  JsonValue out;
+  const bool answered = InternetCall(route, body.str(), status, out);
+  if (job.kind == INET_JOB_LOGOUT) {
+    InternetSignedOut(Tr("Voce saiu da internet. O chat segue na sua rede.", "You left the internet rooms. Chat continues on your network."));
+    return;
+  }
+  if (status == 401) {
+    InternetSignedOut(Tr("Sua sessao acabou. Digite /entrar para voltar.", "Your session ended. Type /login to come back."));
+    return;
+  }
+  if (status == 429) {
+    ChatSystemNote(Tr("Devagar: muitas mensagens em pouco tempo. A ultima nao foi enviada.",
+                      "Slow down: too many messages. The last one was not sent."));
+    return;
+  }
+  if (!answered && job.kind != INET_JOB_NICK) {
+    ChatSystemNote(Tr("Sem resposta do servidor: isso nao chegou a quem esta na internet.",
+                      "No answer from the server: this did not reach the internet rooms."));
+    return;
+  }
+  if (job.kind == INET_JOB_INVITE && status == 200) {
+    ChatSystemNote(Tr("Convite enviado. Para alguem de fora da sua rede entrar, a porta 55435 (UDP) precisa estar aberta no seu roteador. Seu IP so vai para quem aceitar.",
+                      "Invite sent. For someone outside your network to join, port 55435 (UDP) must be open on your router. Your IP only goes to whoever accepts."));
+  } else if (job.kind == INET_JOB_REPORT) {
+    ChatSystemNote(status == 200 ? Tr("Denuncia enviada. Obrigado.", "Report sent. Thank you.")
+                                 : Tr("Nao achei mensagens desse jogador nesta sala.", "No messages from that player in this room."));
+  } else if (job.kind == INET_JOB_NICK && status == 200) {
+    const std::string session = InternetStr(out, "session");
+    if (!session.empty())
+      CloudSyncSaveSecret(kChatSessionFile, session);
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    g_inet_tag = InternetStr(out, "tag");
+    if (!session.empty())
+      g_inet_session = session;
+  }
+}
+
+static void InternetPoll() {
+  const int room = g_current_room.load();
+  const LobbyPresencePeer me = BuildLocalPresence();
+  int64_t since = 0;
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    since = g_inet_since[room];
+  }
+  std::ostringstream body;
+  body << "{\"room\":" << room << ",\"since\":" << since << ",\"status\":" << me.status
+       << ",\"game\":" << JsonQuote(me.current_game) << "}";
+  int status = 0;
+  JsonValue out;
+  const bool answered = InternetCall("/v1/poll", body.str(), status, out);
+  if (status == 401) {
+    InternetSignedOut(Tr("Sua sessao acabou. Digite /entrar para voltar.", "Your session ended. Type /login to come back."));
+    return;
+  }
+  if (!answered || status != 200) {
+    g_inet_state.store(INET_UNREACHABLE);
+#ifdef _WIN32
+    RequestChatRepaint();
+#endif
+    return;
+  }
+  g_inet_state.store(INET_ONLINE);
+
+  const int64_t now = (int64_t)time(NULL);
+  const std::string my_tag = InternetStr(out, "tag");
+  bool invited = false;
+  std::string alert;
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    g_inet_tag = my_tag;
+    const bool first_look = !g_inet_room_loaded[room];
+    g_inet_room_loaded[room] = true;
+    const int64_t seq = InternetInt(out, "seq");
+    // The server restarted and its count began again.
+    g_inet_since[room] = seq;
+    if (const JsonValue* list = out.Find("messages"); list && list->type == JsonValue::Array) {
+      for (const JsonValue& item : list->items) {
+        if (item.type != JsonValue::Object)
+          continue;
+        LiveChatMessage msg;
+        msg.sender = DesktopChatSanitizeText(InternetStr(item, "sender"), 40);
+        msg.text = DesktopChatSanitizeText(InternetStr(item, "text"), 200);
+        msg.game_challenge = DesktopChatSanitizeText(InternetStr(item, "game"), 64);
+        msg.invite_id = DesktopChatSanitizeText(InternetStr(item, "invite"), 32);
+        msg.timestamp_utc = InternetInt(item, "at");
+        if (msg.sender.empty() || g_inet_ignored.count(msg.sender))
+          continue;
+        msg.from_me = msg.sender == my_tag;
+        // What we sent is on screen already; the first look also brings older ones.
+        if (msg.from_me && !first_look)
+          continue;
+        if (!msg.game_challenge.empty())
+          msg.text = std::string(Tr("Convite Netplay: ", "Netplay Invite: ")) + msg.game_challenge;
+        if (SameMessageOtherRoadLocked(room, msg, now))
+          continue;
+        AppendRoomMessageLocked(room, msg);
+        if (!first_look && !msg.from_me && !msg.game_challenge.empty()) {
+          invited = true;
+          alert = msg.sender + ": " + msg.game_challenge;
+        }
+      }
+    }
+  }
+  if (invited && TrayManagerGetStatus() != TRAY_STATUS_BUSY)
+    TrayManagerShowNotification(Tr("Convite de partida", "Match invite"), alert.c_str(), true);
+
+  if (const JsonValue* online = out.Find("online"); online && online->type == JsonValue::Array) {
+    for (const JsonValue& item : online->items) {
+      if (item.type != JsonValue::Object)
+        continue;
+      LobbyPresencePeer peer;
+      peer.tag = DesktopChatSanitizeText(InternetStr(item, "tag"), 40);
+      if (peer.tag.empty() || peer.tag == my_tag)
+        continue;
+      {
+        std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+        if (g_inet_ignored.count(peer.tag))
+          continue;
+      }
+      peer.current_game = DesktopChatSanitizeText(InternetStr(item, "game"), 64);
+      peer.status = (int)InternetInt(item, "status");
+      DesktopChatRegisterPeerPresence(peer); // no address: only an accepted invite gives one
+    }
+  }
+#ifdef _WIN32
+  RequestChatRepaint();
+#endif
+}
+
+static void InternetThreadProc() {
+  while (g_inet_running.load()) {
+    for (;;) {
+      InternetJob job;
+      {
+        std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+        if (g_inet_jobs.empty())
+          break;
+        job = g_inet_jobs.front();
+        g_inet_jobs.pop_front();
+      }
+      InternetRunJob(job);
+      if (!g_inet_running.load())
+        return;
+    }
+    InternetPoll();
+    std::unique_lock<std::mutex> lk(g_inet_wake_mutex);
+    g_inet_wake.wait_for(lk, std::chrono::seconds(kInternetPollSeconds), [] { return g_inet_wake_flag; });
+    g_inet_wake_flag = false;
+  }
+}
+
+static void InternetStartThread() {
+  if (g_inet_running.load())
+    return;
+  if (g_inet_thread.joinable())
+    g_inet_thread.join();
+  g_inet_state.store(INET_CONNECTING);
+  g_inet_running.store(true);
+  g_inet_thread = std::thread(InternetThreadProc);
+}
+
+static void InternetLoadIgnoredLocked() {
+  if (g_inet_ignored_loaded)
+    return;
+  g_inet_ignored_loaded = true;
+  std::ifstream in(kChatIgnoreFile);
+  std::string line;
+  while (std::getline(in, line))
+    if (!line.empty())
+      g_inet_ignored.insert(line);
+}
+
+static void InternetResume() {
+  if (g_inet_running.load() || g_inet_state.load() == INET_LOGGING_IN)
+    return;
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    InternetLoadIgnoredLocked();
+    if (g_inet_session.empty())
+      g_inet_session = CloudSyncLoadSecret(kChatSessionFile);
+    if (g_inet_session.empty())
+      return;
+  }
+  InternetStartThread();
+}
+
+static void InternetStop() {
+  g_inet_login_cancel.store(true);
+  if (g_inet_login_thread.joinable())
+    g_inet_login_thread.join();
+  g_inet_running.store(false);
+  InternetWake();
+  if (g_inet_thread.joinable())
+    g_inet_thread.join();
+  if (g_inet_state.load() != INET_OFF)
+    g_inet_state.store(INET_OFF);
+}
+
+static void InternetEnqueue(int kind, int room, const std::string& text) {
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    if (g_inet_session.empty())
+      return;
+    g_inet_jobs.push_back({kind, room, text});
+  }
+  InternetWake();
+}
+
+bool DesktopChatInternetLoginWithIdToken(const char* id_token) {
+  std::string nick;
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    nick = g_nickname;
+    g_inet_session.clear();
+    InternetLoadIgnoredLocked();
+  }
+  std::ostringstream body;
+  body << "{\"id_token\":" << JsonQuote(id_token ? id_token : "") << ",\"nick\":" << JsonQuote(nick) << "}";
+  int status = 0;
+  JsonValue out;
+  const bool answered = InternetCall("/v1/login", body.str(), status, out);
+  const std::string session = InternetStr(out, "session");
+  if (!answered || status != 200 || session.empty()) {
+    g_inet_state.store(INET_OFF);
+    ChatSystemNote(status == 403 ? Tr("Esta conta foi banida das salas da internet.", "This account is banned from the internet rooms.")
+                 : status == 429 ? Tr("Muitas tentativas. Espere um minuto e tente de novo.", "Too many attempts. Wait a minute and try again.")
+                 : status == 503 ? Tr("O servidor nao conseguiu confirmar o login agora. Tente de novo em instantes.", "The server could not confirm the login right now. Try again shortly.")
+                 : status == 0 || !answered ? Tr("O servidor do chat nao respondeu. O chat segue na sua rede.", "The chat server did not answer. Chat continues on your network.")
+                 : Tr("O servidor recusou o login.", "The server refused the login."));
+    return false;
+  }
+  {
+    std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+    g_inet_session = session;
+    g_inet_tag = InternetStr(out, "tag");
+  }
+  CloudSyncSaveSecret(kChatSessionFile, session);
+  InternetStartThread();
+  ChatSystemNote(std::string(Tr("Voce esta nas salas da internet como ", "You are in the internet rooms as ")) + DesktopChatInternetGetTag() +
+                 Tr(". /ignorar e /denunciar seguidos do nome cuidam de quem incomoda; /sair sai.",
+                    ". /ignore and /report followed by the name deal with whoever bothers you; /logout leaves."));
+  return true;
+}
+
+bool DesktopChatInternetLogin() {
+  if (g_inet_running.load() || g_inet_state.load() == INET_LOGGING_IN)
+    return false;
+  if (!CloudSyncHasClientId()) {
+    ChatSystemNote(Tr("O login Google ainda nao esta ativo nesta versao (falta o Client ID do projeto).",
+                      "Google login is not active in this version yet (the project's Client ID is missing)."));
+    return false;
+  }
+  if (g_inet_login_thread.joinable())
+    g_inet_login_thread.join();
+  g_inet_login_cancel.store(false);
+  g_inet_state.store(INET_LOGGING_IN);
+  ChatSystemNote(Tr("Abrindo o navegador. O login so informa um ID anonimo: nem seu nome nem seu e-mail chegam ao Karamelo.",
+                    "Opening the browser. The login only gives an anonymous ID: neither your name nor your e-mail reach Karamelo."));
+  g_inet_login_thread = std::thread([]() {
+    std::string id_token, error;
+    if (CloudSyncGoogleIdToken(id_token, error, &g_inet_login_cancel)) {
+      DesktopChatInternetLoginWithIdToken(id_token.c_str());
+    } else {
+      g_inet_state.store(INET_OFF);
+      if (!g_inet_login_cancel.load())
+        ChatSystemNote(error == "timeout" ? Tr("O login demorou demais. Tente de novo.", "The login took too long. Try again.")
+                                          : Tr("O Google recusou o login.", "Google refused the login."));
+    }
+#ifdef _WIN32
+    RequestChatRepaint();
+#endif
+  });
+  return true;
+}
+
+void DesktopChatInternetLogout() {
+  if (g_inet_running.load()) {
+    InternetEnqueue(INET_JOB_LOGOUT, 0, "");
+  } else {
+    InternetForgetSession();
+    g_inet_state.store(INET_OFF);
+  }
+}
+
+bool DesktopChatInternetIsOnline() { return g_inet_state.load() == INET_ONLINE; }
+
+std::string DesktopChatInternetGetTag() {
+  std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+  return g_inet_tag;
+}
+
+std::string DesktopChatInternetStatus() {
+  switch (g_inet_state.load()) {
+  case INET_LOGGING_IN:
+    return Tr("Internet: aguardando login no navegador", "Internet: waiting for the browser login");
+  case INET_CONNECTING:
+    return Tr("Internet: conectando", "Internet: connecting");
+  case INET_ONLINE:
+    return "Internet: " + DesktopChatInternetGetTag();
+  case INET_UNREACHABLE:
+    return Tr("Internet: servidor fora do ar, tentando", "Internet: server down, retrying");
+  default:
+    return Tr("Internet: clique para entrar", "Internet: click to join");
+  }
+}
+
+void DesktopChatInternetStatusClicked() {
+  const int state = g_inet_state.load();
+  if (state == INET_OFF)
+    DesktopChatInternetLogin();
+  else if (state == INET_ONLINE)
+    ChatSystemNote(Tr("Voce esta nas salas da internet. Digite /sair para sair.", "You are in the internet rooms. Type /logout to leave."));
+}
+
+static bool InternetResolveInvite(const std::string& invite, std::string& out_ip, int& out_port) {
+  std::ostringstream body;
+  body << "{\"invite\":" << JsonQuote(invite) << "}";
+  int status = 0;
+  JsonValue out;
+  if (!InternetCall("/v1/invite/accept", body.str(), status, out) || status != 200) {
+    ChatSystemNote(status == 404 ? Tr("Esse convite ja expirou.", "That invite has expired.")
+                                 : Tr("Nao deu para aceitar o convite agora.", "Could not accept the invite right now."));
+    return false;
+  }
+  out_ip = InternetStr(out, "ip");
+  out_port = (int)InternetInt(out, "port");
+  return !out_ip.empty() && out_port > 0 && out_port <= 65535;
+}
+
+// The chat commands of the internet rooms. True when the text was one of them.
+static bool InternetCommand(const std::string& in) {
+  if (in == "/entrar" || in == "/login") {
+    if (g_inet_running.load())
+      ChatSystemNote(Tr("Voce ja esta nas salas da internet.", "You are already in the internet rooms."));
+    else
+      DesktopChatInternetLogin();
+    return true;
+  }
+  if (in == "/sair" || in == "/logout") {
+    DesktopChatInternetLogout();
+    return true;
+  }
+  for (const char* cmd : {"/ignorar ", "/ignore "}) {
+    if (in.rfind(cmd, 0) != 0)
+      continue;
+    const std::string tag = DesktopChatSanitizeText(in.substr(strlen(cmd)), 40);
+    if (tag.empty())
+      return true;
+    bool now_ignored;
+    {
+      std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+      InternetLoadIgnoredLocked();
+      now_ignored = g_inet_ignored.insert(tag).second;
+      if (!now_ignored)
+        g_inet_ignored.erase(tag);
+      std::error_code ec;
+      std::filesystem::create_directories("Config", ec);
+      std::ofstream out(kChatIgnoreFile, std::ios::trunc);
+      for (const auto& t : g_inet_ignored)
+        out << t << "\n";
+    }
+    ChatSystemNote(std::string(now_ignored ? Tr("Ignorando ", "Ignoring ") : Tr("Voltou a ver ", "Showing again ")) + tag);
+    return true;
+  }
+  for (const char* cmd : {"/denunciar ", "/report "}) {
+    if (in.rfind(cmd, 0) != 0)
+      continue;
+    const std::string tag = DesktopChatSanitizeText(in.substr(strlen(cmd)), 40);
+    if (tag.empty())
+      return true;
+    if (DesktopChatInternetGetTag().empty())
+      ChatSystemNote(Tr("Denuncia so vale nas salas da internet. Digite /entrar.", "Reports only work in the internet rooms. Type /login."));
+    else
+      InternetEnqueue(INET_JOB_REPORT, g_current_room.load(), tag);
+    return true;
+  }
+  return false;
+}
+
 
 // =============================================================
 // Wire Framing Helpers (JSON Ephemeral Protocol)
@@ -1399,7 +1971,7 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
     ry += 8;
     FillSolidRectGdi(hdc, 14, ry - 4, side_w - 28, 1, col_divider);
     RECT rc_sec2 = {16, ry, side_w - 12, ry + 18};
-    DrawUtf8TextGdi(hdc, Tr("NA SUA REDE", "ON YOUR NETWORK"), rc_sec2, g_font_small, col_txt_muted,
+    DrawUtf8TextGdi(hdc, Tr("ONLINE", "ONLINE"), rc_sec2, g_font_small, col_txt_muted,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     ry += 22;
 
@@ -1440,7 +2012,7 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
     }
     if (!anyone) {
       RECT rc_none = {16, ry, side_w - 12, ry + 36};
-      DrawUtf8TextGdi(hdc, Tr("Ninguem com o chat aberto na sua rede.", "No one has the chat open on your network."),
+      DrawUtf8TextGdi(hdc, Tr("Ninguem online agora.", "No one online right now."),
                       rc_none, g_font_small, col_txt_muted, DT_LEFT | DT_WORDBREAK);
     }
   } else {
@@ -1508,14 +2080,18 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
   DrawUtf8TextGdi(hdc, DesktopChatGetRoomName(active_room), rc_ch_title,
                   g_font_title, col_txt_white, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-  char sub_hdr[160];
+  char sub_hdr[240];
+  const std::string inet_status = DesktopChatInternetStatus();
   snprintf(sub_hdr, sizeof(sub_hdr),
-           g_chat_zoom.load() == 100 ? "%s" : "%s  •  Zoom %d%%",
+           g_chat_zoom.load() == 100 ? "%s  •  %s" : "%s  •  %s  •  Zoom %d%%",
+           inet_status.c_str(),
            VoiceChatIsEnabled() ? Tr("Voz ligada", "Voice on") : Tr("Voz desligada", "Voice off"),
            g_chat_zoom.load());
   RECT rc_ch_sub = {side_w + 18, 34, W - header_buttons_w, 54};
-  DrawUtf8TextGdi(hdc, sub_hdr, rc_ch_sub, g_font_small, col_txt_muted,
+  DrawUtf8TextGdi(hdc, sub_hdr, rc_ch_sub, g_font_small,
+                  g_hover_zone == HIT_BTN_INTERNET ? col_txt_white : col_accent_blue,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+  g_hit_rects.push_back({HIT_BTN_INTERNET, rc_ch_sub});
 
   // Header Buttons
   int bx = W - 14;
@@ -1628,9 +2204,12 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
                       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
       char host_info[96];
-      snprintf(host_info, sizeof(host_info), "Código: %s  •  Host: %s:%d",
-               m.room_code.empty() ? "DIRETO" : m.room_code.c_str(),
-               m.host_ip.c_str(), m.host_port);
+      if (m.host_ip.empty())
+        snprintf(host_info, sizeof(host_info), "%s", Tr("Pela internet", "Over the internet"));
+      else
+        snprintf(host_info, sizeof(host_info), "Código: %s  •  Host: %s:%d",
+                 m.room_code.empty() ? "DIRETO" : m.room_code.c_str(),
+                 m.host_ip.c_str(), m.host_port);
       RECT rc_ct3 = {rc_card.left + 12, rc_card.top + 48, rc_card.right - 130, rc_card.top + 64};
       DrawUtf8TextGdi(hdc, host_info, rc_ct3, g_font_small, col_txt_muted, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
@@ -1771,6 +2350,8 @@ static LRESULT CALLBACK SocialChatWndProc(HWND hwnd, UINT msg, WPARAM wparam, LP
       DesktopChatSendChallenge(NULL);
     } else if (hz == HIT_BTN_ACCEPT_CARD) {
       DesktopChatAcceptLastChallenge();
+    } else if (hz == HIT_BTN_INTERNET) {
+      DesktopChatInternetStatusClicked();
     } else if (hz == HIT_BTN_DENOISE) {
       int next_d = ((int)VoiceChatGetDenoiseEngine() + 1) % 3;
       VoiceChatSetDenoiseEngine((VoiceDenoiseEngine)next_d);
@@ -1978,6 +2559,9 @@ void DesktopChatProcessSdlEvent(const void* raw_event) {
       if (mx >= g_chat_sdl_w - 180 && mx <= g_chat_sdl_w - 20 && my >= 16 && my <= 46) {
         DesktopChatSendChallenge(NULL);
       }
+      if (mx >= 270 && mx < g_chat_sdl_w - 300 && my >= 40 && my <= 54) {
+        DesktopChatInternetStatusClicked();
+      }
       if (g_chat_sdl_has_invite && mx >= g_chat_sdl_w - 290 && mx <= g_chat_sdl_w - 190 && my >= 16 && my <= 46) {
         DesktopChatAcceptLastChallenge();
       }
@@ -2073,7 +2657,7 @@ void DesktopChatRenderSdlWindow() {
       ry += 35;
     }
     ry += 6;
-    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry, Tr("NA SUA REDE:", "ON YOUR NETWORK:"), 0x008C98A8u);
+    DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 16, ry, Tr("ONLINE:", "ONLINE:"), 0x008C98A8u);
     ry += 14;
     const std::string my_tag = DesktopChatGetKarameloTag();
     const std::string my_ip = NetplayGetLocalIp();
@@ -2104,6 +2688,8 @@ void DesktopChatRenderSdlWindow() {
   }
 
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 270, 26, DesktopChatGetRoomName(DesktopChatGetRoom()), 0x00FFFFFFu);
+  const int status_columns = std::max(0, (g_chat_sdl_w - 300 - 270) / 8);
+  DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, 270, 44, DesktopChatInternetStatus().substr(0, (size_t)status_columns).c_str(), 0x0066C0F4u);
   DrawOverlayRectBlend(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, g_chat_sdl_w - 180, 16, 164, 30, 0x002A475Eu, 0x0066C0F4u);
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, g_chat_sdl_w - 168, 27, "DESAFIAR NETPLAY", 0x00FFFFFFu);
 

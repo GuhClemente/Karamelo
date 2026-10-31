@@ -73,6 +73,9 @@ NetplayStats NetplayGetStats();
 // Chat and invite over the real network, between two processes. role "a" hosts
 // the match and "b" accepts. 0 everything arrived, 1 something did not.
 int SocialSelfTest(const char* role, int chat_port, int match_port, const char* result_path);
+// Two processes through a running chat server (tools/test_chat_internet.mjs): login,
+// message, who is online, invite and the match. Role "bad" expects its token refused.
+int InternetChatSelfTest(const char* role, const char* server_url, const char* id_token, int chat_port, const char* result_path);
 // One process, the voice session against itself: the default microphone and
 // speaker (whatever SDL_AUDIO_DRIVER says), a real UDP socket, and packets from
 // another socket standing in for the other player. 0 ok, 1 no audio path.
