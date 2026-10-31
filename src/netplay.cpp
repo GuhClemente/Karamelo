@@ -1237,14 +1237,15 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 	// Config/: without this they would share one, and with the player's own.
 	std::error_code dir_error;
 	std::filesystem::current_path(std::filesystem::path(result_path).parent_path(), dir_error);
-	if (dir_error) return 1;
+	if (dir_error) return 10;
 	NetplayInit();
 	DesktopChatInit();
 	DesktopChatInternetSetServer(server_url);
 	DesktopChatSetNickname(is_a ? "NetA" : "NetB");
 	// Each on its own UDP port and no extra peer: nothing here can arrive by the
-	// LAN road, so whatever arrives came through the server.
-	if (!DesktopChatStartNetwork(chat_port)) return 1;
+	// LAN road, so whatever arrives came through the server. Which port does not
+	// matter, and Windows reserves ranges that change from one machine to the next.
+	if (!DesktopChatStartNetwork(chat_port) && !DesktopChatStartNetwork(0)) return 11;
 
 	const bool logged_in = DesktopChatInternetLoginWithIdToken(id_token);
 	if (is_bad)
@@ -1255,7 +1256,7 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 		DesktopChatStopNetwork();
 		return clean ? 0 : 1;
 	}
-	if (!logged_in) return 1;
+	if (!logged_in) return 12;
 
 	const std::string mine = is_a ? "internet hello from a" : "internet hello from b";
 	const std::string theirs = is_a ? "internet hello from b" : "internet hello from a";

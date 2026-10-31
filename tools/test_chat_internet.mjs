@@ -72,7 +72,8 @@ try {
   report("forged login refused", bad.code === 0, bad.code === 0 ? "" : `exit ${bad.code}`);
 
   const [a, b] = await Promise.all([run("a", idToken("account-a"), 55761), run("b", idToken("account-b"), 55762)]);
-  report("internet chat, invite and match", a.code === 0 && b.code === 0, `${a.text}\n      ${b.text}`);
+  report("internet chat, invite and match", a.code === 0 && b.code === 0,
+    `exit ${a.code}: ${a.text}\n      exit ${b.code}: ${b.text}`);
 } finally {
   server.close();
   server.closeAllConnections();
