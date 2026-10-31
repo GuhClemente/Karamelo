@@ -976,3 +976,25 @@ TEST_CASE(DesktopChat_F10StaysWithComputerGames)
     ASSERT_TRUE(!SystemIsKeyboardComputer("Arcade"));
     ASSERT_TRUE(!SystemIsKeyboardComputer(""));
 }
+
+TEST_CASE(ChatTextForTheFontKeepsTheLetterOfAnAccent)
+{
+    // "ação Ç ñ" and an emoji, written by their bytes.
+    const std::string text = std::string("a\xC3\xA7") + "\xC3\xA3" "o \xC3\x87 \xC3\xB1 \xF0\x9F\x98\x80!";
+    ASSERT_TRUE(DesktopChatToFontText(text) == "acao C n ?!");
+    ASSERT_TRUE(DesktopChatToFontText("plain") == "plain");
+    // Half a letter, from a cut somewhere else, draws nothing rather than garbage.
+    ASSERT_TRUE(DesktopChatToFontText("a\xC3") == "a");
+    ASSERT_TRUE(DesktopChatToFontText("\xA7" "a") == "a");
+}
+
+TEST_CASE(ChatSanitizeDoesNotCutAnAccentedLetterInHalf)
+{
+    const std::string acao = std::string("a\xC3\xA7") + "\xC3\xA3" "o"; // 6 bytes
+    ASSERT_TRUE(DesktopChatSanitizeText(acao, 6) == acao);
+    ASSERT_TRUE(DesktopChatSanitizeText(acao, 4) == std::string("a\xC3\xA7"));
+    ASSERT_TRUE(DesktopChatSanitizeText(acao, 2) == "a");
+    const std::string emoji = "\xF0\x9F\x98\x80";
+    ASSERT_TRUE(DesktopChatSanitizeText(emoji, 3) == "");
+    ASSERT_TRUE(DesktopChatSanitizeText(emoji, 4) == emoji);
+}

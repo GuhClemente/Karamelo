@@ -118,6 +118,14 @@ test("nobody can pose as someone else", async () => {
   assert.equal(got.sender, a.tag);
 });
 
+test("a name cannot imitate another player's tag", async () => {
+  const a = await login("Bia#E13D51");
+  assert.match(a.tag, /^BiaE13D51#[0-9A-F]{6}$/);
+  const renamed = await call("/v1/nick", { nick: "Ana#FFFFFF" }, a.session);
+  assert.match(renamed.body.tag, /^AnaFFFFFF#[0-9A-F]{6}$/);
+  assert.equal((await call("/v1/nick", { nick: "###" }, a.session)).status, 400);
+});
+
 test("the account id never leaves the server", async () => {
   const sub = "very-secret-account-id";
   const r = await call("/v1/login", { id_token: idToken(sub), nick: "Eva" });

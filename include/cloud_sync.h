@@ -68,6 +68,9 @@ const char*    CloudSyncGetLastSyncTimeStr();
 bool           CloudSyncStartOAuthFlow();
 void           CloudSyncDisconnect();
 void           CloudSyncTriggerAsync();
+// Which Google client to use: Config/ if the player set one, else the chat server's,
+// kept so that saves keep syncing while that server is down. A new login asks it again.
+bool           CloudSyncEnsureClient(bool new_login);
 
 // For the chat rooms (desktop_chat.cpp): the same Google login and HTTP as the cloud.
 void           CloudSyncGetLocalClient(std::string& out_id, std::string& out_secret); // from Config/, usually empty

@@ -1808,7 +1808,7 @@ O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via re
    - **Onde fica salvo**: Na pasta oculta de aplicativo (`appDataFolder`) do Google Drive do próprio jogador — não polui os arquivos visíveis do Drive dele e não ocupa um único byte no servidor do Karamelo.
    - **O que sincroniza**: Só os saves de bateria e cartões de memória em `saves/<sistema>/` (`.srm`, `.sav`, `.eep`, `.fla`, `.sra`, `.mcr`, `.mcd`, `.nv`). Savestates, ROMs, BIOS e configurações **não** vão para a nuvem.
    - **Proteção contra perda**: Todo download confere o SHA-256 antes de trocar o save, e o save anterior fica como `.bak`. Se o mesmo save mudou em dois PCs, nenhum lado se perde: o deste PC continua valendo e o do outro fica ao lado como `.conflito`.
-   - **Pré-requisito do lançamento**: precisa de um Client ID OAuth do Google registrado pelo projeto (passo a passo em `docs/CLOUD_GOOGLE.md`). **Sem ele, o botão de conectar pede um Client ID em `Config/cloud.cfg`. Só divulgue a nuvem depois de o projeto registrar o dele.**
+   - **Login**: o aplicativo pede ao servidor do chat (seção 53) qual Client ID do Google usar, e só isso passa por ele: os saves vão direto para o Drive do jogador. Se esse servidor não responder, o botão de conectar avisa; quem já conectou continua sincronizando.
 
 2. **Karamelo Web Admin (LAN) — Gerenciador Local pelo Navegador com Auditor de BIOS**:
    - **Problema que resolve**: Ideal para quem usa o PC na sala de estar (TV / HTPC), mini-PCs ou portáteis rodando Karamelo no sofá e quer enviar jogos ou conferir BIOS a partir de outro PC ou celular na mesma rede Wi-Fi/LAN sem precisar espetar pendrive.
@@ -1823,7 +1823,7 @@ O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via re
    - **Zoom**: A janela do chat aumenta e diminui como um navegador: `Ctrl +`, `Ctrl -`, `Ctrl 0` e `Ctrl` + roda do mouse (de 70% a 250%), e guarda a escolha.
    - **Privacidade**: A rede do chat só liga quando o jogador abre o chat, porque ela anuncia o apelido na rede local. O apelido começa com o nome de usuário do sistema e muda com `/nome Fulano` na caixa do chat.
    - **Convite para Netplay**: A lista mostra quem está na rede local e o que está jogando. Ao aceitar, o jogo do anfitrião abre sozinho no outro PC, desde que ele tenha **o mesmo arquivo** em `roms/`; o arquivo do jogo nunca é enviado. Fora da rede local, o jogador manda o código de sala (`KRM-XXXXX-XXXXX`, que contém o endereço) e o outro digita; pela internet ainda depende de porta aberta no roteador ou VPN.
-   - **Como a partida funciona (seção 52)**: Os dois PCs rodam o mesmo jogo quadro a quadro, e o anfitrião é o Jogador 1. A partida espera o jogador mais lento, então funciona melhor em rede local. Não publique como netplay com rollback.
+   - **Como a partida funciona (seção 52)**: Os dois PCs rodam o mesmo jogo quadro a quadro, e o anfitrião é o Jogador 1. A partida espera o jogador mais lento, então funciona melhor em rede local. Não publique como netplay com rollback. **Não divulgue Netplay de GBA:** em teste, os dois jogos se separam mesmo com o estado reenviado a cada segundo. Game Boy, NES, SNES, Mega Drive e Master System ficaram com a imagem idêntica nos dois lados; os outros sistemas não foram testados.
 
 4. **System Tray (Bandeja do Sistema), Presença & Overlay In-Game (`F10`)**:
    - **Bandeja do Sistema (só Windows)**: Ícone na bandeja com menu rápido e status de presença (`Disponivel`, `Jogando`, `Ocupado`), e notificação com som quando chega um convite de partida (em `Ocupado` não avisa). A janela não some ao minimizar: não prometa "minimizar para a bandeja". Linux e macOS não têm ícone de bandeja nem notificação; o status de presença funciona igual.
@@ -2126,6 +2126,6 @@ Também nesta data:
 
 **O que NÃO prometer:**
 
-- **Partida pela internet sem configurar nada.** O chat e o convite atravessam a internet, a partida não: quem convida ainda precisa da porta 55435 (UDP) aberta no roteador, ou de VPN. O chat avisa isso ao convidar. Não há servidor retransmitindo a partida.
+- **Partida pela internet sem configurar nada.** O chat e o convite atravessam a internet, a partida não: quem convida ainda precisa da porta 55435 (TCP) aberta no roteador, ou de VPN. O chat avisa isso ao convidar. Não há servidor retransmitindo a partida.
 - Não é uma sala pela qual passa voz: a voz continua direta entre os dois jogadores da partida.
 - Login só com Google. Não prometa Discord, Steam ou outros.

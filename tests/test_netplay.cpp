@@ -293,13 +293,23 @@ TEST_CASE(NetplayLearnsAClockButNotARealSplit)
 	guest[1690] = 0x01;
 	guest[1815] = 0x02;
 	std::vector<uint32_t> mask, previous;
+	// The first time it could be anything: the host resends. Back in the same place
+	// after that, it is the core's own.
+	ASSERT_FALSE(NetplayLearnStateMask(host.data(), guest.data(), host.size(), mask, previous));
+	ASSERT_EQ(mask.size(), (size_t)0);
 	ASSERT_TRUE(NetplayLearnStateMask(host.data(), guest.data(), host.size(), mask, previous));
 	NetplayApplyStateMask(host.data(), host.size(), mask);
 	NetplayApplyStateMask(guest.data(), guest.size(), mask);
 	ASSERT_EQ(NetplayHashState(host.data(), host.size()), NetplayHashState(guest.data(), guest.size()));
 
-	// A game that went another way differs all over: never learned, the host resends.
+	// A small difference somewhere else is not learned either: a split may start small.
 	std::vector<uint32_t> before = mask;
+	std::vector<uint8_t> small_split = guest;
+	small_split[30000] = 9;
+	ASSERT_FALSE(NetplayLearnStateMask(host.data(), small_split.data(), host.size(), mask, previous));
+	ASSERT_EQ(mask.size(), before.size());
+
+	// A game that went another way differs all over: never learned, the host resends.
 	for (size_t i = 0; i < guest.size(); i += 97) guest[i] = (uint8_t)(i * 31);
 	ASSERT_FALSE(NetplayLearnStateMask(host.data(), guest.data(), host.size(), mask, previous));
 	ASSERT_EQ(mask.size(), before.size());
@@ -319,6 +329,7 @@ TEST_CASE(NetplayLearnsAClockButNotARealSplit)
 	std::vector<uint8_t> x(64 * 1024, 0), y(64 * 1024, 0);
 	y[8] = 1;
 	std::vector<uint32_t> none;
+	ASSERT_FALSE(NetplayLearnStateMask(x.data(), y.data(), x.size(), full, none));
 	ASSERT_FALSE(NetplayLearnStateMask(x.data(), y.data(), x.size(), full, none));
 }
 

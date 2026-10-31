@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { createChatServer } from "../server/chat/server.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const exe = path.join(root, "app", process.platform === "win32" ? "Karamelo.exe" : "Karamelo");
+const exe = process.env.KARAMELO_TEST_EXE || path.join(root, "app", process.platform === "win32" ? "Karamelo.exe" : "Karamelo");
 if (!fs.existsSync(exe)) {
   console.error(`  no ${exe}`);
   process.exit(2);

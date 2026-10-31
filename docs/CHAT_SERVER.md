@@ -54,7 +54,9 @@ IP que quiser.
 ## Antes de divulgar
 
 1. **Lançar a versão nova do aplicativo:** é ela que busca o Client ID e o segredo neste
-   servidor (`/v1/login-config`) na hora do login. Eles não ficam no código, que é público,
+   servidor (`/v1/login-config`) na hora do login, tanto do chat quanto da nuvem. Sem este
+   servidor no ar, ninguém faz login novo; quem já conectou a nuvem continua sincronizando.
+   Eles não ficam no código, que é público,
    e podem ser trocados aqui sem novo lançamento. O Google não trata o segredo de um app
    instalado como confidencial, então entregá-lo assim não piora nada.
 2. **Tela de consentimento do Google:** escopo `openid` registrado e app publicado, ou só
@@ -101,5 +103,5 @@ Só vale `https://`, ou `http://127.0.0.1` para testes neste PC.
 ## O que ele não faz
 
 A partida não passa por aqui. O convite atravessa a internet, mas quem convida ainda
-precisa da porta 55435 (UDP) aberta no roteador, ou de VPN. Retransmitir a partida é
+precisa da porta 55435 (TCP) aberta no roteador, ou de VPN. Retransmitir a partida é
 outro serviço, com outro custo de banda.

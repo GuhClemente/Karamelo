@@ -19,7 +19,7 @@ set APP_EXE=%APP_BASE%_v%APP_VER%.exe
 
 rem Close any running instances so the linker does not fail with LNK1104 (file in use)
 taskkill /F /IM "%APP_EXE%" >nul 2>&1
-taskkill /F /IM "%APP_BASE%.exe" >nul 2>&1
+rem %APP_BASE%.exe fica de fora: e o que o jogador usa, e o build nao precisa dele.
 
 rc.exe /nologo /I include /fobuild\resource.res src\resource.rc
 
@@ -189,9 +189,14 @@ if errorlevel 1 (
 )
 
 if "%1"=="--fast" (
-    copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
     echo.
-    echo [BUILD OK FAST] app\%APP_BASE%.exe atualizado com sucesso.
+    copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
+    if errorlevel 1 (
+        echo [AVISO] O Karamelo esta aberto: app\%APP_BASE%.exe NAO foi atualizado. A versao nova esta em app\%APP_EXE%.
+        echo [BUILD OK FAST] app\%APP_EXE% compilado.
+    ) else (
+        echo [BUILD OK FAST] app\%APP_BASE%.exe atualizado com sucesso.
+    )
     exit /b 0
 )
 
@@ -230,7 +235,9 @@ echo.
 echo ==================================================
 echo [RUNNING NETPLAY AND SOCIAL TESTS]
 echo ==================================================
-copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
+rem O exe recem-compilado, nao o %APP_BASE%.exe: com o Karamelo aberto a copia para
+rem ele falha, e estes testes rodariam a versao velha e aprovariam o build.
+set "KARAMELO_TEST_EXE=%~dp0app\%APP_EXE%"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\test_netplay.ps1" -Frames 300
 if not "%ERRORLEVEL%"=="0" (
     echo [BUILD FAILED] Netplay: os dois jogos nao ficaram iguais - veja a lista acima.
@@ -261,5 +268,10 @@ if not "%ERRORLEVEL%"=="0" (
 :after_internet_chat
 
 copy /Y "app\%APP_EXE%" "app\%APP_BASE%.exe" >nul 2>&1
-echo [BUILD OK] app\%APP_BASE%.exe atualizado - testes de unidade, bateria de cores, netplay e rede passaram.
+if errorlevel 1 (
+    echo [AVISO] O Karamelo esta aberto: app\%APP_BASE%.exe NAO foi atualizado. A versao nova esta em app\%APP_EXE%.
+    echo [BUILD OK] app\%APP_EXE% - testes de unidade, bateria de cores, netplay e rede passaram.
+) else (
+    echo [BUILD OK] app\%APP_BASE%.exe atualizado - testes de unidade, bateria de cores, netplay e rede passaram.
+)
 exit /b 0

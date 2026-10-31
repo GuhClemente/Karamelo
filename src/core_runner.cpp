@@ -1297,6 +1297,22 @@ static struct retro_vfs_interface g_vfs_iface = {
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
+static const long long kCoreLogMaxBytes = 32 * 1024 * 1024;
+
+// One file per session would lose the crash before this one; one forever fills the
+// disk. Past the limit, the log becomes karamelo.old.log and starts again.
+static FILE* OpenCoreLog()
+{
+	std::error_code ec;
+	const auto size = std::filesystem::file_size("karamelo.log", ec);
+	if (!ec && (long long)size > kCoreLogMaxBytes)
+	{
+		std::filesystem::remove("karamelo.old.log", ec);
+		std::filesystem::rename("karamelo.log", "karamelo.old.log", ec);
+	}
+	return fopen("karamelo.log", "a");
+}
+
 static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 {
 	static const char* lvl_names[] = { "DEBUG", "INFO", "WARN", "ERROR" };
@@ -1310,10 +1326,15 @@ static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 
 	// Kept open: reopening per line meant 35 open/close pairs just to
 	// list the tracks of one CD image.
-	static FILE* f = fopen("karamelo.log", "a");
-	if (f)
+	static FILE* f = OpenCoreLog();
+	// A core can repeat one error for as long as the game runs: a Lynx game wrote
+	// 800 MB of the same line here. The start of a session is what explains it anyway.
+	static long long written = 0;
+	if (f && written < kCoreLogMaxBytes)
 	{
-		fprintf(f, "[%s] %s\n", lvl, buf);
+		written += fprintf(f, "[%s] %s\n", lvl, buf);
+		if (written >= kCoreLogMaxBytes)
+			fprintf(f, "[INFO] log cortado aqui: passou do limite desta sessao\n");
 		fflush(f);
 	}
 	printf("[%s] %s\n", lvl, buf);
@@ -1984,6 +2005,8 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// FM Towns (Geartowns) core options:
 			// Mute buzzer volume by default so holding keyboard keys does not produce loud speaker clicks.
 			else if (strcmp(var->key, "geartowns_buzzer_volume") == 0) var->value = "0";
+			// Enable companion floppy save disk automatically for hybrid CD-ROM games
+			else if (strcmp(var->key, "geartowns_save_disk") == 0) var->value = "Enabled";
 
 			// NEC PC-98 (NP2kai) core options:
 			// Default joymode to "Keypad" so gamepads / joysticks map D-pad and analog stick
@@ -2269,8 +2292,29 @@ static bool CB_Environment(unsigned cmd, void* data)
 static double g_render_us_total = 0.0;
 static long   g_render_count = 0;
 
+static std::atomic<bool> g_net_video_hash_on{ false };
+static std::atomic<uint32_t> g_net_video_hash{ 0 };
+
+void CoreNetSetVideoHash(bool on) { g_net_video_hash_on.store(on); }
+uint32_t CoreNetVideoHash() { return g_net_video_hash.load(); }
+
 static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, size_t pitch)
 {
+	// Only the Netplay self-test asks for this: what the player sees, to compare with
+	// the other side without going through the saved state.
+	if (g_net_video_hash_on.load() && data && data != (const void*)(uintptr_t)-1 && width && height)
+	{
+		const size_t row_bytes = (pitch >= (size_t)width * 4 ? 4 : 2) * (size_t)width;
+		uint32_t h = 2166136261u;
+		for (unsigned y = 0; y < height; y++)
+		{
+			const uint8_t* row = (const uint8_t*)data + pitch * y;
+			for (size_t x = 0; x < row_bytes; x++)
+				h = (h ^ row[x]) * 16777619u;
+		}
+		g_net_video_hash.store(h);
+	}
+
 	// Once a second: how many frames the core actually produced, and how much
 	// of each was spent in our own filter.
 	{
@@ -6152,7 +6196,10 @@ void CoreSetButtonState(int player, int button_id, bool pressed)
 	if (player >= 0 && player < 4 && button_id >= 0 && button_id < 16)
 	{
 		s_injected_buttons[player][button_id] = pressed ? 1 : 0;
-		joypad_buttons[player][button_id] = pressed ? 1 : 0;
+		// This runs on another thread. In a match, a write landing between the core's
+		// poll and its read would play a button the other machine never heard of.
+		if (NetplayGetState() != NETPLAY_CONNECTED)
+			joypad_buttons[player][button_id] = pressed ? 1 : 0;
 	}
 }
 
@@ -6161,7 +6208,8 @@ void CoreSetAnalogState(int player, int stick_id, int axis_id, int16_t value)
 	if (player >= 0 && player < 4 && stick_id >= 0 && stick_id < 2 && axis_id >= 0 && axis_id < 2)
 	{
 		s_injected_analog[player][stick_id][axis_id] = value;
-		analog_sticks[player][stick_id][axis_id] = value;
+		if (NetplayGetState() != NETPLAY_CONNECTED)
+			analog_sticks[player][stick_id][axis_id] = value;
 	}
 }
 

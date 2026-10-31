@@ -44,6 +44,11 @@ const REQUEST_MAX = 500; // per address, and a whole LAN house can share one
 const MAX_REPORTS = 500;
 const JWKS_CACHE_MS = 3600 * 1000;
 
+// "#" is what separates the name from the number that proves who it is.
+export function sanitizeNick(raw) {
+  return sanitizeText(typeof raw === "string" ? raw.replace(/#/g, "") : raw, MAX_NICK);
+}
+
 export function sanitizeText(raw, maxLen) {
   if (typeof raw !== "string") return "";
   // Control, bidi and zero-width characters: they fake other people's lines.
@@ -244,7 +249,7 @@ export function createChatServer(config) {
       }
       const account = hmac("account:" + sub);
       if (bans.has(account)) return [403, { error: "banned" }];
-      const nick = sanitizeText(body.nick, MAX_NICK) || "Jogador";
+      const nick = sanitizeNick(body.nick) || "Jogador";
       return [200, {
         session: makeSessionToken(account, nick, Date.now() + SESSION_MS),
         tag: tagFor(account, nick),
@@ -260,7 +265,7 @@ export function createChatServer(config) {
 
     // The name lives in the token, so a new name is a new token.
     async "POST /v1/nick"(req, body, ip, session, bearer, expires) {
-      const nick = sanitizeText(body.nick, MAX_NICK);
+      const nick = sanitizeNick(body.nick);
       if (!nick) return [400, { error: "bad_nick" }];
       session.tag = tagFor(session.account, nick);
       return [200, { tag: session.tag, session: makeSessionToken(session.account, nick, expires) }];

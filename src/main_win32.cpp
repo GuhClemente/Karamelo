@@ -1929,6 +1929,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	TrayManagerInit(hwnd);
 	if (__argc > 1 && _stricmp(__argv[1], "--chat") == 0)
 		DesktopChatShowWindow();
+	if (__argc > 1 && _stricmp(__argv[1], "--cloud-login") == 0)
+		CloudSyncStartOAuthFlow();
 
 	// Restore the windowed-mode size/position saved on a previous exit, now
 	// that MenuInit() has loaded it. Guards against a monitor that is no

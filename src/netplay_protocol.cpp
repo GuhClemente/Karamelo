@@ -176,9 +176,12 @@ bool NetplayLearnStateMask(const uint8_t* a, const uint8_t* b, size_t size, std:
                            std::vector<uint32_t>& previous_diff)
 {
 	const std::vector<uint32_t> diff = NetplayStateMask(a, b, size);
+	// Only what differs in the very same place again, after the state was sent anew,
+	// is the core's own: a few moved bytes can also be a game that went another way,
+	// and learning those hid a real split while the players saw different games.
 	const bool stands_still = !diff.empty() && diff == previous_diff;
 	previous_diff = diff;
-	if (diff.size() > kNetMaskMaxGrowth && !stands_still) return false;
+	if (!stands_still) return false;
 	std::vector<uint32_t> merged = mask;
 	for (uint32_t block : diff)
 		if (std::find(merged.begin(), merged.end(), block) == merged.end())

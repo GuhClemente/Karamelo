@@ -132,7 +132,6 @@ void NetplayApplyStateMask(uint8_t* state, size_t size, const std::vector<uint32
 // same blocks differ twice in a row: pointers a core keeps in its state differ
 // between two processes and never move, while a game that split changes every time.
 static const size_t kNetMaskMaxBlocks = 512;
-static const size_t kNetMaskMaxGrowth = 32;
 bool NetplayLearnStateMask(const uint8_t* a, const uint8_t* b, size_t size, std::vector<uint32_t>& mask,
                            std::vector<uint32_t>& previous_diff);
 

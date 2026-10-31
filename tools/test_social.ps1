@@ -23,7 +23,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $app = Join-Path $root "app"
-$exe = Join-Path $app "Karamelo.exe"
+$exe = if ($env:KARAMELO_TEST_EXE) { $env:KARAMELO_TEST_EXE } else { Join-Path $app "Karamelo.exe" }
 if (-not (Test-Path $exe)) { Write-Host "Karamelo.exe nao encontrado"; exit 6 }
 
 if (Get-NetTCPConnection -LocalPort 55435 -State Listen -ErrorAction SilentlyContinue) {

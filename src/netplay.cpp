@@ -2,7 +2,6 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #include <algorithm>
-#include <filesystem>
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -62,9 +61,12 @@ static inline void strncpy_s(char* dst, size_t dst_size, const char* src, size_t
 #include <chrono>
 #include <thread>
 #include <filesystem>
+#include <iterator>
+#include <fstream>
 #include <cstddef>
 
 #include "netplay.h"
+#include "cloud_sync.h"
 #include "menu.h" // Tr(): every message on screen follows the language setting
 #include "core_runner.h"
 #include "netplay_protocol.h"
@@ -840,6 +842,10 @@ NetplayStats NetplayGetStats()
 	return sync_state.stats;
 }
 
+// What the self-test saw at each comparison, frame and image: written to a file for
+// the script to compare, because the state alone can be masked into agreeing.
+static std::vector<std::pair<uint32_t, uint32_t>>* g_selftest_video = nullptr;
+
 static void CompareHashes()
 {
 	auto& loc = sync_state.local_hashes;
@@ -1047,6 +1053,7 @@ static int LockstepFrameOnce(const NetInput& local, NetInput& port1, NetInput& p
 	// The state before this frame's input, the same on both machines or not at all.
 	if (frame % kHashEveryFrames == 0)
 	{
+		if (g_selftest_video) g_selftest_video->push_back({ frame, CoreNetVideoHash() });
 		const size_t size = CoreNetStateSize();
 		if (size > 0 && size <= kMaxHashedState)
 		{
@@ -1090,6 +1097,9 @@ int NetplaySelfTest(const char* role, const char* core, const char* rom, const c
 {
 	const bool host = strcmp(role, "host") == 0;
 	NetplayInit();
+	static std::vector<std::pair<uint32_t, uint32_t>> video;
+	g_selftest_video = &video;
+	CoreNetSetVideoHash(true);
 	if (host)
 	{
 		if (!NetplayStartHost(port)) return 4;
@@ -1131,6 +1141,15 @@ int NetplaySelfTest(const char* role, const char* core, const char* rom, const c
 		fprintf(f, "role=%s frames=%u hash_ok=%u hash_bad=%u streak=%u learned=%u resyncs=%u state_bytes=%u delay=%u stalls=%u seconds=%.1f\n",
 		        role, last.frames, last.hash_ok, last.hash_bad, last.hash_streak, last.learned, last.resyncs, last.state_bytes, last.delay, last.stalls, seconds());
 		fclose(f);
+	}
+	{
+		std::lock_guard<std::recursive_mutex> lock(net_lock);
+		FILE* vf = fopen((std::string(result_path) + ".video").c_str(), "w");
+		if (vf)
+		{
+			for (const auto& v : video) fprintf(vf, "%u %08x\n", v.first, v.second);
+			fclose(vf);
+		}
 	}
 	// Differences while it learns a core's clock are normal. What may not happen
 	// is ending on a difference, or needing the state sent again and again.
@@ -1250,6 +1269,18 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 	// A copy with no credentials of its own learns them from the server.
 	std::string login_id, login_secret;
 	if (!DesktopChatInternetFetchLoginConfig(login_id, login_secret) || login_secret.empty()) return 13;
+	// The cloud's login gets the same one.
+	std::string cloud_id, cloud_secret;
+	if (!CloudSyncEnsureClient(false)) return 14;
+	CloudSyncGetLocalClient(cloud_id, cloud_secret);
+	if (cloud_id != login_id || cloud_secret != login_secret) return 14;
+	// And keeps it for when the server is down.
+	{
+		std::ifstream saved("Config/cloud.cfg");
+		const std::string text((std::istreambuf_iterator<char>(saved)), std::istreambuf_iterator<char>());
+		if (text.find("google_client_id=" + login_id) == std::string::npos ||
+		    text.find("client_from_server=1") == std::string::npos) return 14;
+	}
 
 	const bool logged_in = DesktopChatInternetLoginWithIdToken(id_token);
 	if (is_bad)
@@ -1261,6 +1292,11 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 		return clean ? 0 : 1;
 	}
 	if (!logged_in) return 12;
+
+	// A mistyped command stays out of the public room.
+	DesktopChatSubmitInput("/denunciar");
+	for (const auto& m : DesktopChatGetRoomMessages())
+		if (m.text == "/denunciar") return 15;
 
 	const std::string mine = is_a ? "internet hello from a" : "internet hello from b";
 	const std::string theirs = is_a ? "internet hello from b" : "internet hello from a";
@@ -1317,13 +1353,18 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 	}
 
 	const bool session_kept = std::filesystem::exists("Config/chat_session.bin");
+	// If our message shows up twice, who each copy claims to be from says which road
+	// brought it back: the plain name is the LAN, a name with # is the server.
+	std::string mine_senders;
+	for (const auto& m : DesktopChatGetRoomMessages())
+		if (m.text == mine) mine_senders += (mine_senders.empty() ? "" : ",") + m.sender + (m.from_me ? "(me)" : "(other)");
 	FILE* f = fopen(result_path, "w");
 	if (f)
 	{
-		fprintf(f, "role=%s tag=%s message=%d presence=%d invite=%d connected=%d posts=%u copies_of_mine=%u session_kept=%d wrong_host=%d seconds=%.1f\n",
+		fprintf(f, "role=%s tag=%s message=%d presence=%d invite=%d connected=%d posts=%u copies_of_mine=%u session_kept=%d wrong_host=%d seconds=%.1f mine_from=%s\n",
 		        role, DesktopChatInternetGetTag().c_str(), got_message ? 1 : 0, got_presence ? 1 : 0,
 		        (is_a ? invited : saw_invite) ? 1 : 0, connected ? 1 : 0, posts, copies_of_mine,
-		        session_kept ? 1 : 0, wrong_host ? 1 : 0, seconds());
+		        session_kept ? 1 : 0, wrong_host ? 1 : 0, seconds(), mine_senders.c_str());
 		fclose(f);
 	}
 	// The server sends our own messages back: they must not show up twice.

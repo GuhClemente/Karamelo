@@ -37,6 +37,8 @@ bool CoreBinaryExists(const char* dll_or_so_path);
 // load). The self-test uses it to tell a game that runs from one that only
 // got past retro_load_game.
 long CoreGetVideoFrameCount();
+void CoreNetSetVideoHash(bool on);
+uint32_t CoreNetVideoHash();
 void CoreShutdown(bool will_reload = false);
 
 // Recreates any of the frontend's internal locks (toast/name/options) that

@@ -1,4 +1,5 @@
 #include "cloud_sync.h"
+#include "desktop_chat.h"
 #include "app_info.h"
 #include <algorithm>
 #include <atomic>
@@ -586,6 +587,7 @@ static const char*                 kDefaultGoogleClientId = "";
 static const char*                 kDefaultGoogleClientSecret = "";
 static std::string                 g_client_id = kDefaultGoogleClientId;
 static std::string                 g_client_secret = kDefaultGoogleClientSecret;
+static bool                        g_client_from_server = false;
 static std::string                 g_access_token;
 static std::string                 g_refresh_token;
 static int64_t                     g_last_sync_utc = 0;
@@ -647,6 +649,7 @@ static void LoadCloudConfigAndTokens()
 			std::string v = line.substr(eq + 1);
 			if (k == "google_client_id" && !v.empty()) g_client_id = v;
 			else if (k == "google_client_secret" && !v.empty()) g_client_secret = v;
+			else if (k == "client_from_server") g_client_from_server = v == "1";
 			else if (k == "auto_sync") g_cloud_auto_sync.store(v != "0");
 			else if (k == "last_sync_utc")
 			{
@@ -670,7 +673,10 @@ static void LoadCloudConfigAndTokens()
 			{
 				const JsonValue* cid = inst->Find("client_id");
 				if (cid && cid->type == JsonValue::String && !cid->str.empty())
+				{
 					g_client_id = cid->str;
+					g_client_from_server = false;
+				}
 				const JsonValue* csec = inst->Find("client_secret");
 				if (csec && csec->type == JsonValue::String && !csec->str.empty())
 					g_client_secret = csec->str;
@@ -680,7 +686,7 @@ static void LoadCloudConfigAndTokens()
 
 	if (g_client_id.empty()) g_client_id = kDefaultGoogleClientId;
 	if (g_client_secret.empty()) g_client_secret = kDefaultGoogleClientSecret;
-	else
+	if (!fs::exists(cfg_path, ec))
 	{
 		std::ofstream out(cfg_path);
 		if (out.is_open())
@@ -721,6 +727,7 @@ static void SaveCloudConfig()
 		out << "# Karamelo Cloud Configuration (Google Drive appDataFolder)\n";
 		out << "google_client_id=" << g_client_id << "\n";
 		out << "google_client_secret=" << g_client_secret << "\n";
+		out << "client_from_server=" << (g_client_from_server ? 1 : 0) << "\n";
 		out << "auto_sync=" << (g_cloud_auto_sync.load() ? 1 : 0) << "\n";
 		out << "last_sync_utc=" << g_last_sync_utc << "\n";
 	}
@@ -1286,6 +1293,18 @@ static bool DriveDownload(const std::string& token, const DriveFile& f, const fs
 	return true;
 }
 
+bool CloudSyncEnsureClient(bool new_login)
+{
+	if (!g_client_id.empty() && !(new_login && g_client_from_server)) return true;
+	std::string id, secret;
+	if (!DesktopChatInternetFetchLoginConfig(id, secret)) return !g_client_id.empty();
+	g_client_id = id;
+	g_client_secret = secret;
+	g_client_from_server = true;
+	SaveCloudConfig();
+	return true;
+}
+
 bool CloudSyncRunNow(const std::string& root_dir, CloudSyncReport* report, std::string* error_out)
 {
 	CloudSyncReport rep;
@@ -1302,6 +1321,7 @@ bool CloudSyncRunNow(const std::string& root_dir, CloudSyncReport* report, std::
 		refresh = g_refresh_token;
 	}
 	if (refresh.empty()) return fail("sem login");
+	if (!CloudSyncEnsureClient(false)) return fail("sem conexao");
 
 	std::ostringstream form;
 	form << "refresh_token=" << CloudSyncUrlEncode(refresh)
@@ -1442,6 +1462,7 @@ void CloudSyncSetEndpointsForTest(const std::string& token_url, const std::strin
 	g_token_url = token_url;
 	g_api_base = api_base;
 	g_last_sync_utc = last_sync_utc;
+	if (g_client_id.empty()) g_client_id = "test-client"; // the mock must not lead to the real server
 	std::lock_guard<std::mutex> lk(g_cloud_mutex);
 	g_refresh_token = refresh_token;
 }
@@ -1513,38 +1534,46 @@ static CloudLoginResult CloudBrowserLogin(const std::string& client_id, const ch
 
 	OpenBrowserUrl(auth_url.str());
 
-	// Wait up to 3 minutes for OAuth callback on 127.0.0.1
-	int sel = 0;
-	for (int waited = 0; waited < 180 && sel == 0; waited++)
+	// Wait up to 3 minutes for OAuth callback on 127.0.0.1. Anything else may knock
+	// first (a browser opens spare connections, and any program can reach this port),
+	// and must neither end the wait nor hang it: only our state counts.
+	std::string req;
+	decltype(srv) cli = srv;
+	bool got_callback = false;
+	for (int waited = 0; waited < 180 && !got_callback; )
 	{
 		if (g_cloud_shutdown.load() || (cancel && cancel->load())) break;
 		fd_set fds;
 		FD_ZERO(&fds);
 		FD_SET(srv, &fds);
 		timeval tv{ 1, 0 };
-		sel = select((int)srv + 1, &fds, NULL, NULL, &tv);
-	}
-	if (sel <= 0)
-	{
-		close_socket(srv);
-		return CLOUD_LOGIN_TIMEOUT;
-	}
-
-	sockaddr_in cli_addr{};
-	socklen_t cli_len = sizeof(cli_addr);
-	auto cli = accept(srv, (sockaddr*)&cli_addr, &cli_len);
-	close_socket(srv);
+		if (select((int)srv + 1, &fds, NULL, NULL, &tv) <= 0)
+		{
+			waited++;
+			continue;
+		}
+		sockaddr_in cli_addr{};
+		socklen_t cli_len = sizeof(cli_addr);
+		cli = accept(srv, (sockaddr*)&cli_addr, &cli_len);
 #ifdef _WIN32
-	if (cli == INVALID_SOCKET) return CLOUD_LOGIN_NO_CALLBACK;
+		if (cli == INVALID_SOCKET) continue;
+		DWORD recv_ms = 2000;
+		setsockopt(cli, SOL_SOCKET, SO_RCVTIMEO, (const char*)&recv_ms, sizeof(recv_ms));
 #else
-	if (cli < 0) return CLOUD_LOGIN_NO_CALLBACK;
+		if (cli < 0) continue;
+		timeval recv_tv{ 2, 0 };
+		setsockopt(cli, SOL_SOCKET, SO_RCVTIMEO, (const char*)&recv_tv, sizeof(recv_tv));
 #endif
+		char req_buf[2048] = { 0 };
+		int rlen = recv(cli, req_buf, sizeof(req_buf) - 1, 0);
+		req.assign(rlen > 0 ? req_buf : "");
+		if (req.find("state=" + state_tok) != std::string::npos) got_callback = true;
+		else close_socket(cli);
+	}
+	close_socket(srv);
+	if (!got_callback) return CLOUD_LOGIN_TIMEOUT;
 
-	char req_buf[2048] = { 0 };
-	int rlen = recv(cli, req_buf, sizeof(req_buf) - 1, 0);
-	std::string req(rlen > 0 ? req_buf : "");
-
-	bool state_ok = (req.find("state=" + state_tok) != std::string::npos);
+	bool state_ok = true;
 	size_t code_at = req.find("code=");
 	bool exchanged = false;
 	if (state_ok && code_at != std::string::npos)
@@ -1628,13 +1657,6 @@ bool CloudSyncHttpRequest(const char* method, const std::string& url, const std:
 
 bool CloudSyncStartOAuthFlow()
 {
-	if (g_client_id.empty())
-	{
-		CoreSetToast(Tr("DEFINA google_client_id EM Config/cloud.cfg", "SET google_client_id IN Config/cloud.cfg"), 240);
-		SetCloudStatus(CLOUD_ERROR, Tr("Falta Client ID (cloud.cfg)", "Missing Client ID (cloud.cfg)"));
-		return false;
-	}
-
 	if (g_cloud_state.load() == CLOUD_AUTHENTICATING || g_cloud_state.load() == CLOUD_SYNCING)
 		return false;
 
@@ -1642,10 +1664,16 @@ bool CloudSyncStartOAuthFlow()
 		g_auth_worker.join();
 
 	SetCloudStatus(CLOUD_AUTHENTICATING, Tr("Aguardando login no navegador...", "Waiting for browser login..."));
-	CoreSetToast(Tr("ABRINDO NAVEGADOR PARA LOGIN GOOGLE...", "OPENING BROWSER FOR GOOGLE LOGIN..."), 180);
 
 	g_auth_worker = std::thread([]()
 	{
+		if (!CloudSyncEnsureClient(true))
+		{
+			SetCloudStatus(CLOUD_ERROR, Tr("Sem resposta do servidor. Tente de novo.", "No answer from the server. Try again."));
+			CoreSetToast(Tr("NUVEM: SEM RESPOSTA DO SERVIDOR", "CLOUD: NO ANSWER FROM THE SERVER"), 240);
+			return;
+		}
+		CoreSetToast(Tr("ABRINDO NAVEGADOR PARA LOGIN GOOGLE...", "OPENING BROWSER FOR GOOGLE LOGIN..."), 180);
 		std::string acc_tok, ref_tok;
 		const CloudLoginResult result = CloudBrowserLogin(g_client_id,
 			"https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.appdata"

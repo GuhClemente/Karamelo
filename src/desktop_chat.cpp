@@ -131,10 +131,47 @@ std::string DesktopChatSanitizeText(const std::string &raw_text,
     if (out.size() >= max_len)
       break;
   }
+  // Cutting by bytes can leave half of an accented letter at the end.
+  size_t lead = out.size();
+  while (lead > 0 && ((unsigned char)out[lead - 1] & 0xC0) == 0x80)
+    lead--;
+  if (lead > 0) {
+    const unsigned char first = (unsigned char)out[lead - 1];
+    const size_t need = first >= 0xF0 ? 4 : first >= 0xE0 ? 3 : first >= 0xC0 ? 2 : 1;
+    if (out.size() - (lead - 1) < need)
+      out.resize(lead - 1);
+  }
   while (!out.empty() && out.front() == ' ')
     out.erase(out.begin());
   while (!out.empty() && out.back() == ' ')
     out.pop_back();
+  return out;
+}
+
+std::string DesktopChatToFontText(const std::string &utf8) {
+  // U+00C0 to U+00FF, each by the letter it is based on.
+  static const char kLatin1[] = "AAAAAAACEEEEIIIIDNOOOOOxOUUUUYTs"
+                                "aaaaaaaceeeeiiiidnooooo/ouuuuyty";
+  std::string out;
+  out.reserve(utf8.size());
+  for (size_t i = 0; i < utf8.size();) {
+    const unsigned char c = (unsigned char)utf8[i];
+    if (c < 0x80) {
+      out.push_back((char)c);
+      i++;
+      continue;
+    }
+    if (c < 0xC0) { // half of a letter, from a cut elsewhere
+      i++;
+      continue;
+    }
+    const size_t len = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : 2;
+    if (i + len > utf8.size())
+      break;
+    const unsigned code = len == 2 ? ((c & 0x1Fu) << 6) | ((unsigned char)utf8[i + 1] & 0x3Fu) : 0;
+    out.push_back(code >= 0xC0 && code <= 0xFF ? kLatin1[code - 0xC0] : '?');
+    i += len;
+  }
   return out;
 }
 
@@ -1301,8 +1338,8 @@ static void InternetRunJob(const InternetJob& job) {
     return;
   }
   if (job.kind == INET_JOB_INVITE && status == 200) {
-    ChatSystemNote(Tr("Convite enviado. Para alguem de fora da sua rede entrar, a porta 55435 (UDP) precisa estar aberta no seu roteador. Seu IP so vai para quem aceitar.",
-                      "Invite sent. For someone outside your network to join, port 55435 (UDP) must be open on your router. Your IP only goes to whoever accepts."));
+    ChatSystemNote(Tr("Convite enviado. Para alguem de fora da sua rede entrar, a porta 55435 (TCP) precisa estar aberta no seu roteador. Seu IP so vai para quem aceitar.",
+                      "Invite sent. For someone outside your network to join, port 55435 (TCP) must be open on your router. Your IP only goes to whoever accepts."));
   } else if (job.kind == INET_JOB_REPORT) {
     ChatSystemNote(status == 200 ? Tr("Denuncia enviada. Obrigado.", "Report sent. Thank you.")
                                  : Tr("Nao achei mensagens desse jogador nesta sala.", "No messages from that player in this room."));
@@ -1670,6 +1707,12 @@ static bool InternetCommand(const std::string& in) {
       ChatSystemNote(Tr("Denuncia so vale nas salas da internet. Digite /entrar.", "Reports only work in the internet rooms. Type /login."));
     else
       InternetEnqueue(INET_JOB_REPORT, g_current_room.load(), tag);
+    return true;
+  }
+  // A mistyped command must not end up in a public room.
+  if (in[0] == '/') {
+    ChatSystemNote(Tr("Comando desconhecido ou sem o nome. Use /entrar, /sair, /nome Fulano, /ignorar Nome#ABC123 ou /denunciar Nome#ABC123.",
+                      "Unknown command or missing name. Use /login, /logout, /name Someone, /ignore Name#ABC123 or /report Name#ABC123."));
     return true;
   }
   return false;
@@ -2521,6 +2564,10 @@ void DesktopChatShowWindowSdl() {
       g_chat_sdl_tex = SDL_CreateTexture(
           g_chat_sdl_ren, SDL_PIXELFORMAT_ARGB8888,
           SDL_TEXTUREACCESS_STREAMING, g_chat_sdl_w, g_chat_sdl_h);
+      // The canvas is opaque, but its drawing leaves alpha at 0: blending it would
+      // show whatever was on the screen behind it.
+      if (g_chat_sdl_tex)
+        SDL_SetTextureBlendMode(g_chat_sdl_tex, SDL_BLENDMODE_NONE);
       g_chat_sdl_pixels.assign(g_chat_sdl_w * g_chat_sdl_h, 0xFF171A21u);
     }
   }
@@ -2602,7 +2649,12 @@ void DesktopChatProcessSdlEvent(const void* raw_event) {
           DesktopChatSubmitInput(to_send.c_str());
         }
       } else if (event->key.scancode == SDL_SCANCODE_BACKSPACE) {
-        if (!g_input_text.empty()) g_input_text.pop_back();
+        // One letter may be several bytes: taking one would leave half of it.
+        while (!g_input_text.empty()) {
+          const unsigned char c = (unsigned char)g_input_text.back();
+          g_input_text.pop_back();
+          if ((c & 0xC0) != 0x80) break;
+        }
       } else if (event->key.scancode == SDL_SCANCODE_ESCAPE) {
         DesktopChatHideWindowSdl();
       }
@@ -2637,6 +2689,7 @@ void DesktopChatRenderSdlWindow() {
       SDL_Texture *tex = SDL_CreateTexture(g_chat_sdl_ren, SDL_PIXELFORMAT_ARGB8888,
                                            SDL_TEXTUREACCESS_STREAMING, canvas_w, canvas_h);
       if (tex) {
+        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_NONE);
         SDL_DestroyTexture(g_chat_sdl_tex);
         g_chat_sdl_tex = tex;
         g_chat_sdl_w = canvas_w;
@@ -2727,7 +2780,7 @@ void DesktopChatRenderSdlWindow() {
   std::vector<ChatLine> lines;
   for (const auto& m : msgs) {
     lines.push_back({m.sender, !m.game_challenge.empty() ? 0x0057F287u : 0x0066C0F4u});
-    std::string rest = m.text;
+    std::string rest = DesktopChatToFontText(m.text);
     while (!rest.empty()) {
       size_t take = rest.size();
       if ((int)take > columns) {
@@ -2756,6 +2809,10 @@ void DesktopChatRenderSdlWindow() {
   DrawOverlayText8x8(g_chat_sdl_pixels.data(), g_chat_sdl_w, g_chat_sdl_h, g_chat_sdl_w - 78, g_chat_sdl_h - 35, "ENVIAR", 0x00FFFFFFu);
 
   SDL_UpdateTexture(g_chat_sdl_tex, NULL, g_chat_sdl_pixels.data(), g_chat_sdl_w * sizeof(uint32_t));
+  // A Retina window has twice the pixels of its size: the canvas must fill all of them.
+  SDL_SetRenderLogicalPresentation(g_chat_sdl_ren, g_chat_sdl_w, g_chat_sdl_h, SDL_LOGICAL_PRESENTATION_STRETCH);
+  SDL_SetRenderDrawColor(g_chat_sdl_ren, 0x17, 0x1A, 0x21, 0xFF);
+  SDL_RenderClear(g_chat_sdl_ren);
   SDL_RenderTexture(g_chat_sdl_ren, g_chat_sdl_tex, NULL, NULL);
   SDL_RenderPresent(g_chat_sdl_ren);
 }
@@ -2982,8 +3039,10 @@ static void DrawOverlayText8x8(uint32_t *fb, int fb_w, int fb_h, int px, int py,
                                const char *text, uint32_t color) {
   if (!text)
     return;
+  // The 8x8 font stops at ASCII: anything else would come out as a blank.
+  const std::string drawn = DesktopChatToFontText(text);
   int cur_x = px;
-  for (const unsigned char *p = (const unsigned char *)text; *p; ++p) {
+  for (const unsigned char *p = (const unsigned char *)drawn.c_str(); *p; ++p) {
     if (cur_x + 8 > fb_w)
       break;
     const unsigned char *glyph = charfont[*p];

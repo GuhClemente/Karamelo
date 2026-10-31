@@ -1295,6 +1295,8 @@ int main(int argc, char* argv[])
 	TrayManagerInit(nullptr);
 	if (argc > 1 && strcmp(argv[1], "--chat") == 0)
 		DesktopChatShowWindow();
+	if (argc > 1 && strcmp(argv[1], "--cloud-login") == 0)
+		CloudSyncStartOAuthFlow();
 
 	double display_fps = 60.0;
 	SDL_DisplayID display_id = SDL_GetDisplayForWindow(g_window);
