@@ -1088,6 +1088,7 @@ void PopulateShaderList();
 void PopulateDiagnostics();
 void PopulateManageSystems();
 static MenuState shader_list_previous_state = STATE_VIDEO;
+static MenuState controller_previous_state = STATE_SETTINGS;
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
 static int neo_bios = 0;         // 0: Original, 1: UniBIOS
@@ -1403,8 +1404,10 @@ void PopulateMainMenu() {
     PopulateSystemsMenu();
   }
 
-  selected_idx = 0;
-  scroll_top = 0;
+  if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+    selected_idx = 0;
+    scroll_top = 0;
+  }
 }
 
 // Thread-safe task queue for operations dispatched from background threads (e.g. Web Studio)
@@ -1809,8 +1812,10 @@ void PopulateSettings() {
   items.push_back({Tr("Sobre", "About"), ">", false, true, 205});
   items.push_back({Tr("Restaurar Padroes", "Restore Defaults"), ">", false, true, 210});
 
-  selected_idx = 0;
-  scroll_top = 0;
+  if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+    selected_idx = 0;
+    scroll_top = 0;
+  }
 }
 
 void PopulateCloudSettings() {
@@ -1917,8 +1922,10 @@ void PopulateDiagnostics() {
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
 
-  selected_idx = 0;
-  scroll_top = 0;
+  if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+    selected_idx = 0;
+    scroll_top = 0;
+  }
 }
 
 void PopulateResetConfirm() {
@@ -1949,10 +1956,14 @@ static void SelectByAction(int action_id, int fallback_idx) {
   for (size_t i = 0; i < items.size(); i++) {
     if (action_id != 0 && items[i].action_id == action_id) {
       selected_idx = (int)i;
+      if (selected_idx < scroll_top) scroll_top = selected_idx;
+      int max_visible = 12;
+      if (selected_idx >= scroll_top + max_visible) scroll_top = selected_idx - max_visible + 1;
       return;
     }
   }
   selected_idx = fallback_idx;
+  if (selected_idx < scroll_top) scroll_top = selected_idx;
 }
 
 void PopulateVideoSettings() {
@@ -2016,8 +2027,10 @@ void PopulateVideoSettings() {
     snprintf(scroll_lbl, sizeof(scroll_lbl), "%ds", kScrollDelays[setting_name_scroll]);
   items.push_back({Tr("Rolagem Nome", "Name Scroll"), scroll_lbl, false, false, 313});
 
-  selected_idx = 0;
-  scroll_top = 0;
+  if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+    selected_idx = 0;
+    scroll_top = 0;
+  }
 }
 
 void PopulateShaderList() {
@@ -2156,8 +2169,10 @@ void PopulateCoreOptionsSettings() {
   items.push_back({Tr("Voltar", "Back"), "", false, true, 898});
 
   OsdSetSize((int)items.size());
-  selected_idx = 0;
-  scroll_top = 0;
+  if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+    selected_idx = 0;
+    scroll_top = 0;
+  }
 }
 
 void PopulateNetplay() {
@@ -2804,9 +2819,13 @@ static void BrowseGoUp() {
       (lower_parent.find("roms") == std::string::npos && lower_parent.find("ports") == std::string::npos)) {
     current_state = STATE_MAIN;
     PopulateMainMenu();
-    selected_idx = CoreIsRunning() ? 0 : main_menu_saved_idx;
-    if (selected_idx < 0 || selected_idx >= (int)items.size())
-      selected_idx = 0;
+    if (CoreIsRunning()) {
+      SelectByAction(1, 0);
+    } else {
+      selected_idx = main_menu_saved_idx;
+      if (selected_idx < 0 || selected_idx >= (int)items.size())
+        selected_idx = 0;
+    }
     return;
   }
 
@@ -3624,13 +3643,122 @@ void MenuRun() {
   }
 }
 
+static void MenuGoBack() {
+  if (capture_bind >= 0 || wizard_active) {
+    wizard_active = false;
+    capture_bind = -1;
+    PopulateControllerSettings();
+    CoreSetToast(Tr("CONFIGURACAO CANCELADA", "SETUP CANCELLED"), 90);
+    return;
+  }
+
+  if (current_state == STATE_BROWSE) {
+    BrowseGoUp();
+  } else if (current_state == STATE_SYSTEMS) {
+    if (CoreIsRunning()) {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
+      SelectByAction(195, 1); // "Navegar Sistemas"
+    }
+  } else if (current_state == STATE_MAIN) {
+    if (CoreIsRunning()) {
+      current_state = STATE_SYSTEMS;
+      PopulateSystemsMenu();
+      selected_idx = 0;
+      scroll_top = 0;
+    }
+  } else if (current_state == STATE_FAVORITES || current_state == STATE_RECENT) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    SelectByAction(current_state == STATE_FAVORITES ? 190 : 191, 0);
+  } else if (current_state == STATE_ABOUT_CORES) {
+    current_state = STATE_ABOUT;
+    PopulateAbout();
+    SelectByAction(209, 6); // linha "Cores" na About, de onde se veio
+  } else if (current_state == STATE_RESET_CONFIRM) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(210, 6); // "Restaurar Padroes", de onde se veio
+  } else if (current_state == STATE_SHADER_LIST) {
+    current_state = shader_list_previous_state;
+    if (current_state == STATE_MAIN) {
+      PopulateMainMenu();
+      SelectByAction(302, 4);
+    } else {
+      PopulateVideoSettings();
+      SelectByAction(302, 1);
+    }
+  } else if (current_state == STATE_SAVESTATES) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    SelectByAction(4, 10);
+  } else if (current_state == STATE_CORE_OPTIONS) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    SelectByAction(221, 5);
+  } else if (current_state == STATE_CONTROLLER) {
+    current_state = controller_previous_state;
+    if (current_state == STATE_MAIN) {
+      PopulateMainMenu();
+      SelectByAction(203, 11);
+    } else {
+      PopulateSettings();
+      SelectByAction(203, 3);
+    }
+  } else if (current_state == STATE_VIDEO) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(201, 0);
+  } else if (current_state == STATE_AUDIO) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(202, 1);
+  } else if (current_state == STATE_NETPLAY) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(204, 4);
+  } else if (current_state == STATE_ABOUT) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(205, 5);
+  } else if (current_state == STATE_DIAGNOSTICS) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(220, 10);
+  } else if (current_state == STATE_CLOUD) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(217, 7);
+  } else if (current_state == STATE_WEB_ADMIN) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(219, 9);
+  } else if (current_state == STATE_LIVE_CHAT) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(218, 8);
+  } else if (current_state == STATE_MANAGE_SYSTEMS) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(225, 11);
+  } else if (current_state == STATE_UPDATE) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    SelectByAction(30, main_menu_saved_idx);
+  } else if (current_state == STATE_SETTINGS) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    SelectByAction(20, main_menu_saved_idx);
+  }
+}
+
 static void MenuProcessKeyImpl(MenuKey key) {
   g_last_input_tick = TickCountMs();
 
   // While waiting for a key to bind, the menu must not also act on it,
   // except for KEY_CANCEL (ESC) which aborts the capture / wizard.
   if (capture_bind >= 0) {
-    if (key == KEY_CANCEL) {
+    if (key == KEY_CANCEL || key == KEY_BACKSPACE) {
       wizard_active = false;
       capture_bind = -1;
       PopulateControllerSettings();
@@ -3646,8 +3774,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       OsdEnable(0);
       s_scroll_since = TickCountMs();
       s_title_scroll_since = TickCountMs();
-      if (items.empty() || current_state == STATE_MAIN ||
-          (CoreIsRunning() && (current_state == STATE_BROWSE || current_state == STATE_SYSTEMS))) {
+      if (items.empty()) {
         current_state = STATE_MAIN;
         PopulateMainMenu();
         selected_idx = 0;
@@ -4165,17 +4292,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
       MenuRequestQuit();
     } else if (item.action_id == 997) // Back from Cores List -> About
     {
-      current_state = STATE_ABOUT;
-      PopulateAbout();
-      SelectByAction(209, 6); // linha "Cores" na About, de onde se veio
+      MenuGoBack();
     } else if (item.action_id == 999) // Back
     {
-      current_state = STATE_SETTINGS;
-      PopulateSettings();
+      MenuGoBack();
     } else if (item.action_id == 898) // Back (Core Options -> in-game menu, not Settings)
     {
-      current_state = STATE_MAIN;
-      PopulateMainMenu();
+      MenuGoBack();
     } else if (current_state == STATE_MAIN || current_state == STATE_SYSTEMS) {
       if (item.action_id == 195) // Browse Systems
       {
@@ -4185,10 +4308,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         scroll_top = 0;
       } else if (item.action_id == 196) // Back to Core
       {
-        current_state = STATE_MAIN;
-        PopulateMainMenu();
-        selected_idx = 0;
-        scroll_top = 0;
+        MenuGoBack();
       } else if (item.action_id == 1) // Load another game from the same folder
       {
         // The row is labelled "Load" and shows the game name, but it used to
@@ -4405,12 +4525,17 @@ static void MenuProcessKeyImpl(MenuKey key) {
       // "Define Buttons" is on the in-game menu, but its handler only existed
       // under STATE_SETTINGS, so pressing it there did nothing at all.
       else if (item.action_id == 203) {
+        controller_previous_state = STATE_MAIN;
         current_state = STATE_CONTROLLER;
         ControllerPageOnEnter();
         PopulateControllerSettings();
+        selected_idx = 1;
+        scroll_top = 0;
       }
       else if (item.action_id == 221) {
         current_state = STATE_CORE_OPTIONS;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateCoreOptionsSettings();
       }
     } else if (current_state == STATE_SETTINGS) {
@@ -4426,34 +4551,55 @@ static void MenuProcessKeyImpl(MenuKey key) {
         SelectByAction(216, 0);
       } else if (item.action_id == 201) {
         current_state = STATE_VIDEO;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateVideoSettings();
       } else if (item.action_id == 202) {
         current_state = STATE_AUDIO;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateAudioSettings();
       } else if (item.action_id == 203) {
+        controller_previous_state = STATE_SETTINGS;
         current_state = STATE_CONTROLLER;
         ControllerPageOnEnter();
         PopulateControllerSettings();
+        selected_idx = 1;
+        scroll_top = 0;
       } else if (item.action_id == 204) {
         current_state = STATE_NETPLAY;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateNetplay();
       } else if (item.action_id == 217) {
         current_state = STATE_CLOUD;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateCloudSettings();
       } else if (item.action_id == 218) {
         current_state = STATE_LIVE_CHAT;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateLiveChatSettings();
       } else if (item.action_id == 219) {
         current_state = STATE_WEB_ADMIN;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateWebAdminSettings();
       } else if (item.action_id == 206) {
         current_state = STATE_ABOUT;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateRetroAchievements();
       } else if (item.action_id == 205) {
         current_state = STATE_ABOUT;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateAbout();
       } else if (item.action_id == 215) {
         current_state = STATE_DIAGNOSTICS;
+        selected_idx = 0;
+        scroll_top = 0;
         PopulateDiagnostics();
       } else if (item.action_id == 210) {
         current_state = STATE_RESET_CONFIRM;
@@ -4643,8 +4789,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
           PopulateSaveStates();
         }
       } else if (item.action_id == 899) {
-        current_state = STATE_MAIN;
-        PopulateMainMenu();
+        MenuGoBack();
       }
     } else if (current_state == STATE_SHADER_LIST) {
       if (item.action_id >= 650 && item.action_id < 650 + kFilterCount) {
@@ -4862,60 +5007,20 @@ static void MenuProcessKeyImpl(MenuKey key) {
     }
     break;
   }
+  case KEY_BACKSPACE:
+    MenuGoBack();
+    break;
+
   case KEY_CANCEL:
-    if (current_state == STATE_BROWSE) {
-      BrowseGoUp();
-    } else if (current_state == STATE_SYSTEMS) {
-      current_state = STATE_MAIN;
-      PopulateMainMenu();
-      selected_idx = 0;
-      scroll_top = 0;
-    } else if (current_state == STATE_FAVORITES || current_state == STATE_RECENT) {
-      current_state = STATE_MAIN;
-      PopulateMainMenu();
-      selected_idx = CoreIsRunning() ? 0 : main_menu_saved_idx;
-    } else if (current_state == STATE_ABOUT_CORES) {
-      current_state = STATE_ABOUT;
-      PopulateAbout();
-      SelectByAction(209, 6); // linha "Cores" na About, de onde se veio
-    } else if (current_state == STATE_RESET_CONFIRM) {
-      current_state = STATE_SETTINGS;
-      PopulateSettings();
-      SelectByAction(210, 6); // "Restaurar Padroes", de onde se veio
-    } else if (current_state == STATE_SHADER_LIST) {
-      current_state = shader_list_previous_state;
-      if (current_state == STATE_MAIN)
-        PopulateMainMenu();
-      else
-        PopulateVideoSettings();
-    } else if (current_state == STATE_SAVESTATES) {
-      current_state = STATE_MAIN;
-      PopulateMainMenu();
-    } else if (current_state == STATE_CONTROLLER && wizard_active) {
+    if (capture_bind >= 0 || wizard_active) {
       wizard_active = false;
       capture_bind = -1;
       PopulateControllerSettings();
       CoreSetToast(Tr("CONFIGURACAO CANCELADA", "SETUP CANCELLED"), 90);
-    } else if (current_state == STATE_VIDEO || current_state == STATE_AUDIO ||
-               current_state == STATE_CONTROLLER ||
-               current_state == STATE_NETPLAY || current_state == STATE_ABOUT ||
-               current_state == STATE_DIAGNOSTICS ||
-               current_state == STATE_CLOUD ||
-               current_state == STATE_WEB_ADMIN ||
-               current_state == STATE_LIVE_CHAT ||
-               current_state == STATE_MANAGE_SYSTEMS) {
-      current_state = STATE_SETTINGS;
-      PopulateSettings();
-    } else if (current_state == STATE_UPDATE) {
-      current_state = STATE_MAIN;
-      PopulateMainMenu();
-      selected_idx = main_menu_saved_idx;
-    } else if (current_state == STATE_SETTINGS) {
-      current_state = STATE_MAIN;
-      PopulateMainMenu();
-      selected_idx = main_menu_saved_idx;
     } else if (CoreIsRunning()) {
       OsdDisable();
+    } else {
+      MenuGoBack();
     }
     break;
 

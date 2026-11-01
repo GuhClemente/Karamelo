@@ -3204,7 +3204,8 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 				else if (param == "left") g_hooks.process_key(KEY_LEFT);
 				else if (param == "right") g_hooks.process_key(KEY_RIGHT);
 				else if (param == "enter" || param == "select") g_hooks.process_key(KEY_SELECT);
-				else if (param == "back") g_hooks.process_key(KEY_CANCEL);
+				else if (param == "back") g_hooks.process_key(KEY_BACKSPACE);
+				else if (param == "cancel" || param == "esc") g_hooks.process_key(KEY_CANCEL);
 				else if (param == "menu") g_hooks.process_key(KEY_MENU_TOGGLE);
 			}
 		}
