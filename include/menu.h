@@ -48,6 +48,8 @@ int  MenuGetWallpaperMode();
 int  MenuGetWallpaperCustomCount();
 const char* MenuGetWallpaperCustomPath(int index);
 int  MenuGetOsdTheme();
+int  MenuGetPadMenuToggle();
+void MenuSetPadMenuToggle(int mode);
 bool MenuGetFullscreen();
 void MenuSetFullscreen(bool fs);
 // Windowed-mode position/size, persisted across restarts. Get returns false

@@ -28,6 +28,7 @@ union SDL_Event;
 // slot XInput used, so a player who unplugs/replugs may land on a different
 // index than before. Same behavior SDL itself has everywhere else.
 bool GamepadGetState(int slot, XINPUT_STATE* out_state);
+bool GamepadGetGuideButton(int slot);
 
 // Input self-test (--core-selftest ... --input-probe): with a state set, `slot`
 // reports exactly that and every other slot reads as disconnected, so a real

@@ -212,6 +212,31 @@ bool GamepadGetState(int slot, XINPUT_STATE* out_state)
 	return true;
 }
 
+bool GamepadGetGuideButton(int slot)
+{
+	if (slot < 0 || slot >= 4) return false;
+
+	AcquireSRWLockShared(&s_probe_lock);
+	if (s_probe_on)
+	{
+		ReleaseSRWLockShared(&s_probe_lock);
+		return false;
+	}
+	ReleaseSRWLockShared(&s_probe_lock);
+
+	AcquireSRWLockShared(&s_pads_lock);
+	SDL_Gamepad* gp = s_pads[slot];
+	bool pressed = false;
+	if (gp)
+	{
+		pressed = SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_GUIDE) ||
+		          SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_MISC1) ||
+		          SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_TOUCHPAD);
+	}
+	ReleaseSRWLockShared(&s_pads_lock);
+	return pressed;
+}
+
 const char* GamepadGetDeviceName(int slot)
 {
 	if (slot < 0 || slot >= 4) return nullptr;

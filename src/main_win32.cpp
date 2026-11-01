@@ -1124,11 +1124,48 @@ static void PollGamepad()
 		WORD wPressed = wButtons & ~(s_prev_pad_buttons | settling_buttons);
 		s_prev_pad_buttons = wButtons;
 
+		bool guide_now = false;
+		for (int slot = 0; slot < 4; slot++)
+		{
+			if (GamepadGetGuideButton(slot)) guide_now = true;
+		}
+		static bool s_prev_guide = false;
+		bool guide_pressed = guide_now && !s_prev_guide;
+		s_prev_guide = guide_now;
+		if (settling_buttons != 0) guide_pressed = false;
+
+		int toggle_mode = MenuGetPadMenuToggle();
+		bool trigger_toggle = false;
+		if ((toggle_mode == 0 || toggle_mode == 2) && guide_pressed)
+		{
+			trigger_toggle = true;
+		}
+		if ((toggle_mode == 0 || toggle_mode == 1) &&
+		    (wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
+		{
+			if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
+			{
+				trigger_toggle = true;
+			}
+		}
+		if (toggle_mode == 3 &&
+		    (wButtons & XINPUT_GAMEPAD_LEFT_THUMB) && (wButtons & XINPUT_GAMEPAD_RIGHT_THUMB))
+		{
+			if ((wPressed & (XINPUT_GAMEPAD_LEFT_THUMB | XINPUT_GAMEPAD_RIGHT_THUMB)) != 0)
+			{
+				trigger_toggle = true;
+			}
+		}
+
 		if (osd_now)
 		{
 			// Menu Navigation:
 			// Action buttons (Edge-triggered on press down only, never repeating while held)
-			if (wPressed & (XINPUT_GAMEPAD_A | XINPUT_GAMEPAD_X))
+			if (trigger_toggle || (wPressed & XINPUT_GAMEPAD_START))
+			{
+				MenuProcessKey(KEY_MENU_TOGGLE);
+			}
+			else if (wPressed & (XINPUT_GAMEPAD_A | XINPUT_GAMEPAD_X))
 			{
 				MenuProcessKey(KEY_SELECT);
 			}
@@ -1139,10 +1176,6 @@ static void PollGamepad()
 			else if (wPressed & XINPUT_GAMEPAD_Y)
 			{
 				MenuProcessKey(KEY_INFO);
-			}
-			else if (wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK))
-			{
-				MenuProcessKey(KEY_MENU_TOGGLE);
 			}
 
 			// Directional navigation (D-Pad and Left Analog Stick)
@@ -1188,24 +1221,17 @@ static void PollGamepad()
 			{
 				CoreLoadState(CoreGetSelectedSlot());
 			}
-			// Toggle OSD with Start+Select
-			else if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
+			else if (trigger_toggle)
 			{
-				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
-				{
-					MenuProcessKey(KEY_MENU_TOGGLE);
-				}
+				MenuProcessKey(KEY_MENU_TOGGLE);
 			}
 		}
 		else
 		{
-			// Dashboard with menu hidden: Start+Select toggles menu back on
-			if ((wButtons & XINPUT_GAMEPAD_START) && (wButtons & XINPUT_GAMEPAD_BACK))
+			// Dashboard with menu hidden: toggle menu back on
+			if (trigger_toggle)
 			{
-				if ((wPressed & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK)) != 0)
-				{
-					MenuProcessKey(KEY_MENU_TOGGLE);
-				}
+				MenuProcessKey(KEY_MENU_TOGGLE);
 			}
 		}
 	}
