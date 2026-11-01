@@ -3716,9 +3716,10 @@ static void MenuGoBack() {
       scroll_top = 0;
     }
   } else if (current_state == STATE_FAVORITES || current_state == STATE_RECENT) {
+    const int came_from = (current_state == STATE_FAVORITES) ? 190 : 191;
     current_state = STATE_MAIN;
     PopulateMainMenu();
-    SelectByAction(current_state == STATE_FAVORITES ? 190 : 191, 0);
+    SelectByAction(came_from, 0);
   } else if (current_state == STATE_ABOUT_CORES) {
     current_state = STATE_ABOUT;
     PopulateAbout();

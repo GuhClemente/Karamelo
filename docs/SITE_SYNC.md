@@ -2155,61 +2155,42 @@ A única pasta oficial e suportada da BIOS do FM Towns é **`bios/geartowns/`** 
 
 ---
 
-## 55. Adição de 01/11/2026 — Destaque Dedicado: Nintendo 64 no Karamelo (Vídeo, Áudio, Cores e Upscaling Horizontal Nativo)
+## 55. Adição de 01/11/2026 — Nintendo 64: áudio, motores e Upscale Horizontal
 
-Esta seção orienta a IA mantenedora do site `karamelo-emu.com` a montar uma página ou seção de destaque dedicada à experiência do **Nintendo 64 no Karamelo**.
+Conteúdo para a página do Nintendo 64. Publique só o que está aqui: os números foram medidos, e o que não foi medido está marcado.
 
-### 1. Resumo da Proposta de Valor
-O Nintendo 64 no Karamelo entrega a experiência definitiva do console de 64 bits em computadores modernos:
-- **Desempenho 100% Liso**: 60 FPS contínuos, sem engasgos nem micro-stuttering, com frametime baixíssimo (1.7 ms a 2.8 ms) processado via Vulkan Compute Shaders nativos na GPU.
-- **Áudio Cristalino e Sincronizado**: O resampler do frontend acompanha dinamicamente a taxa de amostragem do hardware (registrador `AI_DACRATE_REG`), eliminando estalos (*pops*), ruídos e *underruns* mesmo em transições bruscas de jogabilidade (ex.: ao entrar na corrida em *Wave Race 64*).
-- **Três Motores de Classe Mundial**: Gopher64 (Rust + Vulkan de última geração), Mupen64Plus-Next (maduro, compatibilidade abrangente e texturas HD) e ParaLLEl N64 (Angrylion / baixo nível).
-- **Upscaling Horizontal Nativo (2x e 4x)**: A maior novidade visual para N64! Não é um filtro de pós-processamento: a geometria 3D e as texturas são rasterizadas com o dobro (640x240) ou o quádruplo (1280x240) de resolução horizontal real na GPU, enquanto **preserva rigorosamente as 240 linhas verticais (240p)**. O resultado: corte de polígonos ultra nítido, sem o visual serrilhado de 320 colunas, com suporte 1:1 perfeito aos filtros de Scanlines CRT de tubo sem qualquer moiré ou entrelaçamento 480i!
+**Contagens inalteradas:** 37 sistemas e 42 motores.
 
-### 2. Os Três Motores de N64 do Karamelo
-Não invente contagens (a contagem oficial permanece em 37 sistemas e 42 motores em `include/app_info.h`). Para o Nintendo 64, o jogador pode alternar livremente entre três motores especializados:
-1. **Gopher64 (`n64_gopher.dll`)**:
-   - Escrito do zero em Rust, com renderizador Vulkan Parallel-RDP integrado.
-   - Suporte exclusivo ao novo motor de **Upscaling Horizontal Nativo (2x e 4x)**.
-   - Gerenciamento dinâmico de frequência de áudio e alta fidelidade de baixo nível.
-2. **Mupen64Plus-Next (`n64_mupen.dll`)**:
-   - Motor consagrado com suporte a GLideN64, alta compatibilidade com todo o catálogo de ROMs, pacotes de texturas de alta definição (HD packs) e widescreen anamórfico.
-3. **ParaLLEl N64 (`n64_parallel.dll`)**:
-   - Motor de emulação ciclo a ciclo e precisão de baixo nível com Angrylion e Parallel-RDP tradicional.
+### Motores
 
-### 3. Upscaling Horizontal Nativo: Como Funciona e Por que é Único?
-No Nintendo 64 real, a RDP rasteriza os polígonos em spans horizontais e a VI (Video Interface) processa uma linha analógica com largura de amostragem de até 640 subpixels.
-- **O erro do upscaling comum de emuladores**: Ao subir tudo para 1080p ou 4K, perde-se a estrutura de 240 linhas (240p), os shaders CRT quebram e os elementos 2D (HUDs, textos) ficam deformados.
-- **A abordagem do Karamelo**: O RDP gera **amostras geométricas horizontais reais** (640 ou 1280 pixels), mas mantém **240 linhas verticais**.
-  - Como explicou o desenvolvedor **Artur (@Vocetubeia)**, criador do Portal 64: *"A função Horizontal Upscaling não deveria ter esse nome, pois não se trata de simples upscaling. A resolução horizontal realmente aumenta de maneira nativa. Isso, somado ao ganho de desempenho, faz com que seja um verdadeiro 'N64 Pro'"*.
-  - O jogador escolhe no menu OSD em **Vídeo > Upscale Horiz**:
-    - **Desligado**: 320×240 (Nativo clássico de 1996).
-    - **2x (640)**: 640×240 nativo (dobro de definição horizontal, elimina o serrilhado grosso de 320 colunas, equivalente ao modo do console Analogue 3D).
-    - **4x (1280)**: 1280×240 Ultra nativo (supersampling 2x de RDP, quadruplicando a densidade horizontal mantendo as 240 linhas).
-  - **Fidelidade CRT 100% autêntica**: Compatível 1:1 com os shaders `Scanlines Leve` e `Sony Trinitron` do Karamelo. O feixe de 240 scanlines coincide perfeitamente com a grade da TV, sem o flicker do 480i entrelaçado.
+| motor | arquivo | nota |
+|---|---|---|
+| Gopher64 | `n64_gopher` | Rust com Parallel-RDP em Vulkan. Compilado pelo projeto; no pacote Linux ele não existe. Único com Upscale Horiz. |
+| Mupen64Plus-Next | `n64_mupen` | GLideN64. |
+| ParaLLEl N64 | `n64_parallel` | No Windows, Glide64 com aceleração ou Angrylion sem ela; no Linux, GLideN64 ou Angrylion. |
 
-### 4. Áudio Dinâmico de Baixa Latência
-No hardware original do N64, a frequência de áudio é programada em tempo de execução através do registrador `AI_DACRATE_REG`. Jogos como *Wave Race 64*, *Castlevania*, *Zelda* e *GoldenEye* alteram dinamicamente a taxa de áudio (ex.: de 32.000 Hz nas telas de abertura para 22.050 Hz durante a simulação de corrida e física da água).
-- O Karamelo conta com um **resampler contínuo e adaptativo** de estágio duplo:
-  - Rastreamento contínuo de frequência a cada 0.5s via relógio de alta precisão (QPC).
-  - Relock automático quando o core notifica mudança na taxa de amostragem.
-  - Zero underruns, zero estalos, zero dessincronia, áudio cristalino e fluido em WASAPI (Windows) e SDL3 áudio de baixa latência (Linux e macOS).
+### Upscale Horiz (só Gopher64)
 
-### 5. Guia de Implementação no Site (Layout, Imagens e Vídeos)
-A IA do site deve montar a seção com uma experiência visual rica e interativa:
-- **Hero / Chamada Principal**: "Nintendo 64 no Karamelo: 60 FPS, Áudio Sem Estalos e Upscaling Horizontal Nativo".
-- **Componente Slider Interativo (Antes e Depois)**:
-  - Comparação lado a lado: *Nativo (320×240)* vs *Upscaling Horizontal 2x (640×240)* vs *Modo Ultra (1280×240)*.
-  - Zooms 2x, 4x e 8x demonstrando a separação das ripas de madeira, geometria do Jet Ski de *Wave Race 64* e detalhes finos de textura.
-- **Demonstração em Vídeo**:
-  - Clipes curtos (formato MP4/WebM com reprodução automática em loop mudo):
-    - Vídeo 1: Jogabilidade fluida de *Wave Race 64* no modo Raw (geometria nítida a 60 FPS).
-    - Vídeo 2: Jogabilidade com shader CRT ativado, mostrando que as scanlines continuam intactas e orgânicas como num monitor de tubo profissional PVM/BVM.
-- **Card dos Três Cores**: Grade com ícones de Gopher64 (Vulkan/Rust), Mupen64Plus-Next e ParaLLEl N64 com seus pontos fortes.
-- **Depoimento / Citação Técnica**: Destaque para a análise do dev Artur (@Vocetubeia) explicando o porquê da resolução horizontal ser nativa e não apenas esticada por software.
+Fica em **Vídeo > Upscale Horiz**. Mantém 240 linhas, o que preserva o alinhamento dos filtros de scanline.
 
-### 6. O que NÃO publicar (Regras de Ouro)
-- **Não use nomes de marcas registradas de consoles de terceiros no menu**: O recurso chama-se **"Upscale Horiz"** ou **"Upscaling Horizontal Nativo"** no Karamelo.
-- **Não prometa 4K em 240p**: O objetivo deste modo é a preservação retrô e scanlines perfeitas (240p) com geometria horizontal expandida (até 1280 colunas). Para alta resolução tradicional em 1080p/4K, o motor indicado é o Mupen64Plus-Next.
-- **Não altere as contagens globais**: 37 sistemas e 42 motores no app.
+| opção | saída | o que acontece |
+|---|---|---|
+| Desligado | 320×240 | Saída do console reduzida à largura original. Jogo que desenha 640 de largura mantém os 640. |
+| 2x (640) | 640×240 | A saída de vídeo sem a redução. **Não desenha mais detalhe:** é o mesmo render do Desligado. |
+| 4x (1280) | 1280×240 | O RDP desenha em 2x nos dois eixos e a imagem é reduzida na vertical para 240 linhas. **É o único modo com geometria a mais**, e o ganho real é 2x, não 4x. Mudar exige reabrir o jogo. |
 
+Desempenho medido em um único PC, com Wave Race 64, só o core, sem o filtro de imagem: 132 quadros/s desligado, 159 no 2x e 70 no 4x. O 4x custa cerca de 14 ms por quadro de um total de 16,7 ms, então **não prometa 60 fps nele em qualquer PC**.
+
+Não escreva "geometria nativa em 640", "quádruplo de resolução" nem "não é filtro" para o modo 2x. Não use nome de produto de terceiros para descrever o recurso.
+
+Há uma citação de Artur (@Vocetubeia) circulando sobre o recurso. **Só publique com a fonte e a autorização dele**, e nunca como descrição do modo 2x.
+
+### Áudio
+
+Jogos de N64 mudam a taxa de áudio durante a partida: o Wave Race 64 alterna entre 32,1 e 30,1 kHz. Antes da 0.98 o Gopher64 não avisava essa troca e o som estalava. Agora ele avisa, e o Karamelo também percebe quando um core troca a taxa sem avisar.
+
+Medido na corrida do Wave Race 64, em 51 s por core, a 128 ms: nenhuma amostra de silêncio inserida nos três motores, com saída de áudio simulada. Numa partida real no Gopher64, 84 de 86 trechos ficaram sem falha.
+
+**Não publique** "zero estalos", "zero underruns", "áudio cristalino" nem "60 FPS contínuos": isso não foi medido em todos os jogos e PCs. Pode escrever que o som não estala mais quando o jogo troca a taxa, citando o Wave Race 64.
+
+**Latência** fica em **Áudio > Latência**: 64, 128, 256, 512 ou 1024 ms. O padrão é 128 ms.
