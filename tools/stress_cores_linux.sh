@@ -36,7 +36,7 @@ MAP=(
     "NES:nes:NES"                        "SNES:snes:SNES"                  "Genesis:genesis:Genesis"
     "MasterSystem:sms:MasterSystem"      "MegaCD:genesis:MegaCD"           "32X:32x:32X"
     "GameBoy:gb:GameBoy"                 "GBA:gba:GBA"                     "NDS:nds:NDS"
-    "N64-Parallel:n64_parallel:Nintendo64" "N64-Mupen:n64_mupen:Nintendo64" "N64-Generic:n64:Nintendo64"
+    "N64-Gopher:n64_gopher:Nintendo64"   "N64-Parallel:n64_parallel:Nintendo64" "N64-Mupen:n64_mupen:Nintendo64" "N64-Generic:n64:Nintendo64"
     "PlayStation:psx:PlayStation"        "Saturn:saturn:Saturn"            "Dreamcast:dreamcast:Dreamcast"
     "TurboGrafx16:pce:TurboGrafx16"      "NeoGeo:neogeo:NeoGeo"            "NeoGeo-CD:neocd_alt:NeoGeo"
     "MSX:msx:MSX"                        "Amiga:amiga:Amiga"               "C64:c64:C64"

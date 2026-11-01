@@ -1029,6 +1029,8 @@ int main(int argc, char* argv[])
 
 		// Same parsing as main_win32.cpp: "--driver N" is taken out of the
 		// positional list instead of being read as the recovery-check pair.
+		SDL_Init(SDL_INIT_AUDIO);
+
 		std::vector<const char*> pos;
 		bool input_probe = false;
 		int probe_delay_ms = 1500;

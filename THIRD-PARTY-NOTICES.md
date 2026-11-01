@@ -267,7 +267,8 @@ Texto completo em `third_party/Vulkan-Headers/LICENSE.md`.
 
 Este é o único caso de copyleft no projeto, e merece leitura atenta.
 
-O `cores/n64_gopher.dll` é compilado por `build_gopher64.bat` a partir do
+O `cores/n64_gopher` (`.dll`, `.so` ou `.dylib`) é compilado por `build_gopher64.bat`
+no Windows e `build_gopher64.sh` no Linux e no macOS, a partir do
 fonte em `third_party/gopher64/`, que é **GPL-3.0** — e nós **modificamos**
 esse fonte (a correção de alinhamento de RDRAM em `src/device/rdram.rs`,
 registrada também em `docs/patch-upstream-gopher64-rdram.patch`).

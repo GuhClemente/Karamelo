@@ -390,7 +390,7 @@ static ImageHandle create_message_image(Vulkan::Device &device, int width,
   return handle;
 }
 
-void rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
+bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
               size_t font_size, uint32_t save_state_slot) {
   memset(&rdp_device, 0, sizeof(RDP_DEVICE));
   memset(&callback, 0, sizeof(CALL_BACK));
@@ -400,7 +400,7 @@ void rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   bool result = SDL_AddEventWatch(sdl_event_filter, nullptr);
   if (!result) {
     LOGE("Could not add event watch.\n");
-    return;
+    return false;
   }
 
   gfx_info = _gfx_info;
@@ -430,18 +430,18 @@ void rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   if (!::Vulkan::Context::init_loader(
           (PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr())) {
     rdp_close();
-    return;
+    return false;
   }
   if (!wsi->init_simple(1, handles)) {
     rdp_close();
-    return;
+    return false;
   }
 
   rdp_new_processor();
 
   if (!processor->device_is_supported()) {
     rdp_close();
-    return;
+    return false;
   }
 
   message_font =
@@ -469,6 +469,8 @@ void rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   achievement_progress_indicator_image = Vulkan::ImageHandle();
   fps_image = Vulkan::ImageHandle();
   display_fps = false;
+
+  return true;
 }
 
 void rdp_close() {
@@ -964,7 +966,7 @@ uint64_t rdp_process_commands() {
       return interrupt_timer;
     } else {
       do {
-        offset &= 0xFFFFF8;
+        offset &= (gfx_info.RDRAM_SIZE - 1) & ~uint32_t(7);
         rdp_device.cmd_data[2 * rdp_device.cmd_ptr + 0] =
             *reinterpret_cast<const uint32_t *>(gfx_info.RDRAM + offset);
         rdp_device.cmd_data[2 * rdp_device.cmd_ptr + 1] =

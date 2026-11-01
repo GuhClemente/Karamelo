@@ -2165,7 +2165,7 @@ Conteúdo para a página do Nintendo 64. Publique só o que está aqui: os núme
 
 | motor | arquivo | nota |
 |---|---|---|
-| Gopher64 | `n64_gopher` | Rust com Parallel-RDP em Vulkan. Compilado pelo projeto; no pacote Linux ele não existe. Único com Upscale Horiz. |
+| Gopher64 | `n64_gopher` | Rust com Parallel-RDP em Vulkan. Compilado pelo projeto, no Windows e no Linux desde a 0.98. Único com Upscale Horiz. |
 | Mupen64Plus-Next | `n64_mupen` | GLideN64. |
 | ParaLLEl N64 | `n64_parallel` | No Windows, Glide64 com aceleração ou Angrylion sem ela; no Linux, GLideN64 ou Angrylion. |
 
@@ -2181,9 +2181,9 @@ Fica em **Vídeo > Upscale Horiz**. Mantém 240 linhas, o que preserva o alinham
 
 Desempenho medido em um único PC, com Wave Race 64, só o core, sem o filtro de imagem: 132 quadros/s desligado, 159 no 2x e 70 no 4x. O 4x custa cerca de 14 ms por quadro de um total de 16,7 ms, então **não prometa 60 fps nele em qualquer PC**.
 
-Não escreva "geometria nativa em 640", "quádruplo de resolução" nem "não é filtro" para o modo 2x. Não use nome de produto de terceiros para descrever o recurso.
+Não publique frametime de 1,7 a 2,8 ms (é o filtro de imagem, não o core), "ciclo a ciclo" nem lista de jogos que trocam a taxa: só o Wave Race 64 foi medido. Não escreva "geometria nativa em 640", "quádruplo de resolução" nem "não é filtro" para o modo 2x. Não use nome de produto de terceiros para descrever o recurso.
 
-Há uma citação de Artur (@Vocetubeia) circulando sobre o recurso. **Só publique com a fonte e a autorização dele**, e nunca como descrição do modo 2x.
+**A citação de Artur (@Vocetubeia) fala de outro produto, não do Karamelo. Não a use, nem resumida, nem como depoimento.**
 
 ### Áudio
 
