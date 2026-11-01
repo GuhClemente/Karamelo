@@ -1790,28 +1790,6 @@ static bool ParseCoreVariablesGuarded(const struct retro_variable* vars,
 	}
 }
 
-// Geartowns finds its ROMs in bios/geartowns/ or loose in bios/. It only reaches other
-// subfolders on Windows: on Linux and macOS a set in the bios/fmtowns/ this project used
-// to document failed to load. Whoever still has that folder gets a copy in the right
-// place, and nothing of theirs is removed.
-static void CopyFmTownsBiosToOfficialFolder(const std::string& sys_dir)
-{
-	static bool done = false;
-	if (done) return;
-	done = true;
-
-	std::error_code ec;
-	const fs::path from = fs::path(sys_dir) / "fmtowns";
-	const fs::path to = fs::path(sys_dir) / "geartowns";
-	if (!fs::is_directory(from, ec)) return;
-	fs::create_directories(to, ec);
-	for (const auto& entry : fs::directory_iterator(from, ec))
-	{
-		std::error_code one;
-		if (entry.is_regular_file(one))
-			fs::copy_file(entry.path(), to / entry.path().filename(), fs::copy_options::skip_existing, one);
-	}
-}
 
 static bool CB_Environment(unsigned cmd, void* data)
 {
@@ -1857,8 +1835,6 @@ static bool CB_Environment(unsigned cmd, void* data)
 					sys_dir = fs::absolute("bios").string();
 			}
 
-			if (s_loaded_core_path.find("fmtowns") != std::string::npos)
-				CopyFmTownsBiosToOfficialFolder(sys_dir);
 
 			// fMSX (msx.dll) retro_load_game runs a strrchr for '/' and '\\' on the
 			// system directory buffer and zeroes the last slash, assuming the frontend

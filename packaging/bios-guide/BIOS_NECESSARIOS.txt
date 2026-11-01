@@ -68,7 +68,9 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
     FMT_FNT.ROM        MD5 b91300e55b70227ce98b59c5f02fa8dd (256KB) ou a35ee3364f26b5270be7f3f185ef3577
     FMT_DIC.ROM        MD5 8fa4e553f28cfc0c30a0a1e589799942 ou e28e67838634891b8d6505417ec651db (524.288 bytes)
     FMT_F20.ROM        MD5 ac0c7021e9bf48ca84b51ab651169a88 ou 9559e2ab176041ec1eaae92795c6f671 [opcional - Kanji 20-dot]
-  Pasta: app/bios/geartowns/ (soltos em app/bios/ tambem funcionam)
+      fmtowns.zip        [presente - firmware MAME Model 1/2 para jogos que exigem esse modelo]
+    fmtmarty.zip       [presente - firmware FM Towns Marty]
+  Pasta: app/bios/geartowns/ (pasta canonica do core)
 
 [NEC PC-9801 / PC-9821] cores/pc98.dll (NP2kai)
   Status: PRESENTE E CONFERIDO (22/10) - Pacote oficial completo instalado em app/bios/np2kai/

@@ -1,6 +1,12 @@
 # 🕹️ Guia Oficial de BIOS e Arquivos de Sistema — Karamelo
 
-Este guia detalha **todos os arquivos de BIOS, firmwares, chaves criptográficas e assets de sistema** necessários ou recomendados para os **35 sistemas emulados nativamente** no **Karamelo**.
+> **Conferindo o que voce baixou:** `tools/check_bios.ps1` compara cada
+> arquivo com o MD5 esperado e reconhece ponteiro do Git LFS — o caso real em
+> que dois downloads "bem-sucedidos" tinham 131 bytes de texto no lugar da
+> ROM, e o sintoma foi um core que simplesmente nao abria nada.
+
+
+Este guia detalha **todos os arquivos de BIOS, firmwares, chaves criptográficas e assets de sistema** necessários ou recomendados para os **37 sistemas emulados nativamente** no **Karamelo**.
 
 ---
 
@@ -32,13 +38,13 @@ dos aparelhos que você possui, é com você.
 
 | Status | Significado | Sistemas |
 | :--- | :--- | :--- |
-| 🔴 **Obrigatória (Bloqueante)** | O sistema **não inicia nenhum jogo** sem esses arquivos. | 3DO, Atari 5200, Atari Lynx, PC-FX, ColecoVision, PS1, PS2, Saturn, Sega CD, PC Engine CD, NeoGeo CD, MSX. |
+| 🔴 **Obrigatória (Bloqueante)** | O sistema **não inicia nenhum jogo** sem esses arquivos (ou fica sem textos/fontes legíveis). | 3DO, Atari 5200, Atari Lynx, PC-FX, ColecoVision, PS1, PS2, Saturn, Sega CD, PC Engine CD, NeoGeo CD, MSX, FM Towns, PC-98. |
 | 🟡 **Recomendada / Parcial** | O emulador funciona via HLE, mas a BIOS real traz som autêntico, animação de boot e 100% de compatibilidade. | Nintendo DS, Dreamcast/Naomi, NeoGeo AES/MVS, PSP, GameCube, 3DS (chaves AES), Amiga. |
 | 🟢 **Zero Configuração** | O core **não precisa de nenhuma BIOS externa** (arquivos embutidos ou cycle-accurate sem ROM). | SNES, Genesis (cartucho), NES, Game Boy, Game Boy Color, Game Boy Advance, N64, 32X, Atari 2600, Atari Jaguar, Neo Geo Pocket, WonderSwan, DOSBox Pure, C64, ZX Spectrum. |
 
 ---
 
-## 📋 Tabela Mestra dos 35 Sistemas
+## 📋 Tabela Mestra dos 37 Sistemas
 
 ### 1. Sistemas com BIOS Obrigatória (Bloqueantes)
 
@@ -56,6 +62,8 @@ dos aparelhos que você possui, é com você.
 | **Atari 5200** | `atari5200.dll`<br>*(Atari800)* | `5200.rom`<br>`ATARIXL.ROM`<br>`ATARIBAS.ROM`<br>`ATARIOSA.ROM`<br>`ATARIOSB.ROM` | `281f20ea4320404ec820fb7ec0693b38`<br>`06daac977823773a3eea3422fd26a703`<br>`0bac0c6a50104045d902df4503a4c30b`<br>`eb1f32f5d9f382db1bbfb8d7f9cb343a`<br>`a3e8d617c95d08031fe1b20d541434b2` | `app/bios/` | Todos os 5 chips de sistema Atari OS/Basic. |
 | **Atari Lynx** | `lynx.dll`<br>*(Handy)* | `lynxboot.img` | `fcd403db69f54290b51035d82f835e7b` | `app/bios/` | Boot ROM de 512 bytes. |
 | **PC-FX** | `pcfx.dll`<br>*(Beetle PC-FX)* | `pcfx.rom` | `08e36edbea28a017f79f8d4f7ff9b6d7` | `app/bios/` | BIOS oficial NEC PC-FX. |
+| **Fujitsu FM Towns / Marty** | `fmtowns.dll`<br>*(Geartowns)* | `FMT_SYS.ROM`<br>`FMT_DOS.ROM`<br>`FMT_FNT.ROM`<br>`FMT_DIC.ROM`<br>`FMT_F20.ROM`<br>`fmtowns.zip`<br>`fmtmarty.zip` | `3a4f31cbf48737db6f2df8ef036ab7d4`<br>`fa0c98f5a6b0c61ee34f9a72138fc6b5`<br>`a35ee3364f26b5270be7f3f185ef3577`<br>`e28e67838634891b8d6505417ec651db`<br>`9559e2ab176041ec1eaae92795c6f671` | `app/bios/geartowns/` | Conjunto completo do Towns OS e firmwares MAME (Model 1/2 e Marty). |
+| **NEC PC-9801 / PC-9821** | `pc98.dll`<br>*(NP2kai)* | `font.bmp`<br>`bios.rom`<br>`itf.rom`<br>`sound.rom` | *(fonte bitmap)*<br>`a4fc2355403063f9cfb403f56b50eec3`<br>`185078a63503aa3ca8bb64b38d3ab16e`<br>`97800c7329524da5f6efb2e4d9c74567` | ⚠️ **`app/bios/np2kai/`** | **ATENÇÃO:** Deve ficar na subpasta `np2kai/`. `font.bmp` é indispensável para desenhar Kanji/Kana japoneses nos jogos. |
 
 ---
 
@@ -69,7 +77,7 @@ dos aparelhos que você possui, é com você.
 | **Sony PSP** | `psp.dll`<br>*(PPSSPP)* | Pasta **`PPSSPP/`** completa:<br>• Fontes (`flash0/font/*.pgf`, `Roboto`, `Inconsolata`)<br>• Sons de UI (`system/`)<br>• Shaders, `compat.ini`, `lang/` | ⚠️ **`app/bios/PPSSPP/`** | **CRÍTICO:** Sem essa pasta, a interface interna do PPSSPP fica sem fontes e o jogo congela ao encerrar. Não são ROMs proprietárias, são assets livres do PPSSPP. |
 | **Nintendo GameCube** | `gamecube.dll`<br>*(Dolphin)* | Pasta **`dolphin-emu/Sys/`** completa:<br>• Fontes de sistema (`GC/font_*.bin`)<br>• Certificados SSL e DSP firmware | ⚠️ **`app/bios/dolphin-emu/Sys/`** | Assets oficiais de sistema do Dolphin. |
 | **Nintendo 3DS** | `3ds.dll`<br>*(Citra)* | `aes_keys.txt` | ⚠️ **`app/saves/3DS/Citra/sysdata/`** | Chaves criptográficas AES para execução de jogos comerciais `.3ds` e `.cia` descriptografados em tempo real. |
-| **Commodore Amiga** | `amiga.dll`<br>*(PUAE)* | `kick34005.A500` *(Kickstart 1.3)*<br>`kick40060.CD32` *(Kickstart CD32)*<br>`kick40068.A1200` *(Kickstart 3.1)* | `app/bios/` | O core possui fallback AROS embutido, mas Kickstarts originais garantem fidelidade sonora do chip Paula e sincronia AGA. |
+| **Commodore Amiga** | `amiga.dll`<br>*(PUAE)* | `kick34005.A500` *(Kickstart 1.3)*<br>`kick40060.CD32` *(Kickstart CD32)*<br>`kick40060.CD32.ext` *(ROM estendida, **obrigatória** para CD32)*<br>`kick40068.A1200` *(Kickstart 3.1)* | `app/bios/` | O core possui fallback AROS embutido, mas Kickstarts originais garantem fidelidade sonora do chip Paula e sincronia AGA. **Jogos de CD32 (`.chd`/`.cue`) exigem o par `kick40060.CD32` + `kick40060.CD32.ext`** — só com o Kickstart, o core para na tela pedindo disquete. |
 | **Sega Master System / Game Gear** | `sms.dll`<br>*(Gearsystem)* | `bios_U.sms`<br>`bios_E.sms`<br>`bios_J.sms`<br>`bios.gg` | `app/bios/` | Opcional. Permite visualização do logo da SEGA e tela de abertura original. |
 | **Atari 7800** | `atari7800.dll`<br>*(ProSystem)* | `7800 BIOS (U).rom` | `app/bios/` | Opcional. MD5: `0763f1ffb006ddbe32e52d497ee848ae`. |
 | **Commodore 64 (C64)** | `c64.dll`<br>*(VICE)* | *(Opcional)* `JiffyDOS_C64.bin`<br>`JiffyDOS_1541-II.bin` | `app/bios/vice/` | O core já traz todo o kernel básico embutido. JiffyDOS acelera o acesso ao disco virtual. |

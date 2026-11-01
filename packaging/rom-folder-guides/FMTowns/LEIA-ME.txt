@@ -10,12 +10,14 @@ Formatos aceitos nesta pasta:
   - Compactados: .zip, .7z, .rar
 
 BIOS / firmware:
-  Devem ficar em app/bios/geartowns/ (soltos em app/bios/ tambem funcionam)
+  Devem ficar em app/bios/geartowns/ (pasta canonica do core)
   - FMT_SYS.ROM: OBRIGATORIO (262.144 bytes - BIOS de Sistema Towns OS)
   - FMT_DOS.ROM: OBRIGATORIO (524.288 bytes - ROM de boot DOS Towns OS)
   - FMT_FNT.ROM: OBRIGATORIO (ROM de fontes basicas 8/16-dot)
   - FMT_DIC.ROM: OBRIGATORIO (524.288 bytes - Dicionario Kanji)
-  - FMT_F20.ROM: Opcional (1.253.376 bytes - Fonte Kanji 20/16-dot estendida)
+  - FMT_F20.ROM: Opcional (Fonte Kanji 20/16-dot estendida)
+  - fmtowns.zip: Firmware MAME Model 1/2
+  - fmtmarty.zip: Firmware FM Towns Marty
 
 Observacoes de execucao:
   - Jogos em CD-ROM (.chd/.cue/.iso) inicializam diretamente via Towns OS.

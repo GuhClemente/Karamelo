@@ -136,7 +136,7 @@ std::string WebAdminSanitizeFilename(const std::string& raw_filename)
 bool WebAdminIsAllowedTargetSystem(const std::string& system_dir)
 {
 	static const char* const kAllowedSystems[] = {
-		"bios", "bios/np2kai", "bios/neocd", "bios/dc", "bios/fmtowns", "bios/geartowns",
+		"bios", "bios/np2kai", "bios/neocd", "bios/dc", "bios/geartowns",
 		"SNES", "NES", "Genesis", "MegaCD", "32X", "MasterSystem", "GameGear",
 		"Saturn", "Dreamcast", "GBA", "GB", "GBC", "N64", "NDS", "3DS", "GameCube",
 		"PSX", "PS2", "PSP", "Arcade", "NeoGeo", "NeoGeoCD", "PCEngine", "PCFX",
@@ -282,9 +282,6 @@ std::vector<BiosAuditItem> WebAdminRunBiosAudit(const std::string& bios_root_dir
 			// Also check flat root fallback (e.g. dc_boot.bin directly in bios/)
 			fs::path flat = root / item.filename;
 			if (fs::exists(flat, ec)) candidate = flat;
-			// The old FM Towns folder: the set is copied to bios/geartowns/ on the first load.
-			else if (item.subdir == "geartowns" && fs::exists(root / "fmtowns" / item.filename, ec))
-				candidate = root / "fmtowns" / item.filename;
 		}
 
 		if (fs::exists(candidate, ec) && fs::is_regular_file(candidate, ec))

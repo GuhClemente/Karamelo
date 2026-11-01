@@ -2138,11 +2138,17 @@ Também nesta data:
 
 ## 54. Correção de 31/10/2026 — Pasta da BIOS do FM Towns
 
-A pasta oficial da BIOS do FM Towns agora é **`bios/geartowns/`**, a mesma da documentação do core Geartowns.
+A única pasta oficial e suportada da BIOS do FM Towns é **`bios/geartowns/`** (padrão canônico do core Geartowns).
 
-- No Linux, a pasta antiga `bios/fmtowns/` não abria os jogos, nem com o core 1.0.3. Testado: `bios/geartowns/` e arquivos soltos em `bios/` funcionam. No Windows as três formas funcionam.
-- Quem já tem `bios/fmtowns/` não precisa fazer nada: ao abrir um jogo, o Karamelo copia os arquivos para `bios/geartowns/`, sem apagar os originais.
-- `FMT_SYS.ROM` tem 256 KB (262.144 bytes), não 512 KB.
-- No site: indicar só `bios/geartowns/` nas instruções do FM Towns e no mapa de pastas.
+- A pasta legada `bios/fmtowns/` foi descontinuada e removida para evitar duplicidade.
+- A pasta `bios/geartowns/` recebe o conjunto completo de firmwares e zips MAME necessários para emular todos os modelos (Model 1/2, Marty, HG, UX, HR):
+  - `FMT_SYS.ROM` (256 KB)
+  - `FMT_DOS.ROM` (512 KB)
+  - `FMT_FNT.ROM` (256 KB)
+  - `FMT_DIC.ROM` (512 KB)
+  - `FMT_F20.ROM` (512 KB, opcional)
+  - `fmtowns.zip` (firmware MAME do Model 1/2 para jogos que exigem esse modelo)
+  - `fmtmarty.zip` (firmware do FM Towns Marty)
+- No site: indicar exclusivamente `bios/geartowns/` nas instruções do FM Towns e no mapa de pastas.
 
 **Contagens inalteradas.**

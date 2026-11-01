@@ -23,16 +23,16 @@
    - Confirmar: BOTAO A
    - Voltar: BOTAO B
 
-4. SISTEMAS NATIVOS DISPONIVEIS (35 Sistemas / 40 Motores):
+4. SISTEMAS NATIVOS DISPONIVEIS (37 Sistemas / 42 Motores):
    - Nintendo: NES, SNES, N64, Game Boy, GBA, NDS, 3DS, GameCube
    - Sega: Master System, Genesis/Mega Drive, Mega CD, 32X, Saturn, Dreamcast
    - Sony: PlayStation 1, PlayStation 2, PSP
    - SNK / Arcade: Neo Geo AES/MVS, Neo Geo CD, Neo Geo Pocket, MAME
    - Atari: 2600, 5200, 7800, Jaguar, Lynx
-   - Computadores / Outros: DOSBox Pure, Amiga, C64, MSX, ZX Spectrum,
+   - Computadores / Outros: DOSBox Pure, Amiga, C64, MSX, ZX Spectrum, FM Towns, PC-98,
      PC Engine / TG-16, PC-FX, 3DO, ColecoVision, WonderSwan.
 
-5. CATEGORIA "PORTS & RECOMP" (39 Jogos Nativos de PC):
+5. CATEGORIA "PORTS & RECOMP" (94 Ports Nativos de PC):
    - Inclui OutRun (CannonBall DX), Zelda Ship of Harkinian (OoT),
      2 Ship 2 Harkinian (Majora), Castlevania Symphony of the Night,
      Sonic 3 A.I.R., Super Metroid Recomp, Dr. Mario 64 e muito mais.
