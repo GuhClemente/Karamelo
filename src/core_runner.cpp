@@ -458,7 +458,7 @@ void CoreUpdateToast()
 // High-Performance Audio Resampling & Output Engine
 // -------------------------------------------------------------
 #define RING_BUFFER_SIZE   65536 // 65536 stereo frames (~1.36s capacity)
-#define NUM_WAVE_BUFFERS   48    // upper bound: 48 * 512 frames = 512ms of queue
+#define NUM_WAVE_BUFFERS   96    // upper bound: 96 * 512 frames = 1024ms of queue
 #define MIN_WAVE_BUFFERS   6     // lower bound: 6 * 512 frames = 64ms
 #define SAMPLES_PER_BUFFER 512   // ~10.6ms per buffer at 48kHz
 
@@ -749,10 +749,10 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
 			LONG available = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
 
-			// With half the queue still to play, a short ring is only the core's
-			// next frame not being here yet. Padding then put silence in the middle
-			// of the sound for no reason, and read as an underrun that grew the queue.
-			if (available < SAMPLES_PER_BUFFER && (queued_bytes >= target_bytes / 2 || queued_bytes >= SAMPLES_PER_BUFFER * 4 * (int)sizeof(int16_t))) break;
+			// With two chunks still to play, a short ring is only the core's next frame
+			// not being here yet. Padding then put silence in the middle of the sound for
+			// no reason, and read as an underrun that grew the queue.
+			if (available < SAMPLES_PER_BUFFER && queued_bytes >= 2 * SAMPLES_PER_BUFFER * 2 * (int)sizeof(int16_t)) break;
 
 			// Always keep the device fed. Letting the queue run dry stops
 			// playback outright, which is what produced the periodic gaps;
@@ -1038,14 +1038,14 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	QueryPerformanceCounter(&now);
 	if (s_rate_last.QuadPart == 0) s_rate_last = now;
 
-	if (s_locked_step <= 0.0)
+	s_samples_accum += frames;
+	double elapsed = (double)(now.QuadPart - s_rate_last.QuadPart) / (double)freq.QuadPart;
+	if (elapsed >= 0.5)
 	{
-		s_samples_accum += frames;
-		double elapsed = (double)(now.QuadPart - s_rate_last.QuadPart) / (double)freq.QuadPart;
-		if (elapsed >= 0.5)
+		double measured = (double)s_samples_accum / elapsed;
+		if (measured >= 8000.0 && measured <= 192000.0)
 		{
-			double measured = (double)s_samples_accum / elapsed;
-			if (measured >= 8000.0 && measured <= 192000.0)
+			if (s_locked_step <= 0.0)
 			{
 				// Within 1% of the previous window counts as agreement.
 				if (s_prev_measure > 0.0 &&
@@ -1072,9 +1072,44 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 				// Glide toward the reading only while still searching.
 				s_step = s_step * 0.7 + (measured / (double)g_output_sample_rate) * 0.3;
 			}
-			s_samples_accum = 0;
-			s_rate_last = now;
+			else
+			{
+				// A core that changes rate without saying so (only the SET_SYSTEM_AV_INFO
+				// path above is told). The catch-up after a stall also reads several
+				// percent off for a window or two, and following it detunes the sound, so
+				// this waits for 2 s of windows that agree with each other.
+				double expected_hz = s_locked_step * (double)g_output_sample_rate;
+				if (fabs(measured - expected_hz) > expected_hz * 0.04)
+				{
+					if (s_prev_measure > 0.0 && fabs(measured - s_prev_measure) < s_prev_measure * 0.01)
+						s_agree_count++;
+					else
+						s_agree_count = 0;
+					s_prev_measure = measured;
+
+					if (s_agree_count >= 3)
+					{
+						s_locked_step = measured / (double)g_output_sample_rate;
+						s_step = s_locked_step;
+						s_agree_count = 0;
+						FILE* lf = fopen("karamelo.log", "a");
+						if (lf)
+						{
+							fprintf(lf, "[INFO] [AUDIO] mudanca de taxa detectada: %.0f Hz (anterior %.0f Hz), novo passo %.5f\n",
+								measured, expected_hz, s_locked_step);
+							fclose(lf);
+						}
+					}
+				}
+				else
+				{
+					s_agree_count = 0;
+					s_prev_measure = 0.0;
+				}
+			}
 		}
+		s_samples_accum = 0;
+		s_rate_last = now;
 	}
 
 	// A core whose rate never settles never reaches the control below, and nothing else
@@ -1203,8 +1238,10 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 
 			// Reading ahead of playback means the ring is filling, so the
 			// input needs to be consumed slightly faster - and vice versa.
-			// 0.5% is under the threshold where pitch change becomes audible.
-			step = s_locked_step * (1.0 + err * 0.005);
+			// Past 30% of the target the queue is heading for a gap or a discard, either
+			// way an audible click, so the correction grows from there, without a jump.
+			const double beyond = (fabs(err) > 0.3) ? (fabs(err) - 0.3) * (err < 0.0 ? -1.0 : 1.0) : 0.0;
+			step = s_locked_step * (1.0 + err * 0.005 + beyond * 0.02);
 		}
 		else
 		{
@@ -1903,9 +1940,24 @@ static bool CB_Environment(unsigned cmd, void* data)
 		if (av->timing.fps > 1.0 && av->timing.fps < 1000.0)
 			core_native_fps = av->timing.fps;
 		if (av->timing.sample_rate > 1000.0)
+		{
 			core_native_sample_rate = av->timing.sample_rate;
+		}
 
+		// First: this is what scales the rate when the game follows the display.
 		ApplyDisplaySync();
+
+		if (av->timing.sample_rate > 1000.0)
+		{
+			ResetAudioRateController();
+			s_step = g_core_sample_rate / (double)g_output_sample_rate;
+			s_locked_step = s_step;
+			FILE* lf = fopen("karamelo.log", "a");
+			if (lf) {
+				fprintf(lf, "[INFO] [AUDIO] nova taxa definida pelo core: %.0f Hz, novo passo %.5f\n", g_core_sample_rate, s_step);
+				fclose(lf);
+			}
+		}
 		return true;
 	}
 
@@ -1935,36 +1987,13 @@ static bool CB_Environment(unsigned cmd, void* data)
 		struct retro_variable* var = (struct retro_variable*)data;
 		if (var && var->key)
 		{
-			// N64 Horizontal Upscaling:
-			// Renders 3D geometry with 2x (640x240) or 4x (1280x240) horizontal resolution
-			// while strictly preserving 240p scanlines for authentic CRT display.
-			int n64_up = MenuGetN64Upscale();
+			// Only Gopher64 asks for this. ParaLLEl and Mupen have no 640x240 or 1280x240
+			// among their resolutions, and a value a core does not know leaves it undefined.
 			if (strcmp(var->key, "karamelo-n64-upscale") == 0)
 			{
+				const int n64_up = MenuGetN64Upscale();
 				var->value = (n64_up == 2) ? "2" : (n64_up == 1 ? "1" : "0");
 				return true;
-			}
-			if (n64_up > 0)
-			{
-				const char* res = (n64_up == 2) ? "1280x240" : "640x240";
-				if (strcmp(var->key, "mupen64plus-43screensize") == 0 ||
-				    strcmp(var->key, "parallel-n64-screensize") == 0)
-				{
-					var->value = res;
-					return true;
-				}
-				if (strcmp(var->key, "mupen64plus-EnableNativeResFactor") == 0)
-				{
-					var->value = "0";
-					return true;
-				}
-				if (strcmp(var->key, "mupen64plus-aspect") == 0 ||
-				    strcmp(var->key, "parallel-n64-aspect") == 0 ||
-				    strcmp(var->key, "parallel-n64-aspectratiohint") == 0)
-				{
-					var->value = "4:3";
-					return true;
-				}
 			}
 
 			EnterCriticalSection(&options_lock);
@@ -2009,7 +2038,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// for a stall.
 			else if (strcmp(var->key, "parallel-n64-gfxplugin") == 0)
 #ifdef _WIN32
-				var->value = (MenuGetHwRender() && HwGlProbed()) ? ((n64_up > 0) ? "gliden64" : "glide64") : "angrylion";
+				var->value = (MenuGetHwRender() && HwGlProbed()) ? "glide64" : "angrylion";
 #else
 				// glide64 crashes inside Mesa from retro_unload_game - every
 				// N64 game closed with ParaLLEl killed the app on Linux (seen

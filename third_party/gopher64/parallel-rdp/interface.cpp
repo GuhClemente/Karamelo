@@ -114,6 +114,7 @@ static bool crop_letterbox;
 static CALL_BACK callback;
 static GFX_INFO gfx_info;
 static uint32_t g_analogue3d_mode = 0;
+static uint32_t g_vi_width = 0;
 static const uint32_t *fragment_spirv;
 static size_t fragment_size;
 
@@ -731,6 +732,8 @@ static void render_frame(Vulkan::Device &device) {
 }
 
 void rdp_set_vi_register(uint32_t reg, uint32_t value) {
+  if (reg == VI_WIDTH_REG)
+    g_vi_width = value & 0xFFF;
   processor->set_vi_register(RDP::VIRegister(reg), value);
 }
 
@@ -743,6 +746,10 @@ static std::vector<RDP::RGBA> g_frame_pixels;
 static std::vector<RDP::RGBA> g_processed_pixels;
 
 void rdp_set_analogue3d_mode(uint32_t mode) {
+  // Mode 2 needs the RDP rendering at 2x, which is decided when the processor is
+  // created. Crossing that line with a game running only stretched the image.
+  if (processor && (mode == 2) != (gfx_info.analogue3d_mode == 2))
+    return;
   g_analogue3d_mode = mode;
 }
 
@@ -764,7 +771,10 @@ bool rdp_get_framebuffer(const uint32_t **out_pixels, uint32_t *out_width, uint3
 
   if (mode == 0) {
     // Mode 0: Desligado / Nativo (320x240, 320x288 PAL)
-    unsigned target_w = (w >= 640) ? (w / 2) : w;
+    // The VI scans out 640 wide whatever the game draws, so halving it is what gives
+    // 320 back. A game really drawing 640 wide keeps all of it.
+    const bool hires_game = g_vi_width > 400;
+    unsigned target_w = (w >= 640 && !hires_game) ? (w / 2) : w;
     unsigned target_h = h;
     if (target_w != w || target_h != h) {
       g_processed_pixels.resize(target_w * target_h);
@@ -801,28 +811,6 @@ bool rdp_get_framebuffer(const uint32_t **out_pixels, uint32_t *out_width, uint3
           dst[x].g = (uint8_t)(((uint32_t)row0[x].g + (uint32_t)row1[x].g) >> 1);
           dst[x].b = (uint8_t)(((uint32_t)row0[x].b + (uint32_t)row1[x].b) >> 1);
           dst[x].a = 0xFF;
-        }
-      }
-      if (out_pixels) *out_pixels = reinterpret_cast<const uint32_t *>(g_processed_pixels.data());
-      if (out_width) *out_width = target_w;
-      if (out_height) *out_height = target_h;
-      return true;
-    } else if (w == 640) {
-      // 2x horizontal supersampling: 640x240 -> 1280x240
-      unsigned target_w = 1280;
-      unsigned target_h = h;
-      g_processed_pixels.resize(target_w * target_h);
-      for (unsigned y = 0; y < target_h; y++) {
-        const RDP::RGBA *src = &g_frame_pixels[y * 640];
-        RDP::RGBA *dst = &g_processed_pixels[y * 1280];
-        for (unsigned x = 0; x < 640; x++) {
-          const RDP::RGBA &p0 = src[x];
-          const RDP::RGBA &p1 = (x + 1 < 640) ? src[x + 1] : p0;
-          dst[2 * x] = p0;
-          dst[2 * x + 1].r = (uint8_t)(((uint32_t)p0.r + (uint32_t)p1.r) >> 1);
-          dst[2 * x + 1].g = (uint8_t)(((uint32_t)p0.g + (uint32_t)p1.g) >> 1);
-          dst[2 * x + 1].b = (uint8_t)(((uint32_t)p0.b + (uint32_t)p1.b) >> 1);
-          dst[2 * x + 1].a = 0xFF;
         }
       }
       if (out_pixels) *out_pixels = reinterpret_cast<const uint32_t *>(g_processed_pixels.data());

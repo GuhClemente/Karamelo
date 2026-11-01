@@ -51,6 +51,18 @@ unsafe extern "C" fn audio_callback(
 
 pub fn update_freq(device: &mut device::Device) {
     if ui::video::LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+        // What is still buffered was made at the old rate, so it goes out first.
+        flush_libretro_audio();
+        // The frontend paces this core at the 60/50 fps it declares, not at the game's
+        // real VI rate, and the samples per second follow that pace.
+        let declared_fps = if device.cart.pal { 50.0 } else { 60.0 };
+        let frame_time = device.vi.frame_time;
+        let rate = if frame_time > 1.0 / 70.0 && frame_time < 1.0 / 40.0 {
+            device.ai.freq as f64 * frame_time * declared_fps
+        } else {
+            device.ai.freq as f64
+        };
+        crate::libretro_api::notify_sample_rate(rate, device.cart.pal);
         return;
     }
     let game_audio_spec = sdl3_sys::audio::SDL_AudioSpec {

@@ -276,7 +276,7 @@ static int setting_pad_menu_toggle = 0;
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
 // Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
 // the mixer on a loaded machine; above 512ms the delay is audible against input.
-static const int kAudioLatencyMs[4] = { 64, 128, 256, 512 };
+static const int kAudioLatencyMs[5] = { 64, 128, 256, 512, 1024 };
 
 enum VideoDriverChoice {
   VIDEO_DRIVER_AUTO = 0,     // Auto (GPU 3D)
@@ -705,7 +705,7 @@ int MenuGetDeadzone() { return (setting_deadzone + 1) * 5; }
 int MenuGetPadAsMouse() { return setting_pad_mouse; }
 int MenuGetPadMenuToggle() { return setting_pad_menu_toggle; }
 void MenuSetPadMenuToggle(int mode) { setting_pad_menu_toggle = ClampInt(mode, 0, 4); }
-int MenuGetAudioLatencyMs() { return kAudioLatencyMs[ClampInt(setting_latency, 0, 3)]; }
+int MenuGetAudioLatencyMs() { return kAudioLatencyMs[ClampInt(setting_latency, 0, 4)]; }
 int MenuGetVideoDriver() { return setting_driver; }
 void MenuSetVideoDriverForSelftest(int driver) {
   setting_driver = ClampInt(driver, 0, 4);
@@ -1362,7 +1362,7 @@ void PopulateMainMenu() {
     }
 
     // 3a-2. N64 Horizontal Upscaling
-    if (core_name.find("Gopher") != std::string::npos || core_name.find("N64") != std::string::npos || core_name.find("Nintendo 64") != std::string::npos || core_name.find("ParaLLEl") != std::string::npos || core_name.find("Mupen") != std::string::npos) {
+    if (CoreBinaryExists("cores/n64_gopher.dll") && (core_name.find("Gopher") != std::string::npos || core_name.find("N64") != std::string::npos || core_name.find("Nintendo 64") != std::string::npos || core_name.find("ParaLLEl") != std::string::npos || core_name.find("Mupen") != std::string::npos)) {
       const char *n64_upscales_pt[] = {"Desligado", "2x (640)", "4x (1280)"};
       const char *n64_upscales_en[] = {"Disabled", "2x (640)", "4x (1280)"};
       items.push_back({Tr("Upscale Horiz", "Horiz Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
@@ -2032,9 +2032,11 @@ void PopulateVideoSettings() {
   const char *n64_cores[] = {"ParaLLEl N64", "Mupen64+ Next", "Gopher64"};
   items.push_back({Tr("Core do N64", "N64 Core"), n64_cores[setting_n64_core], false, false, 309});
 
-  const char *n64_upscales_pt[] = {"Desligado", "2x (640)", "4x (1280)"};
-  const char *n64_upscales_en[] = {"Disabled", "2x (640)", "4x (1280)"};
-  items.push_back({Tr("Upscale Horiz", "Horiz Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
+  if (CoreBinaryExists("cores/n64_gopher.dll")) {
+    const char *n64_upscales_pt[] = {"Desligado", "2x (640)", "4x (1280)"};
+    const char *n64_upscales_en[] = {"Disabled", "2x (640)", "4x (1280)"};
+    items.push_back({Tr("Upscale Horiz", "Horiz Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
+  }
 
   char osd_to[16];
   if (kOsdTimeouts[setting_osd_timeout] == 0)
@@ -2153,7 +2155,7 @@ void PopulateAudioSettings() {
   current_title = Tr("Audio & Voz", "Audio & Voice");
   OsdSetSize(13);
 
-  const char *latencies[] = {"64 ms", "128 ms", "256 ms", "512 ms"};
+  const char *latencies[] = {"64 ms", "128 ms", "256 ms", "512 ms", "1024 ms"};
 
   items.push_back({Tr("Mudo", "Mute"), CoreGetMute() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 401});
   items.push_back({Tr("Latencia", "Latency"), latencies[setting_latency], false, false, 402});
@@ -3071,7 +3073,7 @@ static void MenuLoadSettings() {
     else if (InputBindFromPadConfigKey(key) >= 0)
       InputBindSetPad(InputBindFromPadConfigKey(key), iv);
     else if (!strcmp(key, "latency"))
-      setting_latency = ClampInt(iv, 0, 3);
+      setting_latency = ClampInt(iv, 0, 4);
     else if (!strcmp(key, "driver"))
       setting_driver = ClampInt(iv, 0, 4);
     else if (!strcmp(key, "sync"))
@@ -4169,7 +4171,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       SelectByAction(item.action_id, 0);
     } else if (item.action_id == 402) // Latency
     {
-      setting_latency = (setting_latency + delta + 4) % 4;
+      setting_latency = (setting_latency + delta + 5) % 5;
       PopulateAudioSettings();
       SelectByAction(item.action_id, 1);
     } else if (item.action_id == 403) // Volume

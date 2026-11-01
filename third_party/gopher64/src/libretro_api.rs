@@ -200,12 +200,13 @@ pub unsafe extern "C" fn retro_get_system_av_info(av_info: *mut retro_system_av_
 
     (*av_info).geometry.base_width = 320;
     (*av_info).geometry.base_height = if is_pal { 288 } else { 240 };
-    (*av_info).geometry.max_width = 640;
+    // The 1280x240 upscale mode delivers this width.
+    (*av_info).geometry.max_width = 1280;
     (*av_info).geometry.max_height = if is_pal { 576 } else { 480 };
     (*av_info).geometry.aspect_ratio = 4.0 / 3.0;
 
     (*av_info).timing.fps = if is_pal { 50.0 } else { 60.0 };
-        let mut rate = if is_pal { 31250.0 } else { 32000.0 };
+    let mut rate = if is_pal { 31250.0 } else { 32000.0 };
     {
         let guard = device_lock();
         if let Some(ref dev) = *guard {
@@ -215,6 +216,40 @@ pub unsafe extern "C" fn retro_get_system_av_info(av_info: *mut retro_system_av_
         }
     }
     (*av_info).timing.sample_rate = rate;
+}
+
+pub static CURRENT_SAMPLE_RATE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+// Runs inside retro_run, on an AI register write, while retro_run holds G_DEVICE: this
+// must never take device_lock(), so the caller passes what it needs from the device.
+pub fn notify_sample_rate(rate: f64, is_pal: bool) {
+    let rate_u32 = rate as u32;
+    if rate_u32 < 8000 || rate_u32 > 192000 {
+        return;
+    }
+    let prev = CURRENT_SAMPLE_RATE.swap(rate_u32, Ordering::Relaxed);
+    if prev == rate_u32 {
+        return;
+    }
+    let env_opt = *ENV_CB.lock().unwrap();
+    if let Some(cb) = env_opt {
+        let mut av_info = retro_system_av_info {
+            geometry: retro_game_geometry {
+                base_width: 320,
+                base_height: if is_pal { 288 } else { 240 },
+                max_width: 1280,
+                max_height: if is_pal { 576 } else { 480 },
+                aspect_ratio: 4.0 / 3.0,
+            },
+            timing: retro_system_timing {
+                fps: if is_pal { 50.0 } else { 60.0 },
+                sample_rate: rate,
+            },
+        };
+        unsafe {
+            cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &mut av_info as *mut _ as *mut c_void);
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -275,6 +310,11 @@ pub unsafe extern "C" fn retro_load_game(game: *const retro_game_info) -> bool {
         };
 
         let mut dev = Device::new(true);
+
+        // Both outlive a game: the next one has to announce its rate again, and must
+        // not start with the last samples of the previous one.
+        CURRENT_SAMPLE_RATE.store(0, Ordering::Relaxed);
+        ui::audio::LIBRETRO_AUDIO_BUF.lock().unwrap().clear();
 
         // Query frontend for Analogue 3D Upscale mode (0=Off 320x240, 1=Analogue 3D 640x240, 2=Analogue 3D Ultra 1280x240)
         let mut upscale_mode: u32 = 0;
