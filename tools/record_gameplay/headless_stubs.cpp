@@ -14,6 +14,11 @@
 int  MenuGetDeadzone() { return 0; }
 int  MenuGetAudioLatencyMs() { return 64; }
 int  MenuGetHwRender() { return 1; }
+int  MenuGetPadAsMouse() { return 0; }
+
+static int s_headless_n64_upscale = 0;
+int  MenuGetN64Upscale() { return s_headless_n64_upscale; }
+void MenuSetN64Upscale(int mode) { s_headless_n64_upscale = mode; }
 
 NetplayState NetplayGetState() { return NETPLAY_DISCONNECTED; }
 void NetplaySyncInputs(int16_t[16], int16_t[2][2], int16_t out_p2_buttons[16], int16_t out_p2_analog[2][2])
@@ -21,6 +26,7 @@ void NetplaySyncInputs(int16_t[16], int16_t[2][2], int16_t out_p2_buttons[16], i
 	for (int i = 0; i < 16; i++) out_p2_buttons[i] = 0;
 	for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++) out_p2_analog[i][j] = 0;
 }
+bool NetplayLockstepFrame(const NetInput&, NetInput&, NetInput&) { return false; }
 
 bool OsdIsEnabled() { return false; }
 
@@ -32,6 +38,15 @@ bool RaIsHardcoreActive() { return false; }
 const char* MenuGetPersistedCoreOption(const char*) { return nullptr; }
 int MenuGetVideoDriver() { return 0; }
 void CrashReporterSetLastGameInfo(const char*, const char*) {}
+
+void CloudSyncOnGameLoad(const char*, const char*) {}
+void CloudSyncOnGameUnload(const char*, const char*, uint64_t) {}
+
+enum TrayPresenceStatus { TRAY_STATUS_OFFLINE, TRAY_STATUS_MENU, TRAY_STATUS_PLAYING };
+void TrayManagerSetStatus(TrayPresenceStatus, const char*) {}
+
+bool VoiceChatIsActive() { return false; }
+void VoiceChatFeedReferenceAudio(const int16_t*, size_t) {}
 
 int MenuGetLanguage() { return 0; }
 const char* Tr(const char* pt, const char* en) { return pt ? pt : en; }

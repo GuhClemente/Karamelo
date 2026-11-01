@@ -16,6 +16,7 @@
 #include <algorithm>
 
 #include "core_runner.h"
+#include "menu.h"
 #include "hw_render.h"
 
 namespace fs = std::filesystem;
@@ -129,6 +130,10 @@ int main(int argc, char** argv)
 	if (duration_sec < 5) duration_sec = 90;
 	std::string out_dir = argv[4];
 	std::string base_name = (argc > 5) ? argv[5] : "gameplay";
+	int upscale_mode = (argc > 6) ? atoi(argv[6]) : 0;
+	int filter_mode = (argc > 7) ? atoi(argv[7]) : 0;
+	MenuSetN64Upscale(upscale_mode);
+	printf("[INFO] N64 Upscale Mode: %d, Filter Mode: %d\n", upscale_mode, filter_mode);
 
 	std::string lower_rom = rom_path;
 	std::transform(lower_rom.begin(), lower_rom.end(), lower_rom.begin(), ::tolower);
@@ -198,9 +203,11 @@ int main(int argc, char** argv)
 	int frames_written = 0;
 	bool s1 = false, s2 = false, s3 = false, s4 = false;
 
-	while (CoreIsRunning() && (GetTickCount() - run_t0) < (DWORD)(duration_sec * 1000))
+	const int target_frames = duration_sec * 30;
+	const uint32_t target_audio = (uint32_t)duration_sec * 44100 * 4;
+	while (CoreIsRunning() && (frames_written < target_frames || g_audio_bytes < target_audio))
 	{
-		DWORD elapsed = (GetTickCount() - run_t0) / 1000;
+		DWORD elapsed = frames_written / 30;
 
 		// Default: clear inputs
 		for (int b = 0; b < 16; b++) CoreSetButtonState(0, b, false);
@@ -583,21 +590,23 @@ int main(int argc, char** argv)
 			}
 		}
 
-		CoreRender(frame_buf.data(), kWidth, kHeight, 0, 0);
+		CoreRender(frame_buf.data(), kWidth, kHeight, 0, filter_mode);
 		if (vpipe) fwrite(frame_buf.data(), 1, (size_t)kWidth * kHeight * sizeof(uint32_t), vpipe);
 
-		int shot1_sec = is_fmtowns ? 28 : 15;
-		int shot2_sec = is_fmtowns ? 44 : 35;
-		int shot3_sec = is_fmtowns ? 64 : 60;
-		int shot4_sec = (int)duration_sec - 5;
+		int shot1_sec = 15;
+		int shot2_sec = 30;
+		int shot3_sec = 45;
+		int shot4_sec = 55;
 
-		if (elapsed >= (DWORD)shot1_sec && !s1) { SaveBmp(out_dir + "/" + base_name + "_01.bmp", 0); s1 = true; }
-		if (elapsed >= (DWORD)shot2_sec && !s2) { SaveBmp(out_dir + "/" + base_name + "_02.bmp", 0); s2 = true; }
-		if (elapsed >= (DWORD)shot3_sec && !s3) { SaveBmp(out_dir + "/" + base_name + "_03.bmp", 0); s3 = true; }
+		if (elapsed >= (DWORD)shot1_sec && !s1) { SaveBmp(out_dir + "/" + base_name + "_01.bmp", filter_mode); s1 = true; }
+		if (elapsed >= (DWORD)shot2_sec && !s2) { SaveBmp(out_dir + "/" + base_name + "_02.bmp", filter_mode); s2 = true; }
+		if (elapsed >= (DWORD)shot3_sec && !s3) { SaveBmp(out_dir + "/" + base_name + "_03.bmp", filter_mode); s3 = true; }
 		if (elapsed >= (DWORD)shot4_sec && !s4) { SaveBmp(out_dir + "/" + base_name + "_04_crt.bmp", 8); s4 = true; }
 
 		frames_written++;
-		Sleep(33); // ~30 fps
+		DWORD expected_ms = (DWORD)((uint64_t)frames_written * 1000 / 30);
+		DWORD cur_ms = GetTickCount() - run_t0;
+		if (cur_ms < expected_ms) Sleep(expected_ms - cur_ms);
 	}
 
 	if (vpipe)
@@ -625,8 +634,8 @@ int main(int argc, char** argv)
 	if (g_audio_bytes > 1000)
 	{
 		snprintf(mux_cmd, sizeof(mux_cmd),
-			"ffmpeg -y -i \"%s\" -i \"%s\" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart \"%s\" 2>nul",
-			temp_mp4_path.c_str(), wav_path.c_str(), final_mp4_path.c_str());
+			"ffmpeg -y -i \"%s\" -i \"%s\" -t %d -c:v copy -c:a aac -b:a 192k -movflags +faststart \"%s\" 2>nul",
+			temp_mp4_path.c_str(), wav_path.c_str(), duration_sec, final_mp4_path.c_str());
 	}
 	else
 	{
@@ -652,8 +661,8 @@ int main(int argc, char** argv)
 	if (g_audio_bytes > 1000)
 	{
 		snprintf(conv_cmd, sizeof(conv_cmd),
-			"ffmpeg -y -i \"%s\" -c:v libvpx-vp9 -crf 28 -b:v 0 -c:a libopus \"%s/%s.webm\" 2>nul",
-			final_mp4_path.c_str(), out_dir.c_str(), base_name.c_str());
+			"ffmpeg -y -i \"%s\" -t %d -c:v libvpx-vp9 -crf 28 -b:v 0 -c:a libopus \"%s/%s.webm\" 2>nul",
+			final_mp4_path.c_str(), duration_sec, out_dir.c_str(), base_name.c_str());
 	}
 	else
 	{

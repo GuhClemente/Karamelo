@@ -34,7 +34,7 @@ if not exist "third_party\gopher64\Cargo.toml" (
 
 echo [GOPHER64] Compilando ^(release^)... isso leva alguns minutos.
 pushd "third_party\gopher64"
-cargo build --release
+cargo build --release --lib
 set BUILD_RC=%errorlevel%
 popd
 

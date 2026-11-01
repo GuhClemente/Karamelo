@@ -112,6 +112,8 @@ static retro_load_game_t p_retro_load_game = NULL;
 static retro_unload_game_t p_retro_unload_game = NULL;
 static retro_get_memory_data_t p_retro_get_memory_data = NULL;
 static retro_get_memory_size_t p_retro_get_memory_size = NULL;
+typedef void (*retro_set_n64_upscale_t)(int mode);
+static retro_set_n64_upscale_t p_retro_set_n64_upscale = NULL;
 
 static bool is_core_loaded = false;
 static bool is_game_loaded = false;
@@ -1473,6 +1475,13 @@ const char* CoreGetOption(const char* key)
 	LeaveCriticalSection(&options_lock);
 	return result;
 }
+void CoreSetN64Upscale(int mode)
+{
+	if (p_retro_set_n64_upscale)
+	{
+		p_retro_set_n64_upscale(mode);
+	}
+}
 
 // Splits a core-declared SET_VARIABLES value ("Label; choice1|choice2|...")
 // into its display label and pipe-separated choice list - every core follows
@@ -1928,6 +1937,11 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// Renders 3D geometry with 2x (640x240) or 4x (1280x240) horizontal resolution
 			// while strictly preserving 240p scanlines for authentic CRT display.
 			int n64_up = MenuGetN64Upscale();
+			if (strcmp(var->key, "karamelo-n64-upscale") == 0)
+			{
+				var->value = (n64_up == 2) ? "2" : (n64_up == 1 ? "1" : "0");
+				return true;
+			}
 			if (n64_up > 0)
 			{
 				const char* res = (n64_up == 2) ? "1280x240" : "640x240";
@@ -4119,6 +4133,7 @@ static void ResetCoreFunctionPointers()
 	p_retro_get_memory_size = NULL;
 	p_retro_load_game = NULL;
 	p_retro_unload_game = NULL;
+	p_retro_set_n64_upscale = NULL;
 }
 
 // A core-spawned background thread that crashes while holding one of these
@@ -4650,6 +4665,11 @@ static bool CoreLoad(const char* core_dll_path)
 	p_retro_unload_game = (retro_unload_game_t)GetProcAddress(h_core_dll, "retro_unload_game");
 	p_retro_get_memory_data = (retro_get_memory_data_t)GetProcAddress(h_core_dll, "retro_get_memory_data");
 	p_retro_get_memory_size = (retro_get_memory_size_t)GetProcAddress(h_core_dll, "retro_get_memory_size");
+	p_retro_set_n64_upscale = (retro_set_n64_upscale_t)GetProcAddress(h_core_dll, "retro_set_n64_upscale");
+	if (p_retro_set_n64_upscale)
+	{
+		p_retro_set_n64_upscale(MenuGetN64Upscale());
+	}
 
 	// p_retro_get_system_av_info is required by the libretro API just like the
 	// three below it - CoreLoadGame() calls it unconditionally further down

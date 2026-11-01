@@ -23,6 +23,7 @@ typedef struct {
   uint32_t upscale;
   bool ssaa;
   bool crt;
+  uint32_t analogue3d_mode;
 } GFX_INFO;
 
 typedef struct {
@@ -68,6 +69,8 @@ size_t rdp_state_size();
 void rdp_save_state(uint8_t *state);
 void rdp_load_state(GFX_INFO _gfx_info, const uint8_t *state);
 void rdp_set_fps(uint32_t fps, uint32_t vis);
+void rdp_set_analogue3d_mode(uint32_t mode);
+uint32_t rdp_get_analogue3d_mode();
 
 JoystickEvent get_joystick_event();
 

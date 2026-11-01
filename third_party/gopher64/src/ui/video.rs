@@ -35,6 +35,7 @@ fn build_gfx_info(device: &mut device::Device, netplay: bool) -> GFX_INFO {
         upscale: device.ui.config.video.upscale,
         ssaa: device.ui.config.video.ssaa,
         crt: device.ui.config.video.crt,
+        analogue3d_mode: device.ui.config.video.analogue3d_mode,
     }
 }
 

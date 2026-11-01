@@ -34,6 +34,14 @@ pub const RETRO_DEVICE_INDEX_ANALOG_RIGHT: c_uint = 1;
 pub const RETRO_DEVICE_ID_ANALOG_X: c_uint = 0;
 pub const RETRO_DEVICE_ID_ANALOG_Y: c_uint = 1;
 
+pub const RETRO_ENVIRONMENT_GET_VARIABLE: c_uint = 15;
+
+#[repr(C)]
+pub struct retro_variable {
+    pub key: *const c_char,
+    pub value: *const c_char,
+}
+
 pub const RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: c_uint = 10;
 pub const RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: c_uint = 32;
 pub const RETRO_ENVIRONMENT_SET_GEOMETRY: c_uint = 37;
@@ -169,7 +177,7 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut retro_system_info) {
     if info.is_null() {
         return;
     }
-    (*info).library_name = b"Gopher64 (MiSTer 4 All)\0".as_ptr() as *const c_char;
+    (*info).library_name = b"Gopher64 N64 (Karamelo)\0".as_ptr() as *const c_char;
     (*info).library_version = b"1.1.36\0".as_ptr() as *const c_char;
     (*info).valid_extensions = b"z64|n64|v64\0".as_ptr() as *const c_char;
     (*info).need_fullpath = false;
@@ -258,6 +266,27 @@ pub unsafe extern "C" fn retro_load_game(game: *const retro_game_info) -> bool {
         };
 
         let mut dev = Device::new(true);
+
+        // Query frontend for Analogue 3D Upscale mode (0=Off 320x240, 1=Analogue 3D 640x240, 2=Analogue 3D Ultra 1280x240)
+        let mut upscale_mode: u32 = 0;
+        let env_opt = *ENV_CB.lock().unwrap();
+        if let Some(cb) = env_opt {
+            let mut var = retro_variable {
+                key: b"karamelo-n64-upscale\0".as_ptr() as *const c_char,
+                value: std::ptr::null(),
+            };
+            if unsafe { cb(RETRO_ENVIRONMENT_GET_VARIABLE, &mut var as *mut _ as *mut c_void) } && !var.value.is_null() {
+                if let Ok(s) = unsafe { std::ffi::CStr::from_ptr(var.value) }.to_str() {
+                    upscale_mode = s.parse::<u32>().unwrap_or(0);
+                }
+            }
+        }
+        dev.ui.config.video.analogue3d_mode = upscale_mode;
+        if upscale_mode == 2 {
+            dev.ui.config.video.upscale = 2;
+        } else {
+            dev.ui.config.video.upscale = 1;
+        }
 
         // 1. Initialize ROM & Cartridge
         device::cart::rom::init(&mut dev, &rom_contents);
@@ -434,4 +463,9 @@ pub unsafe extern "C" fn retro_serialize(_data: *mut c_void, _size: usize) -> bo
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_unserialize(_data: *const c_void, _size: usize) -> bool {
     false
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn retro_set_n64_upscale(mode: std::ffi::c_int) {
+    unsafe { ui::video::rdp_set_analogue3d_mode(mode as u32) };
 }

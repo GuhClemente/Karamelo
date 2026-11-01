@@ -56,6 +56,7 @@ pub struct Video {
     pub widescreen: bool,
     pub vsync: bool,
     pub crt: bool,
+    pub analogue3d_mode: u32,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
@@ -190,6 +191,7 @@ impl Config {
                 widescreen: false,
                 vsync: true,
                 crt: false,
+                analogue3d_mode: 0,
             },
             emulation: Emulation {
                 overclock: false,

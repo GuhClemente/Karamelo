@@ -215,6 +215,8 @@ fn main() {
         .allowlist_function("rdp_load_state")
         .allowlist_function("rdp_idle")
         .allowlist_function("rdp_set_fps")
+        .allowlist_function("rdp_set_analogue3d_mode")
+        .allowlist_function("rdp_get_analogue3d_mode")
         .allowlist_function("get_joystick_event")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()

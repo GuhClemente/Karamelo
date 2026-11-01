@@ -787,6 +787,8 @@ static const char *GetArcadeCoreDll(const std::string &file_path = "") {
 // CoreBinaryExists is declared in core_runner.h
 
 static const char *GetN64CoreDll() {
+  if (setting_n64_upscale > 0 && CoreBinaryExists("cores/n64_gopher.dll"))
+    return "cores/n64_gopher.dll";
   if (setting_n64_core == 0 && CoreBinaryExists("cores/n64_parallel.dll"))
     return "cores/n64_parallel.dll";
   if (setting_n64_core == 1 && CoreBinaryExists("cores/n64_mupen.dll"))
@@ -1360,7 +1362,7 @@ void PopulateMainMenu() {
     }
 
     // 3a-2. N64 Analogue 3D Horizontal Upscaling
-    if (core_name == "Nintendo 64" || core_name.find("N64") != std::string::npos || core_name.find("Nintendo 64") != std::string::npos) {
+    if (core_name.find("Gopher") != std::string::npos || core_name.find("N64") != std::string::npos || core_name.find("Nintendo 64") != std::string::npos || core_name.find("ParaLLEl") != std::string::npos || core_name.find("Mupen") != std::string::npos) {
       const char *n64_upscales_pt[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
       const char *n64_upscales_en[] = {"Disabled", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
       items.push_back({Tr("Upscale N64", "N64 Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
@@ -4071,6 +4073,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (item.action_id == 309) // N64 core
     {
       setting_n64_core = (setting_n64_core + delta + 3) % 3;
+      if (setting_n64_core != 2 && setting_n64_upscale > 0) {
+        setting_n64_upscale = 0;
+        CoreSetN64Upscale(0);
+      }
+      MenuSaveSettings();
       const char *names[] = {"PARALLEL-N64", "MUPEN64PLUS",
                              "GOPHER64 (VULKAN)"};
       char msg[80];
@@ -4082,17 +4089,23 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (item.action_id == 310) // N64 Upscale (Analogue 3D)
     {
       setting_n64_upscale = (setting_n64_upscale + delta + 3) % 3;
+      if (setting_n64_upscale > 0) {
+        setting_n64_core = 2; // Gopher64
+      }
+      CoreSetN64Upscale(setting_n64_upscale);
       if (current_state == STATE_MAIN) PopulateMainMenu();
       else PopulateVideoSettings();
       SelectByAction(item.action_id, 7);
       MenuSaveSettings();
       const char *names[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
-      char msg[64];
+      char msg[80];
       if (CoreIsRunning())
         snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
+      else if (setting_n64_upscale > 0)
+        snprintf(msg, sizeof(msg), "N64 Upscale: %s (Gopher64)", names[setting_n64_upscale]);
       else
         snprintf(msg, sizeof(msg), "N64 Upscale: %s", names[setting_n64_upscale]);
-      CoreSetToast(msg, 75);
+      CoreSetToast(msg, 90);
     } else if (item.action_id == 312) // OSD auto-hide
     {
       setting_osd_timeout =
@@ -4829,17 +4842,23 @@ static void MenuProcessKeyImpl(MenuKey key) {
         MenuSaveSettings();
       } else if (item.action_id == 310) {
         setting_n64_upscale = (setting_n64_upscale + 1) % 3;
+        if (setting_n64_upscale > 0) {
+          setting_n64_core = 2; // Gopher64
+        }
+        CoreSetN64Upscale(setting_n64_upscale);
         if (current_state == STATE_MAIN) PopulateMainMenu();
         else PopulateVideoSettings();
         SelectByAction(item.action_id, 7);
         MenuSaveSettings();
         const char *names[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
-        char msg[64];
+        char msg[80];
         if (CoreIsRunning())
           snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
+        else if (setting_n64_upscale > 0)
+          snprintf(msg, sizeof(msg), "N64 Upscale: %s (Gopher64)", names[setting_n64_upscale]);
         else
           snprintf(msg, sizeof(msg), "N64 Upscale: %s", names[setting_n64_upscale]);
-        CoreSetToast(msg, 75);
+        CoreSetToast(msg, 90);
       } else if (item.action_id == 798) {
         wizard_active = true;
         wizard_step = 0;

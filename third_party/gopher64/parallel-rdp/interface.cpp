@@ -113,6 +113,7 @@ static RDP_DEVICE rdp_device;
 static bool crop_letterbox;
 static CALL_BACK callback;
 static GFX_INFO gfx_info;
+static uint32_t g_analogue3d_mode = 0;
 static const uint32_t *fragment_spirv;
 static size_t fragment_size;
 
@@ -328,7 +329,7 @@ static void rdp_new_processor() {
       RDP::COMMAND_PROCESSOR_FLAG_HOST_VISIBLE_HIDDEN_RDRAM_BIT |
       RDP::COMMAND_PROCESSOR_FLAG_HOST_VISIBLE_TMEM_BIT;
 
-  if (gfx_info.upscale == 2) {
+  if (gfx_info.analogue3d_mode == 2 || gfx_info.upscale == 2) {
     flags |= RDP::COMMAND_PROCESSOR_FLAG_SUPER_SAMPLED_DITHER_BIT;
     flags |= RDP::COMMAND_PROCESSOR_FLAG_UPSCALING_2X_BIT;
   } else if (gfx_info.upscale == 4) {
@@ -402,6 +403,7 @@ void rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   }
 
   gfx_info = _gfx_info;
+  g_analogue3d_mode = _gfx_info.analogue3d_mode;
 
   if (gfx_info.crt) {
     fragment_spirv = crt_fragment_spirv;
@@ -738,6 +740,15 @@ void rdp_render_frame() {
 }
 
 static std::vector<RDP::RGBA> g_frame_pixels;
+static std::vector<RDP::RGBA> g_processed_pixels;
+
+void rdp_set_analogue3d_mode(uint32_t mode) {
+  g_analogue3d_mode = mode;
+}
+
+uint32_t rdp_get_analogue3d_mode() {
+  return g_analogue3d_mode;
+}
 
 bool rdp_get_framebuffer(const uint32_t **out_pixels, uint32_t *out_width, uint32_t *out_height) {
   if (!processor) return false;
@@ -748,6 +759,80 @@ bool rdp_get_framebuffer(const uint32_t **out_pixels, uint32_t *out_width, uint3
   unsigned w = 0, h = 0;
   processor->scanout_sync(g_frame_pixels, w, h, options);
   if (w == 0 || h == 0 || g_frame_pixels.empty()) return false;
+
+  uint32_t mode = g_analogue3d_mode;
+
+  if (mode == 0) {
+    // Mode 0: Desligado / Nativo (320x240, 320x288 PAL)
+    unsigned target_w = (w >= 640) ? (w / 2) : w;
+    unsigned target_h = h;
+    if (target_w != w || target_h != h) {
+      g_processed_pixels.resize(target_w * target_h);
+      for (unsigned y = 0; y < target_h; y++) {
+        const RDP::RGBA *src = &g_frame_pixels[y * w];
+        RDP::RGBA *dst = &g_processed_pixels[y * target_w];
+        for (unsigned x = 0; x < target_w; x++) {
+          const RDP::RGBA &p0 = src[2 * x];
+          const RDP::RGBA &p1 = src[2 * x + 1];
+          dst[x].r = (uint8_t)(((uint32_t)p0.r + (uint32_t)p1.r) >> 1);
+          dst[x].g = (uint8_t)(((uint32_t)p0.g + (uint32_t)p1.g) >> 1);
+          dst[x].b = (uint8_t)(((uint32_t)p0.b + (uint32_t)p1.b) >> 1);
+          dst[x].a = 0xFF;
+        }
+      }
+      if (out_pixels) *out_pixels = reinterpret_cast<const uint32_t *>(g_processed_pixels.data());
+      if (out_width) *out_width = target_w;
+      if (out_height) *out_height = target_h;
+      return true;
+    }
+  } else if (mode == 2) {
+    // Mode 2: Analogue 3D Ultra (1280x240)
+    if (w >= 1280 && h >= 480) {
+      // 2x RDP supersampling: resolve 1280x480 to 1280x240 (vertical 2x SSAA filter)
+      unsigned target_w = 1280;
+      unsigned target_h = h / 2;
+      g_processed_pixels.resize(target_w * target_h);
+      for (unsigned y = 0; y < target_h; y++) {
+        const RDP::RGBA *row0 = &g_frame_pixels[(2 * y) * w];
+        const RDP::RGBA *row1 = &g_frame_pixels[(2 * y + 1) * w];
+        RDP::RGBA *dst = &g_processed_pixels[y * target_w];
+        for (unsigned x = 0; x < target_w; x++) {
+          dst[x].r = (uint8_t)(((uint32_t)row0[x].r + (uint32_t)row1[x].r) >> 1);
+          dst[x].g = (uint8_t)(((uint32_t)row0[x].g + (uint32_t)row1[x].g) >> 1);
+          dst[x].b = (uint8_t)(((uint32_t)row0[x].b + (uint32_t)row1[x].b) >> 1);
+          dst[x].a = 0xFF;
+        }
+      }
+      if (out_pixels) *out_pixels = reinterpret_cast<const uint32_t *>(g_processed_pixels.data());
+      if (out_width) *out_width = target_w;
+      if (out_height) *out_height = target_h;
+      return true;
+    } else if (w == 640) {
+      // 2x horizontal supersampling: 640x240 -> 1280x240
+      unsigned target_w = 1280;
+      unsigned target_h = h;
+      g_processed_pixels.resize(target_w * target_h);
+      for (unsigned y = 0; y < target_h; y++) {
+        const RDP::RGBA *src = &g_frame_pixels[y * 640];
+        RDP::RGBA *dst = &g_processed_pixels[y * 1280];
+        for (unsigned x = 0; x < 640; x++) {
+          const RDP::RGBA &p0 = src[x];
+          const RDP::RGBA &p1 = (x + 1 < 640) ? src[x + 1] : p0;
+          dst[2 * x] = p0;
+          dst[2 * x + 1].r = (uint8_t)(((uint32_t)p0.r + (uint32_t)p1.r) >> 1);
+          dst[2 * x + 1].g = (uint8_t)(((uint32_t)p0.g + (uint32_t)p1.g) >> 1);
+          dst[2 * x + 1].b = (uint8_t)(((uint32_t)p0.b + (uint32_t)p1.b) >> 1);
+          dst[2 * x + 1].a = 0xFF;
+        }
+      }
+      if (out_pixels) *out_pixels = reinterpret_cast<const uint32_t *>(g_processed_pixels.data());
+      if (out_width) *out_width = target_w;
+      if (out_height) *out_height = target_h;
+      return true;
+    }
+  }
+
+  // Mode 1: Analogue 3D (640x240 native VI scanout)
   if (out_pixels) *out_pixels = reinterpret_cast<const uint32_t *>(g_frame_pixels.data());
   if (out_width) *out_width = w;
   if (out_height) *out_height = h;
@@ -819,6 +904,7 @@ void rdp_save_state(uint8_t *state) {
 
 void rdp_load_state(GFX_INFO _gfx_info, const uint8_t *state) {
   gfx_info = _gfx_info;
+  g_analogue3d_mode = _gfx_info.analogue3d_mode;
   memcpy(&rdp_device, state, sizeof(RDP_DEVICE));
 
   if (g_tmem) {
