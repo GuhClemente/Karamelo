@@ -1192,7 +1192,8 @@ int main(int argc, char* argv[])
 			passed, iterations, elapsed / 1000.0, elapsed / (double)iterations);
 		return (passed == iterations) ? 0 : 1;
 	}
-
+
+
 	// --dump-port-catalog <file>: the loaded Ports & Recomp catalog as JSON.
 	if (argc > 2 && strcasecmp(argv[1], "--dump-port-catalog") == 0)
 		return PortDumpCatalog(argv[2]) ? 0 : 1;
@@ -1264,6 +1265,20 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	ApplyWindowIcon(g_window);
+
+	bool start_fullscreen = false;
+	const char* fs_env = getenv("KARAMELO_FULLSCREEN");
+	if (fs_env && strcmp(fs_env, "0") != 0)
+		start_fullscreen = true;
+	for (int i = 1; i < argc; i++)
+	{
+		if (strcmp(argv[i], "--fullscreen") == 0 || strcmp(argv[i], "-f") == 0)
+			start_fullscreen = true;
+	}
+	if (start_fullscreen)
+	{
+		SDL_SetWindowFullscreen(g_window, true);
+	}
 
 	g_renderer = SDL_CreateRenderer(g_window, NULL);
 	if (!g_renderer)
