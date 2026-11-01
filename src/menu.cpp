@@ -348,6 +348,7 @@ static int setting_vsync = 1; // 0=Disabled, 1=Enabled
 // ParaLLEl N64 is the primary robust core with Ari64 Dynarec and RetroAchievements.
 // Defaulting to it provides 60fps locked emulation and rock-solid stability.
 static int setting_n64_core = 0;
+static int setting_n64_upscale = 0; // 0=Desligado (Nativo), 1=Analogue 3D (640x240), 2=Analogue 3D Ultra (1280x240)
 static int setting_osd_timeout = 0; // index into kOsdTimeouts
 static int setting_name_scroll = 3; // index into kScrollDelays; default 5s
 static int setting_sms_fm = 0; // 0=auto, 1=desligado, 2=ligado
@@ -712,6 +713,8 @@ void MenuSetVideoDriverForSelftest(int driver) {
 int MenuGetSyncMode() { return setting_sync; }
 int MenuGetVsync() { return setting_vsync; }
 int MenuGetN64Core() { return setting_n64_core; }
+int MenuGetN64Upscale() { return setting_n64_upscale; }
+void MenuSetN64Upscale(int mode) { setting_n64_upscale = ClampInt(mode, 0, 2); }
 // Arcade routing is automatic and deliberately has no setting. There used to
 // be one, offering "FinalBurn Neo", "MAME 2003", "MAME 2010" and "Flycast".
 // Picking wrong was not a harmless mistake: handing a romset to a MAME build
@@ -1356,6 +1359,13 @@ void PopulateMainMenu() {
           {Tr("Acesso do CD", "CD Access"), (setting_language == 1) ? acc_en[setting_cd_latency] : acc_pt[setting_cd_latency], false, false, 514});
     }
 
+    // 3a-2. N64 Analogue 3D Horizontal Upscaling
+    if (core_name == "Nintendo 64" || core_name.find("N64") != std::string::npos || core_name.find("Nintendo 64") != std::string::npos) {
+      const char *n64_upscales_pt[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+      const char *n64_upscales_en[] = {"Disabled", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+      items.push_back({Tr("Upscale N64", "N64 Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
+    }
+
     // 3b. Core Options: whatever the core itself declared via SET_VARIABLES
     // (internal resolution, region, DSP, ...), generically - only shown when
     // there is actually something to show, same as every other conditional
@@ -1779,6 +1789,7 @@ static void ResetAllSettingsToDefault() {
   setting_sync = 1;
   setting_vsync = 1;
   setting_n64_core = 0; // ParaLLEl N64 - see the comment on its declaration
+  setting_n64_upscale = 0;
   setting_osd_timeout = 0;
   setting_name_scroll = 3;
   setting_sms_fm = 0;
@@ -2018,6 +2029,10 @@ void PopulateVideoSettings() {
   // the OSD value column shows.
   const char *n64_cores[] = {"ParaLLEl N64", "Mupen64+ Next", "Gopher64"};
   items.push_back({Tr("Core do N64", "N64 Core"), n64_cores[setting_n64_core], false, false, 309});
+
+  const char *n64_upscales_pt[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+  const char *n64_upscales_en[] = {"Disabled", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+  items.push_back({Tr("Upscale N64", "N64 Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
 
   char osd_to[16];
   if (kOsdTimeouts[setting_osd_timeout] == 0)
@@ -2921,6 +2936,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "sync", setting_sync);
   AppendSetting(out, "vsync", setting_vsync);
   AppendSetting(out, "n64_core", setting_n64_core);
+  AppendSetting(out, "n64_upscale", setting_n64_upscale);
   AppendSetting(out, "osd_timeout", setting_osd_timeout);
   AppendSetting(out, "name_scroll", setting_name_scroll);
   AppendSetting(out, "hw_render", (setting_driver != VIDEO_DRIVER_SOFTWARE) ? 1 : 0);
@@ -3062,6 +3078,8 @@ static void MenuLoadSettings() {
       setting_vsync = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "n64_core"))
       setting_n64_core = ClampInt(iv, 0, 2);
+    else if (!strcmp(key, "n64_upscale"))
+      setting_n64_upscale = ClampInt(iv, 0, 2);
     else if (!strcmp(key, "osd_timeout"))
       setting_osd_timeout = ClampInt(iv, 0, kOsdTimeoutCount - 1);
     else if (!strcmp(key, "name_scroll"))
@@ -4061,6 +4079,20 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
       SelectByAction(item.action_id, 6);
+    } else if (item.action_id == 310) // N64 Upscale (Analogue 3D)
+    {
+      setting_n64_upscale = (setting_n64_upscale + delta + 3) % 3;
+      if (current_state == STATE_MAIN) PopulateMainMenu();
+      else PopulateVideoSettings();
+      SelectByAction(item.action_id, 7);
+      MenuSaveSettings();
+      const char *names[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+      char msg[64];
+      if (CoreIsRunning())
+        snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
+      else
+        snprintf(msg, sizeof(msg), "N64 Upscale: %s", names[setting_n64_upscale]);
+      CoreSetToast(msg, 75);
     } else if (item.action_id == 312) // OSD auto-hide
     {
       setting_osd_timeout =
@@ -4795,6 +4827,19 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateControllerSettings();
         SelectByAction(item.action_id, 4);
         MenuSaveSettings();
+      } else if (item.action_id == 310) {
+        setting_n64_upscale = (setting_n64_upscale + 1) % 3;
+        if (current_state == STATE_MAIN) PopulateMainMenu();
+        else PopulateVideoSettings();
+        SelectByAction(item.action_id, 7);
+        MenuSaveSettings();
+        const char *names[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+        char msg[64];
+        if (CoreIsRunning())
+          snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
+        else
+          snprintf(msg, sizeof(msg), "N64 Upscale: %s", names[setting_n64_upscale]);
+        CoreSetToast(msg, 75);
       } else if (item.action_id == 798) {
         wizard_active = true;
         wizard_step = 0;

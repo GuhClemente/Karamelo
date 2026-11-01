@@ -120,7 +120,7 @@ static bool  s_core_faulted = false;   // retro_run raised an exception this ses
 static enum retro_pixel_format core_pixel_format = RETRO_PIXEL_FORMAT_RGB565;
 
 // Triple-Buffered Lock-Free Framebuffer System
-#define MAX_FB_WIDTH  1024
+#define MAX_FB_WIDTH  1280
 #define MAX_FB_HEIGHT 1024
 // Lock-free triple buffer.
 //
@@ -1924,6 +1924,33 @@ static bool CB_Environment(unsigned cmd, void* data)
 		struct retro_variable* var = (struct retro_variable*)data;
 		if (var && var->key)
 		{
+			// Analogue 3D N64 Horizontal Upscaling (Caminho A):
+			// Renders 3D geometry with 2x (640x240) or 4x (1280x240) horizontal resolution
+			// while strictly preserving 240p scanlines for authentic CRT display.
+			int n64_up = MenuGetN64Upscale();
+			if (n64_up > 0)
+			{
+				const char* res = (n64_up == 2) ? "1280x240" : "640x240";
+				if (strcmp(var->key, "mupen64plus-43screensize") == 0 ||
+				    strcmp(var->key, "parallel-n64-screensize") == 0)
+				{
+					var->value = res;
+					return true;
+				}
+				if (strcmp(var->key, "mupen64plus-EnableNativeResFactor") == 0)
+				{
+					var->value = "0";
+					return true;
+				}
+				if (strcmp(var->key, "mupen64plus-aspect") == 0 ||
+				    strcmp(var->key, "parallel-n64-aspect") == 0 ||
+				    strcmp(var->key, "parallel-n64-aspectratiohint") == 0)
+				{
+					var->value = "4:3";
+					return true;
+				}
+			}
+
 			EnterCriticalSection(&options_lock);
 			auto it = g_core_options.find(var->key);
 			const char* user_value = (it != g_core_options.end()) ? StableOptionValue(it->second) : NULL;
@@ -1966,7 +1993,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// for a stall.
 			else if (strcmp(var->key, "parallel-n64-gfxplugin") == 0)
 #ifdef _WIN32
-				var->value = (MenuGetHwRender() && HwGlProbed()) ? "glide64" : "angrylion";
+				var->value = (MenuGetHwRender() && HwGlProbed()) ? ((n64_up > 0) ? "gliden64" : "glide64") : "angrylion";
 #else
 				// glide64 crashes inside Mesa from retro_unload_game - every
 				// N64 game closed with ParaLLEl killed the app on Linux (seen
