@@ -205,7 +205,16 @@ pub unsafe extern "C" fn retro_get_system_av_info(av_info: *mut retro_system_av_
     (*av_info).geometry.aspect_ratio = 4.0 / 3.0;
 
     (*av_info).timing.fps = if is_pal { 50.0 } else { 60.0 };
-    (*av_info).timing.sample_rate = 44100.0;
+        let mut rate = if is_pal { 31250.0 } else { 32000.0 };
+    {
+        let guard = device_lock();
+        if let Some(ref dev) = *guard {
+            if dev.ai.freq > 0 {
+                rate = dev.ai.freq as f64;
+            }
+        }
+    }
+    (*av_info).timing.sample_rate = rate;
 }
 
 #[unsafe(no_mangle)]
@@ -412,6 +421,9 @@ pub unsafe extern "C" fn retro_run() {
 
         // Step CPU until vertical interrupt finishes frame
         device::cpu::run(dev);
+
+        // Flush any remaining audio samples from this frame
+        ui::audio::flush_libretro_audio();
     });
 
     if let Err(err) = result {

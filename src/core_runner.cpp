@@ -752,7 +752,7 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			// With half the queue still to play, a short ring is only the core's
 			// next frame not being here yet. Padding then put silence in the middle
 			// of the sound for no reason, and read as an underrun that grew the queue.
-			if (available < SAMPLES_PER_BUFFER && queued_bytes >= target_bytes / 2) break;
+			if (available < SAMPLES_PER_BUFFER && (queued_bytes >= target_bytes / 2 || queued_bytes >= SAMPLES_PER_BUFFER * 4 * (int)sizeof(int16_t))) break;
 
 			// Always keep the device fed. Letting the queue run dry stops
 			// playback outright, which is what produced the periodic gaps;
@@ -1122,13 +1122,15 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		// Too empty pads with silence; too full discards the excess, which is
 		// stale latency nobody wants to hear anyway.
 		const LONG seed = (LONG)target_fill;
-		const LONG min_thresh = s_loaded_core_is_pcsx2 ? (SAMPLES_PER_BUFFER * 2) : (seed / 3);
+		const LONG min_thresh = SAMPLES_PER_BUFFER * 2;
 		if (total_queued < min_thresh || total_queued > seed * 3)
 		{
 			// Re-read: the audio thread has been draining since the snapshot
 			// above, so the stale value would seed us behind the reader.
 			rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
-			const LONG ring_wanted = (seed > stream_frames) ? (seed - stream_frames) : 0;
+			const LONG baseline_seed = (LONG)InterlockedCompareExchange(&g_baseline_wave_buffers, 0, 0) * SAMPLES_PER_BUFFER;
+			const LONG prime_target = (seed < baseline_seed) ? seed : baseline_seed;
+			const LONG ring_wanted = (prime_target > stream_frames) ? (prime_target - stream_frames) : 0;
 			for (LONG i = occupancy; i < ring_wanted; i++)
 			{
 				LONG idx = (rp + i) % RING_BUFFER_SIZE;

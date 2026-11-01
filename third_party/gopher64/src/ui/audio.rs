@@ -4,6 +4,21 @@ use crate::ui;
 
 pub static AUDIO_BATCH_CB: std::sync::Mutex<Option<unsafe extern "C" fn(*const i16, usize) -> usize>> =
     std::sync::Mutex::new(None);
+pub static LIBRETRO_AUDIO_BUF: std::sync::Mutex<Vec<i16>> = std::sync::Mutex::new(Vec::new());
+
+pub fn flush_libretro_audio() {
+    let mut buf = LIBRETRO_AUDIO_BUF.lock().unwrap();
+    if buf.is_empty() {
+        return;
+    }
+    let cb_opt = *AUDIO_BATCH_CB.lock().unwrap();
+    if let Some(cb) = cb_opt {
+        unsafe {
+            cb(buf.as_ptr(), buf.len() / 2);
+        }
+    }
+    buf.clear();
+}
 
 static ADJUST_LOCKED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -181,24 +196,33 @@ fn adjust_audio_frequency(audio_stream: *mut sdl3_sys::audio::SDL_AudioStream, f
 
 pub fn play_audio(device: &device::Device, dram_addr: usize, length: u64) {
     if ui::video::LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-        let cb_opt = *AUDIO_BATCH_CB.lock().unwrap();
-        if let Some(cb) = cb_opt {
-            let sample_count = length as usize / 2;
-            let mut primary_buffer: Vec<i16> = vec![0; sample_count];
-            let mut i = 0;
-            while i < sample_count {
-                // Left channel
-                primary_buffer[i] = *device.rdram.mem.get(dram_addr + (i * 2) + 2).unwrap_or(&0) as i16
-                    | ((*device.rdram.mem.get(dram_addr + (i * 2) + 3).unwrap_or(&0) as i16) << 8);
+        let sample_count = length as usize / 2;
+        if sample_count == 0 {
+            return;
+        }
+        let mut buf = LIBRETRO_AUDIO_BUF.lock().unwrap();
+        let start_len = buf.len();
+        buf.resize(start_len + sample_count, 0);
+        let mut i = 0;
+        while i < sample_count {
+            // Left channel
+            buf[start_len + i] = *device.rdram.mem.get(dram_addr + (i * 2) + 2).unwrap_or(&0) as i16
+                | ((*device.rdram.mem.get(dram_addr + (i * 2) + 3).unwrap_or(&0) as i16) << 8);
 
-                // Right channel
-                primary_buffer[i + 1] = *device.rdram.mem.get(dram_addr + (i * 2)).unwrap_or(&0) as i16
-                    | ((*device.rdram.mem.get(dram_addr + (i * 2) + 1).unwrap_or(&0) as i16) << 8);
-                i += 2;
+            // Right channel
+            buf[start_len + i + 1] = *device.rdram.mem.get(dram_addr + (i * 2)).unwrap_or(&0) as i16
+                | ((*device.rdram.mem.get(dram_addr + (i * 2) + 1).unwrap_or(&0) as i16) << 8);
+            i += 2;
+        }
+
+        if buf.len() >= 512 {
+            let cb_opt = *AUDIO_BATCH_CB.lock().unwrap();
+            if let Some(cb) = cb_opt {
+                unsafe {
+                    cb(buf.as_ptr(), buf.len() / 2);
+                }
             }
-            unsafe {
-                cb(primary_buffer.as_ptr(), sample_count / 2);
-            }
+            buf.clear();
         }
         return;
     }
