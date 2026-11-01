@@ -1072,13 +1072,39 @@ static int s_prev_dpad_dir = 0; // 0=none, 1=up, 2=down, 3=left, 4=right
 static DWORD s_dpad_first_press_tick = 0;
 static DWORD s_dpad_last_repeat_tick = 0;
 static bool s_prev_osd_enabled = false;
+static DWORD s_pad_seen_tick[4] = {}; // when each slot appeared, 0 while it is empty
 
 static void PollGamepad()
 {
+	// Any connected pad drives the menu. Which one gets slot 0 depends on what Windows
+	// found first, so after a restart the pad in the player's hands could be slot 1
+	// and the menu did not react to it. Who plays as whom in a game is decided elsewhere.
 	XINPUT_STATE state;
 	ZeroMemory(&state, sizeof(XINPUT_STATE));
+	bool any_pad = false;
+	WORD settling_buttons = 0;
+	for (int slot = 0; slot < 4; slot++)
+	{
+		XINPUT_STATE one;
+		ZeroMemory(&one, sizeof(one));
+		if (!GamepadGetState(slot, &one))
+		{
+			s_pad_seen_tick[slot] = 0;
+			continue;
+		}
+		any_pad = true;
+		state.Gamepad.wButtons |= one.Gamepad.wButtons;
+		// A pad reads as all released until its first report arrives, so a button already
+		// down when it connects looks like a fresh press. That confirmed the first item of
+		// the menu by itself and opened Favoritos. Nothing counts until the pad has settled.
+		const DWORD tick = GetTickCount();
+		if (!s_pad_seen_tick[slot]) s_pad_seen_tick[slot] = tick ? tick : 1;
+		if (tick - s_pad_seen_tick[slot] < 500) settling_buttons |= one.Gamepad.wButtons;
+		if (abs((int)one.Gamepad.sThumbLX) > abs((int)state.Gamepad.sThumbLX)) state.Gamepad.sThumbLX = one.Gamepad.sThumbLX;
+		if (abs((int)one.Gamepad.sThumbLY) > abs((int)state.Gamepad.sThumbLY)) state.Gamepad.sThumbLY = one.Gamepad.sThumbLY;
+	}
 
-	if (GamepadGetState(0, &state))
+	if (any_pad)
 	{
 		WORD wButtons = state.Gamepad.wButtons;
 		SHORT sThumbY = state.Gamepad.sThumbLY;
@@ -1095,7 +1121,7 @@ static void PollGamepad()
 			s_prev_dpad_dir = 0;
 		}
 
-		WORD wPressed = wButtons & ~s_prev_pad_buttons;
+		WORD wPressed = wButtons & ~(s_prev_pad_buttons | settling_buttons);
 		s_prev_pad_buttons = wButtons;
 
 		if (osd_now)
