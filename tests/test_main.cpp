@@ -13,6 +13,7 @@ const char* NetplayGetPeerIp() { return ""; }
 std::vector<NetplayLocalInterface> NetplayGetLocalInterfaces() { return {}; }
 bool NetplayStartHost(int port) { (void)port; return true; }
 bool NetplayStartClient(const char* ip, int port) { (void)ip; (void)port; return true; }
+bool NetplayStartRelay(bool is_host, const char* host, int port, const char* ticket) { (void)is_host; (void)host; (void)port; (void)ticket; return true; }
 NetplayRole NetplayGetRole() { return NETPLAY_NONE; }
 NetplayState NetplayGetState() { return NETPLAY_DISCONNECTED; }
 void MenuRequestQuit() {}

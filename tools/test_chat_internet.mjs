@@ -40,7 +40,56 @@ const server = createChatServer({
   getKey: async (kid) => (kid === "k1" ? jwk : undefined), log: () => {},
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+await new Promise((resolve) => server.relay.listen(0, "127.0.0.1", resolve));
 const url = "http://127.0.0.1:" + server.address().port;
+
+async function post(route, body, token) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = "Bearer " + token;
+  const r = await fetch(url + route, { method: "POST", headers, body: JSON.stringify(body) });
+  return r.json();
+}
+
+// Two real games through the bridge: they must keep showing the same image. Needs a
+// core and a game, so it is skipped where there are none, as in CI.
+async function matchThroughBridge() {
+  const app = path.join(root, "app");
+  const ext = process.platform === "win32" ? "dll" : process.platform === "darwin" ? "dylib" : "so";
+  const core = "cores/gb." + ext;
+  const romDir = path.join(app, "roms", "GameBoy");
+  const rom = fs.existsSync(romDir) ? fs.readdirSync(romDir).find((f) => /\.(gb|gbc)$/i.test(f)) : null;
+  if (!rom || !fs.existsSync(path.join(app, core))) return null;
+  const host = await post("/v1/login", { id_token: idToken("match-host"), nick: "H" });
+  const guest = await post("/v1/login", { id_token: idToken("match-guest"), nick: "G" });
+  const made = await post("/v1/match", {}, host.session);
+  const joined = await post("/v1/match/join", { code: made.code }, guest.session);
+  const play = (role, ticket) => new Promise((resolve) => {
+    const out = path.join(work, "bridge_" + role + ".txt");
+    const child = spawn(exe, ["--netplay-selftest", role, core, path.join(romDir, rom), "relay:" + ticket,
+      String(made.relay_port), "300", out], {
+      cwd: app, stdio: "ignore",
+      env: { ...process.env, SDL_AUDIO_DRIVER: "dummy", SDL_VIDEO_DRIVER: process.env.SDL_VIDEO_DRIVER || "dummy" },
+    });
+    const killer = setTimeout(() => child.kill(), 80000);
+    child.on("exit", (code) => {
+      clearTimeout(killer);
+      resolve({ code, out });
+    });
+  });
+  const hostRun = play("host", made.ticket);
+  await new Promise((r) => setTimeout(r, 2000));
+  const [h, g] = await Promise.all([hostRun, play("guest", joined.ticket)]);
+  const video = (f) => fs.existsSync(f + ".video")
+    ? fs.readFileSync(f + ".video", "utf8").trim().split("\n").map((l) => l.trim().split(" ")) : [];
+  const seen = new Map(video(h.out));
+  let same = 0, diff = 0;
+  for (const [frame, image] of video(g.out).slice(1)) {
+    if (!seen.has(frame)) continue;
+    if (seen.get(frame) === image) same++;
+    else diff++;
+  }
+  return { h: h.code, g: g.code, same, diff };
+}
 
 function run(role, token, chatPort) {
   const dir = path.join(work, role);
@@ -72,8 +121,16 @@ try {
   report("forged login refused", bad.code === 0, bad.code === 0 ? "" : `exit ${bad.code}`);
 
   const [a, b] = await Promise.all([run("a", idToken("account-a"), 55761), run("b", idToken("account-b"), 55762)]);
-  report("internet chat, invite and match", a.code === 0 && b.code === 0,
+  report("internet chat, match code and bridge", a.code === 0 && b.code === 0,
     `exit ${a.code}: ${a.text}\n      exit ${b.code}: ${b.text}`);
+
+  const game = await matchThroughBridge();
+  if (game) {
+    report("game through the bridge", (game.h === 0 || game.h === 5) && (game.g === 0 || game.g === 5) && game.same > 0 && game.diff === 0,
+      `exit ${game.h}/${game.g}, image: ${game.same} equal, ${game.diff} different`);
+  } else {
+    console.log("  game through the bridge: skipped, no Game Boy core or game here");
+  }
 } finally {
   server.close();
   server.closeAllConnections();

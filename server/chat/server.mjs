@@ -4,8 +4,11 @@
 // only, gone on restart. What it writes to disk: the ban list, as keyed hashes of
 // the Google account id. A login is a signed token held by the player, so a
 // restart does not sign anyone out. Google's token is read for its anonymous id;
-// the login never asks for a name or an e-mail, and the player's address is only
-// handed over when someone accepts that player's invite.
+// the login never asks for a name or an e-mail.
+//
+// A player's address never leaves here. A match over the internet is a bridge: both
+// players connect to this server and it passes the bytes along, so neither learns
+// where the other is. Addresses are only held while connected, to limit connections.
 //
 // No dependencies: Node 20 or newer. TLS is done by the proxy in front of it.
 //
@@ -17,12 +20,16 @@
 //   CHAT_TRUST_PROXY        "1" behind a proxy: read the client from X-Forwarded-For
 //   CHAT_JWKS_URL, CHAT_ISSUER  only the tests change these
 //   PORT                    default 8787
+//   CHAT_RELAY_PORT         the match bridge, plain TCP, default 55440
+//   TYPESAFE_API_KEY        Jev, the moderation service; without it only the word list runs
 
 import http from "node:http";
+import net from "node:net";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_ALLOWED, loadBlocklist, makeJev, makeMatcher, sweeten } from "./moderation.mjs";
 
 export const ROOM_COUNT = 4;
 const MAX_ROOM_MESSAGES = 100;
@@ -34,7 +41,16 @@ const MAX_ONLINE_LISTED = 100;
 const MAX_ONLINE = 20000;
 const SESSION_MS = 30 * 24 * 3600 * 1000;
 const ONLINE_MS = 30 * 1000;
-const INVITE_MS = 10 * 60 * 1000;
+const MATCH_CODE_MS = 10 * 60 * 1000;
+const MATCH_MAX_MS = 12 * 3600 * 1000;
+const RELAY_IDLE_MS = 5 * 60 * 1000;
+const RELAY_HELLO_MS = 10 * 1000;
+const RELAY_MAX_PAIRS = 100;
+const RELAY_MAX_PER_ADDRESS = 8;
+const RELAY_MAX_BYTES = 4 * 1024 * 1024 * 1024;
+const JOIN_WINDOW_MS = 60 * 1000;
+const JOIN_MAX = 10;
+const CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const SEND_WINDOW_MS = 10 * 1000;
 const SEND_MAX = 5;
 const LOGIN_WINDOW_MS = 60 * 1000;
@@ -143,6 +159,9 @@ export function createChatServer(config) {
     getKey = makeGoogleKeyFetcher(jwksUrl),
     log = (line) => console.log(line),
     loginMax = LOGIN_MAX,
+    jevKey = "",
+    jevCall = undefined,
+    blocklist = loadBlocklist(),
   } = config;
   if (!clientIds || clientIds.length === 0) throw new Error("CHAT_GOOGLE_CLIENT_IDS is required");
   if (!hashSecret) throw new Error("CHAT_HASH_SECRET is required");
@@ -151,21 +170,56 @@ export function createChatServer(config) {
   const rooms = Array.from({ length: ROOM_COUNT }, () => ({ seq: 0, messages: [] }));
   const sessions = new Map();  // account -> who is around now; rebuilt from tokens
   const revoked = new Map();   // signed-out token hash -> when it expires
-  const invites = new Map();   // invite id -> { ip, port, tag, game, at, room }
+  const matches = new Map();   // code -> { account, hostTicket, at }
+  const tickets = new Map();   // ticket -> { pair, role, account, at }
+  const joinLimits = new Map();
   const reports = [];
   const sendLimits = new Map();
   const loginLimits = new Map();
   const requestLimits = new Map();
   const bansPath = path.join(dataDir, "bans.json");
-  let bans = new Set();
+  // account hash -> { tag, at }: the tag is what lets the admin panel show who it was.
+  const bans = new Map();
   try {
-    bans = new Set(JSON.parse(fs.readFileSync(bansPath, "utf8")));
+    for (const entry of JSON.parse(fs.readFileSync(bansPath, "utf8"))) {
+      if (typeof entry === "string") bans.set(entry, { tag: "", at: 0 });
+      else bans.set(entry.id, { tag: entry.tag || "", at: entry.at || 0 });
+    }
   } catch { /* no bans yet */ }
+
+  // What the admin panel controls. Survives restarts, unlike everything about the rooms.
+  const settingsPath = path.join(dataDir, "settings.json");
+  const settings = {
+    chat_enabled: true, matches_enabled: true, words_enabled: true, links_enabled: true,
+    jev_enabled: true, jev_block_at: 0.8, extra_words: [], allowed_words: DEFAULT_ALLOWED,
+  };
+  try {
+    Object.assign(settings, JSON.parse(fs.readFileSync(settingsPath, "utf8")));
+  } catch { /* the defaults */ }
+  let matcher = makeMatcher([...blocklist, ...settings.extra_words], settings.allowed_words);
+  const jev = makeJev({ apiKey: jevKey, call: jevCall });
+  const moderationStats = { swapped: 0 };
+  const blockedLog = []; // the last messages Jev stopped, in memory, for the panel
+
+  function saveSettings() {
+    fs.mkdirSync(dataDir, { recursive: true });
+    const tmp = settingsPath + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(settings));
+    fs.renameSync(tmp, settingsPath);
+  }
+
+  function cleanWords(text) {
+    if (!settings.words_enabled && !settings.links_enabled) return { text, changed: false };
+    const m = settings.words_enabled ? matcher : makeMatcher([], []);
+    const result = sweeten(text, m, { links: settings.links_enabled });
+    if (result.changed) moderationStats.swapped++;
+    return result;
+  }
 
   function saveBans() {
     fs.mkdirSync(dataDir, { recursive: true });
     const tmp = bansPath + ".tmp";
-    fs.writeFileSync(tmp, JSON.stringify([...bans]));
+    fs.writeFileSync(tmp, JSON.stringify([...bans].map(([id, info]) => ({ id, ...info }))));
     fs.renameSync(tmp, bansPath);
   }
 
@@ -202,12 +256,12 @@ export function createChatServer(config) {
   }
 
   function publicMessage(m) {
-    return { seq: m.seq, sender: m.sender, text: m.text, at: m.at, game: m.game, invite: m.invite };
+    return { seq: m.seq, sender: m.sender, text: m.text, at: m.at };
   }
 
   function appendMessage(roomIdx, fields) {
     const room = rooms[roomIdx];
-    const msg = { seq: ++room.seq, at: Math.floor(Date.now() / 1000), game: "", invite: "", ...fields };
+    const msg = { seq: ++room.seq, at: Math.floor(Date.now() / 1000), ...fields };
     room.messages.push(msg);
     if (room.messages.length > MAX_ROOM_MESSAGES) room.messages.shift();
     return msg;
@@ -217,8 +271,8 @@ export function createChatServer(config) {
     const t = Date.now();
     for (const [key, s] of sessions) if (t - s.seen > ONLINE_MS * 10) sessions.delete(key);
     for (const [key, expires] of revoked) if (t > expires) revoked.delete(key);
-    for (const [id, inv] of invites) if (t - inv.at > INVITE_MS) invites.delete(id);
-    for (const map of [sendLimits, loginLimits, requestLimits])
+    for (const [code, m] of matches) if (t - m.at > MATCH_CODE_MS) dropMatch(code);
+    for (const map of [sendLimits, loginLimits, requestLimits, joinLimits])
       for (const [key, w] of map) if (t - w.start > 120 * 1000) map.delete(key);
   }
   const sweeper = setInterval(sweep, 60 * 1000);
@@ -249,7 +303,7 @@ export function createChatServer(config) {
       }
       const account = hmac("account:" + sub);
       if (bans.has(account)) return [403, { error: "banned" }];
-      const nick = sanitizeNick(body.nick) || "Jogador";
+      const nick = sanitizeNick(cleanWords(sanitizeText(body.nick, MAX_NICK)).text) || "Jogador";
       return [200, {
         session: makeSessionToken(account, nick, Date.now() + SESSION_MS),
         tag: tagFor(account, nick),
@@ -265,7 +319,7 @@ export function createChatServer(config) {
 
     // The name lives in the token, so a new name is a new token.
     async "POST /v1/nick"(req, body, ip, session, bearer, expires) {
-      const nick = sanitizeNick(body.nick);
+      const nick = sanitizeNick(cleanWords(sanitizeText(body.nick, MAX_NICK)).text);
       if (!nick) return [400, { error: "bad_nick" }];
       session.tag = tagFor(session.account, nick);
       return [200, { tag: session.tag, session: makeSessionToken(session.account, nick, expires) }];
@@ -276,7 +330,7 @@ export function createChatServer(config) {
       const roomIdx = body.room;
       if (!Number.isInteger(roomIdx) || roomIdx < 0 || roomIdx >= ROOM_COUNT)
         return [400, { error: "bad_room" }];
-      session.game = sanitizeText(body.game, MAX_GAME);
+      session.game = cleanWords(sanitizeText(body.game, MAX_GAME)).text;
       if (Number.isInteger(body.status) && body.status >= 1 && body.status <= 3) session.status = body.status;
       const room = rooms[roomIdx];
       const since = Number.isInteger(body.since) && body.since >= 0 ? body.since : 0;
@@ -288,36 +342,50 @@ export function createChatServer(config) {
       const roomIdx = body.room;
       if (!Number.isInteger(roomIdx) || roomIdx < 0 || roomIdx >= ROOM_COUNT)
         return [400, { error: "bad_room" }];
+      if (!settings.chat_enabled) return [503, { error: "paused" }];
       if (overLimit(sendLimits, session.account, SEND_WINDOW_MS, SEND_MAX, Date.now()))
         return [429, { error: "too_many" }];
-      const text = sanitizeText(body.text, MAX_TEXT);
-      if (!text) return [400, { error: "empty" }];
+      const original = sanitizeText(body.text, MAX_TEXT);
+      if (!original) return [400, { error: "empty" }];
+      // Jev reads what the player wrote; the room reads it with the words swapped.
+      if (settings.jev_enabled) {
+        const risk = await jev.risk(original);
+        if (risk !== null && risk >= settings.jev_block_at) {
+          jev.stats.blocked++;
+          blockedLog.push({ tag: session.tag, text: original, risk, at: Math.floor(Date.now() / 1000) });
+          if (blockedLog.length > 50) blockedLog.shift();
+          return [422, { error: "moderated" }];
+        }
+      }
+      const { text, changed } = cleanWords(original);
       const msg = appendMessage(roomIdx, { sender: session.tag, account: session.account, text });
-      return [200, { seq: msg.seq }];
+      return [200, changed ? { seq: msg.seq, text } : { seq: msg.seq }];
     },
 
-    // The address stays here until someone accepts: a room full of strangers must
-    // not get the IP of everyone who invites.
-    async "POST /v1/invite"(req, body, ip, session) {
-      const roomIdx = body.room;
-      if (!Number.isInteger(roomIdx) || roomIdx < 0 || roomIdx >= ROOM_COUNT)
-        return [400, { error: "bad_room" }];
+    // A match over the internet. The code says nothing about anyone: it is only a
+    // word the host passes to a friend, and it works once.
+    async "POST /v1/match"(req, body, ip, session) {
+      if (!settings.matches_enabled) return [503, { error: "paused" }];
       if (overLimit(sendLimits, session.account, SEND_WINDOW_MS, SEND_MAX, Date.now()))
         return [429, { error: "too_many" }];
-      const game = sanitizeText(body.game, MAX_GAME);
-      if (!game) return [400, { error: "empty" }];
-      const port = Number.isInteger(body.port) && body.port > 0 && body.port <= 65535 ? body.port : 55435;
-      const id = crypto.randomBytes(12).toString("hex");
-      invites.set(id, { ip, port, tag: session.tag, account: session.account, game, at: Date.now() });
-      const msg = appendMessage(roomIdx, { sender: session.tag, account: session.account, text: game, game, invite: id });
-      return [200, { seq: msg.seq, invite: id, public_ip: ip }];
+      for (const [old, m] of matches) if (m.account === session.account) dropMatch(old);
+      const code = makeMatchCode();
+      const pair = { host: null, guest: null };
+      const ticket = makeTicket(pair, "host", session.account);
+      matches.set(code, { account: session.account, pair, hostTicket: ticket, at: Date.now() });
+      pair.code = code;
+      return [200, { code, ticket, relay_port: relayPort() }];
     },
 
-    async "POST /v1/invite/accept"(req, body, ip, session) {
-      const inv = invites.get(body.invite);
-      if (!inv) return [404, { error: "gone" }];
-      if (inv.account === session.account) return [400, { error: "own_invite" }];
-      return [200, { ip: inv.ip, port: inv.port, tag: inv.tag, game: inv.game }];
+    async "POST /v1/match/join"(req, body, ip, session) {
+      if (overLimit(joinLimits, session.account, JOIN_WINDOW_MS, JOIN_MAX, Date.now()))
+        return [429, { error: "too_many" }];
+      const code = String(body.code || "").trim().toUpperCase();
+      const match = matches.get(code);
+      if (!match) return [404, { error: "gone" }];
+      if (match.account === session.account) return [400, { error: "own_match" }];
+      matches.delete(code);
+      return [200, { ticket: makeTicket(match.pair, "guest", session.account), relay_port: relayPort() }];
     },
 
     async "POST /v1/report"(req, body, ip, session) {
@@ -340,6 +408,41 @@ export function createChatServer(config) {
   };
 
   const adminRoutes = {
+    // Everything the panel shows. Never the key, and no addresses.
+    async "GET /v1/admin/status"() {
+      return [200, {
+        settings,
+        list_size: blocklist.length,
+        online: onlineList(Date.now()).length,
+        matches: { waiting: matches.size, playing: relayPairs },
+        moderation: moderationStats,
+        jev: { configured: jev.configured, ...jev.stats },
+        blocked: blockedLog,
+        bans: [...bans].map(([id, info]) => ({ id, tag: info.tag, at: info.at })),
+        reports: reports.map(({ account, ...r }) => r),
+      }];
+    },
+    async "POST /v1/admin/settings"(req, body) {
+      for (const key of ["chat_enabled", "matches_enabled", "words_enabled", "links_enabled", "jev_enabled"]) {
+        if (typeof body[key] === "boolean") settings[key] = body[key];
+      }
+      if (typeof body.jev_block_at === "number" && body.jev_block_at >= 0.3 && body.jev_block_at <= 1) {
+        settings.jev_block_at = body.jev_block_at;
+      }
+      for (const key of ["extra_words", "allowed_words"]) {
+        if (Array.isArray(body[key])) {
+          settings[key] = [...new Set(body[key].map((w) => sanitizeText(w, 40)).filter(Boolean))].slice(0, 2000);
+        }
+      }
+      matcher = makeMatcher([...blocklist, ...settings.extra_words], settings.allowed_words);
+      saveSettings();
+      return [200, { settings }];
+    },
+    async "POST /v1/admin/unban"(req, body) {
+      if (!bans.delete(String(body.id || ""))) return [404, { error: "not_found" }];
+      saveBans();
+      return [200, { ok: true }];
+    },
     async "GET /v1/admin/reports"() {
       return [200, { reports: reports.map(({ account, ...r }) => r) }];
     },
@@ -359,13 +462,140 @@ export function createChatServer(config) {
         if (rep) account = rep.account;
       }
       if (!account) return [404, { error: "not_found" }];
-      bans.add(account);
+      bans.set(account, { tag, at: Math.floor(Date.now() / 1000) });
       saveBans();
       sessions.delete(account);
       for (const r of rooms) r.messages = r.messages.filter((m) => m.account !== account);
       return [200, { ok: true }];
     },
   };
+
+  function makeMatchCode() {
+    for (;;) {
+      const bytes = crypto.randomBytes(10);
+      let letters = "";
+      for (const byte of bytes) letters += CODE_CHARS[byte & 31];
+      const code = "KRI-" + letters.slice(0, 5) + "-" + letters.slice(5);
+      if (!matches.has(code)) return code;
+    }
+  }
+
+  function makeTicket(pair, role, account) {
+    const ticket = crypto.randomBytes(24).toString("hex");
+    tickets.set(ticket, { pair, role, account, at: Date.now() });
+    return ticket;
+  }
+
+  function dropMatch(code) {
+    const m = matches.get(code);
+    if (!m) return;
+    matches.delete(code);
+    tickets.delete(m.hostTicket);
+    if (m.pair.host) m.pair.host.destroy();
+  }
+
+  // The bridge. "KRMB1 <ticket>\n", then one "!" once both sides are here, and from
+  // then on whatever one side sends reaches the other. Nothing of it is kept.
+  const relayAddresses = new Map();
+  const relaySockets = new Set();
+  let relayPairs = 0;
+
+  function relayPort() {
+    const address = relay.address();
+    return address ? address.port : Number(config.relayPort || 55440);
+  }
+
+  function joinPair(pair) {
+    const { host, guest } = pair;
+    if (relayPairs >= RELAY_MAX_PAIRS) {
+      host.destroy();
+      guest.destroy();
+      return;
+    }
+    relayPairs++;
+    let bytes = 0;
+    const started = Date.now();
+    const count = (chunk) => {
+      bytes += chunk.length;
+      if (bytes > RELAY_MAX_BYTES || Date.now() - started > MATCH_MAX_MS) {
+        host.destroy();
+        guest.destroy();
+      }
+    };
+    let closed = false;
+    const finish = () => {
+      if (!closed) relayPairs--;
+      closed = true;
+      host.destroy();
+      guest.destroy();
+    };
+    for (const sock of [host, guest]) {
+      sock.setTimeout(RELAY_IDLE_MS);
+      sock.removeAllListeners("data");
+      sock.on("data", count);
+      sock.on("close", finish);
+      sock.on("error", finish);
+    }
+    host.write("!");
+    guest.write("!");
+    host.pipe(guest);
+    guest.pipe(host);
+  }
+
+  const relay = net.createServer((sock) => {
+    const address = String(sock.remoteAddress || "");
+    const open = relayAddresses.get(address) || 0;
+    if (open >= RELAY_MAX_PER_ADDRESS) {
+      sock.destroy();
+      return;
+    }
+    relayAddresses.set(address, open + 1);
+    relaySockets.add(sock);
+    sock.setNoDelay(true);
+    sock.setTimeout(RELAY_HELLO_MS);
+    sock.on("timeout", () => sock.destroy());
+    sock.on("error", () => sock.destroy());
+    sock.on("close", () => {
+      relaySockets.delete(sock);
+      const left = (relayAddresses.get(address) || 1) - 1;
+      if (left > 0) relayAddresses.set(address, left);
+      else relayAddresses.delete(address);
+    });
+    let hello = "";
+    sock.on("data", (chunk) => {
+      hello += chunk.toString("latin1");
+      if (hello.length > 128) {
+        sock.destroy();
+        return;
+      }
+      const end = hello.indexOf("\n");
+      if (end < 0) return;
+      const m = /^KRMB1 ([0-9a-f]{48})\r?$/.exec(hello.slice(0, end));
+      const entry = m ? tickets.get(m[1]) : null;
+      if (!entry || bans.has(entry.account)) {
+        sock.destroy();
+        return;
+      }
+      tickets.delete(m[1]); // each ticket opens one connection, once
+      const { pair, role } = entry;
+      pair[role] = sock;
+      if (pair.host && pair.guest) {
+        joinPair(pair);
+      } else {
+        sock.removeAllListeners("data");
+        // The host waits for as long as its code is good; the code going away ends it.
+        sock.setTimeout(role === "host" ? MATCH_CODE_MS : RELAY_HELLO_MS * 3);
+        sock.on("close", () => {
+          if (pair.code) {
+            const held = matches.get(pair.code);
+            if (held && held.pair === pair) matches.delete(pair.code);
+          }
+          const other = role === "host" ? pair.guest : pair.host;
+          if (other) other.destroy();
+        });
+      }
+    });
+  });
 
   function safeEqual(a, b) {
     const x = Buffer.from(hmac("cmp:" + a));
@@ -457,6 +687,11 @@ export function createChatServer(config) {
     });
     res.end(text);
   });
+  server.relay = relay;
+  server.on("close", () => {
+    relay.close();
+    for (const sock of relaySockets) sock.destroy();
+  });
   server.requestTimeout = 15000;
   server.headersTimeout = 10000;
   return server;
@@ -471,9 +706,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     adminToken: process.env.CHAT_ADMIN_TOKEN || "",
     dataDir: process.env.CHAT_DATA_DIR || "data",
     trustProxy: process.env.CHAT_TRUST_PROXY === "1",
+    relayPort: Number(process.env.CHAT_RELAY_PORT || 55440),
+    jevKey: process.env.TYPESAFE_API_KEY || "",
     jwksUrl: process.env.CHAT_JWKS_URL || undefined,
     issuers: process.env.CHAT_ISSUER ? [process.env.CHAT_ISSUER] : undefined,
   });
   server.listen(port, () => console.log(`Karamelo chat on port ${port}`));
+  const relayListenPort = Number(process.env.CHAT_RELAY_PORT || 55440);
+  server.relay.listen(relayListenPort, () => console.log(`Match bridge on port ${relayListenPort}`));
   for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => server.close(() => process.exit(0)));
 }

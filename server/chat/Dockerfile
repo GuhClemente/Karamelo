@@ -5,10 +5,10 @@ ENV PORT=8787
 ENV CHAT_DATA_DIR=/data
 ENV CHAT_TRUST_PROXY=1
 WORKDIR /app
-COPY server.mjs ./
+COPY server.mjs moderation.mjs blocklist.txt ./
 # The ban list: mount a volume here or bans are lost with the container.
 RUN mkdir -p /data && chown node:node /data
 USER node
-EXPOSE 8787
+EXPOSE 8787 55440
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:8787/healthz || exit 1
 CMD ["node", "server.mjs"]

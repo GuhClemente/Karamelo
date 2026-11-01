@@ -435,6 +435,8 @@ build, gameplay incomplete".
 
 Essas duas estão em `third_party/` com o fonte junto.
 
+O servidor das salas de chat usa a lista de palavras [LDNOOBW](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words) (Shutterstock e colaboradores, CC BY 4.0), sem alterações.
+
 ## ⚠ Licenças dos cores: pendência antes de distribuir
 
 **Esta lista identifica os cores, mas não resolve a questão de licenciamento.**

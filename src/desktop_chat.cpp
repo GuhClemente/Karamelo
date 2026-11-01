@@ -57,9 +57,10 @@ static std::string NetFrame(char kind, const std::string& json);
 struct InternetJob;
 static void InternetEnqueue(int kind, int room, const std::string& text);
 static void InternetResume();
+static bool InternetJoinMatch(const std::string& typed);
 static void InternetStop();
 static bool InternetCommand(const std::string& in);
-enum { INET_JOB_SEND, INET_JOB_INVITE, INET_JOB_REPORT, INET_JOB_NICK, INET_JOB_LOGOUT };
+enum { INET_JOB_SEND, INET_JOB_MATCH, INET_JOB_REPORT, INET_JOB_NICK, INET_JOB_LOGOUT };
 static std::atomic<int> g_current_room{LIVE_ROOM_ARCADE_FIGHT};
 static std::atomic<bool> g_overlay_visible{false};
 static std::string g_nickname = "Player1";
@@ -735,6 +736,8 @@ bool DesktopChatSubmitInput(const char *text) {
   if (!text || !*text)
     return false;
   const std::string in = text;
+  if (in.rfind("KRI-", 0) == 0 || in.rfind("kri-", 0) == 0)
+    return InternetJoinMatch(in);
   if (in.rfind("KRM-", 0) == 0)
     return DesktopChatJoinByRoomCode(text);
   for (const char *cmd : {"/nome ", "/name "}) {
@@ -776,6 +779,12 @@ bool DesktopChatSendChallenge(const char *game_title) {
                       "You are already in a match. Leave it before inviting."));
     return false;
   }
+  // Over the internet there is only the bridge: no address in the room or in the code.
+  if (!DesktopChatInternetGetTag().empty()) {
+    InternetEnqueue(INET_JOB_MATCH, g_current_room.load(), title);
+    ChatSystemNote(Tr("Criando a partida...", "Creating the match..."));
+    return true;
+  }
   if (!NetplayStartHost(55435)) {
     ChatSystemNote(Tr("Nao deu para abrir a partida: a porta 55435 esta em uso.",
                       "Could not open the match: port 55435 is in use."));
@@ -803,7 +812,6 @@ bool DesktopChatSendChallenge(const char *game_title) {
   DesktopChatAnnouncePresence();
   DesktopChatStartNetwork();
   NetSendDatagram(NetFrame('m', DesktopChatFormatWireMessage((LiveChatRoom)g_current_room.load(), msg)));
-  InternetEnqueue(INET_JOB_INVITE, g_current_room.load(), title);
 
   TrayManagerSetStatus(TRAY_STATUS_PLAYING, title.c_str());
   CoreSetToast(
@@ -817,8 +825,6 @@ bool DesktopChatSendChallenge(const char *game_title) {
   return true;
 }
 
-static bool InternetResolveInvite(const std::string& invite, std::string& out_ip, int& out_port);
-
 bool DesktopChatAcceptLastChallenge() {
   LiveChatMessage found;
   bool has_challenge = false;
@@ -826,8 +832,7 @@ bool DesktopChatAcceptLastChallenge() {
     std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
     const auto &vec = g_room_messages[g_current_room.load()];
     for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
-      if (!it->from_me && !it->game_challenge.empty() &&
-          (!it->host_ip.empty() || !it->room_code.empty() || !it->invite_id.empty())) {
+      if (!it->from_me && !it->game_challenge.empty() && (!it->host_ip.empty() || !it->room_code.empty())) {
         found = *it;
         has_challenge = true;
         break;
@@ -851,9 +856,6 @@ bool DesktopChatAcceptLastChallenge() {
   // The invite carries no game: the connection only shares the controllers.
   ChatSystemNote(Tr("Conectando. O jogo do outro jogador abre aqui sozinho se voce tiver o mesmo arquivo em roms/.",
                     "Connecting. The other player's game opens here by itself if you have the same file in roms/."));
-
-  if (!found.invite_id.empty() && !InternetResolveInvite(found.invite_id, found.host_ip, found.host_port))
-    return false;
 
   if (found.host_ip.empty())
     return DesktopChatJoinByRoomCode(found.room_code.c_str());
@@ -1204,6 +1206,7 @@ static bool g_inet_wake_flag = false;
 static std::string g_inet_server;
 static std::string g_inet_session;
 static std::string g_inet_tag;
+static std::string g_inet_match_code;
 static int64_t g_inet_since[LIVE_ROOM_COUNT] = {0};
 static bool g_inet_room_loaded[LIVE_ROOM_COUNT] = {false};
 static std::deque<InternetJob> g_inet_jobs;
@@ -1258,6 +1261,16 @@ static bool InternetCall(const std::string& route, const std::string& body, int&
   return JsonParse(text, out, err) && out.type == JsonValue::Object;
 }
 
+// Only the name: the bridge is on the same machine as the chat, on its own port.
+static std::string InternetServerHost() {
+  std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+  std::string host = InternetServerLocked();
+  const size_t scheme = host.find("://");
+  if (scheme != std::string::npos)
+    host.erase(0, scheme + 3);
+  return host.substr(0, host.find_first_of(":/"));
+}
+
 static std::string InternetStr(const JsonValue& obj, const char* key) {
   const JsonValue* v = obj.Find(key);
   return (v && v->type == JsonValue::String) ? v->str : std::string();
@@ -1302,9 +1315,9 @@ static void InternetRunJob(const InternetJob& job) {
     route = "/v1/send";
     body << "{\"room\":" << job.room << ",\"text\":" << JsonQuote(job.text) << "}";
     break;
-  case INET_JOB_INVITE:
-    route = "/v1/invite";
-    body << "{\"room\":" << job.room << ",\"game\":" << JsonQuote(job.text) << ",\"port\":55435}";
+  case INET_JOB_MATCH:
+    route = "/v1/match";
+    body << "{}";
     break;
   case INET_JOB_REPORT:
     route = "/v1/report";
@@ -1330,6 +1343,17 @@ static void InternetRunJob(const InternetJob& job) {
     InternetSignedOut(Tr("Sua sessao acabou. Digite /entrar para voltar.", "Your session ended. Type /login to come back."));
     return;
   }
+  if (status == 422) {
+    ChatSystemNote(Tr("A moderacao barrou sua ultima mensagem: ela nao foi enviada.",
+                      "Moderation stopped your last message: it was not sent."));
+    return;
+  }
+  if (status == 503) {
+    ChatSystemNote(job.kind == INET_JOB_MATCH
+                       ? Tr("Partidas pela internet estao pausadas agora.", "Matches over the internet are paused right now.")
+                       : Tr("As salas da internet estao pausadas agora.", "The internet rooms are paused right now."));
+    return;
+  }
   if (status == 429) {
     ChatSystemNote(Tr("Devagar: muitas mensagens em pouco tempo. A ultima nao foi enviada.",
                       "Slow down: too many messages. The last one was not sent."));
@@ -1340,9 +1364,39 @@ static void InternetRunJob(const InternetJob& job) {
                       "No answer from the server: this did not reach the internet rooms."));
     return;
   }
-  if (job.kind == INET_JOB_INVITE && status == 200) {
-    ChatSystemNote(Tr("Convite enviado. Para alguem de fora da sua rede entrar, a porta 55435 (TCP) precisa estar aberta no seu roteador. Seu IP so vai para quem aceitar.",
-                      "Invite sent. For someone outside your network to join, port 55435 (TCP) must be open on your router. Your IP only goes to whoever accepts."));
+  if (job.kind == INET_JOB_SEND && status == 200) {
+    // The server swapped a word: show here what the others are reading.
+    const std::string sent = DesktopChatSanitizeText(InternetStr(out, "text"), 200);
+    if (!sent.empty()) {
+      std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+      auto& vec = g_room_messages[job.room];
+      for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
+        if (it->text == job.text) {
+          it->text = sent;
+          break;
+        }
+      }
+#ifdef _WIN32
+      RequestChatRepaint();
+#endif
+    }
+  }
+  if (job.kind == INET_JOB_MATCH && status == 200) {
+    const std::string code = InternetStr(out, "code");
+    const std::string ticket = InternetStr(out, "ticket");
+    const int relay_port = (int)InternetInt(out, "relay_port");
+    if (code.empty() || ticket.empty() || relay_port <= 0 ||
+        !NetplayStartRelay(true, InternetServerHost().c_str(), relay_port, ticket.c_str())) {
+      ChatSystemNote(Tr("Nao deu para criar a partida agora.", "Could not create the match right now."));
+      return;
+    }
+    {
+      std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+      g_inet_match_code = code;
+    }
+    ChatSystemNote(std::string(Tr("Seu codigo de partida: ", "Your match code: ")) + code +
+                   Tr(". Passe so para quem voce confia; esse jogador digita o codigo no chat. Vale uma vez, e so voce o ve aqui. Seu IP nao e revelado. Voz nao funciona pela internet.",
+                      ". Give it only to someone you trust; they type it in the chat. It works once, and only you see it here. Your IP is not revealed. Voice does not work over the internet."));
   } else if (job.kind == INET_JOB_REPORT) {
     ChatSystemNote(status == 200 ? Tr("Denuncia enviada. Obrigado.", "Report sent. Thank you.")
                                  : Tr("Nao achei mensagens desse jogador nesta sala.", "No messages from that player in this room."));
@@ -1386,8 +1440,6 @@ static void InternetPoll() {
 
   const int64_t now = (int64_t)time(NULL);
   const std::string my_tag = InternetStr(out, "tag");
-  bool invited = false;
-  std::string alert;
   {
     std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
     g_inet_tag = my_tag;
@@ -1403,8 +1455,6 @@ static void InternetPoll() {
         LiveChatMessage msg;
         msg.sender = DesktopChatSanitizeText(InternetStr(item, "sender"), 40);
         msg.text = DesktopChatSanitizeText(InternetStr(item, "text"), 200);
-        msg.game_challenge = DesktopChatSanitizeText(InternetStr(item, "game"), 64);
-        msg.invite_id = DesktopChatSanitizeText(InternetStr(item, "invite"), 32);
         msg.timestamp_utc = InternetInt(item, "at");
         if (msg.sender.empty() || g_inet_ignored.count(msg.sender))
           continue;
@@ -1412,21 +1462,12 @@ static void InternetPoll() {
         // What we sent is on screen already; the first look also brings older ones.
         if (msg.from_me && !first_look)
           continue;
-        if (!msg.game_challenge.empty())
-          msg.text = std::string(Tr("Convite Netplay: ", "Netplay Invite: ")) + msg.game_challenge;
         if (SameMessageOtherRoadLocked(room, msg, now))
           continue;
         AppendRoomMessageLocked(room, msg);
-        if (!first_look && !msg.from_me && !msg.game_challenge.empty()) {
-          invited = true;
-          alert = msg.sender + ": " + msg.game_challenge;
-        }
       }
     }
   }
-  if (invited && TrayManagerGetStatus() != TRAY_STATUS_BUSY)
-    TrayManagerShowNotification(Tr("Convite de partida", "Match invite"), alert.c_str(), true);
-
   if (const JsonValue* online = out.Find("online"); online && online->type == JsonValue::Array) {
     for (const JsonValue& item : online->items) {
       if (item.type != JsonValue::Object)
@@ -1650,19 +1691,44 @@ void DesktopChatInternetStatusClicked() {
     ChatSystemNote(Tr("Voce esta nas salas da internet. Digite /sair para sair.", "You are in the internet rooms. Type /logout to leave."));
 }
 
-static bool InternetResolveInvite(const std::string& invite, std::string& out_ip, int& out_port) {
-  std::ostringstream body;
-  body << "{\"invite\":" << JsonQuote(invite) << "}";
-  int status = 0;
-  JsonValue out;
-  if (!InternetCall("/v1/invite/accept", body.str(), status, out) || status != 200) {
-    ChatSystemNote(status == 404 ? Tr("Esse convite ja expirou.", "That invite has expired.")
-                                 : Tr("Nao deu para aceitar o convite agora.", "Could not accept the invite right now."));
+std::string DesktopChatInternetMatchCode() {
+  std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
+  return g_inet_match_code;
+}
+
+static bool InternetJoinMatch(const std::string& typed) {
+  if (DesktopChatInternetGetTag().empty()) {
+    ChatSystemNote(Tr("Para entrar com esse codigo, entre na internet primeiro: /entrar.",
+                      "To use that code, join the internet rooms first: /login."));
     return false;
   }
-  out_ip = InternetStr(out, "ip");
-  out_port = (int)InternetInt(out, "port");
-  return !out_ip.empty() && out_port > 0 && out_port <= 65535;
+  if (NetplayGetState() == NETPLAY_CONNECTED) {
+    ChatSystemNote(Tr("Voce ja esta em uma partida. Saia dela antes de entrar em outra.",
+                      "You are already in a match. Leave it before joining another."));
+    return false;
+  }
+  std::ostringstream body;
+  body << "{\"code\":" << JsonQuote(typed) << "}";
+  int status = 0;
+  JsonValue out;
+  if (!InternetCall("/v1/match/join", body.str(), status, out) || status != 200) {
+    ChatSystemNote(status == 404 ? Tr("Esse codigo nao existe mais: cada um vale uma vez e dura 10 minutos.",
+                                      "That code is gone: each one works once and lasts 10 minutes.")
+                   : status == 400 ? Tr("Esse codigo e da sua propria partida.", "That code is your own match.")
+                   : status == 429 ? Tr("Muitas tentativas. Espere um minuto.", "Too many attempts. Wait a minute.")
+                                   : Tr("Nao deu para entrar na partida agora.", "Could not join the match right now."));
+    return false;
+  }
+  const std::string ticket = InternetStr(out, "ticket");
+  const int relay_port = (int)InternetInt(out, "relay_port");
+  if (ticket.empty() || relay_port <= 0 ||
+      !NetplayStartRelay(false, InternetServerHost().c_str(), relay_port, ticket.c_str())) {
+    ChatSystemNote(Tr("Nao deu para entrar na partida agora.", "Could not join the match right now."));
+    return false;
+  }
+  ChatSystemNote(Tr("Entrando. Seu IP nao e revelado, mas o outro jogador envia dados do jogo ao seu Karamelo: entre so em partida de quem voce confia.",
+                    "Joining. Your IP is not revealed, but the other player sends game data to your Karamelo: only join someone you trust."));
+  return true;
 }
 
 // The chat commands of the internet rooms. True when the text was one of them.
@@ -2264,12 +2330,9 @@ static void PaintSocialWindow(HWND hwnd, HDC target_hdc) {
                       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
       char host_info[96];
-      if (m.host_ip.empty())
-        snprintf(host_info, sizeof(host_info), "%s", Tr("Pela internet", "Over the internet"));
-      else
-        snprintf(host_info, sizeof(host_info), "Código: %s  •  Host: %s:%d",
-                 m.room_code.empty() ? "DIRETO" : m.room_code.c_str(),
-                 m.host_ip.c_str(), m.host_port);
+      snprintf(host_info, sizeof(host_info), "Código: %s  •  Host: %s:%d",
+               m.room_code.empty() ? "DIRETO" : m.room_code.c_str(),
+               m.host_ip.c_str(), m.host_port);
       RECT rc_ct3 = {rc_card.left + 12, rc_card.top + 48, rc_card.right - 130, rc_card.top + 64};
       DrawUtf8TextGdi(hdc, host_info, rc_ct3, g_font_small, col_txt_muted, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 

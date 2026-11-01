@@ -27,7 +27,6 @@ struct LiveChatMessage
 	std::string text;
 	std::string game_challenge; // Non-empty if this is a 1-Click Netplay challenge
 	std::string room_code;      // Room Code with the host address in it ("KRM-XXXXX-XXXXX")
-	std::string invite_id;      // Invite held by the chat server: it gives the address on accept
 	std::string host_ip;        // Peer IP for 1-Click Netplay accept
 	int         host_port = 55435;
 	int64_t     timestamp_utc = 0;
@@ -114,6 +113,7 @@ void         DesktopChatInternetLogout();
 bool         DesktopChatInternetIsOnline();
 std::string  DesktopChatInternetGetTag();
 std::string  DesktopChatInternetStatus();
+std::string  DesktopChatInternetMatchCode(); // the "KRI-..." of the match this player created
 void         DesktopChatInternetStatusClicked();
 // The second half of the login, which the self-test calls with its own token.
 bool         DesktopChatInternetLoginWithIdToken(const char* id_token);

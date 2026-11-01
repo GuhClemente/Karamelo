@@ -1822,7 +1822,7 @@ O Karamelo agora integra uma camada de nuvem pessoal, gerenciamento local via re
    - **Alcance real**: As 4 salas (`# Arcade & Luta`, `# 16-Bit Classicos`, `# Retro Racing`, `# Papo Livre`) falam com **quem está na mesma rede local** e com **o outro jogador da partida de Netplay**, sem servidor e sem login. **Pela internet, com login Google (seção 53)**. Não divulgue a sala da internet antes de a seção 53 dizer que está aberta ao público.
    - **Zoom**: A janela do chat aumenta e diminui como um navegador: `Ctrl +`, `Ctrl -`, `Ctrl 0` e `Ctrl` + roda do mouse (de 70% a 250%), e guarda a escolha.
    - **Privacidade**: A rede do chat só liga quando o jogador abre o chat, porque ela anuncia o apelido na rede local. O apelido começa com o nome de usuário do sistema e muda com `/nome Fulano` na caixa do chat.
-   - **Convite para Netplay**: A lista mostra quem está na rede local e o que está jogando. Ao aceitar, o jogo do anfitrião abre sozinho no outro PC, desde que ele tenha **o mesmo arquivo** em `roms/`; o arquivo do jogo nunca é enviado. Fora da rede local, o jogador manda o código de sala (`KRM-XXXXX-XXXXX`, que contém o endereço) e o outro digita; pela internet ainda depende de porta aberta no roteador ou VPN.
+   - **Convite para Netplay**: A lista mostra quem está na rede local e o que está jogando. Ao aceitar, o jogo do anfitrião abre sozinho no outro PC, desde que ele tenha **o mesmo arquivo** em `roms/`; o arquivo do jogo nunca é enviado. O código `KRM-XXXXX-XXXXX` contém o endereço local e é só para a mesma rede. Pela internet, a partida usa o código `KRI-` e a ponte do servidor (seção 53).
    - **Como a partida funciona (seção 52)**: Os dois PCs rodam o mesmo jogo quadro a quadro, e o anfitrião é o Jogador 1. A partida espera o jogador mais lento, então funciona melhor em rede local. Não publique como netplay com rollback. **Não divulgue Netplay de GBA:** em teste, os dois jogos se separam mesmo com o estado reenviado a cada segundo. Game Boy, NES, SNES, Mega Drive e Master System ficaram com a imagem idêntica nos dois lados; os outros sistemas não foram testados.
 
 4. **System Tray (Bandeja do Sistema), Presença & Overlay In-Game (`F10`)**:
@@ -2111,8 +2111,9 @@ Também nesta data:
 - As mesmas 4 salas do chat, agora também com gente fora da rede local, na janela do chat e no overlay.
 - Login com Google, por clique em "Internet" no alto do chat ou com `/entrar`. Fica guardado por 30 dias; `/sair` encerra.
 - Lista de quem está online e o que está jogando.
-- Convite de Netplay na sala: o IP de quem convida **não aparece na sala**, só vai para quem aceitar.
-- Moderação: `/ignorar Nome#ABC123` esconde a pessoa neste PC, `/denunciar Nome#ABC123` avisa o administrador, que pode banir a conta.
+- Partida pela internet por **código** (`KRI-XXXXX-XXXXX`): quem cria recebe o código no próprio chat e passa a quem quiser; o outro digita no chat. Vale uma vez e por 10 minutos, exige login dos dois e nunca aparece na sala.
+- **A partida passa pela ponte do servidor:** os dois se conectam só a ele, então **nenhum jogador vê o IP do outro** e ninguém precisa abrir porta no roteador. Não há convite pela internet nas salas.
+- Moderação: palavrão e link viram um doce sorteado (`caramelinho`, `pudim`). `/ignorar Nome#ABC123` esconde a pessoa neste PC, `/denunciar Nome#ABC123` avisa o administrador, que pode banir a conta. Mensagem grave, como ameaça ou golpe, é barrada por um serviço de moderação.
 
 **O que publicar sobre privacidade (e é verdade):**
 
@@ -2120,12 +2121,17 @@ Também nesta data:
 - As últimas 100 mensagens de cada sala ficam **só na memória** do servidor do chat e somem quando ele reinicia. Não há histórico em disco.
 - Uma denúncia guarda na memória as últimas mensagens da pessoa denunciada, para o administrador avaliar.
 - O disco do servidor guarda só a lista de banidos, em hash com chave, sem o ID do Google.
-- O endereço IP de quem convida fica na memória por até 10 minutos e vai para quem aceitar o convite. É necessário: a partida é direta entre os dois PCs.
+- **O IP de um jogador nunca é entregue a outro jogador pela internet.** O servidor só usa o endereço na conexão aberta, para limitar abusos, e não o grava. O código de partida não contém endereço.
+- Os dados da partida passam pelo servidor sem serem gravados.
+- **As mensagens das salas da internet são enviadas à TypeSafe AI para moderação automática** (só o texto, sem nome, tag ou IP). Isso precisa constar na privacidade. Na rede local não.
+
+**Controle no admin do site:** o painel "Chat ao vivo" em `/admin` (`app/admin/chat-panel.js`, com a rota `app/api/admin/chat`) liga e desliga salas, partidas, troca de palavras e links e o JEV; ajusta o rigor do JEV; edita as listas de palavras; mostra o estado do JEV; e lista denúncias, mensagens barradas e banidos, com banir e desbanir. Ele precisa de `CHAT_ADMIN_TOKEN` no ambiente do site, igual ao do servidor do chat.
 
 **Antes de divulgar, o site precisa:** atualizar a página de privacidade e os termos com a lista acima (hoje dizem que nada passa por servidor) e definir a idade mínima e as regras das salas, porque é conversa aberta entre desconhecidos.
 
 **O que NÃO prometer:**
 
-- **Partida pela internet sem configurar nada.** O chat e o convite atravessam a internet, a partida não: quem convida ainda precisa da porta 55435 (TCP) aberta no roteador, ou de VPN. O chat avisa isso ao convidar. Não há servidor retransmitindo a partida.
-- Não é uma sala pela qual passa voz: a voz continua direta entre os dois jogadores da partida.
+- **Voz pela internet.** A voz é direta entre os PCs e revelaria o IP, então só funciona na rede local; nas partidas pela ponte ela fica desligada.
+- **Baixa latência pela internet:** a partida passa pelo servidor e espera o jogador mais lento.
+- **Segurança com desconhecidos.** A partida carrega dados enviados pelo outro jogador; o chat recomenda entrar só em partida de quem se confia. Na rede local, o convite continua usando o endereço local.
 - Login só com Google. Não prometa Discord, Steam ou outros.

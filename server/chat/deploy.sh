@@ -60,6 +60,7 @@ fi
 
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 docker run -d --name "$NAME" --restart unless-stopped --network coolify \
+    -p 55440:55440 \
     --memory 256m --read-only --tmpfs /tmp \
     --env-file "$BASE/.env" -e CHAT_GOOGLE_CLIENT_IDS="$CLIENT_IDS" \
     -v "$BASE/data:/data" "${LABELS[@]}" "$NAME:latest" >/dev/null

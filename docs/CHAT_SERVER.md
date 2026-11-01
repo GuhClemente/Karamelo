@@ -10,7 +10,8 @@ Não tem dependências: Node 20 ou mais novo, um arquivo só.
 |---|---|---|
 | Últimas 100 mensagens de cada sala | memória | até sair da fila ou o servidor reiniciar |
 | Quem está online e o que joga | memória | enquanto o jogador estiver conectado |
-| IP de quem convidou para uma partida | memória | 10 minutos; só vai para quem aceitar |
+| Código de partida | memória | até ser usado, ou 10 minutos |
+| Endereço de quem está conectado | memória | só durante a conexão, para limitar abuso; nunca vai a outro jogador |
 | Denúncias, com as últimas mensagens do denunciado | memória | até 500 denúncias ou reiniciar |
 | Lista de banidos, em hash com chave | disco (`bans.json`) | até remover |
 
@@ -32,7 +33,7 @@ automático a cada push.
 |---|---|
 | `src/` | `server.mjs`, `Dockerfile` e `deploy.sh`, copiados deste repositório |
 | `client_ids` | os Client IDs aceitos; vários, separados por vírgula |
-| `.env` | `CHAT_HASH_SECRET` e `CHAT_ADMIN_TOKEN`, gerados no servidor, e `CHAT_GOOGLE_CLIENT_SECRET` (modo 600) |
+| `.env` | `CHAT_HASH_SECRET` e `CHAT_ADMIN_TOKEN`, gerados no servidor, `CHAT_GOOGLE_CLIENT_SECRET` e `TYPESAFE_API_KEY` (modo 600) |
 | `data/bans.json` | a lista de banidos |
 
 **Nunca apague nem troque o `CHAT_HASH_SECRET`:** todos os jogadores seriam desconectados,
@@ -41,7 +42,7 @@ os números das tags mudariam e os banidos voltariam.
 ## Atualizar
 
 ```bash
-scp server/chat/server.mjs server/chat/Dockerfile server/chat/deploy.sh root@187.127.59.127:/data/karamelo-chat/src/
+scp server/chat/server.mjs server/chat/moderation.mjs server/chat/blocklist.txt server/chat/Dockerfile server/chat/deploy.sh root@187.127.59.127:/data/karamelo-chat/src/
 ssh root@187.127.59.127 "sed -i 's/\r$//' /data/karamelo-chat/src/deploy.sh; bash /data/karamelo-chat/src/deploy.sh tls"
 ```
 
@@ -63,7 +64,26 @@ IP que quiser.
    as contas de teste conseguem entrar (`docs/CLOUD_GOOGLE.md`).
 3. **Site:** privacidade, termos, idade mínima e regras das salas (`docs/SITE_SYNC.md`, seção 53).
 
-## Moderar
+## Moderação
+
+Duas camadas, ajustáveis no admin do site (`/admin`, painel "Chat ao vivo"):
+
+- **Lista de palavras e links:** a palavra vira um doce sorteado (`caramelinho`, `pudim`...).
+  Roda sempre no servidor, com o JEV aprovando ou não, e mesmo com ele fora do ar. A lista é
+  a LDNOOBW (`blocklist.txt`, inglês e português). `moderation.mjs` já libera palavras comuns
+  dela, como `comer` e `mama`; no painel dá para bloquear e liberar sem deploy.
+- **JEV (TypeSafe AI):** avalia a mensagem inteira e barra ameaça, golpe e assédio. Quem
+  escreveu recebe um aviso. A chave fica só no servidor (`TYPESAFE_API_KEY`), e ele recebe só
+  o texto, sem tag, conta ou IP. **Se cair, ficar sem crédito ou demorar mais de 1,5 s, a
+  mensagem segue só com a lista.** Depois de chave recusada ou falta de crédito, ele não é
+  consultado por 10 minutos; depois de 5 falhas seguidas, por 1 minuto. O painel mostra isso.
+
+Na rede local as mensagens não passam pelo servidor, então nada disso se aplica lá.
+
+No servidor, o painel do site precisa de `CHAT_ADMIN_TOKEN` igual ao do chat, e de
+`CHAT_SERVER_URL` se o endereço mudar. Os ajustes ficam em `/data/settings.json`.
+
+## Moderar por comando
 
 Ver denúncias:
 
@@ -91,7 +111,7 @@ node --test server/chat/server.test.mjs
 node tools/test_chat_internet.mjs
 ```
 
-O primeiro cobre tokens forjados, limites, sessão, convite e banimento. O segundo sobe o
+O primeiro cobre tokens forjados, limites, sessão, partida, ponte e banimento. O segundo sobe o
 servidor neste PC e coloca dois Karamelo de verdade para conversar, convidar e abrir a
 partida. Os dois fazem parte do `compile.bat`, do `tools/test_netplay_unix.sh` e do CI.
 Eles assinam os logins com uma chave de teste; o Google de verdade só se testa com o
@@ -102,6 +122,16 @@ Só vale `https://`, ou `http://127.0.0.1` para testes neste PC.
 
 ## O que ele não faz
 
-A partida não passa por aqui. O convite atravessa a internet, mas quem convida ainda
-precisa da porta 55435 (TCP) aberta no roteador, ou de VPN. Retransmitir a partida é
-outro serviço, com outro custo de banda.
+Não grava conversa nem partida, e não entrega o IP de um jogador a outro. A voz não
+passa por aqui: por ser direta entre os PCs, ela fica desligada nas partidas pela internet.
+
+## A ponte de partida
+
+Porta **55440 (TCP)**, aberta direto no servidor, fora do proxy. Os dois jogadores se
+conectam a ela com um bilhete de uso único, e ela repassa os dados entre eles. O bilhete
+sai de `/v1/match` (quem cria) e `/v1/match/join` (quem digita o código).
+
+Limites: 100 partidas ao mesmo tempo, 8 conexões por endereço, 4 GB e 12 horas por
+partida, 5 minutos parada. **Toda a banda das partidas passa por este servidor:** se o uso
+crescer, acompanhe o consumo. Os dados não são criptografados nesse trecho; são botões
+e estado do jogo, sem nada da conta do jogador.

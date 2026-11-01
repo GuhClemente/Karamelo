@@ -81,6 +81,11 @@ static NetplayState net_state = NETPLAY_DISCONNECTED;
 static SOCKET       listen_sock = INVALID_SOCKET;
 static SOCKET       peer_sock = INVALID_SOCKET;
 static std::string  peer_ip_str;
+// A match through the server's bridge: the socket goes out to it, the role stays what
+// it is, and peer_ip_str stays empty, because nobody's address is known here.
+static std::string  relay_ticket;
+static int          relay_stage = 0; // 0 no bridge, 1 connecting, 2 waiting for the other player
+static std::chrono::steady_clock::time_point relay_deadline;
 static std::string  local_ip_str = "127.0.0.1";
 static std::string  status_str = "Disconnected";
 static int          ping_ms = 0;
@@ -432,10 +437,49 @@ bool NetplayStartClient(const char* host_ip, int port)
 	return true;
 }
 
+bool NetplayStartRelay(bool is_host, const char* relay_host, int port, const char* ticket)
+{
+	NetplayDisconnect();
+
+	addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	addrinfo* found = NULL;
+	if (getaddrinfo(relay_host, NULL, &hints, &found) != 0 || !found) return false;
+	sockaddr_in addr = *(sockaddr_in*)found->ai_addr;
+	freeaddrinfo(found);
+	addr.sin_port = htons((u_short)port);
+
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (peer_sock == INVALID_SOCKET) return false;
+	ConfigurePeerSocket(peer_sock);
+	net_stream.Clear();
+	sync_state = SyncState();
+	connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
+
+	relay_ticket = ticket;
+	relay_stage = 1;
+	relay_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+	net_role = is_host ? NETPLAY_HOST : NETPLAY_CLIENT;
+	net_state = NETPLAY_CONNECTING;
+	status_str = "Connecting through the Karamelo bridge...";
+	return true;
+}
+
+bool NetplayIsRelayed()
+{
+	std::lock_guard<std::recursive_mutex> lock(net_lock);
+	return !relay_ticket.empty();
+}
+
 void NetplayDisconnect()
 {
 	std::lock_guard<std::recursive_mutex> lock(net_lock);
 
+	relay_ticket.clear();
+	relay_stage = 0;
 	if (peer_sock != INVALID_SOCKET)
 	{
 		closesocket(peer_sock);
@@ -704,6 +748,52 @@ void NetplayUpdate()
 			net_state = NETPLAY_CONNECTED;
 			status_str = "Connected with Player 2 (" + peer_ip_str + ")";
 			CoreSetToast(Tr("JOGADOR 2 CONECTADO VIA NETPLAY!", "PLAYER 2 CONNECTED VIA NETPLAY!"), 180);
+		}
+	}
+	else if (relay_stage == 1 && net_state == NETPLAY_CONNECTING)
+	{
+		fd_set write_fds, error_fds;
+		FD_ZERO(&write_fds);
+		FD_ZERO(&error_fds);
+		FD_SET(peer_sock, &write_fds);
+		FD_SET(peer_sock, &error_fds);
+		timeval tv = { 0, 0 };
+		const int res = select((int)peer_sock + 1, NULL, &write_fds, &error_fds, &tv);
+		int so_error = 0;
+		socklen_t len = sizeof(so_error);
+		if (res > 0) getsockopt(peer_sock, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len);
+		if (res > 0 && !FD_ISSET(peer_sock, &error_fds) && so_error == 0)
+		{
+			const std::string hello = "KRMB1 " + relay_ticket + "\n";
+			send(peer_sock, hello.data(), (int)hello.size(), 0);
+			relay_stage = 2;
+			status_str = "Waiting for the other player...";
+		}
+		else if ((res > 0) || std::chrono::steady_clock::now() > relay_deadline)
+		{
+			NetplayDisconnect();
+			status_str = "Could not reach the bridge";
+			CoreSetToast(Tr("NETPLAY: SEM RESPOSTA DO SERVIDOR", "NETPLAY: NO ANSWER FROM THE SERVER"), 180);
+		}
+	}
+	else if (relay_stage == 2 && net_state == NETPLAY_CONNECTING)
+	{
+		// One byte says the other player is here. Nothing after it may be taken: it
+		// already belongs to the match.
+		char ready = 0;
+		const int got = recv(peer_sock, &ready, 1, 0);
+		if (got == 1 && ready == '!')
+		{
+			relay_stage = 0;
+			net_state = NETPLAY_CONNECTED;
+			status_str = "Connected through the Karamelo bridge";
+			CoreSetToast(Tr("JOGADORES CONECTADOS!", "PLAYERS CONNECTED!"), 180);
+		}
+		else if (got == 0 || (got < 0 && WSAGetLastError() != WSAEWOULDBLOCK && WSAGetLastError() != EAGAIN))
+		{
+			NetplayDisconnect();
+			status_str = "The match ended";
+			CoreSetToast(Tr("NETPLAY: A PARTIDA TERMINOU", "NETPLAY: THE MATCH ENDED"), 180);
 		}
 	}
 	else if (net_role == NETPLAY_CLIENT && net_state == NETPLAY_CONNECTING)
@@ -1100,7 +1190,14 @@ int NetplaySelfTest(const char* role, const char* core, const char* rom, const c
 	static std::vector<std::pair<uint32_t, uint32_t>> video;
 	g_selftest_video = &video;
 	CoreNetSetVideoHash(true);
-	if (host)
+	// "relay:<ticket>" in place of an address: the same match, through the bridge.
+	const bool through_bridge = strncmp(ip, "relay:", 6) == 0;
+	if (through_bridge)
+	{
+		if (!NetplayStartRelay(host, "127.0.0.1", port, ip + 6)) return 4;
+		if (host && !CoreRequestLoad(rom, core)) return 4;
+	}
+	else if (host)
 	{
 		if (!NetplayStartHost(port)) return 4;
 		if (!CoreRequestLoad(rom, core)) return 4;
@@ -1302,8 +1399,10 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 	const std::string theirs = is_a ? "internet hello from b" : "internet hello from a";
 	const std::string other_nick = is_a ? "NetB#" : "NetA#";
 
+	// The code goes from one side to the other the way a player would pass it: outside.
+	const std::string code_file = "../match_code.txt";
 	bool got_message = false, got_presence = false, invited = false, accepted = false;
-	bool connected = false, saw_invite = false, wrong_host = false;
+	bool connected = false, code_seen = false, wrong_host = false;
 	unsigned copies_of_mine = 0, posts = 0;
 	const auto started = std::chrono::steady_clock::now();
 	auto seconds = [&started]() {
@@ -1326,12 +1425,8 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 			if (m.text == mine) mine_now++;
 			if (m.sender.rfind(other_nick, 0) != 0) continue;
 			if (m.text == theirs) got_message = true;
-			if (!m.game_challenge.empty())
-			{
-				saw_invite = true;
-				// The room must not learn the host's address.
-				if (!m.host_ip.empty() || !m.room_code.empty() || m.invite_id.empty()) wrong_host = true;
-			}
+			// Nothing about a match may reach the room, and nothing may carry an address.
+			if (!m.game_challenge.empty() || !m.host_ip.empty() || !m.room_code.empty()) wrong_host = true;
 		}
 		if (mine_now > copies_of_mine) copies_of_mine = mine_now;
 		for (const auto& p : DesktopChatGetActivePeers())
@@ -1339,13 +1434,35 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 
 		if (is_a && got_message && got_presence && !invited)
 			invited = DesktopChatSendChallenge("Internet Match");
-		if (!is_a && saw_invite && !accepted)
-			accepted = DesktopChatAcceptLastChallenge();
+		if (is_a && invited && !code_seen)
+		{
+			const std::string code = DesktopChatInternetMatchCode();
+			if (!code.empty())
+			{
+				code_seen = true;
+				// The code is a word, not an address.
+				std::string decoded_ip;
+				int decoded_port = 0;
+				if (code.rfind("KRI-", 0) != 0 || DesktopChatResolveRoomCode(code, decoded_ip, decoded_port)) wrong_host = true;
+				std::ofstream(code_file, std::ios::trunc) << code;
+			}
+		}
+		if (!is_a && !accepted)
+		{
+			std::string code;
+			std::ifstream(code_file) >> code;
+			if (!code.empty())
+			{
+				code_seen = true;
+				accepted = DesktopChatSubmitInput(code.c_str());
+			}
+		}
 
 		if (NetplayGetState() == NETPLAY_CONNECTED && !connected)
 		{
 			connected = true;
 			connected_at = seconds();
+			if (NetplayGetPeerIp()[0] || !NetplayIsRelayed()) wrong_host = true;
 		}
 		// Long enough for the other side to finish its own checks.
 		if (connected && got_message && got_presence && seconds() - connected_at > 5.0) break;
@@ -1363,7 +1480,7 @@ int InternetChatSelfTest(const char* role, const char* server_url, const char* i
 	{
 		fprintf(f, "role=%s tag=%s message=%d presence=%d invite=%d connected=%d posts=%u copies_of_mine=%u session_kept=%d wrong_host=%d seconds=%.1f mine_from=%s\n",
 		        role, DesktopChatInternetGetTag().c_str(), got_message ? 1 : 0, got_presence ? 1 : 0,
-		        (is_a ? invited : saw_invite) ? 1 : 0, connected ? 1 : 0, posts, copies_of_mine,
+		        (is_a ? invited : accepted) ? 1 : 0, connected ? 1 : 0, posts, copies_of_mine,
 		        session_kept ? 1 : 0, wrong_host ? 1 : 0, seconds(), mine_senders.c_str());
 		fclose(f);
 	}

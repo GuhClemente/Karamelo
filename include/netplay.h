@@ -26,6 +26,10 @@ void NetplayInit();
 void NetplayShutdown();
 
 bool NetplayStartHost(int port = 55435);
+// A match over the internet: both players connect to the server, which passes the
+// bytes along, so neither learns the other's address. No port to open either.
+bool NetplayStartRelay(bool is_host, const char* relay_host, int port, const char* ticket);
+bool NetplayIsRelayed();
 bool NetplayStartClient(const char* host_ip, int port = 55435);
 void NetplayDisconnect();
 
