@@ -7,6 +7,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -142,6 +143,7 @@ int main(int argc, char** argv)
 
 	bool is_rally = (lower_rom.find("rally") != std::string::npos || lower_base.find("rally") != std::string::npos);
 	bool is_zelda = (lower_rom.find("zelda") != std::string::npos || lower_rom.find("link") != std::string::npos || lower_base.find("zelda") != std::string::npos);
+	bool is_waverace = (lower_rom.find("wave race") != std::string::npos || lower_base.find("waverace") != std::string::npos);
 	bool is_sor = (lower_rom.find("streets") != std::string::npos || lower_rom.find("rage") != std::string::npos || lower_rom.find("sor") != std::string::npos || lower_base.find("sor") != std::string::npos || lower_base.find("streets") != std::string::npos);
 	bool is_castlevania = (lower_rom.find("castlevania") != std::string::npos || lower_rom.find("aria") != std::string::npos || lower_base.find("castlevania") != std::string::npos);
 	bool is_fmtowns = (lower_rom.find("fmtowns") != std::string::npos || lower_base.find("fmtowns") != std::string::npos || lower_base.find("geartowns") != std::string::npos || std::string(core_dll).find("fmtowns") != std::string::npos);
@@ -165,6 +167,8 @@ int main(int argc, char** argv)
 		uint8_t dummy[44] = { 0 };
 		fwrite(dummy, 1, 44, g_audio_file);
 		g_audio_bytes = 0;
+		// The app's audio thread only runs with this up, and the [PERF] queue numbers come from it.
+		SDL_InitSubSystem(SDL_INIT_AUDIO);
 		CoreSetAudioCallback(RecordAudioCallback);
 	}
 
@@ -205,7 +209,7 @@ int main(int argc, char** argv)
 
 	const int target_frames = duration_sec * 30;
 	const uint32_t target_audio = (uint32_t)duration_sec * 44100 * 4;
-	while (CoreIsRunning() && (frames_written < target_frames || g_audio_bytes < target_audio))
+	while (CoreIsRunning() && frames_written < target_frames)
 	{
 		DWORD elapsed = frames_written / 30;
 
@@ -217,7 +221,28 @@ int main(int argc, char** argv)
 		// Pulsing helper: toggles every 6 frames (~0.2s)
 		bool pulse = ((frames_written / 6) % 2 == 0);
 
-		if (is_rally)
+		if (is_waverace)
+		{
+			// Wave Race 64:
+			// 1) 0-5s: Title Screen -> Press START
+			if (elapsed < 5)
+			{
+				if (elapsed >= 4) CoreSetButtonState(0, 3, pulse);
+			}
+			// 2) 5-16s: Menus (Mode / Jet Ski / Track) -> Press A
+			else if (elapsed >= 5 && elapsed < 16)
+			{
+				CoreSetButtonState(0, 8, pulse);
+			}
+			// 3) 16s+: ACTIVE RACE! Hold Gas (A button) and steer!
+			else
+			{
+				CoreSetButtonState(0, 8, true);
+				int16_t steer = (int16_t)(sin(frames_written * 0.05) * 12000);
+				CoreSetAnalogState(0, 0, 0, steer);
+			}
+		}
+		else if (is_rally)
 		{
 			// Top Gear Rally 2:
 			// 1) 1-20s: Dismiss 'Controller Pak not found' and advance Title Screen

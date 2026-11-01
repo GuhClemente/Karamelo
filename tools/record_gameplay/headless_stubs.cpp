@@ -12,7 +12,7 @@
 #include "retroachievements.h"
 
 int  MenuGetDeadzone() { return 0; }
-int  MenuGetAudioLatencyMs() { return 64; }
+int  MenuGetAudioLatencyMs() { return 128; }
 int  MenuGetHwRender() { return 1; }
 int  MenuGetPadAsMouse() { return 0; }
 
