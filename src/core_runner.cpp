@@ -1933,7 +1933,7 @@ static bool CB_Environment(unsigned cmd, void* data)
 		struct retro_variable* var = (struct retro_variable*)data;
 		if (var && var->key)
 		{
-			// Analogue 3D N64 Horizontal Upscaling (Caminho A):
+			// N64 Horizontal Upscaling:
 			// Renders 3D geometry with 2x (640x240) or 4x (1280x240) horizontal resolution
 			// while strictly preserving 240p scanlines for authentic CRT display.
 			int n64_up = MenuGetN64Upscale();

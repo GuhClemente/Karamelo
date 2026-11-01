@@ -348,7 +348,7 @@ static int setting_vsync = 1; // 0=Disabled, 1=Enabled
 // ParaLLEl N64 is the primary robust core with Ari64 Dynarec and RetroAchievements.
 // Defaulting to it provides 60fps locked emulation and rock-solid stability.
 static int setting_n64_core = 0;
-static int setting_n64_upscale = 0; // 0=Desligado (Nativo), 1=Analogue 3D (640x240), 2=Analogue 3D Ultra (1280x240)
+static int setting_n64_upscale = 0; // 0=Desligado (Nativo), 1=2x (640x240), 2=4x (1280x240)
 static int setting_osd_timeout = 0; // index into kOsdTimeouts
 static int setting_name_scroll = 3; // index into kScrollDelays; default 5s
 static int setting_sms_fm = 0; // 0=auto, 1=desligado, 2=ligado
@@ -1361,11 +1361,11 @@ void PopulateMainMenu() {
           {Tr("Acesso do CD", "CD Access"), (setting_language == 1) ? acc_en[setting_cd_latency] : acc_pt[setting_cd_latency], false, false, 514});
     }
 
-    // 3a-2. N64 Analogue 3D Horizontal Upscaling
+    // 3a-2. N64 Horizontal Upscaling
     if (core_name.find("Gopher") != std::string::npos || core_name.find("N64") != std::string::npos || core_name.find("Nintendo 64") != std::string::npos || core_name.find("ParaLLEl") != std::string::npos || core_name.find("Mupen") != std::string::npos) {
-      const char *n64_upscales_pt[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
-      const char *n64_upscales_en[] = {"Disabled", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
-      items.push_back({Tr("Upscale N64", "N64 Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
+      const char *n64_upscales_pt[] = {"Desligado", "2x (640)", "4x (1280)"};
+      const char *n64_upscales_en[] = {"Disabled", "2x (640)", "4x (1280)"};
+      items.push_back({Tr("Upscale Horiz", "Horiz Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
     }
 
     // 3b. Core Options: whatever the core itself declared via SET_VARIABLES
@@ -2032,9 +2032,9 @@ void PopulateVideoSettings() {
   const char *n64_cores[] = {"ParaLLEl N64", "Mupen64+ Next", "Gopher64"};
   items.push_back({Tr("Core do N64", "N64 Core"), n64_cores[setting_n64_core], false, false, 309});
 
-  const char *n64_upscales_pt[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
-  const char *n64_upscales_en[] = {"Disabled", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
-  items.push_back({Tr("Upscale N64", "N64 Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
+  const char *n64_upscales_pt[] = {"Desligado", "2x (640)", "4x (1280)"};
+  const char *n64_upscales_en[] = {"Disabled", "2x (640)", "4x (1280)"};
+  items.push_back({Tr("Upscale Horiz", "Horiz Upscale"), (setting_language == 1) ? n64_upscales_en[setting_n64_upscale] : n64_upscales_pt[setting_n64_upscale], false, false, 310});
 
   char osd_to[16];
   if (kOsdTimeouts[setting_osd_timeout] == 0)
@@ -4086,7 +4086,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
       SelectByAction(item.action_id, 6);
-    } else if (item.action_id == 310) // N64 Upscale (Analogue 3D)
+    } else if (item.action_id == 310) // N64 Upscale Horizontal
     {
       setting_n64_upscale = (setting_n64_upscale + delta + 3) % 3;
       if (setting_n64_upscale > 0) {
@@ -4097,14 +4097,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
       else PopulateVideoSettings();
       SelectByAction(item.action_id, 7);
       MenuSaveSettings();
-      const char *names[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+      const char *names[] = {"Desligado", "2x (640x240)", "4x (1280x240)"};
       char msg[80];
       if (CoreIsRunning())
         snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
       else if (setting_n64_upscale > 0)
-        snprintf(msg, sizeof(msg), "N64 Upscale: %s (Gopher64)", names[setting_n64_upscale]);
+        snprintf(msg, sizeof(msg), "Upscale Horiz: %s (Gopher64)", names[setting_n64_upscale]);
       else
-        snprintf(msg, sizeof(msg), "N64 Upscale: %s", names[setting_n64_upscale]);
+        snprintf(msg, sizeof(msg), "Upscale Horiz: Desligado");
       CoreSetToast(msg, 90);
     } else if (item.action_id == 312) // OSD auto-hide
     {
@@ -4850,14 +4850,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
         else PopulateVideoSettings();
         SelectByAction(item.action_id, 7);
         MenuSaveSettings();
-        const char *names[] = {"Desligado", "Analogue 3D (640x240)", "Analogue 3D Ultra (1280x240)"};
+        const char *names[] = {"Desligado", "2x (640x240)", "4x (1280x240)"};
         char msg[80];
         if (CoreIsRunning())
           snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
         else if (setting_n64_upscale > 0)
-          snprintf(msg, sizeof(msg), "N64 Upscale: %s (Gopher64)", names[setting_n64_upscale]);
+          snprintf(msg, sizeof(msg), "Upscale Horiz: %s (Gopher64)", names[setting_n64_upscale]);
         else
-          snprintf(msg, sizeof(msg), "N64 Upscale: %s", names[setting_n64_upscale]);
+          snprintf(msg, sizeof(msg), "Upscale Horiz: Desligado");
         CoreSetToast(msg, 90);
       } else if (item.action_id == 798) {
         wizard_active = true;
