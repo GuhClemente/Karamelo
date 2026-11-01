@@ -10,8 +10,8 @@ Formatos aceitos nesta pasta:
   - Compactados: .zip, .7z, .rar
 
 BIOS / firmware:
-  Devem ficar soltos em app/bios/
-  - FMT_SYS.ROM: OBRIGATORIO (524.288 bytes - BIOS de Sistema Towns OS)
+  Devem ficar em app/bios/geartowns/ (soltos em app/bios/ tambem funcionam)
+  - FMT_SYS.ROM: OBRIGATORIO (262.144 bytes - BIOS de Sistema Towns OS)
   - FMT_DOS.ROM: OBRIGATORIO (524.288 bytes - ROM de boot DOS Towns OS)
   - FMT_FNT.ROM: OBRIGATORIO (ROM de fontes basicas 8/16-dot)
   - FMT_DIC.ROM: OBRIGATORIO (524.288 bytes - Dicionario Kanji)

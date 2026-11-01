@@ -136,7 +136,7 @@ std::string WebAdminSanitizeFilename(const std::string& raw_filename)
 bool WebAdminIsAllowedTargetSystem(const std::string& system_dir)
 {
 	static const char* const kAllowedSystems[] = {
-		"bios", "bios/np2kai", "bios/neocd", "bios/dc", "bios/fmtowns",
+		"bios", "bios/np2kai", "bios/neocd", "bios/dc", "bios/fmtowns", "bios/geartowns",
 		"SNES", "NES", "Genesis", "MegaCD", "32X", "MasterSystem", "GameGear",
 		"Saturn", "Dreamcast", "GBA", "GB", "GBC", "N64", "NDS", "3DS", "GameCube",
 		"PSX", "PS2", "PSP", "Arcade", "NeoGeo", "NeoGeoCD", "PCEngine", "PCFX",
@@ -258,7 +258,7 @@ std::vector<BiosAuditItem> WebAdminRunBiosAudit(const std::string& bios_root_dir
 		{ "ColecoVision",      "coleco.rom",                        "2c66f5911e5b42b8ebe113403548eee7", "",       true,  false, 0 },
 		{ "MSX / MSX2",        "MSX.ROM",                           "364a1a579fe5cb8dba54519bcfcdac0d", "",       true,  false, 0 },
 		{ "MSX / MSX2",        "MSX2.ROM",                          "ec3a01c91f24fbddcbcab0ad301bc9ef", "",       true,  false, 0 },
-		{ "FM Towns",          "FMT_SYS.ROM",                       "86fb6f7280689259f0ca839dd3dd6cde", "",       true,  false, 0 },
+		{ "FM Towns",          "FMT_SYS.ROM",                       "86fb6f7280689259f0ca839dd3dd6cde", "geartowns", true,  false, 0 },
 		{ "NEC PC-98",         "bios.rom",                          "cd237e16e7e77c06bb58540e9e9fca68", "np2kai", true,  false, 0 },
 		{ "NeoGeo CD",         "neocd_z.rom",                       "",                                 "neocd",  true,  false, 0 },
 		{ "Nintendo DS",       "bios7.bin",                         "df692a80a5b1bc90728bc3dfc76cd948", "",       false, false, 0 },
@@ -282,6 +282,9 @@ std::vector<BiosAuditItem> WebAdminRunBiosAudit(const std::string& bios_root_dir
 			// Also check flat root fallback (e.g. dc_boot.bin directly in bios/)
 			fs::path flat = root / item.filename;
 			if (fs::exists(flat, ec)) candidate = flat;
+			// The old FM Towns folder: the set is copied to bios/geartowns/ on the first load.
+			else if (item.subdir == "geartowns" && fs::exists(root / "fmtowns" / item.filename, ec))
+				candidate = root / "fmtowns" / item.filename;
 		}
 
 		if (fs::exists(candidate, ec) && fs::is_regular_file(candidate, ec))

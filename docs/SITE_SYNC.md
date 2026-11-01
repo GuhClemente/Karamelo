@@ -1539,7 +1539,7 @@ Inclusão oficial de dois dos computadores mais icônicos do mercado japonês no
      - Imagens de CD: `.chd`, `.cue/.bin`, `.iso`, `.m3u`
      - Disquetes de boot: `.d77`, `.d88`, `.hdm`, `.xdf`, `.bin`, `.img`
      - Compactados: `.zip`, `.7z`, `.rar`
-   - **BIOS e Arquivos de Sistema**: Soltos em `app/bios/` ou `app/bios/fmtowns/`.
+   - **BIOS e Arquivos de Sistema**: Em `app/bios/geartowns/` (soltos em `app/bios/` também funcionam).
      - `FMT_SYS.ROM` (524.288 bytes - MD5 `3a4f31cbf48737db6f2df8ef036ab7d4`): BIOS de Sistema Towns OS.
      - `FMT_DOS.ROM` (524.288 bytes - MD5 `fa0c98f5a6b0c61ee34f9a72138fc6b5`): Towns OS DOS Kernel.
      - `FMT_FNT.ROM` (MD5 `a35ee3364f26b5270be7f3f185ef3577`): Fontes básicas.
@@ -1551,7 +1551,7 @@ Inclusão oficial de dois dos computadores mais icônicos do mercado japonês no
    - Detecção automática de subpastas `roms/PC98` e `roms/FMTowns` para roteamento correto aos respectivos cores `cores/pc98.dll` e `cores/fmtowns.dll`.
 
 4. **Auditoria e Instalação Completa de BIOS (100% de Conformidade)**:
-   - **FM Towns**: Todas as 5 ROMs oficiais do Towns OS instaladas em `app/bios/` e `app/bios/fmtowns/` (`FMT_SYS.ROM`, `FMT_DOS.ROM`, `FMT_FNT.ROM`, `FMT_DIC.ROM`, `FMT_F20.ROM`), com suporte tanto ao set Model 1/2 quanto ao set Marty/Fresh/UX.
+   - **FM Towns**: Todas as 5 ROMs oficiais do Towns OS instaladas em `app/bios/geartowns/` (`FMT_SYS.ROM`, `FMT_DOS.ROM`, `FMT_FNT.ROM`, `FMT_DIC.ROM`, `FMT_F20.ROM`), com suporte tanto ao set Model 1/2 quanto ao set Marty/Fresh/UX.
    - **NEC PC-98**: Conjunto completo de 17 arquivos de sistema instalado em `app/bios/np2kai/` (`font.bmp`, `font.rom`, `bios.rom`, `bios9821.rom`, `itf.rom`, `sound.rom`, `ide.rom`, `sasi.rom`, `scsi.rom`, `pci.rom`, `d8000.rom` e 6 samples WAV de percussão do chip FM YM2608).
    - **Complementos em Outros Sistemas**:
      - Atari 7800: `7800 BIOS (U).rom` instalado e conferido por MD5.
@@ -2135,3 +2135,14 @@ Também nesta data:
 - **Baixa latência pela internet:** a partida passa pelo servidor e espera o jogador mais lento.
 - **Segurança com desconhecidos.** A partida carrega dados enviados pelo outro jogador; o chat recomenda entrar só em partida de quem se confia. Na rede local, o convite continua usando o endereço local.
 - Login só com Google. Não prometa Discord, Steam ou outros.
+
+## 54. Correção de 31/10/2026 — Pasta da BIOS do FM Towns
+
+A pasta oficial da BIOS do FM Towns agora é **`bios/geartowns/`**, a mesma da documentação do core Geartowns.
+
+- No Linux, a pasta antiga `bios/fmtowns/` não abria os jogos, nem com o core 1.0.3. Testado: `bios/geartowns/` e arquivos soltos em `bios/` funcionam. No Windows as três formas funcionam.
+- Quem já tem `bios/fmtowns/` não precisa fazer nada: ao abrir um jogo, o Karamelo copia os arquivos para `bios/geartowns/`, sem apagar os originais.
+- `FMT_SYS.ROM` tem 256 KB (262.144 bytes), não 512 KB.
+- No site: indicar só `bios/geartowns/` nas instruções do FM Towns e no mapa de pastas.
+
+**Contagens inalteradas.**

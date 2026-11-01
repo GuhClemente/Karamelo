@@ -738,11 +738,19 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 		static int16_t s_hold_r = 0;
 		int16_t chunk[SAMPLES_PER_BUFFER * 2];
 
-		while (SDL_GetAudioStreamQueued(g_audio_stream) < target_bytes)
+		for (;;)
 		{
+			const int queued_bytes = SDL_GetAudioStreamQueued(g_audio_stream);
+			if (queued_bytes >= target_bytes) break;
+
 			LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
 			LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
 			LONG available = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
+
+			// With half the queue still to play, a short ring is only the core's
+			// next frame not being here yet. Padding then put silence in the middle
+			// of the sound for no reason, and read as an underrun that grew the queue.
+			if (available < SAMPLES_PER_BUFFER && queued_bytes >= target_bytes / 2) break;
 
 			// Always keep the device fed. Letting the queue run dry stops
 			// playback outright, which is what produced the periodic gaps;
@@ -879,12 +887,9 @@ static void InitAudio(int sample_rate)
 	InterlockedExchange(&g_ring_read_pos, 0);
 	memset(g_ring_buffer, 0, sizeof(g_ring_buffer));
 
-	// Start the ring already at its target occupancy rather than empty. The
-	// buffer is zeroed, so this is silence, and the startup ramp covers it.
-	// Filling up to the target instead would mean running detuned for the
-	// whole climb - which is what the deeper settings made audible.
-	InterlockedExchange(&g_ring_write_pos,
-		InterlockedCompareExchange(&g_active_wave_buffers, 0, 0) * SAMPLES_PER_BUFFER);
+	// Empty: the stream is primed with the whole target below, and what counts
+	// as latency is the ring and the stream together.
+	InterlockedExchange(&g_ring_write_pos, 0);
 
 	if (audio_initialized)
 	{
@@ -914,7 +919,7 @@ static void InitAudio(int sample_rate)
 		int want = ComputeWantedQueueDepth(g_output_sample_rate);
 		InterlockedExchange(&g_active_wave_buffers, (LONG)want);
 		InterlockedExchange(&g_baseline_wave_buffers, (LONG)want);
-		InterlockedExchange(&g_ring_write_pos, want * SAMPLES_PER_BUFFER);
+		InterlockedExchange(&g_ring_write_pos, 0);
 		g_audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
 	}
 
@@ -1070,6 +1075,25 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		}
 	}
 
+	// A core whose rate never settles never reaches the control below, and nothing else
+	// held its queue back: the arcade core sat at over a second of delay. Too much
+	// queued is stale whichever stage this is, so the excess goes.
+	if (s_locked_step <= 0.0)
+	{
+		const LONG limit = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0) * SAMPLES_PER_BUFFER * 3;
+		const LONG queued = occupancy + (g_audio_stream
+			? (LONG)(SDL_GetAudioStreamQueued(g_audio_stream) / (2 * (int)sizeof(int16_t))) : 0);
+		if (queued > limit)
+		{
+			const LONG excess = queued - limit / 3;
+			const LONG drop = excess < occupancy ? excess : occupancy;
+			rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
+			wp = (rp + (occupancy - drop)) % RING_BUFFER_SIZE;
+			occupancy -= drop;
+			capacity = RING_BUFFER_SIZE - occupancy - 1;
+		}
+	}
+
 	double step = s_step;
 	if (s_locked_step > 0.0)
 	{
@@ -1078,8 +1102,14 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		// holding 683ms of audio, and the slow climb toward that target is
 		// itself an audible drift. 12 buffers of 512 frames is 128ms, which is
 		// enough to ride out a hitch without adding noticeable delay.
+		//
+		// That reserve is the ring and the stream together. Each used to aim at the
+		// whole Latency setting on its own, so "128 ms" in the menu meant over 300 ms.
 		const double target_fill = (double)(InterlockedCompareExchange(&g_active_wave_buffers, 0, 0)
 		                                    * SAMPLES_PER_BUFFER);
+		const LONG stream_frames = g_audio_stream
+			? (LONG)(SDL_GetAudioStreamQueued(g_audio_stream) / (2 * (int)sizeof(int16_t))) : 0;
+		const LONG total_queued = occupancy + stream_frames;
 
 		// Resync outright when the gap is gross. The trim below is deliberately
 		// too gentle to close a large gap quickly - at 0.5% it moves 240
@@ -1091,12 +1121,13 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		// stale latency nobody wants to hear anyway.
 		const LONG seed = (LONG)target_fill;
 		const LONG min_thresh = s_loaded_core_is_pcsx2 ? (SAMPLES_PER_BUFFER * 2) : (seed / 3);
-		if (occupancy < min_thresh || occupancy > seed * 3)
+		if (total_queued < min_thresh || total_queued > seed * 3)
 		{
 			// Re-read: the audio thread has been draining since the snapshot
 			// above, so the stale value would seed us behind the reader.
 			rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
-			for (LONG i = occupancy; i < seed; i++)
+			const LONG ring_wanted = (seed > stream_frames) ? (seed - stream_frames) : 0;
+			for (LONG i = occupancy; i < ring_wanted; i++)
 			{
 				LONG idx = (rp + i) % RING_BUFFER_SIZE;
 				g_ring_buffer[idx * 2 + 0] = 0;
@@ -1105,8 +1136,8 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 			// wp and capacity have to move with it: the write loop below
 			// continues from wp and stores it back at the end, which would
 			// otherwise undo this.
-			wp = (rp + seed) % RING_BUFFER_SIZE;
-			occupancy = seed;
+			wp = (rp + ring_wanted) % RING_BUFFER_SIZE;
+			occupancy = ring_wanted;
 			capacity = RING_BUFFER_SIZE - occupancy - 1;
 
 			// The gap that just got closed was, by definition, not something
@@ -1117,7 +1148,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 			s_stable_time = 0.0;
 		}
 
-		double raw_ratio = (target_fill > 0.0) ? ((double)occupancy / target_fill) : 1.0;
+		double raw_ratio = (target_fill > 0.0) ? ((double)(occupancy + stream_frames) / target_fill) : 1.0;
 
 		double dt = (s_tempo_last_time.QuadPart != 0)
 			? (double)(now.QuadPart - s_tempo_last_time.QuadPart) / (double)freq.QuadPart
@@ -1759,6 +1790,29 @@ static bool ParseCoreVariablesGuarded(const struct retro_variable* vars,
 	}
 }
 
+// Geartowns finds its ROMs in bios/geartowns/ or loose in bios/. It only reaches other
+// subfolders on Windows: on Linux and macOS a set in the bios/fmtowns/ this project used
+// to document failed to load. Whoever still has that folder gets a copy in the right
+// place, and nothing of theirs is removed.
+static void CopyFmTownsBiosToOfficialFolder(const std::string& sys_dir)
+{
+	static bool done = false;
+	if (done) return;
+	done = true;
+
+	std::error_code ec;
+	const fs::path from = fs::path(sys_dir) / "fmtowns";
+	const fs::path to = fs::path(sys_dir) / "geartowns";
+	if (!fs::is_directory(from, ec)) return;
+	fs::create_directories(to, ec);
+	for (const auto& entry : fs::directory_iterator(from, ec))
+	{
+		std::error_code one;
+		if (entry.is_regular_file(one))
+			fs::copy_file(entry.path(), to / entry.path().filename(), fs::copy_options::skip_existing, one);
+	}
+}
+
 static bool CB_Environment(unsigned cmd, void* data)
 {
 	switch (cmd)
@@ -1802,6 +1856,9 @@ static bool CB_Environment(unsigned cmd, void* data)
 				else
 					sys_dir = fs::absolute("bios").string();
 			}
+
+			if (s_loaded_core_path.find("fmtowns") != std::string::npos)
+				CopyFmTownsBiosToOfficialFolder(sys_dir);
 
 			// fMSX (msx.dll) retro_load_game runs a strrchr for '/' and '\\' on the
 			// system directory buffer and zeroes the last slash, assuming the frontend
@@ -2333,9 +2390,11 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 			LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
 			LONG occ = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
 			LONG underruns = InterlockedExchange(&g_audio_underrun_count, 0);
+			const long stream = g_audio_stream ? SDL_GetAudioStreamQueued(g_audio_stream) / (2 * (int)sizeof(int16_t)) : 0;
 			CoreLogPrintf(RETRO_LOG_INFO,
-				"[PERF] core=%.1f fps  filtro=%.2f ms/quadro  alvo=%.1f  buf=%ld  underrun=%ld",
-				frames / secs, avg_us / 1000.0, core_target_fps, (long)occ, (long)underruns);
+				"[PERF] core=%.1f fps  filtro=%.2f ms/quadro  alvo=%.1f  buf=%ld  fila=%ldms  underrun=%ld",
+				frames / secs, avg_us / 1000.0, core_target_fps, (long)occ,
+				(long)((occ + stream) * 1000 / g_output_sample_rate), (long)underruns);
 			frames = 0; last = now;
 			g_render_us_total = 0.0; g_render_count = 0;
 		}
