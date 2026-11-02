@@ -2194,3 +2194,49 @@ Medido na corrida do Wave Race 64, em 51 s por core, a 128 ms: nenhuma amostra d
 **Não publique** "zero estalos", "zero underruns", "áudio cristalino" nem "60 FPS contínuos": isso não foi medido em todos os jogos e PCs. Pode escrever que o som não estala mais quando o jogo troca a taxa, citando o Wave Race 64.
 
 **Latência** fica em **Áudio > Latência**: 64, 128, 256, 512 ou 1024 ms. O padrão é 128 ms.
+
+## 56. Correção de 01/11/2026 — Página /comparativo
+
+A página diz "sem hype", mas traz números que o projeto não mediu ou que estão errados. Corrija em PT e EN, nos cards, nos duelos, na tabela, no radar, no FAQ e nas metatags. **Sem medição, sai o número.**
+
+### Números errados
+
+| hoje na página | correto |
+|---|---|
+| "~1 MB", "1 MB de executável", "binário minúsculo" | Executável: 4,8 MB no Windows e 6,1 MB no Linux. |
+| "100x mais leve", "Zero Bloat" | Pacote da 0.98: 229 MB no Windows e 164 MB no Linux, porque traz os cores. Remova as duas frases. |
+| "Ring Buffer de 16 buffers/slots" | Remova. A fila é ajustável (64, 128, 256, 512 ou 1024 ms; padrão 128 ms). |
+| "OSD Autêntico MiSTer", "OSD fiel", "exact MiSTer FPGA OSD" | "Menu inspirado no visual do MiSTer". O código é próprio, escrito do zero. |
+
+### Sem medição: remova
+
+- "< 0.1s", "boot instantâneo" e o card de tempo de inicialização. Se quiser um card ali, use "37 sistemas" ou "42 motores".
+- "3 a 5 segundos" do RetroArch, "2 a 4 segundos" do MiSTer e "15 a 30 segundos" do Batocera.
+- "4.0 GB+" e outros tamanhos de concorrentes, a não ser com fonte e data.
+- "zero estalos", "sem estalos", "áudio limpo", "sem dessincronização", "zero pops". O que foi medido está na seção 55.
+- Notas do radar sem critério publicado.
+- "100%" e "Plug & Play": alguns sistemas exigem BIOS do próprio usuário.
+
+### Errado sobre os outros projetos
+
+- **MiSTer "não cabe N64 nem Saturn":** existem cores de N64 e de Saturn para o MiSTer. Não diga que não cabem. Ao comparar, limite-se a "Nintendo DS, Dreamcast, PS2, GameCube, 3DS e PSP no Karamelo", e confira antes se algum deles tem core no MiSTer.
+- **MiSTer "roda sem sistema operacional (bare-metal)":** a própria tabela da página cita o Linux interno do ARM. Remova.
+- **MiSTer "latência zero":** troque por "Baixíssima latência, por rodar em hardware".
+- **RetroArch "se desconfigura sozinho", "intimidador":** é opinião sem prova. Escreva "tem muitas opções; o Karamelo tem menos e já vem configurado".
+
+### Preços
+
+R$ 3.500 a 4.500, R$ 3.800 e R$ 3.880 aparecem juntos na página e não têm fonte. Use um único valor como estimativa, com a data, e **"varia conforme fornecedor e câmbio"**. Se não houver fonte, escreva apenas "exige comprar hardware".
+
+### Pode manter
+
+- Grátis e código aberto (GPL-3.0).
+- Roda como aplicativo no PC, em janela ou tela cheia.
+- RetroAchievements integrado e leitura de .7z e .chd.
+- As vantagens listadas dos outros projetos, como CRT analógico no MiSTer e trailers no RetroBat, conferindo o que estiver desatualizado.
+- O aviso legal de não afiliação.
+
+### Conferir com o app antes de publicar
+
+- "10 Shaders Integrados": confirme a contagem no menu.
+- Batocera: a frase "não precisa formatar pendrive" compara só o aplicativo. Não misture com o Karamelo OS, que ainda não foi lançado.
