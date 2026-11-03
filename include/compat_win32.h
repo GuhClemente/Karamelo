@@ -217,7 +217,7 @@ static inline void* ThreadShimProc(void* p)
 
 static inline HANDLE CreateThread(void* sec, size_t stack, LPTHREAD_START_ROUTINE fn, LPVOID param, DWORD flags, DWORD* id)
 {
-	(void)sec; (void)stack; (void)flags; (void)id;
+	(void)sec; (void)flags; (void)id;
 	WinHandle* h = new WinHandle();
 	h->type = HANDLE_TYPE_THREAD;
 	h->refcount.store(2);
@@ -226,14 +226,24 @@ static inline HANDLE CreateThread(void* sec, size_t stack, LPTHREAD_START_ROUTIN
 	pthread_mutex_init(&h->thread.mtx, NULL);
 	pthread_cond_init(&h->thread.cond, NULL);
 	ThreadShimData* s = new ThreadShimData{ fn, param, h };
-	if (pthread_create(&h->thread.th, NULL, ThreadShimProc, s) != 0)
+
+	constexpr size_t DEFAULT_THREAD_STACK_SIZE = 8 * 1024 * 1024;
+	const size_t effective_stack = (stack > 0) ? stack : DEFAULT_THREAD_STACK_SIZE;
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, effective_stack);
+
+	if (pthread_create(&h->thread.th, &attr, ThreadShimProc, s) != 0)
 	{
+		pthread_attr_destroy(&attr);
 		pthread_mutex_destroy(&h->thread.mtx);
 		pthread_cond_destroy(&h->thread.cond);
 		delete s;
 		delete h;
 		return NULL;
 	}
+	pthread_attr_destroy(&attr);
 	return (HANDLE)h;
 }
 
