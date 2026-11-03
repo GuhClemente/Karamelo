@@ -15,6 +15,9 @@
 #include <mutex>
 #include <tuple>
 #include <SDL3/SDL.h>
+#if defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -4328,6 +4331,21 @@ static bool WaitForCoreThread(HANDLE h, DWORD timeout_ms)
 		MSG msg;
 		PeekMessageA(&msg, NULL, 0, 0, PM_NOREMOVE);
 	}
+#elif defined(__APPLE__)
+	if (pthread_main_np())
+	{
+		DWORD waited = 0;
+		for (;;)
+		{
+			DWORD slice = (timeout_ms - waited < 50) ? timeout_ms - waited : 50;
+			if (WaitForSingleObject(h, slice) != WAIT_TIMEOUT) return true;
+			waited += slice;
+			if (waited >= timeout_ms) return false;
+			SDL_PumpEvents();
+			CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
+		}
+	}
+	return WaitForSingleObject(h, timeout_ms) != WAIT_TIMEOUT;
 #else
 	return WaitForSingleObject(h, timeout_ms) != WAIT_TIMEOUT;
 #endif

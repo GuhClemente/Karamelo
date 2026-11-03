@@ -97,6 +97,11 @@ elif ls cores/*.dylib 1>/dev/null 2>&1; then
     cp -a cores/*.dylib "$DIST_DIR/cores/"
 fi
 
+# Copiar libMoltenVK.dylib se presente (necessario para Vulkan/MoltenVK no macOS)
+if [ -f "app/libMoltenVK.dylib" ]; then
+    cp -a "app/libMoltenVK.dylib" "$DIST_DIR/"
+fi
+
 # Remover atributos de quarentena
 xattr -rd com.apple.quarantine "$DIST_DIR" 2>/dev/null || true
 

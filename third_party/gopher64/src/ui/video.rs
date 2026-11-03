@@ -40,7 +40,6 @@ fn build_gfx_info(device: &mut device::Device, netplay: bool) -> GFX_INFO {
 }
 
 pub fn init(device: &mut device::Device, netplay: bool) {
-    ui::sdl_init(sdl3_sys::init::SDL_INIT_VIDEO);
     ui::ttf_init();
 
     let window_title = std::ffi::CString::new("gopher64").unwrap();
@@ -82,7 +81,7 @@ pub fn init(device: &mut device::Device, netplay: bool) {
     };
 
     device.ui.video.window = unsafe {
-        sdl3_sys::video::SDL_CreateWindow(window_title.as_ptr(), window_width, window_height, flags)
+        gopher_init_video_and_window(window_title.as_ptr(), window_width, window_height, flags)
     };
     if device.ui.video.window.is_null() {
         let err = sdl3_sys::error::SDL_GetError();
@@ -165,7 +164,7 @@ fn fps_counter(ui: &mut ui::Ui) {
 pub fn close(ui: &ui::Ui) {
     unsafe {
         rdp_close();
-        sdl3_sys::video::SDL_DestroyWindow(ui.video.window);
+        gopher_destroy_window(ui.video.window);
     }
 }
 
@@ -175,6 +174,13 @@ unsafe extern "C" {
         out_width: *mut u32,
         out_height: *mut u32,
     ) -> bool;
+    pub fn gopher_init_video_and_window(
+        title: *const std::ffi::c_char,
+        width: i32,
+        height: i32,
+        flags: sdl3_sys::video::SDL_WindowFlags,
+    ) -> *mut sdl3_sys::video::SDL_Window;
+    pub fn gopher_destroy_window(win: *mut sdl3_sys::video::SDL_Window);
 }
 
 static CONVERTED_FRAME_BUFFER: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(Vec::new());

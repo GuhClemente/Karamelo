@@ -99,8 +99,13 @@ def run_tier_2_binary_checks():
     if has_sdl:
         print(f"      {Colors.GREEN}✔ SDL3 vinculado dinamicamente (/opt/homebrew ou rpath){Colors.RESET}")
     else:
-        print(f"      {Colors.RED}✖ libSDL3 não encontrado em otool -L{Colors.RESET}")
-        all_ok = False
+        # Verifica se SDL3 foi incorporado estaticamente (third_party/SDL3)
+        res_nm = subprocess.run(["nm", exe], capture_output=True, text=True)
+        if "T _SDL_Init" in res_nm.stdout:
+            print(f"      {Colors.GREEN}✔ SDL3 vinculado estaticamente de third_party/SDL3 (sem dependencia externa){Colors.RESET}")
+        else:
+            print(f"      {Colors.RED}✖ libSDL3 não encontrado (nem estático nem dinâmico){Colors.RESET}")
+            all_ok = False
         
     if has_gl:
         print(f"      {Colors.GREEN}✔ OpenGL.framework nativo do macOS vinculado{Colors.RESET}")
@@ -227,7 +232,16 @@ def run_tier_3_core_battery():
 # ---------------------------------------------------------------------
 def run_tier_4_package_verification():
     log_section("TIER 4: Verificação de Integridade do Pacote Distribuível (dist/)")
-    tar_path = "dist/Karamelo_v0.9.4_macOS_arm64.tar.gz"
+    app_ver = "0.98"
+    if os.path.exists("include/app_info.h"):
+        with open("include/app_info.h", "r") as f:
+            for line in f:
+                if "#define APP_VERSION" in line:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        app_ver = parts[2].strip('"\r\n')
+                    break
+    tar_path = f"dist/Karamelo_v{app_ver}_macOS_arm64.tar.gz"
     version_path = "dist/version.json"
     
     if not os.path.exists(tar_path):

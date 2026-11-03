@@ -7,6 +7,9 @@
 *.ilk
 *.exp
 *.lib
+*.dylib
+*.so
+*.dll
 
 # Runtime artefacts and user data
 /app/cache/

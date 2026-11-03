@@ -347,6 +347,17 @@ static bool VkLoadLoader()
 {
 	if (vkCreateInstance_) return true;
 
+#if defined(__APPLE__)
+	const char* hint = SDL_GetHint(SDL_HINT_VULKAN_LIBRARY);
+	if (!hint || !hint[0])
+	{
+		if (access("libMoltenVK.dylib", F_OK) == 0)
+			SDL_SetHint(SDL_HINT_VULKAN_LIBRARY, "libMoltenVK.dylib");
+		else if (access("/opt/homebrew/lib/libMoltenVK.dylib", F_OK) == 0)
+			SDL_SetHint(SDL_HINT_VULKAN_LIBRARY, "/opt/homebrew/lib/libMoltenVK.dylib");
+	}
+#endif
+
 	if (!SDL_Vulkan_LoadLibrary(NULL))
 	{
 		VkHwLog("SDL_Vulkan_LoadLibrary falhou: %s", SDL_GetError());

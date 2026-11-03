@@ -17,6 +17,64 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
 #endif
 
+#if defined(__APPLE__)
+#include <dispatch/dispatch.h>
+#include <pthread.h>
+#include <unistd.h>
+#endif
+
+extern "C" void* gopher_init_video_and_window(const char* title, int width, int height, uint64_t flags) {
+#if defined(__APPLE__)
+  __block void* win = nullptr;
+  void (^init_block)(void) = ^{
+    const char* hint = SDL_GetHint(SDL_HINT_VULKAN_LIBRARY);
+    if (!hint || !hint[0]) {
+      if (access("libMoltenVK.dylib", F_OK) == 0) {
+        SDL_SetHint(SDL_HINT_VULKAN_LIBRARY, "libMoltenVK.dylib");
+      } else if (access("/opt/homebrew/lib/libMoltenVK.dylib", F_OK) == 0) {
+        SDL_SetHint(SDL_HINT_VULKAN_LIBRARY, "/opt/homebrew/lib/libMoltenVK.dylib");
+      }
+    }
+    if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
+      SDL_InitSubSystem(SDL_INIT_VIDEO);
+    }
+    SDL_Window* w = SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags);
+    if (w) {
+      SDL_SyncWindow(w);
+    }
+    win = (void*)w;
+  };
+
+  if (!pthread_main_np()) {
+    dispatch_sync(dispatch_get_main_queue(), init_block);
+  } else {
+    init_block();
+  }
+  return win;
+#else
+  if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
+    SDL_InitSubSystem(SDL_INIT_VIDEO);
+  }
+  return (void*)SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags);
+#endif
+}
+
+extern "C" void gopher_destroy_window(void* win) {
+  if (!win) return;
+#if defined(__APPLE__)
+  void (^destroy_block)(void) = ^{
+    SDL_DestroyWindow((SDL_Window*)win);
+  };
+  if (!pthread_main_np()) {
+    dispatch_async(dispatch_get_main_queue(), destroy_block);
+  } else {
+    destroy_block();
+  }
+#else
+  SDL_DestroyWindow((SDL_Window*)win);
+#endif
+}
+
 using namespace Vulkan;
 
 #define DP_STATUS_XBUS_DMA 0x01
@@ -396,7 +454,9 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   memset(&callback, 0, sizeof(CALL_BACK));
 
   window = (SDL_Window *)_window;
+#if !defined(__APPLE__)
   SDL_SyncWindow(window);
+#endif
   bool result = SDL_AddEventWatch(sdl_event_filter, nullptr);
   if (!result) {
     LOGE("Could not add event watch.\n");
@@ -835,7 +895,9 @@ void rdp_update_screen() {
   }
   if (!wsi->end_frame()) {
     LOGE("End frame failed\n");
+#if !defined(__APPLE__)
     SDL_PumpEvents(); // For Android to trigger pause event
+#endif
   }
   wsi->begin_frame();
 }

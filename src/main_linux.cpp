@@ -1,4 +1,7 @@
 #include "compat_win32.h"
+#if defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -1027,9 +1030,18 @@ int main(int argc, char* argv[])
 			}
 		};
 
+		static auto SelftestWait = [](DWORD ms) {
+#if defined(__APPLE__)
+			SDL_PumpEvents();
+			CFRunLoopRunInMode(kCFRunLoopDefaultMode, ms / 1000.0, false);
+#else
+			Sleep(ms);
+#endif
+		};
+
 		// Same parsing as main_win32.cpp: "--driver N" is taken out of the
 		// positional list instead of being read as the recovery-check pair.
-		SDL_Init(SDL_INIT_AUDIO);
+		SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO);
 
 		std::vector<const char*> pos;
 		bool input_probe = false;
@@ -1082,7 +1094,7 @@ int main(int argc, char* argv[])
 		DWORD waited_ms = 0;
 		while (started && (CoreIsLoading() || !CoreIsRunning()) && waited_ms < 20000)
 		{
-			Sleep(50);
+			SelftestWait(50);
 			waited_ms += 50;
 		}
 		bool running = CoreIsRunning();
@@ -1096,7 +1108,7 @@ int main(int argc, char* argv[])
 			DWORD fw = 0;
 			while ((frames = CoreGetVideoFrameCount()) < 5 && CoreIsRunning() && fw < 10000)
 			{
-				Sleep(50);
+				SelftestWait(50);
 				fw += 50;
 			}
 			running = CoreIsRunning();
@@ -1156,7 +1168,7 @@ int main(int argc, char* argv[])
 			DWORD waited2 = 0;
 			while (retry_started && (CoreIsLoading() || !CoreIsRunning()) && waited2 < 20000)
 			{
-				Sleep(50);
+				SelftestWait(50);
 				waited2 += 50;
 			}
 			retry_running = CoreIsRunning();
@@ -1169,7 +1181,7 @@ int main(int argc, char* argv[])
 				DWORD fw2 = 0;
 				while ((retry_frames = CoreGetVideoFrameCount()) < 5 && CoreIsRunning() && fw2 < 10000)
 				{
-					Sleep(50);
+					SelftestWait(50);
 					fw2 += 50;
 				}
 				retry_running = CoreIsRunning() && retry_frames >= 5;
