@@ -363,7 +363,9 @@ bool sdl_event_filter(void *userdata, SDL_Event *event) {
     wsi->deinit_surface_and_swapchain();
   } else if (event->type == SDL_EVENT_RENDER_DEVICE_RESET) {
     wsi->init_surface_swapchain();
-    wsi->begin_frame();
+    if (window && !(SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN)) {
+      wsi->begin_frame();
+    }
   }
 
   return 0;
@@ -512,7 +514,9 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
     LOGE("Warning: fonts could not be loaded, continuing without OSD text.\n");
   }
 
-  wsi->begin_frame();
+  if (window && !(SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN)) {
+    wsi->begin_frame();
+  }
 
   callback.emu_running = true;
   callback.enable_speedlimiter = true;
@@ -559,7 +563,7 @@ void rdp_close() {
   achievement_progress_indicator_image = Vulkan::ImageHandle();
   fps_image = Vulkan::ImageHandle();
 
-  if (wsi)
+  if (wsi && window && !(SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN))
     wsi->end_frame();
 
   if (message_font) {
@@ -890,7 +894,10 @@ bool rdp_get_framebuffer(const uint32_t **out_pixels, uint32_t *out_width, uint3
 }
 
 void rdp_update_screen() {
-  if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
+  if (SDL_GetWindowFlags(window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) {
+    if (wsi) {
+      wsi->get_device().next_frame_context();
+    }
     return;
   }
   if (!wsi->end_frame()) {
