@@ -713,6 +713,7 @@ void MenuSetVideoDriverForSelftest(int driver) {
 int MenuGetSyncMode() { return setting_sync; }
 int MenuGetVsync() { return setting_vsync; }
 int MenuGetN64Core() { return setting_n64_core; }
+void MenuSetN64Core(int core) { setting_n64_core = ClampInt(core, 0, 2); }
 int MenuGetN64Upscale() { return setting_n64_upscale; }
 void MenuSetN64Upscale(int mode) { setting_n64_upscale = ClampInt(mode, 0, 2); }
 // Arcade routing is automatic and deliberately has no setting. There used to

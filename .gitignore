@@ -21,6 +21,8 @@
 /cache/
 /saves/
 /screenshots/
+*.mp4
+/app/*.mp4
 *.log
 *.log.old
 /app/*.log*

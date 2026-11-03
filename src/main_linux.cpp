@@ -1405,6 +1405,30 @@ int main(int argc, char* argv[])
 		CrashReporterCheckAndDispatch();
 	}
 
+	std::string record_out_path = "";
+	int record_target_seconds = 0;
+	for (int i = 1; i < argc; i++)
+	{
+		if (strcmp(argv[i], "--n64-core") == 0 && i + 1 < argc)
+		{
+			MenuSetN64Core(atoi(argv[i + 1]));
+		}
+		if (strcmp(argv[i], "--upscale") == 0 && i + 1 < argc)
+		{
+			MenuSetN64Core(2); // Forca Gopher64
+			MenuSetN64Upscale(atoi(argv[i + 1]));
+		}
+		if (strcmp(argv[i], "--filter") == 0 && i + 1 < argc)
+		{
+			MenuSetFilterMode(atoi(argv[i + 1]));
+		}
+		if (strcmp(argv[i], "--record") == 0 && i + 2 < argc)
+		{
+			record_out_path = argv[i + 1];
+			record_target_seconds = atoi(argv[i + 2]);
+		}
+	}
+
 	if (argc > 1 && argv[1] && argv[1][0] != '\0' && argv[1][0] != '-')
 	{
 		std::string arg = argv[1];
@@ -1594,6 +1618,111 @@ int main(int argc, char* argv[])
 		}
 
 		DesktopChatRenderSdlWindow();
+
+		static FILE* fp_rec_video = nullptr;
+		static int rec_frames_captured = 0;
+		static bool rec_started = false;
+
+		if (!record_out_path.empty())
+		{
+			if (CoreIsRunning() && !CoreIsLoading() && !OsdIsEnabled())
+			{
+				const int REC_W = 1440;
+				const int REC_H = 1080;
+
+				if (!rec_started)
+				{
+					char cmd[1024];
+					snprintf(cmd, sizeof(cmd),
+						"/opt/homebrew/bin/ffmpeg -y -f rawvideo -pixel_format bgr0 -video_size %dx%d -framerate 60 -i - -c:v h264_videotoolbox -b:v 10M -pix_fmt yuv420p rec_video_temp.mp4 >/dev/null 2>&1",
+						REC_W, REC_H);
+					fp_rec_video = popen(cmd, "w");
+					CoreStartAudioRecording("rec_audio_temp.raw");
+					rec_started = true;
+					printf("[RECORD] Gravacao iniciada: alvo=%ds (%d quadros) resolucao=%dx%d saida=%s\n",
+						record_target_seconds, record_target_seconds * 60, REC_W, REC_H, record_out_path.c_str());
+				}
+
+				if (fp_rec_video)
+				{
+					static uint32_t rec_canvas[1440 * 1080];
+					CoreRender(rec_canvas, REC_W, REC_H, 0, 0);
+					fwrite(rec_canvas, sizeof(uint32_t), REC_W * REC_H, fp_rec_video);
+					rec_frames_captured++;
+
+					if (rec_frames_captured == 900 || rec_frames_captured == 2100)
+					{
+						int raw_w = 0, raw_h = 0;
+						const uint32_t* raw_fb = CoreAcquireRawFrame(&raw_w, &raw_h);
+						if (raw_fb && raw_w > 0 && raw_h > 0)
+						{
+							std::error_code dir_ec;
+							fs::create_directories("screenshots", dir_ec);
+							std::string stem = fs::path(record_out_path).stem().string();
+							char snap_path[256];
+							snprintf(snap_path, sizeof(snap_path), "screenshots/%s_%s_raw_%dx%d.bmp",
+								stem.c_str(),
+								(rec_frames_captured == 900 ? "title" : "race"), raw_w, raw_h);
+							FILE* f_bmp = fopen(snap_path, "wb");
+							if (f_bmp)
+							{
+								uint32_t width = (uint32_t)raw_w;
+								uint32_t height = (uint32_t)raw_h;
+								uint32_t row_bytes = width * 3;
+								uint32_t pad = (4 - (row_bytes % 4)) % 4;
+								uint32_t image_size = (row_bytes + pad) * height;
+								unsigned char file_hdr[14] = { 'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0 };
+								uint32_t file_size = 54 + image_size;
+								file_hdr[2] = (unsigned char)(file_size);
+								file_hdr[3] = (unsigned char)(file_size >> 8);
+								file_hdr[4] = (unsigned char)(file_size >> 16);
+								file_hdr[5] = (unsigned char)(file_size >> 24);
+								unsigned char info_hdr[40] = { 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 24, 0 };
+								info_hdr[4] = (unsigned char)(width);
+								info_hdr[5] = (unsigned char)(width >> 8);
+								info_hdr[6] = (unsigned char)(width >> 16);
+								info_hdr[7] = (unsigned char)(width >> 24);
+								info_hdr[8] = (unsigned char)(height);
+								info_hdr[9] = (unsigned char)(height >> 8);
+								info_hdr[10] = (unsigned char)(height >> 16);
+								info_hdr[11] = (unsigned char)(height >> 24);
+								fwrite(file_hdr, 1, 14, f_bmp);
+								fwrite(info_hdr, 1, 40, f_bmp);
+								unsigned char pad_bytes[3] = { 0, 0, 0 };
+								for (int y = (int)height - 1; y >= 0; y--)
+								{
+									for (unsigned x = 0; x < width; x++)
+									{
+										uint32_t rgb = raw_fb[y * width + x];
+										unsigned char bgr[3] = { (unsigned char)(rgb & 0xFF), (unsigned char)((rgb >> 8) & 0xFF), (unsigned char)((rgb >> 16) & 0xFF) };
+										fwrite(bgr, 1, 3, f_bmp);
+									}
+									if (pad > 0) fwrite(pad_bytes, 1, pad, f_bmp);
+								}
+								fclose(f_bmp);
+								printf("[RECORD] Snapshot salvo: %s\n", snap_path);
+							}
+						}
+					}
+
+					if (rec_frames_captured >= record_target_seconds * 60)
+					{
+						printf("[RECORD] Concluindo gravacao de %d quadros...\n", rec_frames_captured);
+						pclose(fp_rec_video);
+						fp_rec_video = nullptr;
+						CoreStopAudioRecording();
+
+						char mux_cmd[1024];
+						snprintf(mux_cmd, sizeof(mux_cmd),
+							"/opt/homebrew/bin/ffmpeg -y -i rec_video_temp.mp4 -f s16le -ar 48000 -ac 2 -i rec_audio_temp.raw -c:v copy -c:a aac -b:a 192k \"%s\" >/dev/null 2>&1 && rm -f rec_video_temp.mp4 rec_audio_temp.raw",
+							record_out_path.c_str());
+						int res = system(mux_cmd);
+						printf("[RECORD] Gravacao finalizada com sucesso: %s (status=%d)\n", record_out_path.c_str(), res);
+						running = false;
+					}
+				}
+			}
+		}
 
 		if (PortIsRunning())
 		{

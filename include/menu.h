@@ -50,6 +50,8 @@ const char* MenuGetWallpaperCustomPath(int index);
 int  MenuGetOsdTheme();
 int  MenuGetPadMenuToggle();
 void MenuSetPadMenuToggle(int mode);
+int  MenuGetN64Core();
+void MenuSetN64Core(int core);
 int  MenuGetN64Upscale();
 void MenuSetN64Upscale(int mode);
 bool MenuGetFullscreen();

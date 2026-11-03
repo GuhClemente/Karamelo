@@ -90,11 +90,14 @@ int  CoreGetSelectedSlot();
 void CoreSetSelectedSlot(int slot);
 bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t max_time_len, int64_t* out_bytes);
 bool CoreTakeScreenshot();
+const uint32_t* CoreAcquireRawFrame(int* out_w, int* out_h);
 
 // Volume & Audio Controls
 typedef void (*CoreAudioCallback)(const int16_t* data, size_t frames);
 void CoreSetAudioCallback(CoreAudioCallback cb);
 int  CoreGetAudioSampleRate();
+void CoreStartAudioRecording(const char* raw_audio_path);
+void CoreStopAudioRecording();
 
 void CoreSetVolume(int volume_percent);
 int  CoreGetVolume();

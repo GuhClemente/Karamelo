@@ -718,6 +718,8 @@ static void DeescalateWaveQueue()
 	}
 }
 
+static std::atomic<FILE*> s_record_audio_fp{ nullptr };
+
 static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 {
 	(void)lpParam;
@@ -789,6 +791,11 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			}
 
 			InterlockedExchange(&g_ring_read_pos, rp);
+			FILE* r_fp = s_record_audio_fp.load(std::memory_order_relaxed);
+			if (r_fp)
+			{
+				fwrite(chunk, sizeof(chunk), 1, r_fp);
+			}
 			// A false return means nothing was actually queued - breaking
 			// here avoids ever spinning forever on a while condition that
 			// SDL_GetAudioStreamQueued() would otherwise never satisfy.
@@ -2597,6 +2604,23 @@ void CoreSetAudioCallback(CoreAudioCallback cb)
 int CoreGetAudioSampleRate()
 {
 	return (g_core_sample_rate > 0.0) ? (int)g_core_sample_rate : 48000;
+}
+
+void CoreStartAudioRecording(const char* raw_audio_path)
+{
+	FILE* old_fp = s_record_audio_fp.exchange(nullptr);
+	if (old_fp) { fflush(old_fp); fclose(old_fp); }
+	if (raw_audio_path && raw_audio_path[0])
+	{
+		FILE* fp = fopen(raw_audio_path, "wb");
+		s_record_audio_fp.store(fp);
+	}
+}
+
+void CoreStopAudioRecording()
+{
+	FILE* old_fp = s_record_audio_fp.exchange(nullptr);
+	if (old_fp) { fflush(old_fp); fclose(old_fp); }
 }
 
 static void CB_AudioSample(int16_t left, int16_t right)
@@ -5649,6 +5673,11 @@ bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t
 		}
 	}
 	return true;
+}
+
+const uint32_t* CoreAcquireRawFrame(int* out_w, int* out_h)
+{
+	return AcquireFrame(out_w, out_h);
 }
 
 bool CoreTakeScreenshot()
