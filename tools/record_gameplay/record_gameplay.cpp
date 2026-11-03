@@ -5,8 +5,24 @@
 // - Long-form capture (60s - 120s)
 // - Direct PCM audio recording to WAV and AAC muxing
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#define POPEN _popen
+#define PCLOSE _pclose
+#else
+#include <unistd.h>
+#include <chrono>
+#include <thread>
+#define POPEN popen
+#define PCLOSE pclose
+typedef uint32_t DWORD;
+static inline void Sleep(uint32_t ms) { usleep(ms * 1000); }
+static inline uint32_t GetTickCount() {
+    using namespace std::chrono;
+    return (uint32_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+#endif
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -133,8 +149,10 @@ int main(int argc, char** argv)
 	std::string base_name = (argc > 5) ? argv[5] : "gameplay";
 	int upscale_mode = (argc > 6) ? atoi(argv[6]) : 0;
 	int filter_mode = (argc > 7) ? atoi(argv[7]) : 0;
+	bool no_input = (argc > 8) ? (atoi(argv[8]) != 0) : false;
+	bool skip_extras = (argc > 9) ? (atoi(argv[9]) != 0) : false;
 	MenuSetN64Upscale(upscale_mode);
-	printf("[INFO] N64 Upscale Mode: %d, Filter Mode: %d\n", upscale_mode, filter_mode);
+	printf("[INFO] N64 Upscale Mode: %d, Filter Mode: %d, No-Input: %d, Skip-Extras: %d\n", upscale_mode, filter_mode, (int)no_input, (int)skip_extras);
 
 	std::string lower_rom = rom_path;
 	std::transform(lower_rom.begin(), lower_rom.end(), lower_rom.begin(), ::tolower);
@@ -191,16 +209,17 @@ int main(int argc, char** argv)
 	}
 
 	printf("[INFO] Core is running! Recording frames for %d seconds...\n", duration_sec);
+	CoreSetN64Upscale(upscale_mode);
 
 	std::string temp_mp4_path = out_dir + "/" + base_name + "_temp.mp4";
 	std::string final_mp4_path = out_dir + "/" + base_name + ".mp4";
 
 	char pipe_cmd[1024];
 	snprintf(pipe_cmd, sizeof(pipe_cmd),
-		"ffmpeg -y -f rawvideo -vcodec rawvideo -s %dx%d -pix_fmt bgra -r 30 -i - -c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p \"%s\"",
+		"ffmpeg -y -f rawvideo -vcodec rawvideo -s %dx%d -pix_fmt bgra -r 30 -i - -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p \"%s\"",
 		kWidth, kHeight, temp_mp4_path.c_str());
 
-	FILE* vpipe = _popen(pipe_cmd, "wb");
+	FILE* vpipe = POPEN(pipe_cmd, "wb");
 	std::vector<uint32_t> frame_buf(kWidth * kHeight, 0);
 
 	DWORD run_t0 = GetTickCount();
@@ -221,9 +240,11 @@ int main(int argc, char** argv)
 		// Pulsing helper: toggles every 6 frames (~0.2s)
 		bool pulse = ((frames_written / 6) % 2 == 0);
 
-		if (is_waverace)
+		if (!no_input)
 		{
-			// Wave Race 64:
+			if (is_waverace)
+			{
+				// Wave Race 64:
 			// 1) 0-5s: Title Screen -> Press START
 			if (elapsed < 5)
 			{
@@ -615,10 +636,13 @@ int main(int argc, char** argv)
 			}
 		}
 
+		}
+
 		CoreRender(frame_buf.data(), kWidth, kHeight, 0, filter_mode);
 		if (vpipe) fwrite(frame_buf.data(), 1, (size_t)kWidth * kHeight * sizeof(uint32_t), vpipe);
 
-		int shot1_sec = 15;
+		if (!skip_extras) {
+			int shot1_sec = 15;
 		int shot2_sec = 30;
 		int shot3_sec = 45;
 		int shot4_sec = 55;
@@ -627,6 +651,7 @@ int main(int argc, char** argv)
 		if (elapsed >= (DWORD)shot2_sec && !s2) { SaveBmp(out_dir + "/" + base_name + "_02.bmp", filter_mode); s2 = true; }
 		if (elapsed >= (DWORD)shot3_sec && !s3) { SaveBmp(out_dir + "/" + base_name + "_03.bmp", filter_mode); s3 = true; }
 		if (elapsed >= (DWORD)shot4_sec && !s4) { SaveBmp(out_dir + "/" + base_name + "_04_crt.bmp", 8); s4 = true; }
+		}
 
 		frames_written++;
 		DWORD expected_ms = (DWORD)((uint64_t)frames_written * 1000 / 30);
@@ -636,7 +661,7 @@ int main(int argc, char** argv)
 
 	if (vpipe)
 	{
-		_pclose(vpipe);
+		PCLOSE(vpipe);
 		printf("[INFO] Raw video stream finished: %s (%d frames)\n", temp_mp4_path.c_str(), frames_written);
 	}
 
@@ -659,7 +684,7 @@ int main(int argc, char** argv)
 	if (g_audio_bytes > 1000)
 	{
 		snprintf(mux_cmd, sizeof(mux_cmd),
-			"ffmpeg -y -i \"%s\" -i \"%s\" -t %d -c:v copy -c:a aac -b:a 192k -movflags +faststart \"%s\" 2>nul",
+			"ffmpeg -y -i \"%s\" -i \"%s\" -t %d -c:v copy -c:a aac -b:a 320k -movflags +faststart \"%s\" 2>nul",
 			temp_mp4_path.c_str(), wav_path.c_str(), duration_sec, final_mp4_path.c_str());
 	}
 	else
@@ -670,6 +695,7 @@ int main(int argc, char** argv)
 	}
 	system(mux_cmd);
 
+	if (!skip_extras) {
 	// Convert screenshots
 	char conv_cmd[1024];
 	const char* shots[] = { "_01", "_02", "_03", "_04_crt" };
@@ -696,6 +722,8 @@ int main(int argc, char** argv)
 			final_mp4_path.c_str(), out_dir.c_str(), base_name.c_str());
 	}
 	system(conv_cmd);
+
+	}
 
 	// Cleanup temp files
 	remove(temp_mp4_path.c_str());
