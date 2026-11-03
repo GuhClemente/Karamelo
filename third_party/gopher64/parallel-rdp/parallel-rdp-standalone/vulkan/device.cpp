@@ -33,6 +33,14 @@
 #include <algorithm>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <vector>
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#include <sys/types.h>
+#else
+#include <direct.h>
+#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -755,19 +763,50 @@ bool Device::init_pipeline_cache(const uint8_t *data, size_t size)
 void Device::init_pipeline_cache()
 {
 #ifdef GRANITE_VULKAN_SYSTEM_HANDLES
-	if (!system_handles.filesystem)
-		return;
-	auto file = system_handles.filesystem->open_readonly_mapping("cache://pipeline_cache.bin");
-	if (file)
+	if (system_handles.filesystem)
 	{
-		auto size = file->get_size();
-		auto *mapped = file->data<uint8_t>();
-		if (mapped && !init_pipeline_cache(mapped, size))
+		auto file = system_handles.filesystem->open_readonly_mapping("cache://pipeline_cache.bin");
+		if (file)
+		{
+			auto size = file->get_size();
+			auto *mapped = file->data<uint8_t>();
+			if (mapped && !init_pipeline_cache(mapped, size))
+				LOGE("Failed to initialize pipeline cache.\n");
+			return;
+		}
+		else if (!init_pipeline_cache(nullptr, 0))
+		{
 			LOGE("Failed to initialize pipeline cache.\n");
+			return;
+		}
 	}
-	else if (!init_pipeline_cache(nullptr, 0))
-		LOGE("Failed to initialize pipeline cache.\n");
 #endif
+
+	// Standalone/libretro fallback when system_handles.filesystem is null
+	FILE *fp = fopen("cache/gopher64_pipeline_cache.bin", "rb");
+	if (fp)
+	{
+		fseek(fp, 0, SEEK_END);
+		long sz = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+		if (sz > 0)
+		{
+			std::vector<uint8_t> buf(static_cast<size_t>(sz));
+			if (fread(buf.data(), 1, buf.size(), fp) == buf.size())
+			{
+				if (init_pipeline_cache(buf.data(), buf.size()))
+				{
+					fclose(fp);
+					LOGI("Loaded %zu bytes from cache/gopher64_pipeline_cache.bin\n", buf.size());
+					return;
+				}
+			}
+		}
+		fclose(fp);
+	}
+
+	if (!init_pipeline_cache(nullptr, 0))
+		LOGE("Failed to initialize fresh pipeline cache.\n");
 }
 
 size_t Device::get_pipeline_cache_size()
@@ -820,31 +859,53 @@ bool Device::get_pipeline_cache_data(uint8_t *data, size_t size)
 void Device::flush_pipeline_cache()
 {
 #ifdef GRANITE_VULKAN_SYSTEM_HANDLES
-	if (!system_handles.filesystem)
-		return;
-
-	size_t size = get_pipeline_cache_size();
-	if (!size)
+	if (system_handles.filesystem)
 	{
-		LOGE("Failed to get pipeline cache size.\n");
-		return;
-	}
+		size_t size = get_pipeline_cache_size();
+		if (!size)
+		{
+			LOGE("Failed to get pipeline cache size.\n");
+			return;
+		}
 
-	auto file = system_handles.filesystem->open_transactional_mapping(
-			"cache://pipeline_cache.bin", size);
+		auto file = system_handles.filesystem->open_transactional_mapping(
+				"cache://pipeline_cache.bin", size);
 
-	if (!file)
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return;
-	}
+		if (!file)
+		{
+			LOGE("Failed to get pipeline cache data.\n");
+			return;
+		}
 
-	if (!get_pipeline_cache_data(file->mutable_data<uint8_t>(), size))
-	{
-		LOGE("Failed to get pipeline cache data.\n");
+		if (!get_pipeline_cache_data(file->mutable_data<uint8_t>(), size))
+		{
+			LOGE("Failed to get pipeline cache data.\n");
+			return;
+		}
 		return;
 	}
 #endif
+
+	size_t size = get_pipeline_cache_size();
+	if (!size)
+		return;
+
+	std::vector<uint8_t> buf(size);
+	if (get_pipeline_cache_data(buf.data(), size))
+	{
+#if !defined(_WIN32)
+		mkdir("cache", 0755);
+#else
+		_mkdir("cache");
+#endif
+		FILE *fp = fopen("cache/gopher64_pipeline_cache.bin", "wb");
+		if (fp)
+		{
+			fwrite(buf.data(), 1, size, fp);
+			fclose(fp);
+			LOGI("Saved %zu bytes to cache/gopher64_pipeline_cache.bin\n", size);
+		}
+	}
 }
 
 void Device::init_workarounds()
