@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.98 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.981 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.

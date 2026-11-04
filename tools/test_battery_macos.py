@@ -232,7 +232,7 @@ def run_tier_3_core_battery():
 # ---------------------------------------------------------------------
 def run_tier_4_package_verification():
     log_section("TIER 4: Verificação de Integridade do Pacote Distribuível (dist/)")
-    app_ver = "0.98"
+    app_ver = "0.981"
     if os.path.exists("include/app_info.h"):
         with open("include/app_info.h", "r") as f:
             for line in f:
