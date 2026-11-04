@@ -2239,11 +2239,49 @@ R$ 3.500 a 4.500, R$ 3.800 e R$ 3.880 aparecem juntos na página e não têm fon
 ### Conferir com o app antes de publicar
 
 - "10 Shaders Integrados": confirme a contagem no menu.
-- Batocera: a frase "não precisa formatar pendrive" compara só o aplicativo. Não misture com o Karamelo OS, que ainda não foi lançado.
+- Batocera: no comparativo, diferencie a experiência do aplicativo no PC (dia a dia, sem reiniciar) da distribuição dedicada Karamelo OS (bootável em pendrive para TV de sala), conforme a seção 57.
 
 ---
 
-## 57. Lançamento da Versão 0.981 (04/11/2026)
+## 57. Adição de 02/11/2026 - Karamelo OS: Console Appliance Edition (Distribuição Linux Dedicada)
+
+O projeto agora conta com uma distribuição Linux autônoma dedicada em desenvolvimento no repositório `Karamelo Linux/` (`c:\github\Karamelo Linux`), projetada para transformar qualquer PC, Mini-PC x86 (Intel N100, AMD Ryzen) ou portátil em um console retrô de sala de estar.
+
+### Duas modalidades oficiais no ecossistema Karamelo
+
+1. **Karamelo Emulador (Desktop App)**:
+   - Para Windows x64, Linux x64 e macOS ARM64 (Apple Silicon).
+   - Executa como aplicativo portátil convencional na área de trabalho.
+   - Ideal para jogar no computador de trabalho ou uso diário, em janela ou tela cheia, sem reiniciar a máquina.
+
+2. **Karamelo OS (Console Appliance Edition)**:
+   - Distribuição Linux x86_64 dedicada baseada em Arch Linux.
+   - Bootável via pendrive (live USB) com UEFI e BIOS Legacy, ou instalável em disco interno (NVMe/SSD/SATA) via `karamelo-install`.
+   - Inicialização direta na tela do emulador em ~6 segundos na TV, sem ambiente desktop tradicional (sem GNOME/KDE) e 100% operável por gamepad (zero teclado e mouse necessários).
+   - Micro-compositor **Valve Gamescope** (Wayland / DRM / KMS) com Integer Scaling pixel-perfect (240p/480p nítidos em 4K) e AMD FSR integrado em chips AMD/Intel; fallback X11 otimizado para placas NVIDIA proprietárias.
+   - **Sistema imutável anti-queda de energia**: raiz do sistema em SquashFS somente leitura (`ro`). Desligar direto na tomada ou queda de energia nunca corrompe o sistema operacional.
+   - **Partição de dados persistente (`/storage`)**: auto-expansão no primeiro boot para ocupar 100% do pendrive ou SSD (`resize-storage.service`). Contém `roms/` (37 consoles), `bios/`, `saves/`, `ports/` e `Config/`.
+   - **Áudio PipeWire** em tempo real de baixa latência com detecção de múltiplas placas de som (HDMI e analógico).
+   - **Gerenciamento LAN integrado**:
+     - Servidor Samba (SMB) ativo por padrão: acesse `\\KARAMELO` no Windows Explorer ou `smb://karamelo.local` no Mac Finder para transferir jogos e BIOS pela rede local.
+     - Web Studio LAN (`http://<ip>:8080` com PIN de segurança exibido no OSD) para gerenciar ROMs, BIOS e controles pelo navegador do celular no sofá.
+
+### REGRA MANDATÓRIA DE DIREITOS AUTORAIS E DISTRIBUIÇÃO
+
+- **A ISO oficial distribuída publicamente é estritamente limpa**: não contém ROMs comerciais nem BIOS proprietárias protegidas por direitos autorais. O usuário transfere seus próprios arquivos legalmente obtidos para `/storage/roms` e `/storage/bios` via Samba ou Web Studio.
+- **A imagem interna "ISO Full" (com ROMs e BIOS embutidas)** é estritamente privada, feita exclusivamente para testes internos de laboratório do autor, e **NUNCA SERÁ PUBLICADA NEM DISTRIBUÍDA**.
+- Toda menção pública ao Karamelo OS deve reforçar o modelo ético de software livre: distribuição limpa pronta para o usuário colocar seu próprio acervo.
+
+### Alinhamento no site
+
+- **`/comparativo`**: O duelo contra o Batocera.linux agora contrasta a flexibilidade do Karamelo: quem quer jogar sem sair do Windows/Linux usa o aplicativo portátil; quem quer transformar um mini-PC de TV em console dedicado usa o Karamelo OS com Gamescope e boot direto no controle.
+- **`/guia`**: Incluir instrução clara de transferência de arquivos no Karamelo OS via rede local (Samba `\\KARAMELO` e Web Studio), sem precisar desplugar o pendrive da TV.
+- **`/recursos`**: Citar a arquitetura do Karamelo OS como a opção de appliance de console dedicada do projeto.
+
+
+---
+
+## 58. Lançamento da Versão 0.981 (04/11/2026)
 
 Publicada em 04/11/2026 para Windows, Linux e macOS (Apple Silicon).
 Contagens mantidas: **37 sistemas, 42 motores; 94 ports — 94 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**.
