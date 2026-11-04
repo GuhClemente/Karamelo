@@ -1,8 +1,8 @@
 {
     "version": "0.981",
     "title": "Karamelo v0.981",
-    "release_date": "2026-11-03",
-    "notes": "37 Sistemas; 94 PC Ports & Recompilados.",
+    "release_date": "2026-11-04",
+    "notes": "Gopher64 com Vulkan no macOS; Upscale Horizontal no Mac; Controller Pak nativo no N64; Dynarec no ParaLLEl N64; Pipeline autonomo de gravacao.",
     "force_full_package": false,
     "linux_bin_url": "https://karamelo-emu.com/downloads/Karamelo_linux",
     "linux_bin_size": 6422640,

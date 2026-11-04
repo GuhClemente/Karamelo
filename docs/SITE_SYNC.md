@@ -2240,3 +2240,18 @@ R$ 3.500 a 4.500, R$ 3.800 e R$ 3.880 aparecem juntos na página e não têm fon
 
 - "10 Shaders Integrados": confirme a contagem no menu.
 - Batocera: a frase "não precisa formatar pendrive" compara só o aplicativo. Não misture com o Karamelo OS, que ainda não foi lançado.
+
+---
+
+## 57. Lançamento da Versão 0.981 (04/11/2026)
+
+Publicada em 04/11/2026 para Windows, Linux e macOS (Apple Silicon).
+Contagens mantidas: **37 sistemas, 42 motores; 94 ports — 94 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎**.
+
+Novidades para o jogador:
+
+- **Gopher64 com Vulkan no macOS**: o motor Gopher64 de Nintendo 64 agora roda nativamente no Apple Silicon com MoltenVK e cache de pipeline persistente em disco.
+- **Upscale Horizontal no Mac**: os modos 2x (640x240) e 4x (1280x240) agora funcionam nas três plataformas (Windows, Linux e macOS).
+- **Controller Pak nativo no N64**: suporte a salvamento direto em memory card virtual nos jogos que exigem Controller Pak.
+- **Dynarec no ParaLLEl N64**: melhoria substancial de desempenho com recompilador dinâmico.
+- **Pipeline autônomo de gravação**: suporte interno a gravação de vídeo 1080p a 60 fps e áudio PCM 48 kHz.

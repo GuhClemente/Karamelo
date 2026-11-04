@@ -143,6 +143,8 @@ psx_last_run_report.json
 *.zip
 *.7z
 *.rar
+__pycache__/
+*.pyc
 /temp_cores_dl/
 # Saida de build. Uma excecao: o dist/version.json e o manifesto do
 # auto-update, e o updater usa a copia dele no GitHub como fallback quando
