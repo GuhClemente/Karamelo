@@ -37,6 +37,11 @@ GAMES = [
         "id": "perfectdark",
         "name": "James Bond (Perfect Dark)",
         "rom": os.path.join(ROOT_DIR, "roms/Nintendo64/Perfect Dark (U) (V1.1) [!].z64")
+    },
+    {
+        "id": "topgear2",
+        "name": "Top Gear Rally 2",
+        "rom": os.path.join(ROOT_DIR, "roms/Nintendo64/Top Gear Rally 2 (USA).z64")
     }
 ]
 
@@ -142,3 +147,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

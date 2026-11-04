@@ -28,6 +28,7 @@ static inline uint32_t GetTickCount() {
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <mutex>
 #include <filesystem>
 #include <cmath>
 #include <algorithm>
@@ -41,15 +42,15 @@ namespace fs = std::filesystem;
 static const int kWidth = 1280;
 static const int kHeight = 720;
 
-static FILE* g_audio_file = nullptr;
-static uint32_t g_audio_bytes = 0;
+static std::vector<int16_t> g_audio_pcm_buf;
+static std::mutex g_audio_pcm_mutex;
 
 static void RecordAudioCallback(const int16_t* data, size_t frames)
 {
-	if (!g_audio_file || !data || frames == 0) return;
-	size_t byte_count = frames * 2 * sizeof(int16_t); // 2 channels stereo, 16-bit
-	fwrite(data, 1, byte_count, g_audio_file);
-	g_audio_bytes += (uint32_t)byte_count;
+	if (!data || frames == 0) return;
+	size_t count = frames * 2;
+	std::lock_guard<std::mutex> lock(g_audio_pcm_mutex);
+	g_audio_pcm_buf.insert(g_audio_pcm_buf.end(), data, data + count);
 }
 
 static void WriteWavHeader(FILE* f, int sample_rate, uint32_t data_bytes)
@@ -82,9 +83,33 @@ static void WriteWavHeader(FILE* f, int sample_rate, uint32_t data_bytes)
 	fwrite(&data_bytes, 4, 1, f);
 }
 
+#ifdef _WIN32
+#define DEV_NULL "2>nul"
+#else
+#define DEV_NULL "2>/dev/null"
+#endif
+
+static const char* GetFfmpegCmd()
+{
+#ifdef _WIN32
+	return "ffmpeg";
+#else
+	static std::string s_cmd;
+	if (!s_cmd.empty()) return s_cmd.c_str();
+	if (system("which ffmpeg >/dev/null 2>&1") == 0) s_cmd = "ffmpeg";
+	else if (system("which ffmpeg.exe >/dev/null 2>&1") == 0) s_cmd = "ffmpeg.exe";
+	else s_cmd = "ffmpeg";
+	return s_cmd.c_str();
+#endif
+}
+
 static bool FfmpegAvailable()
 {
+#ifdef _WIN32
 	return system("where ffmpeg >nul 2>nul") == 0;
+#else
+	return system("which ffmpeg >/dev/null 2>&1 || which ffmpeg.exe >/dev/null 2>&1") == 0;
+#endif
 }
 
 static void SaveBmp(const std::string& path, int filter_mode)
@@ -127,6 +152,79 @@ static void SaveBmp(const std::string& path, int filter_mode)
 	fclose(bf);
 }
 
+struct TimedButtonPress {
+	int start_frame;
+	int end_frame;
+	std::vector<int> buttons;
+};
+
+static std::vector<TimedButtonPress> ParseMacroSpec(const std::string& spec)
+{
+	std::vector<TimedButtonPress> result;
+	if (spec.empty() || spec == "none" || spec == "0") return result;
+
+	std::string token;
+	for (size_t i = 0; i <= spec.size(); i++)
+	{
+		char c = (i < spec.size()) ? spec[i] : ';';
+		if (c == ',' || c == ';' || i == spec.size())
+		{
+			if (!token.empty())
+			{
+				size_t colon = token.find(':');
+				if (colon != std::string::npos)
+				{
+					std::string time_part = token.substr(0, colon);
+					std::string btn_part = token.substr(colon + 1);
+
+					int start_f = 0, end_f = 0;
+					size_t dash = time_part.find('-');
+					if (dash != std::string::npos)
+					{
+						double s0 = atof(time_part.substr(0, dash).c_str());
+						double s1 = atof(time_part.substr(dash + 1).c_str());
+						start_f = (int)(s0 * 30.0);
+						end_f = (int)(s1 * 30.0);
+					}
+					else
+					{
+						double s0 = atof(time_part.c_str());
+						start_f = (int)(s0 * 30.0);
+						end_f = start_f + 15;
+					}
+
+					std::transform(btn_part.begin(), btn_part.end(), btn_part.begin(), ::tolower);
+					std::vector<int> btns;
+					if (btn_part == "a") { btns.push_back(0); btns.push_back(8); }
+					else if (btn_part == "b") { btns.push_back(1); btns.push_back(0); }
+					else if (btn_part == "start") { btns.push_back(3); }
+					else if (btn_part == "select") { btns.push_back(2); }
+					else if (btn_part == "up") { btns.push_back(4); }
+					else if (btn_part == "down") { btns.push_back(5); }
+					else if (btn_part == "left") { btns.push_back(6); }
+					else if (btn_part == "right") { btns.push_back(7); }
+					else if (btn_part == "x") { btns.push_back(9); }
+					else if (btn_part == "y") { btns.push_back(10); }
+					else if (btn_part == "l") { btns.push_back(9); }
+					else if (btn_part == "r") { btns.push_back(11); }
+					else if (!btn_part.empty() && isdigit(btn_part[0])) { btns.push_back(atoi(btn_part.c_str())); }
+
+					if (!btns.empty() && end_f >= start_f)
+					{
+						result.push_back({ start_f, end_f, btns });
+					}
+				}
+				token.clear();
+			}
+		}
+		else
+		{
+			token += c;
+		}
+	}
+	return result;
+}
+
 int main(int argc, char** argv)
 {
 	if (argc < 5)
@@ -151,6 +249,12 @@ int main(int argc, char** argv)
 	int filter_mode = (argc > 7) ? atoi(argv[7]) : 0;
 	bool no_input = (argc > 8) ? (atoi(argv[8]) != 0) : false;
 	bool skip_extras = (argc > 9) ? (atoi(argv[9]) != 0) : false;
+	std::string macro_spec = (argc > 10) ? argv[10] : "";
+	std::vector<TimedButtonPress> timed_macros = ParseMacroSpec(macro_spec);
+	if (!timed_macros.empty())
+	{
+		printf("[INFO] Timed input macros: loaded %zu action(s)\n", timed_macros.size());
+	}
 	MenuSetN64Upscale(upscale_mode);
 	printf("[INFO] N64 Upscale Mode: %d, Filter Mode: %d, No-Input: %d, Skip-Extras: %d\n", upscale_mode, filter_mode, (int)no_input, (int)skip_extras);
 
@@ -177,18 +281,20 @@ int main(int argc, char** argv)
 
 	fs::create_directories(out_dir);
 
-	// Setup audio WAV file
+	// High process priority so recorder never starves emulation
+#ifdef _WIN32
+	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+#endif
+
+	// Setup lock-free in-memory audio buffer (zero disk I/O in callback!)
 	std::string wav_path = out_dir + "/" + base_name + "_temp.wav";
-	g_audio_file = fopen(wav_path.c_str(), "wb+");
-	if (g_audio_file)
 	{
-		uint8_t dummy[44] = { 0 };
-		fwrite(dummy, 1, 44, g_audio_file);
-		g_audio_bytes = 0;
-		// The app's audio thread only runs with this up, and the [PERF] queue numbers come from it.
-		SDL_InitSubSystem(SDL_INIT_AUDIO);
-		CoreSetAudioCallback(RecordAudioCallback);
+		std::lock_guard<std::mutex> lock(g_audio_pcm_mutex);
+		g_audio_pcm_buf.clear();
+		g_audio_pcm_buf.reserve((size_t)duration_sec * 48000 * 2);
 	}
+	SDL_InitSubSystem(SDL_INIT_AUDIO);
+	CoreSetAudioCallback(RecordAudioCallback);
 
 	printf("[INFO] Loading core: %s for %d seconds...\n", core_dll, duration_sec);
 
@@ -204,7 +310,7 @@ int main(int argc, char** argv)
 	if (!CoreIsRunning())
 	{
 		printf("[ERROR] Core failed to run: %s\n", core_dll);
-		if (g_audio_file) fclose(g_audio_file);
+		// audio in memory, no file to close
 		return 1;
 	}
 
@@ -215,9 +321,25 @@ int main(int argc, char** argv)
 	std::string final_mp4_path = out_dir + "/" + base_name + ".mp4";
 
 	char pipe_cmd[1024];
+#ifdef _WIN32
+	static int s_has_nvenc = -1;
+	if (s_has_nvenc == -1)
+	{
+		s_has_nvenc = (system("ffmpeg -v error -f lavfi -i testsrc=duration=0.1 -c:v h264_nvenc -f null - 2>nul") == 0) ? 1 : 0;
+		if (s_has_nvenc == 1) printf("[PERF] Hardware Encoder Ativo: NVIDIA NVENC (0%% CPU load)\n");
+	}
+	const char* enc_codec = (s_has_nvenc == 1)
+		? "-c:v h264_nvenc -preset p4 -cq 18 -pix_fmt yuv420p"
+		: "-c:v libx264 -preset ultrafast -crf 18 -pix_fmt yuv420p";
+#elif defined(__APPLE__)
+	const char* enc_codec = "-c:v h264_videotoolbox -q:v 65 -pix_fmt yuv420p";
+#else
+	const char* enc_codec = "-c:v libx264 -preset ultrafast -crf 18 -pix_fmt yuv420p";
+#endif
+
 	snprintf(pipe_cmd, sizeof(pipe_cmd),
-		"ffmpeg -y -f rawvideo -vcodec rawvideo -s %dx%d -pix_fmt bgra -r 30 -i - -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p \"%s\"",
-		kWidth, kHeight, temp_mp4_path.c_str());
+		"%s -y -f rawvideo -vcodec rawvideo -s %dx%d -pix_fmt bgra -r 30 -i - %s \"%s\"",
+		GetFfmpegCmd(), kWidth, kHeight, enc_codec, temp_mp4_path.c_str());
 
 	FILE* vpipe = POPEN(pipe_cmd, "wb");
 	std::vector<uint32_t> frame_buf(kWidth * kHeight, 0);
@@ -240,6 +362,25 @@ int main(int argc, char** argv)
 		// Pulsing helper: toggles every 6 frames (~0.2s)
 		bool pulse = ((frames_written / 6) % 2 == 0);
 
+		// Custom timed button macros passed via command line (e.g. "2-5:A,8-10:START")
+		for (const auto& tb : timed_macros)
+		{
+			if (frames_written >= tb.start_frame && frames_written <= tb.end_frame)
+			{
+				for (int b : tb.buttons) CoreSetButtonState(0, b, pulse);
+			}
+		}
+
+		// Essential controller intervention for N64 prompt dismissals
+		// Castlevania 64 displays Controller Pak warnings at boot:
+		// We pulse Button 0 (N64 A) and Button 8 from 2s to 5s so the prompt is cleanly dismissed
+		// without pressing START (which would enter player select or game menus).
+		if (is_castlevania && elapsed >= 2 && elapsed <= 5)
+		{
+			CoreSetButtonState(0, 0, pulse); // Libretro B -> N64 A button
+			CoreSetButtonState(0, 8, pulse); // Libretro A
+		}
+
 		if (!no_input)
 		{
 			if (is_waverace)
@@ -259,31 +400,6 @@ int main(int argc, char** argv)
 			else
 			{
 				CoreSetButtonState(0, 8, true);
-				int16_t steer = (int16_t)(sin(frames_written * 0.05) * 12000);
-				CoreSetAnalogState(0, 0, 0, steer);
-			}
-		}
-		else if (is_rally)
-		{
-			// Top Gear Rally 2:
-			// 1) 1-20s: Dismiss 'Controller Pak not found' and advance Title Screen
-			if (elapsed >= 1 && elapsed < 20)
-			{
-				CoreSetButtonState(0, 8, pulse); // A button
-				CoreSetButtonState(0, 0, pulse); // B button
-				CoreSetButtonState(0, 3, pulse); // START
-			}
-			// 2) 20-28s: Confirm Menu / Practice / Car / Track selection (ONLY A button, NEVER START!)
-			else if (elapsed >= 20 && elapsed < 28)
-			{
-				CoreSetButtonState(0, 8, pulse); // A button
-			}
-			// 3) 28s+: ACTIVE RACE! Hold Gas (A + R) and steer smoothly! NEVER press START!
-			else if (elapsed >= 28)
-			{
-				CoreSetButtonState(0, 8, true);  // A button = ACCELERATE / GAS
-				CoreSetButtonState(0, 11, true); // R trigger = ACCELERATE
-				// Smooth steering sine wave so car follows dirt track
 				int16_t steer = (int16_t)(sin(frames_written * 0.05) * 12000);
 				CoreSetAnalogState(0, 0, 0, steer);
 			}
@@ -665,33 +781,44 @@ int main(int argc, char** argv)
 		printf("[INFO] Raw video stream finished: %s (%d frames)\n", temp_mp4_path.c_str(), frames_written);
 	}
 
-	// Finalize WAV
+	// Finalize WAV (write in-memory PCM buffer directly to disk)
 	CoreSetAudioCallback(nullptr);
-	if (g_audio_file)
+	size_t total_pcm_bytes = 0;
 	{
-		int sample_rate = CoreGetAudioSampleRate();
-		if (sample_rate <= 0) sample_rate = 44100;
-		WriteWavHeader(g_audio_file, sample_rate, g_audio_bytes);
-		fclose(g_audio_file);
-		g_audio_file = nullptr;
-		printf("[INFO] Audio WAV generated: %s (%u bytes at %d Hz)\n", wav_path.c_str(), g_audio_bytes, sample_rate);
+		std::lock_guard<std::mutex> lock(g_audio_pcm_mutex);
+		total_pcm_bytes = g_audio_pcm_buf.size() * sizeof(int16_t);
+		if (total_pcm_bytes > 0)
+		{
+			FILE* wf = fopen(wav_path.c_str(), "wb");
+			if (wf)
+			{
+				int sample_rate = CoreGetAudioSampleRate();
+				if (sample_rate <= 0) sample_rate = 44100;
+				uint8_t dummy[44] = { 0 };
+				fwrite(dummy, 1, 44, wf);
+				fwrite(g_audio_pcm_buf.data(), 1, total_pcm_bytes, wf);
+				WriteWavHeader(wf, sample_rate, (uint32_t)total_pcm_bytes);
+				fclose(wf);
+				printf("[INFO] Audio WAV generated: %s (%zu bytes at %d Hz)\n", wav_path.c_str(), total_pcm_bytes, sample_rate);
+			}
+		}
 	}
 
 	CoreShutdown();
 
 	// Mux Audio + Video with ffmpeg (using -shortest so no silent tail at the end)
 	char mux_cmd[1024];
-	if (g_audio_bytes > 1000)
+	if (total_pcm_bytes > 1000)
 	{
 		snprintf(mux_cmd, sizeof(mux_cmd),
-			"ffmpeg -y -i \"%s\" -i \"%s\" -t %d -c:v copy -c:a aac -b:a 320k -movflags +faststart \"%s\" 2>nul",
-			temp_mp4_path.c_str(), wav_path.c_str(), duration_sec, final_mp4_path.c_str());
+			"%s -y -i \"%s\" -i \"%s\" -t %d -c:v copy -c:a aac -b:a 320k -movflags +faststart \"%s\" %s",
+			GetFfmpegCmd(), temp_mp4_path.c_str(), wav_path.c_str(), duration_sec, final_mp4_path.c_str(), DEV_NULL);
 	}
 	else
 	{
 		snprintf(mux_cmd, sizeof(mux_cmd),
-			"ffmpeg -y -i \"%s\" -c:v copy -movflags +faststart \"%s\" 2>nul",
-			temp_mp4_path.c_str(), final_mp4_path.c_str());
+			"%s -y -i \"%s\" -c:v copy -movflags +faststart \"%s\" %s",
+			GetFfmpegCmd(), temp_mp4_path.c_str(), final_mp4_path.c_str(), DEV_NULL);
 	}
 	system(mux_cmd);
 
@@ -701,25 +828,25 @@ int main(int argc, char** argv)
 	const char* shots[] = { "_01", "_02", "_03", "_04_crt" };
 	for (const char* shot : shots)
 	{
-		snprintf(conv_cmd, sizeof(conv_cmd), "ffmpeg -y -i \"%s/%s%s.bmp\" -q:v 2 \"%s/%s%s.jpg\" 2>nul",
-			out_dir.c_str(), base_name.c_str(), shot, out_dir.c_str(), base_name.c_str(), shot);
+		snprintf(conv_cmd, sizeof(conv_cmd), "%s -y -i \"%s/%s%s.bmp\" -q:v 2 \"%s/%s%s.jpg\" %s",
+			GetFfmpegCmd(), out_dir.c_str(), base_name.c_str(), shot, out_dir.c_str(), base_name.c_str(), shot, DEV_NULL);
 		system(conv_cmd);
 		std::string bmp_file = out_dir + "/" + base_name + shot + ".bmp";
 		remove(bmp_file.c_str());
 	}
 
 	// Generate WebM
-	if (g_audio_bytes > 1000)
+	if (total_pcm_bytes > 1000)
 	{
 		snprintf(conv_cmd, sizeof(conv_cmd),
-			"ffmpeg -y -i \"%s\" -t %d -c:v libvpx-vp9 -crf 28 -b:v 0 -c:a libopus \"%s/%s.webm\" 2>nul",
-			final_mp4_path.c_str(), duration_sec, out_dir.c_str(), base_name.c_str());
+			"%s -y -i \"%s\" -t %d -c:v libvpx-vp9 -crf 28 -b:v 0 -c:a libopus \"%s/%s.webm\" %s",
+			GetFfmpegCmd(), final_mp4_path.c_str(), duration_sec, out_dir.c_str(), base_name.c_str(), DEV_NULL);
 	}
 	else
 	{
 		snprintf(conv_cmd, sizeof(conv_cmd),
-			"ffmpeg -y -i \"%s\" -c:v libvpx-vp9 -crf 28 -b:v 0 \"%s/%s.webm\" 2>nul",
-			final_mp4_path.c_str(), out_dir.c_str(), base_name.c_str());
+			"%s -y -i \"%s\" -c:v libvpx-vp9 -crf 28 -b:v 0 \"%s/%s.webm\" %s",
+			GetFfmpegCmd(), final_mp4_path.c_str(), out_dir.c_str(), base_name.c_str(), DEV_NULL);
 	}
 	system(conv_cmd);
 

@@ -490,6 +490,7 @@ static SDL_AudioStream* g_audio_stream = nullptr;
 static HANDLE   h_audio_event = NULL;
 static HANDLE   h_audio_thread = NULL;
 static bool     audio_thread_running = false;
+static CoreAudioCallback g_audio_tap_callback = nullptr;
 
 // How many SAMPLES_PER_BUFFER-sized chunks of latency to keep queued in the
 // stream. Set from the Audio Latency setting when a game loads. A deeper
@@ -791,6 +792,10 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			}
 
 			InterlockedExchange(&g_ring_read_pos, rp);
+			if (g_audio_tap_callback)
+			{
+				g_audio_tap_callback(chunk, SAMPLES_PER_BUFFER);
+			}
 			FILE* r_fp = s_record_audio_fp.load(std::memory_order_relaxed);
 			if (r_fp)
 			{
@@ -2035,7 +2040,9 @@ static bool CB_Environment(unsigned cmd, void* data)
 			else if (strcmp(var->key, "geolith_cd_speed_hack") == 0) var->value = "enabled";
 			else if (strcmp(var->key, "geolith_cd_skip_loading") == 0) var->value = "disabled";
 			else if (strcmp(var->key, "n64_ram_size") == 0) var->value = "8MByte";
-			else if (strcmp(var->key, "parallel-n64-cpucore") == 0) var->value = "pure_interpreter";
+			else if (strcmp(var->key, "parallel-n64-cpucore") == 0) var->value = "dynamic_recompiler";
+			else if (strcmp(var->key, "parallel-n64-pak1") == 0) var->value = "memory";
+			else if (strcmp(var->key, "mupen64plus-pak1") == 0) var->value = "memory";
 
 			// The graphics plugin has to match the render mode. A GL plugin on
 			// a machine with no context hangs the core, and a software
@@ -2596,14 +2603,14 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 	InterlockedExchange(&g_fb_dirty, 1);
 }
 
-static CoreAudioCallback g_audio_tap_callback = nullptr;
 void CoreSetAudioCallback(CoreAudioCallback cb)
 {
 	g_audio_tap_callback = cb;
 }
 int CoreGetAudioSampleRate()
 {
-	return (g_core_sample_rate > 0.0) ? (int)g_core_sample_rate : 48000;
+	// The resampled audio output from AudioThreadProc is always 48000 Hz.
+	return 48000;
 }
 
 void CoreStartAudioRecording(const char* raw_audio_path)
@@ -2626,13 +2633,11 @@ void CoreStopAudioRecording()
 static void CB_AudioSample(int16_t left, int16_t right)
 {
 	int16_t frame[2] = { left, right };
-	if (g_audio_tap_callback) g_audio_tap_callback(frame, 1);
 	SendAudioSamples(frame, 1);
 }
 
 static size_t CB_AudioSampleBatch(const int16_t* data, size_t frames)
 {
-	if (g_audio_tap_callback && data && frames > 0) g_audio_tap_callback(data, frames);
 	SendAudioSamples(data, frames);
 	if (VoiceChatIsActive()) VoiceChatFeedReferenceAudio(data, frames);
 	return frames;

@@ -150,3 +150,4 @@ def run_record(core_path, rom_path, duration, out_dir, base_name, upscale, filte
 
 if __name__ == "__main__":
     main()
+

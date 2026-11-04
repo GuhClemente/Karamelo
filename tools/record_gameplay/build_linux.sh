@@ -58,7 +58,8 @@ fi
 
 g++ build/linux_record_obj/*.o \
     "$SDL3_LIB" \
-    -ldl -lpthread -lm \
+    -ldl -lpthread -lm -lGL \
     -o tools/record_gameplay/out/record_gameplay
 
 echo "[BUILD SUCCESS] tools/record_gameplay/out/record_gameplay pronto para uso!"
+

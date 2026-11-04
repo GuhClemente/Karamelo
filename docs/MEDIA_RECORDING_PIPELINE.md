@@ -148,3 +148,4 @@ python tools/record_gameplay/record_suite.py --system n64 --duration 90 --upscal
    ffmpeg -i video_input.mp4 -an -c:v libx264 -crf 23 -preset slow -pix_fmt yuv420p video_web.mp4
    ```
 3. Utilize os frames de zoom da pasta `docs/images/` para os componentes de *Slider Interativo*.
+

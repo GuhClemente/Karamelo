@@ -65,3 +65,4 @@ clang++ build/macos_record_obj/*.o \
     -o tools/record_gameplay/out/record_gameplay
 
 echo "[BUILD SUCCESS] tools/record_gameplay/out/record_gameplay pronto para uso no macOS!"
+
