@@ -3023,6 +3023,36 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 		return;
 	}
 
+	if (method == "POST" && path == "/api/audio/cycle")
+	{
+#ifdef __linux__
+		int ignored = system("/usr/local/bin/karamelo-audio-cycle next 2>/dev/null &");
+		(void)ignored;
+#endif
+		SendHttpResponse(cli, "200 OK", "application/json", "{\"ok\":true}");
+		return;
+	}
+
+	if (method == "POST" && path == "/api/audio/test")
+	{
+#ifdef __linux__
+		int ignored = system("/usr/local/bin/karamelo-audio-cycle test 2>/dev/null &");
+		(void)ignored;
+#endif
+		SendHttpResponse(cli, "200 OK", "application/json", "{\"ok\":true}");
+		return;
+	}
+
+	if (method == "POST" && path == "/api/bluetooth/pair")
+	{
+#ifdef __linux__
+		int ignored = system("/usr/local/bin/karamelo-bluetooth-pair auto 15 2>/dev/null &");
+		(void)ignored;
+#endif
+		SendHttpResponse(cli, "200 OK", "application/json", "{\"ok\":true}");
+		return;
+	}
+
 	if (method == "GET" && path == "/api/systems/visibility")
 	{
 		std::string v_json = WebAdminBuildSystemsVisibilityJson();

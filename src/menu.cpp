@@ -14,6 +14,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <vector>
+#include <thread>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -69,7 +70,8 @@ enum MenuState {
   STATE_CLOUD,
   STATE_WEB_ADMIN,
   STATE_LIVE_CHAT,
-  STATE_MANAGE_SYSTEMS
+  STATE_MANAGE_SYSTEMS,
+  STATE_WIZARD
 };
 
 struct MenuItem {
@@ -1096,8 +1098,140 @@ void PopulateSaveStates();
 void PopulateShaderList();
 void PopulateDiagnostics();
 void PopulateManageSystems();
+void PopulateWizard();
 static MenuState shader_list_previous_state = STATE_VIDEO;
 static MenuState controller_previous_state = STATE_SETTINGS;
+
+// -------------------------------------------------------------
+// Audio & Bluetooth Appliance Management (Karamelo OS)
+// -------------------------------------------------------------
+struct AudioSinkInfo {
+  std::string id;
+  std::string name;
+  std::string desc;
+  bool is_default;
+};
+
+static std::vector<AudioSinkInfo> s_audio_sinks;
+static int s_current_sink_idx = 0;
+
+static void RefreshAudioSinks() {
+  s_audio_sinks.clear();
+  s_current_sink_idx = 0;
+#ifdef __linux__
+  FILE* fp = popen("/usr/local/bin/karamelo-audio-cycle list 2>/dev/null", "r");
+  if (fp) {
+    char line[512];
+    while (fgets(line, sizeof(line), fp)) {
+      std::string l(line);
+      while (!l.empty() && (l.back() == '\r' || l.back() == '\n')) l.pop_back();
+      if (l.empty()) continue;
+      std::stringstream ss(l);
+      std::string id, name, desc, is_def_str;
+      if (std::getline(ss, id, '|') && std::getline(ss, name, '|') &&
+          std::getline(ss, desc, '|') && std::getline(ss, is_def_str, '|')) {
+        bool is_def = (is_def_str == "1");
+        if (is_def) s_current_sink_idx = (int)s_audio_sinks.size();
+        s_audio_sinks.push_back({id, name, desc, is_def});
+      }
+    }
+    pclose(fp);
+  }
+#endif
+  if (s_audio_sinks.empty()) {
+    s_audio_sinks.push_back({"0", "default", "Padrao do Sistema", true});
+    s_current_sink_idx = 0;
+  }
+}
+
+static void AudioSelectNext(int delta) {
+  if (s_audio_sinks.empty()) RefreshAudioSinks();
+  if (s_audio_sinks.empty()) return;
+  s_current_sink_idx = (s_current_sink_idx + delta + (int)s_audio_sinks.size()) % (int)s_audio_sinks.size();
+  const auto& sink = s_audio_sinks[s_current_sink_idx];
+#ifdef __linux__
+  std::string cmd = "/usr/local/bin/karamelo-audio-cycle set " + sink.name + " 2>/dev/null &";
+  int ignored = system(cmd.c_str());
+  (void)ignored;
+#endif
+}
+
+static void AudioTestCurrent() {
+#ifdef __linux__
+  int ignored = system("/usr/local/bin/karamelo-audio-cycle test 2>/dev/null &");
+  (void)ignored;
+#endif
+}
+
+static std::string s_bt_status_msg = "";
+static std::atomic<bool> s_bt_scanning{false};
+
+static void BluetoothStartAutoPair() {
+  if (s_bt_scanning.load()) return;
+  s_bt_scanning.store(true);
+  s_bt_status_msg = "Procurando (12s)...";
+  std::thread([]() {
+#ifdef __linux__
+    FILE* fp = popen("/usr/local/bin/karamelo-bluetooth-pair auto 12 2>/dev/null", "r");
+    std::string result = "";
+    if (fp) {
+      char buf[256];
+      while (fgets(buf, sizeof(buf), fp)) {
+        result += buf;
+      }
+      pclose(fp);
+    }
+    if (result.find("SUCESSO:") != std::string::npos) {
+      size_t pos = result.find("SUCESSO: Conectado a ");
+      if (pos != std::string::npos) {
+        std::string name = result.substr(pos + 21);
+        while (!name.empty() && (name.back() == '\r' || name.back() == '\n')) name.pop_back();
+        if (name.size() > 20) name = name.substr(0, 18) + "..";
+        s_bt_status_msg = "OK: " + name;
+      } else {
+        s_bt_status_msg = "OK: Conectado!";
+      }
+    } else {
+      s_bt_status_msg = "Nenhum detectado";
+    }
+#else
+    s_bt_status_msg = "OK (Simulado)";
+#endif
+    s_bt_scanning.store(false);
+  }).detach();
+}
+
+void PopulateWizard() {
+  items.clear();
+  current_title = Tr("Setup Karamelo OS", "Setup Karamelo OS");
+  OsdSetSize(13);
+
+  items.push_back({Tr("--- 1. SAIDA DE SOM ---", "--- 1. AUDIO OUTPUT ---"), "", false, false, 0});
+
+  RefreshAudioSinks();
+  std::string active_sink_name = "Padrao do Sistema";
+  if (!s_audio_sinks.empty() && s_current_sink_idx >= 0 && s_current_sink_idx < (int)s_audio_sinks.size()) {
+    active_sink_name = s_audio_sinks[s_current_sink_idx].desc;
+    if (active_sink_name.empty()) active_sink_name = s_audio_sinks[s_current_sink_idx].name;
+    if (active_sink_name.size() > 22) active_sink_name = active_sink_name.substr(0, 20) + "..";
+  }
+  items.push_back({Tr("Dispositivo Audio", "Audio Device"), "< " + active_sink_name + " >", false, false, 404});
+  items.push_back({Tr("Testar Som Agora", "Test Audio Now"), "[Tocar Chime]", false, true, 405});
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("--- 2. CONTROLE BLUETOOTH ---", "--- 2. BLUETOOTH PAD ---"), "", false, false, 0});
+  items.push_back({Tr("Parear Controle BT", "Pair Controller"),
+                   s_bt_scanning.load() ? Tr("Procurando...", "Scanning...") : (s_bt_status_msg.empty() ? "[Auto-Pair]" : s_bt_status_msg),
+                   false, true, 535});
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Concluir e Jogar!", "Finish & Play!"), "[Confirmar]", false, true, 227});
+
+  if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+    selected_idx = 1;
+    scroll_top = 0;
+  }
+}
 
 static int neo_sys = 0;          // 0: AES, 1: MVS, 2: CDZ
 static int neo_bios = 0;         // 0: Original, 1: UniBIOS
@@ -1670,6 +1804,8 @@ void PopulateControllerSettings() {
     Tr("Arcade 6-Botoes", "Arcade 6-Button")
   };
   items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
+  items.push_back({Tr("Parear Bluetooth", "Pair Bluetooth"), s_bt_scanning.load() ? Tr("Buscando...", "Scanning...") : (s_bt_status_msg.empty() ? "[Auto-Pair]" : s_bt_status_msg), false, true, 535});
+
 
   // Per-System Remap:
   if (CoreIsRunning()) {
@@ -1836,6 +1972,8 @@ void PopulateSettings() {
   OsdSetSize(13);
 
   items.push_back({Tr("Idioma", "Language"), setting_language == 0 ? "Portugues" : "English", false, false, 216});
+  items.push_back({Tr("Assistente de Setup", "Setup Wizard"), ">", false, true, 226});
+
   items.push_back({Tr("Video", "Video"), ">", false, true, 201});
   items.push_back({Tr("Audio & Voz", "Audio & Voice"), ">", false, true, 202});
   items.push_back({Tr("Controles", "Controller"), ">", false, true, 203});
@@ -2164,6 +2302,16 @@ void PopulateAudioSettings() {
   char vol_str[32];
   snprintf(vol_str, sizeof(vol_str), "%d%%", CoreGetVolume());
   items.push_back({Tr("Volume", "Volume"), vol_str, false, false, 403});
+  RefreshAudioSinks();
+  std::string active_sink_name = "Padrao do Sistema";
+  if (!s_audio_sinks.empty() && s_current_sink_idx >= 0 && s_current_sink_idx < (int)s_audio_sinks.size()) {
+    active_sink_name = s_audio_sinks[s_current_sink_idx].desc;
+    if (active_sink_name.empty()) active_sink_name = s_audio_sinks[s_current_sink_idx].name;
+    if (active_sink_name.size() > 22) active_sink_name = active_sink_name.substr(0, 20) + "..";
+  }
+  items.push_back({Tr("Saida de Audio", "Audio Output"), "< " + active_sink_name + " >", false, false, 404});
+  items.push_back({Tr("Testar Som", "Test Sound"), "[Tocar]", false, true, 405});
+
 
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Chat de Voz", "Voice Chat"), VoiceChatIsEnabled() ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 930});
@@ -3358,8 +3506,22 @@ void MenuInit() {
   LoadFavoritesAndRecent();
   NetplayInit();
   StarsInit(640, 360);
+#ifdef __linux__
+  bool wizard_completed = false;
+  if (std::filesystem::exists("/storage/Config/wizard_done") || std::filesystem::exists("Config/wizard_done")) {
+    wizard_completed = true;
+  }
+  if (!wizard_completed && (std::filesystem::exists("/storage") || std::filesystem::exists("/proc/asound"))) {
+    current_state = STATE_WIZARD;
+    PopulateWizard();
+  } else {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+  }
+#else
   current_state = STATE_MAIN;
   PopulateMainMenu();
+#endif
 }
 
 void MenuSetStatus(const char *status) {
@@ -3791,6 +3953,11 @@ static void MenuGoBack() {
     current_state = STATE_SETTINGS;
     PopulateSettings();
     SelectByAction(225, 11);
+  } else if (current_state == STATE_WIZARD) {
+    current_state = STATE_MAIN;
+    PopulateMainMenu();
+    selected_idx = 0;
+    scroll_top = 0;
   } else if (current_state == STATE_UPDATE) {
     current_state = STATE_MAIN;
     PopulateMainMenu();
@@ -4176,7 +4343,17 @@ static void MenuProcessKeyImpl(MenuKey key) {
       setting_latency = (setting_latency + delta + 5) % 5;
       PopulateAudioSettings();
       SelectByAction(item.action_id, 1);
-    } else if (item.action_id == 403) // Volume
+        } else if (item.action_id == 404) // Audio Output Cycle
+    {
+      AudioSelectNext(delta);
+      if (current_state == STATE_WIZARD) {
+        PopulateWizard();
+        SelectByAction(404, 1);
+      } else {
+        PopulateAudioSettings();
+        SelectByAction(404, 3);
+      }
+} else if (item.action_id == 403) // Volume
     {
       int v = std::clamp(CoreGetVolume() + delta * 5, 0, 100);
       CoreSetVolume(v);
@@ -4630,6 +4807,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
         MenuSetLanguage(setting_language);
         PopulateSettings();
         SelectByAction(216, 0);
+      } else if (item.action_id == 226) {
+        current_state = STATE_WIZARD;
+        selected_idx = 1;
+        scroll_top = 0;
+        PopulateWizard();
       } else if (item.action_id == 201) {
         current_state = STATE_VIDEO;
         selected_idx = 0;
@@ -4825,6 +5007,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
           PopulateControllerSettings();
           SelectByAction(530, 2);
         }
+      } else if (item.action_id == 535) {
+        BluetoothStartAutoPair();
+        PopulateControllerSettings();
+        SelectByAction(535, 2);
       } else if (item.action_id == 500) {
         setting_pad_device = (setting_pad_device + 1) % 2;
         PopulateControllerSettings();
@@ -4955,7 +5141,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
         SelectByAction(item.action_id, 4);
       }
     } else if (current_state == STATE_AUDIO) {
-      if (item.action_id == 401) {
+      if (item.action_id == 404) {
+        AudioSelectNext(1);
+        PopulateAudioSettings();
+        SelectByAction(404, 3);
+      } else if (item.action_id == 405) {
+        AudioTestCurrent();
+      } else if (item.action_id == 401) {
         CoreSetMute(!CoreGetMute());
         PopulateAudioSettings();
         SelectByAction(item.action_id, 0);
@@ -4987,6 +5179,27 @@ static void MenuProcessKeyImpl(MenuKey key) {
         VoiceChatSetAgcEnabled(!VoiceChatGetAgcEnabled());
         PopulateAudioSettings();
         SelectByAction(item.action_id, 10);
+      }
+    } else if (current_state == STATE_WIZARD) {
+      if (item.action_id == 404) {
+        AudioSelectNext(1);
+        PopulateWizard();
+        SelectByAction(404, 1);
+      } else if (item.action_id == 405) {
+        AudioTestCurrent();
+      } else if (item.action_id == 535) {
+        BluetoothStartAutoPair();
+        PopulateWizard();
+        SelectByAction(535, 4);
+      } else if (item.action_id == 227) {
+#ifdef __linux__
+        int ignored = system("mkdir -p /storage/Config 2>/dev/null && touch /storage/Config/wizard_done 2>/dev/null || true");
+        (void)ignored;
+#endif
+        current_state = STATE_MAIN;
+        PopulateMainMenu();
+        selected_idx = 0;
+        scroll_top = 0;
       }
     } else if (current_state == STATE_UPDATE) {
       if (item.action_id == 391) {

@@ -1468,7 +1468,31 @@ int main(int argc, char* argv[])
 				// over and over, F12 flickered the menu. Menu arrows still repeat.
 				const bool key_repeat = event.key.repeat;
 
-				if (sc == SDL_SCANCODE_F10)
+				if (sc == SDL_SCANCODE_F3)
+				{
+					if (!key_repeat)
+					{
+						FILE* fp = popen("/usr/local/bin/karamelo-audio-cycle next 2>/dev/null", "r");
+						if (fp) {
+							char line[256] = {0};
+							while (fgets(line, sizeof(line), fp)) {
+								char* p = strstr(line, "Saida ativa:");
+								if (p) {
+									p += 12;
+									while (*p == ' ' || *p == '\t') p++;
+									size_t len = strlen(p);
+									while (len > 0 && (p[len-1] == '\r' || p[len-1] == '\n')) p[--len] = 0;
+									char toast[256];
+									snprintf(toast, sizeof(toast), "Audio: %s", p);
+									CoreSetToast(toast, 120);
+									break;
+								}
+							}
+							pclose(fp);
+						}
+					}
+				}
+				else if (sc == SDL_SCANCODE_F10)
 				{
 					if (!key_repeat && (!CoreGameUsesKeyboard() || DesktopChatIsOverlayVisible()))
 						DesktopChatToggleOverlay();
