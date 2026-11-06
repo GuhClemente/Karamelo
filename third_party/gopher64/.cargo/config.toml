@@ -20,6 +20,8 @@ rustflags = ["-C", "target-cpu=cortex-a76"]
 [env]
 CC = "clang"
 CXX = "clang++"
-AR = "ar"
+# No AR here: [env] applies to every OS and there is no archiver that exists on
+# all three (Windows has llvm-ar, Apple's command line tools only ar).
+# build_gopher64.bat sets llvm-ar and build_gopher64.sh sets ar.
 SDKROOT = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
 CMAKE_POLICY_VERSION_MINIMUM = "3.5" # for freetype

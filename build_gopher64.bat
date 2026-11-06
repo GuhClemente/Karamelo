@@ -33,6 +33,8 @@ if not exist "third_party\gopher64\Cargo.toml" (
 )
 
 echo [GOPHER64] Compilando ^(release^)... isso leva alguns minutos.
+rem O archiver sai do .cargo\config.toml porque o macOS nao tem llvm-ar.
+if not defined AR set "AR=llvm-ar"
 pushd "third_party\gopher64"
 cargo build --release --lib
 set BUILD_RC=%errorlevel%

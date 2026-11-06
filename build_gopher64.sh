@@ -25,6 +25,10 @@ if [ ! -f third_party/gopher64/Cargo.toml ]; then
     exit 1
 fi
 
+# O archiver nao fica no .cargo/config.toml: o Windows usa llvm-ar e o macOS
+# (Command Line Tools) so tem ar. Aqui vale o ar do sistema.
+export AR="${AR:-ar}"
+
 echo "[GOPHER64] Compilando (release)... isso leva alguns minutos."
 # Sem a interface propria do Gopher64 (Slint): o Karamelo e a interface, e ela
 # so traria dependencias de sistema a mais, como o fontconfig.
