@@ -1,3 +1,4 @@
+#include "karamelo_os.h"
 #include "web_admin.h"
 #include "json_mini.h"
 #include "netplay.h"
@@ -3026,6 +3027,11 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 	if (method == "POST" && path == "/api/audio/cycle")
 	{
 #ifdef __linux__
+		if (!KarameloIsAppliance())
+		{
+			SendHttpResponse(cli, "404 Not Found", "application/json", "{\"error\":\"not_karamelo_os\"}");
+			return;
+		}
 		int ignored = system("/usr/local/bin/karamelo-audio-cycle next 2>/dev/null &");
 		(void)ignored;
 #endif
@@ -3036,6 +3042,11 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 	if (method == "POST" && path == "/api/audio/test")
 	{
 #ifdef __linux__
+		if (!KarameloIsAppliance())
+		{
+			SendHttpResponse(cli, "404 Not Found", "application/json", "{\"error\":\"not_karamelo_os\"}");
+			return;
+		}
 		int ignored = system("/usr/local/bin/karamelo-audio-cycle test 2>/dev/null &");
 		(void)ignored;
 #endif
@@ -3046,6 +3057,11 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 	if (method == "POST" && path == "/api/bluetooth/pair")
 	{
 #ifdef __linux__
+		if (!KarameloIsAppliance())
+		{
+			SendHttpResponse(cli, "404 Not Found", "application/json", "{\"error\":\"not_karamelo_os\"}");
+			return;
+		}
 		int ignored = system("/usr/local/bin/karamelo-bluetooth-pair auto 15 2>/dev/null &");
 		(void)ignored;
 #endif

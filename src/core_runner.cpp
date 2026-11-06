@@ -723,6 +723,9 @@ static void DeescalateWaveQueue()
 }
 
 static std::atomic<FILE*> s_record_audio_fp{ nullptr };
+// Held while the audio thread writes and while the file is swapped or closed,
+// so stopping a recording never closes the FILE under an fwrite in flight.
+static std::mutex s_record_audio_mtx;
 
 static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 {
@@ -799,10 +802,11 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			{
 				g_audio_tap_callback(chunk, SAMPLES_PER_BUFFER);
 			}
-			FILE* r_fp = s_record_audio_fp.load(std::memory_order_relaxed);
-			if (r_fp)
+			if (s_record_audio_fp.load(std::memory_order_relaxed))
 			{
-				fwrite(chunk, sizeof(chunk), 1, r_fp);
+				std::lock_guard<std::mutex> rec_lock(s_record_audio_mtx);
+				if (FILE* r_fp = s_record_audio_fp.load(std::memory_order_relaxed))
+					fwrite(chunk, sizeof(chunk), 1, r_fp);
 			}
 			// A false return means nothing was actually queued - breaking
 			// here avoids ever spinning forever on a while condition that
@@ -2618,6 +2622,7 @@ int CoreGetAudioSampleRate()
 
 void CoreStartAudioRecording(const char* raw_audio_path)
 {
+	std::lock_guard<std::mutex> rec_lock(s_record_audio_mtx);
 	FILE* old_fp = s_record_audio_fp.exchange(nullptr);
 	if (old_fp) { fflush(old_fp); fclose(old_fp); }
 	if (raw_audio_path && raw_audio_path[0])
@@ -2629,6 +2634,7 @@ void CoreStartAudioRecording(const char* raw_audio_path)
 
 void CoreStopAudioRecording()
 {
+	std::lock_guard<std::mutex> rec_lock(s_record_audio_mtx);
 	FILE* old_fp = s_record_audio_fp.exchange(nullptr);
 	if (old_fp) { fflush(old_fp); fclose(old_fp); }
 }

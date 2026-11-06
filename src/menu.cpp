@@ -31,6 +31,7 @@
 #include "hw_render_d3d11.h"
 #include "input_map.h"
 #include "menu.h"
+#include "karamelo_os.h"
 #include "system_registry.h"
 #include <functional>
 #include "karamelo_math.h"
@@ -1119,7 +1120,7 @@ static void RefreshAudioSinks() {
   s_audio_sinks.clear();
   s_current_sink_idx = 0;
 #ifdef __linux__
-  FILE* fp = popen("/usr/local/bin/karamelo-audio-cycle list 2>/dev/null", "r");
+  FILE* fp = KarameloIsAppliance() ? popen("/usr/local/bin/karamelo-audio-cycle list 2>/dev/null", "r") : nullptr;
   if (fp) {
     char line[512];
     while (fgets(line, sizeof(line), fp)) {
@@ -1150,26 +1151,45 @@ static void AudioSelectNext(int delta) {
   s_current_sink_idx = (s_current_sink_idx + delta + (int)s_audio_sinks.size()) % (int)s_audio_sinks.size();
   const auto& sink = s_audio_sinks[s_current_sink_idx];
 #ifdef __linux__
-  std::string cmd = "/usr/local/bin/karamelo-audio-cycle set " + sink.name + " 2>/dev/null &";
-  int ignored = system(cmd.c_str());
-  (void)ignored;
+  // The name comes from pactl, and a Bluetooth sink is named after a device
+  // anyone nearby can rename: only a plain name reaches the shell.
+  if (KarameloIsAppliance() && KarameloIsSafeSinkName(sink.name.c_str())) {
+    std::string cmd = "/usr/local/bin/karamelo-audio-cycle set '" + sink.name + "' 2>/dev/null &";
+    int ignored = system(cmd.c_str());
+    (void)ignored;
+  }
 #endif
 }
 
 static void AudioTestCurrent() {
 #ifdef __linux__
+  if (!KarameloIsAppliance()) return;
   int ignored = system("/usr/local/bin/karamelo-audio-cycle test 2>/dev/null &");
   (void)ignored;
 #endif
 }
 
+// Written by the pairing thread and read by the menu: always through these two.
+static std::mutex s_bt_status_mtx;
 static std::string s_bt_status_msg = "";
 static std::atomic<bool> s_bt_scanning{false};
 
+static void BtSetStatus(const std::string& msg) {
+  std::lock_guard<std::mutex> lock(s_bt_status_mtx);
+  s_bt_status_msg = msg;
+}
+
+static std::string BtStatusLabel(const char* scanning_label) {
+  if (s_bt_scanning.load()) return scanning_label;
+  std::lock_guard<std::mutex> lock(s_bt_status_mtx);
+  return s_bt_status_msg.empty() ? std::string("[Auto-Pair]") : s_bt_status_msg;
+}
+
 static void BluetoothStartAutoPair() {
-  if (s_bt_scanning.load()) return;
-  s_bt_scanning.store(true);
-  s_bt_status_msg = "Procurando (12s)...";
+  if (!KarameloIsAppliance()) return;
+  bool expected = false;
+  if (!s_bt_scanning.compare_exchange_strong(expected, true)) return;
+  BtSetStatus("Procurando (12s)...");
   std::thread([]() {
 #ifdef __linux__
     FILE* fp = popen("/usr/local/bin/karamelo-bluetooth-pair auto 12 2>/dev/null", "r");
@@ -1187,15 +1207,13 @@ static void BluetoothStartAutoPair() {
         std::string name = result.substr(pos + 21);
         while (!name.empty() && (name.back() == '\r' || name.back() == '\n')) name.pop_back();
         if (name.size() > 20) name = name.substr(0, 18) + "..";
-        s_bt_status_msg = "OK: " + name;
+        BtSetStatus("OK: " + name);
       } else {
-        s_bt_status_msg = "OK: Conectado!";
+        BtSetStatus("OK: Conectado!");
       }
     } else {
-      s_bt_status_msg = "Nenhum detectado";
+      BtSetStatus("Nenhum detectado");
     }
-#else
-    s_bt_status_msg = "OK (Simulado)";
 #endif
     s_bt_scanning.store(false);
   }).detach();
@@ -1221,7 +1239,7 @@ void PopulateWizard() {
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("--- 2. CONTROLE BLUETOOTH ---", "--- 2. BLUETOOTH PAD ---"), "", false, false, 0});
   items.push_back({Tr("Parear Controle BT", "Pair Controller"),
-                   s_bt_scanning.load() ? Tr("Procurando...", "Scanning...") : (s_bt_status_msg.empty() ? "[Auto-Pair]" : s_bt_status_msg),
+                   BtStatusLabel(Tr("Procurando...", "Scanning...")),
                    false, true, 535});
 
   items.push_back({" ", "", false, false, 0});
@@ -1738,9 +1756,8 @@ void PopulateSystemsMenu() {
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Configuracoes", "Settings"), ">", false, true, 20});
   items.push_back({Tr("Atualizacao", "Update"), ">", false, true, 30});
-#ifdef __linux__
-  items.push_back({Tr("Area de Trabalho", "Desktop Mode"), ">", false, true, 98});
-#endif
+  if (KarameloIsAppliance())
+    items.push_back({Tr("Area de Trabalho", "Desktop Mode"), ">", false, true, 98});
   items.push_back({std::string(Tr("Sair do ", "Exit ")) + APP_NAME, "", false, true, 99});
 
   // Counted here rather than written down somewhere else: this is the list.
@@ -1807,7 +1824,8 @@ void PopulateControllerSettings() {
     Tr("Arcade 6-Botoes", "Arcade 6-Button")
   };
   items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
-  items.push_back({Tr("Parear Bluetooth", "Pair Bluetooth"), s_bt_scanning.load() ? Tr("Buscando...", "Scanning...") : (s_bt_status_msg.empty() ? "[Auto-Pair]" : s_bt_status_msg), false, true, 535});
+  if (KarameloIsAppliance())
+    items.push_back({Tr("Parear Bluetooth", "Pair Bluetooth"), BtStatusLabel(Tr("Buscando...", "Scanning...")), false, true, 535});
 
 
   // Per-System Remap:
@@ -1975,7 +1993,8 @@ void PopulateSettings() {
   OsdSetSize(13);
 
   items.push_back({Tr("Idioma", "Language"), setting_language == 0 ? "Portugues" : "English", false, false, 216});
-  items.push_back({Tr("Assistente de Setup", "Setup Wizard"), ">", false, true, 226});
+  if (KarameloIsAppliance())
+    items.push_back({Tr("Assistente de Setup", "Setup Wizard"), ">", false, true, 226});
 
   items.push_back({Tr("Video", "Video"), ">", false, true, 201});
   items.push_back({Tr("Audio & Voz", "Audio & Voice"), ">", false, true, 202});
@@ -2305,15 +2324,17 @@ void PopulateAudioSettings() {
   char vol_str[32];
   snprintf(vol_str, sizeof(vol_str), "%d%%", CoreGetVolume());
   items.push_back({Tr("Volume", "Volume"), vol_str, false, false, 403});
-  RefreshAudioSinks();
-  std::string active_sink_name = "Padrao do Sistema";
-  if (!s_audio_sinks.empty() && s_current_sink_idx >= 0 && s_current_sink_idx < (int)s_audio_sinks.size()) {
-    active_sink_name = s_audio_sinks[s_current_sink_idx].desc;
-    if (active_sink_name.empty()) active_sink_name = s_audio_sinks[s_current_sink_idx].name;
-    if (active_sink_name.size() > 22) active_sink_name = active_sink_name.substr(0, 20) + "..";
+  if (KarameloIsAppliance()) {
+    RefreshAudioSinks();
+    std::string active_sink_name = "Padrao do Sistema";
+    if (!s_audio_sinks.empty() && s_current_sink_idx >= 0 && s_current_sink_idx < (int)s_audio_sinks.size()) {
+      active_sink_name = s_audio_sinks[s_current_sink_idx].desc;
+      if (active_sink_name.empty()) active_sink_name = s_audio_sinks[s_current_sink_idx].name;
+      if (active_sink_name.size() > 22) active_sink_name = active_sink_name.substr(0, 20) + "..";
+    }
+    items.push_back({Tr("Saida de Audio", "Audio Output"), "< " + active_sink_name + " >", false, false, 404});
+    items.push_back({Tr("Testar Som", "Test Sound"), "[Tocar]", false, true, 405});
   }
-  items.push_back({Tr("Saida de Audio", "Audio Output"), "< " + active_sink_name + " >", false, false, 404});
-  items.push_back({Tr("Testar Som", "Test Sound"), "[Tocar]", false, true, 405});
 
 
   items.push_back({" ", "", false, false, 0});
@@ -3509,22 +3530,16 @@ void MenuInit() {
   LoadFavoritesAndRecent();
   NetplayInit();
   StarsInit(640, 360);
-#ifdef __linux__
-  bool wizard_completed = false;
-  if (std::filesystem::exists("/storage/Config/wizard_done") || std::filesystem::exists("Config/wizard_done")) {
-    wizard_completed = true;
-  }
-  if (!wizard_completed && (std::filesystem::exists("/storage") || std::filesystem::exists("/proc/asound"))) {
+  // First boot of Karamelo OS only. /proc/asound used to be enough, and it
+  // exists on every Linux PC: ordinary desktops got the wizard on every start.
+  std::error_code wiz_ec;
+  if (KarameloIsAppliance() && !std::filesystem::exists("/storage/Config/wizard_done", wiz_ec)) {
     current_state = STATE_WIZARD;
     PopulateWizard();
   } else {
     current_state = STATE_MAIN;
     PopulateMainMenu();
   }
-#else
-  current_state = STATE_MAIN;
-  PopulateMainMenu();
-#endif
 }
 
 void MenuSetStatus(const char *status) {
@@ -4551,7 +4566,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
     if (item.action_id == 99) // Exit
     {
       MenuRequestQuit();
-    } else if (item.action_id == 98) // Desktop Mode (Karamelo OS)
+    } else if (item.action_id == 98 && KarameloIsAppliance()) // Desktop Mode (Karamelo OS)
     {
       FILE* f = fopen("/tmp/karamelo_switch_desktop", "w");
       if (f) {
@@ -5203,10 +5218,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateWizard();
         SelectByAction(535, 4);
       } else if (item.action_id == 227) {
-#ifdef __linux__
-        int ignored = system("mkdir -p /storage/Config 2>/dev/null && touch /storage/Config/wizard_done 2>/dev/null || true");
-        (void)ignored;
-#endif
+        if (KarameloIsAppliance()) {
+          std::error_code done_ec;
+          std::filesystem::create_directories("/storage/Config", done_ec);
+          std::ofstream("/storage/Config/wizard_done") << "1\n";
+        }
         current_state = STATE_MAIN;
         PopulateMainMenu();
         selected_idx = 0;

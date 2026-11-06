@@ -1,4 +1,5 @@
 #include "compat_win32.h"
+#include "karamelo_os.h"
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
 #endif
@@ -1426,8 +1427,16 @@ int main(int argc, char* argv[])
 		{
 			record_out_path = argv[i + 1];
 			record_target_seconds = atoi(argv[i + 2]);
+			// The output path goes into a shell command: refuse anything that
+			// could end the quoted string instead of trying to escape it.
+			if (record_out_path.find_first_of("\"`$\\\n\r") != std::string::npos || record_target_seconds <= 0)
+			{
+				printf("[RECORD] Caminho ou duracao invalidos, gravacao desligada: %s\n", record_out_path.c_str());
+				record_out_path.clear();
+			}
 		}
 	}
+	const char* record_ffmpeg_bin = "ffmpeg";
 
 	if (argc > 1 && argv[1] && argv[1][0] != '\0' && argv[1][0] != '-')
 	{
@@ -1468,9 +1477,10 @@ int main(int argc, char* argv[])
 				// over and over, F12 flickered the menu. Menu arrows still repeat.
 				const bool key_repeat = event.key.repeat;
 
-				if (sc == SDL_SCANCODE_F3)
+				if (sc == SDL_SCANCODE_F3 && KarameloIsAppliance())
 				{
-					if (!key_repeat)
+					// Same rule as F10: a computer game that reads the keyboard keeps F3.
+					if (!key_repeat && !CoreGameUsesKeyboard())
 					{
 						FILE* fp = popen("/usr/local/bin/karamelo-audio-cycle next 2>/dev/null", "r");
 						if (fp) {
@@ -1656,10 +1666,18 @@ int main(int argc, char* argv[])
 
 				if (!rec_started)
 				{
+#if defined(__APPLE__)
+					const char* ffmpeg_bin = (access("/opt/homebrew/bin/ffmpeg", X_OK) == 0) ? "/opt/homebrew/bin/ffmpeg" : "ffmpeg";
+					const char* venc = "-c:v h264_videotoolbox -b:v 10M";
+#else
+					const char* ffmpeg_bin = "ffmpeg";
+					const char* venc = "-c:v libx264 -preset veryfast -crf 18";
+#endif
+					record_ffmpeg_bin = ffmpeg_bin;
 					char cmd[1024];
 					snprintf(cmd, sizeof(cmd),
-						"/opt/homebrew/bin/ffmpeg -y -f rawvideo -pixel_format bgr0 -video_size %dx%d -framerate 60 -i - -c:v h264_videotoolbox -b:v 10M -pix_fmt yuv420p rec_video_temp.mp4 >/dev/null 2>&1",
-						REC_W, REC_H);
+						"%s -y -f rawvideo -pixel_format bgr0 -video_size %dx%d -framerate 60 -i - %s -pix_fmt yuv420p rec_video_temp.mp4 >/dev/null 2>&1",
+						ffmpeg_bin, REC_W, REC_H, venc);
 					fp_rec_video = popen(cmd, "w");
 					CoreStartAudioRecording("rec_audio_temp.raw");
 					rec_started = true;
@@ -1738,8 +1756,8 @@ int main(int argc, char* argv[])
 
 						char mux_cmd[1024];
 						snprintf(mux_cmd, sizeof(mux_cmd),
-							"/opt/homebrew/bin/ffmpeg -y -i rec_video_temp.mp4 -f s16le -ar 48000 -ac 2 -i rec_audio_temp.raw -c:v copy -c:a aac -b:a 192k \"%s\" >/dev/null 2>&1 && rm -f rec_video_temp.mp4 rec_audio_temp.raw",
-							record_out_path.c_str());
+							"%s -y -i rec_video_temp.mp4 -f s16le -ar 48000 -ac 2 -i rec_audio_temp.raw -c:v copy -c:a aac -b:a 192k \"%s\" >/dev/null 2>&1 && rm -f rec_video_temp.mp4 rec_audio_temp.raw",
+							record_ffmpeg_bin, record_out_path.c_str());
 						int res = system(mux_cmd);
 						printf("[RECORD] Gravacao finalizada com sucesso: %s (status=%d)\n", record_out_path.c_str(), res);
 						running = false;
