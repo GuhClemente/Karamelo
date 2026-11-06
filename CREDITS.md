@@ -214,10 +214,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | GoldenEye 007 (XBLA Remaster) | 🪟 | [SunJaycy/GoldenEye-Recomp](https://github.com/SunJaycy/GoldenEye-Recomp) |
 | Crash Team Racing (High Octane) | 🪟 | [Rinnegatamante/Crash-Team-Racing-High-Octane](https://github.com/Rinnegatamante/Crash-Team-Racing-High-Octane) |
 | The Legend of Zelda: The Minish Cap | 🪟🐧🍎 | [999sian/tmc](https://github.com/999sian/tmc) |
+| The Legend of Zelda: Ocarina of Time 3D (TriAevum) | 🪟🐧 | [coccofresco/TriAevum](https://github.com/coccofresco/TriAevum) |
 
-**59 de 94 têm build Linux** e **42 de 94 têm build macOS** (Apple Silicon /
-Universal), verificado em 25/10/2026 contra a release mais recente de cada
-repositório (adicionados 23 ports nas Ondas 1, 2 e 3: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane e Minish Cap; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
+**60 de 95 têm build Linux** e **42 de 95 têm build macOS** (Apple Silicon /
+Universal), verificado em 05/11/2026 contra a release mais recente de cada
+repositório (adicionados 24 ports nas Ondas 1, 2 e 3 + TriAevum: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap e TriAevum; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -293,6 +294,15 @@ para Windows. O zip não traz o jogo: no primeiro uso o instalador do projeto
 confere o `.iso` ou `.ciso` USA `GM4E01` do jogador em `roms/GameCube/` (nome
 contendo "kart" e "double") e compila o jogo no próprio PC, o que leva vários
 minutos. Jogar online exige que todos estejam na mesma versão.
+
+Um detalhe da linha do The Legend of Zelda: Ocarina of Time 3D (TriAevum): é a recompilação
+estática nativa (AOT) em C++ do clássico de Nintendo 3DS por coccofresco (Echoes of Time),
+com renderizador moderno NRI/Vulkan, interface single-screen em HD e interpolação de alta
+taxa de quadros (60/90+ FPS). Publica builds oficiais para Windows (ZIP x64) e Linux
+(AppImage e Flatpak x86_64). Não possui compilação para macOS. Na primeira execução, o utilitário
+gráfico TriAevumForge extrai os recursos do jogo a partir da ROM desencriptada do jogador
+(.3ds ou .cci, USA ou EUR) e compila os shaders para a GPU do sistema, gerando o executável
+TriAevum.exe para as sessões seguintes.
 
 Um detalhe da linha do Conker's Bad Fur Day: é o port nativo de **Conker's Bad Fur
 Day** (Nintendo 64) via recompilação estática com RT64 (código por sciaschi,

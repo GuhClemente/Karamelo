@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.981 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.982 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -381,8 +381,8 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 30/10/2026:** são **94** jogos de "Ports & Recomp" (94 🪟, 59 🐧, 42 🍎) — 42 até
-11/09, +1 em 30/10 (Project Tandem — ver seção 51), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
+**Atualizado em 05/11/2026:** são **95** jogos de "Ports & Recomp" (95 🪟, 60 🐧, 42 🍎) — 42 até
+11/09, +1 em 30/10 (Project Tandem — ver seção 51), +1 em 05/11 (The Legend of Zelda: Ocarina of Time 3D / TriAevum — ver seção 59), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
 nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 61, 62, 70, 80, 89, 96) de outra página no futuro. É coincidência
@@ -480,8 +480,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **94** jogos de Ports & Recomp (atualizado em 30/10/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40 e 41),
+- Os **95** jogos de Ports & Recomp (atualizado em 05/11/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40, 41, 51 e 59),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -1600,7 +1600,7 @@ arquivo `data/ports.json` do repositório, publicado em
 > **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
 > arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
 > `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
-> Hoje: **94 jogos — 94 Windows 🪟, 59 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem).
+> Hoje: **95 jogos — 95 Windows 🪟, 60 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem; seção 59 para o TriAevum).
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
@@ -1874,7 +1874,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
    - Visão consolidada da arquitetura multi-OS do projeto:
      - 🪟 **Windows (x86_64)**: Win32 puro, Direct3D 11, WASAPI, System Tray com menu completo e Web Studio (Ativo).
      - 🍎 **macOS (Apple Silicon M1-M4)**: Cocoa, Metal/OpenGL, SDL3 estático sem Homebrew e 42 PC Ports Mach-O ARM64 (Pronto).
-     - 🐧 **Linux (x86_64 / Steam Deck)**: SDL3 nativo, PipeWire/ALSA e 59 PC Ports nativos ELF64 (Pronto).
+     - 🐧 **Linux (x86_64 / Steam Deck)**: SDL3 nativo, PipeWire/ALSA e 60 PC Ports nativos ELF64 (Pronto).
      - 📀 **Karamelo OS**: Distro Linux própria minimalista com boot < 3s direto no OSD (Em desenvolvimento).
      - 🍓 **Raspberry Pi & SBCs (ARM64)**: Suporte nativo e imagem para Raspberry Pi 4/5, Orange Pi e TV Boxes (`docs/RASPBERRY_PI.md`).
      - 📱 **Android**: Target futuro C++20 via NDK + Vulkan API + touch gamepad overlay (`docs/ANDROID.md`).
@@ -1917,7 +1917,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
 | **Tempo de Boot** | Vários segundos carregando temas e Python | **Instantâneo (< 1 segundo)** |
 | **Consumo de Memória** | Alto (EmulationStation + scripts + emulador filho) | **Mínimo (~30 MB de RAM em repouso)** |
 | **Multiplataforma** | **Apenas Windows** | **Windows, Linux e macOS Apple Silicon (M1-M4) nativo** |
-| **PC Ports & Recompilados** | Depende de configurações manuais | **94 PC Ports com catalogação e atualização integrada** |
+| **PC Ports & Recompilados** | Depende de configurações manuais | **95 PC Ports com catalogação e atualização integrada** |
 | **Gerenciamento Remoto** | Não possui | **Karamelo Studio (Web Admin Wi-Fi / TV Remote)** |
 | **Nuvem Pessoal** | Depende de ferramentas externas | **Sincronização de saves com o Google Drive do jogador** |
 | **Menu OSD** | Abrir o menu fecha ou minimiza o jogo ativo | **OSD MiSTer integrado que sobrepõe sem perder foco** |
@@ -2293,3 +2293,42 @@ Novidades para o jogador:
 - **Controller Pak nativo no N64**: suporte a salvamento direto em memory card virtual nos jogos que exigem Controller Pak.
 - **Dynarec no ParaLLEl N64**: melhoria substancial de desempenho com recompilador dinâmico.
 - **Pipeline autônomo de gravação**: suporte interno a gravação de vídeo 1080p a 60 fps e áudio PCM 48 kHz.
+
+---
+
+## 59. Adição de 05/11/2026 — The Legend of Zelda: Ocarina of Time 3D (TriAevum)
+
+Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 95 jogos — 95 Windows 🪟, 60 Linux 🐧, 42 macOS 🍎.**
+
+- **Projeto**: [coccofresco/TriAevum](https://github.com/coccofresco/TriAevum) (*Echoes of Time*), licença GPL-3.0.
+- **Sistemas**: **Windows 🪟 e Linux 🐧**.
+  - **Windows (x64)**: pacote oficial ZIP com o assistente gráfico `TriAevumForge.exe` e o jogo compilado `TriAevum.exe`.
+  - **Linux (x86_64)**: pacote oficial em `.AppImage` (compatível com desktop e Steam Deck) e Flatpak.
+  - **macOS 🍎**: **NÃO possui suporte upstream**. O projeto utiliza renderizador NRI/Vulkan e não publica binários Mach-O para ARM64 nem backend Metal. Não anuncie versão Mac para este jogo.
+- **Estado**: beta (`v0.8.0-beta.1.2`).
+- **Destaques técnicos**:
+  - Recompilação estática Ahead-of-Time (AOT) em C++ direto do código de Nintendo 3DS.
+  - Renderizador moderno baseado em NVIDIA NRI (Vulkan API), com interface limpa single-screen adaptada da versão portátil de duas telas (trabalho baseado em TopScreen/SingleScreen por rlgcarrot e OoT3DHud por OTPR26).
+  - Oclusão de ambiente MXAO oficial integrada (iMMERSE por Pascal Gilcher / Marty's Mods).
+  - Texturas e interface gráfica em alta definição (OoT3D Vanilla UI/HUD por chubbycubby).
+  - Interpolação e suporte a altas taxas de quadros (60, 90, 120+ FPS desbloqueados).
+- **O que o jogador precisa**:
+  - Dump próprio desencriptado da ROM original de Nintendo 3DS em formato `.3ds` ou `.cci`.
+  - Regiões suportadas: **USA** ou **EUR** (versão original ou Rev 1).
+- **Como funciona no Karamelo**:
+  - Na primeira execução após o download do port, o Karamelo abre o assistente gráfico `TriAevumForge.exe` (ou o modo Forge no Linux).
+  - O jogador escolhe a sua ROM desencriptada e preferências opcionais (texturas HD, idioma). O Forge extrai os assets do jogo e gera os shaders otimizados para a GPU do jogador.
+  - Nas execuções seguintes, o Karamelo detecta o executável principal `TriAevum.exe` e entra direto no jogo.
+
+---
+
+## 60. Preparação da Versão 0.982 (Em desenvolvimento)
+
+Versão em preparação (Windows, Linux e macOS).
+Contagens: **37 sistemas, 42 motores; 95 ports — 95 Windows 🪟, 60 Linux 🐧, 42 macOS 🍎**.
+
+Novidades em andamento:
+- **The Legend of Zelda: Ocarina of Time 3D (TriAevum)**: integração do recompilado nativo de 3DS para PC (Windows e Linux), com renderizador Vulkan/NRI, single-screen HD e assistente TriAevumForge.
+- *(Novas melhorias e adições sendo integradas antes do empacotamento oficial)*.
+
+

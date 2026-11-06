@@ -544,7 +544,7 @@ static std::string WebAdminBuildStatusJson(const std::string& csrf_token = "")
 	ss << ",\"arch\":" << JsonQuote(APP_ARCH);
 	ss << ",\"systems_count\":" << APP_SYSTEM_COUNT;
 	ss << ",\"core_engines\":" << APP_CORE_ENGINES;
-	ss << ",\"ports_count\":94";
+	ss << ",\"ports_count\":95";
 
 	bool running = (g_hooks.is_running ? g_hooks.is_running() : false);
 	ss << ",\"game_running\":" << (running ? "true" : "false");
@@ -1862,7 +1862,7 @@ input:checked + .slider:before {
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
             <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">37 Sistemas Retrô</div>
             <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">42 Motores Libretro</div>
-            <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">94 PC Ports &amp; Recompilados</div>
+            <div class="badge badge-gold" style="padding:6px 14px;font-size:12.5px;">95 PC Ports &amp; Recompilados</div>
           </div>
           <p class="card-desc">
             Arquitetura C++20 limpa (clean-room), inspirada no visual e OSD do MiSTer FPGA, porém 100% nativa para PC e dispositivos modernos.
@@ -1879,7 +1879,7 @@ input:checked + .slider:before {
 	h << R"raw(            </div>
             <div class="eco-card">
               <h4><span>🐧 Linux (x86_64 / Deck)</span><span class="badge badge-ok">Pronto</span></h4>
-              <p>SDL3 nativo, OpenGL, PipeWire/ALSA, 59 PC Ports nativos ELF64, pronto para Steam Deck e mini PCs de sala de estar.</p>
+              <p>SDL3 nativo, OpenGL, PipeWire/ALSA, 60 PC Ports nativos ELF64, pronto para Steam Deck e mini PCs de sala de estar.</p>
             </div>
             <div class="eco-card">
               <h4><span>📀 Karamelo OS (Futuro)</span><span class="badge" style="color:var(--text-muted);border-color:var(--border-subtle);">Planejado</span></h4>

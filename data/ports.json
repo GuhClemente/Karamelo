@@ -1,5 +1,5 @@
 {
-  "catalog_version": 6,
+  "catalog_version": 7,
   "ports": [
     {
       "id": "DrMario64",
@@ -1497,6 +1497,20 @@
         "Project-Tandem-Windows-Public-Beta-3.zip": "02166ef948ab89667b2056d56d07266ba2786276d75173d40fb2abbd7db93a0f"
       },
       "notes": "GameCube static recomp (MIT) with 2-8 player online, prerelease-only repo. Windows only, checked 30/10/2026: only a Windows zip is released and the setup and launcher are PowerShell, so has_linux_build and has_macos_build stay false. The zip has no game: Setup-Tandem.cmd checks main.dol of the user's USA GM4E01 ISO/CISO and compiles with the bundled toolchain, which is why the first launch runs it. Launch-Tandem.cmd starts mkdd.exe and exits, so detached_process keeps Karamelo minimized until the game closes. Online requires everyone on the same build: keep the pin current."
+    },
+    {
+      "id": "TriAevum",
+      "display_name": "The Legend of Zelda: Ocarina of Time 3D",
+      "repo": "coccofresco/TriAevum",
+      "exe_hint": "TriAevum.exe",
+      "has_linux_build": true,
+      "release_tag": "v0.8.0-beta.1.2",
+      "asset_sha256": {
+        "TriAevum-v0.8.0-beta.1.2-Linux-x86_64.AppImage": "2e80fb50e1d21ffc5cc852a90f715408b82e65839e8baf8b3dbf6f9295d5296a",
+        "TriAevum-v0.8.0-beta.1.2-Linux-x86_64.flatpak": "575db1812b37070e9512192bf760d5d78b9efda158b740a089a2eb1a528a54ef",
+        "TriAevum-v0.8.0-beta.1.2-Windows-x64.zip": "23c3febe3a4dc1b7ffe652f21861f4c5b5068411a16df5fc721e52a80ba817a6"
+      },
+      "notes": "Ahead-of-Time (AOT) native PC recompilation of The Legend of Zelda: Ocarina of Time 3D (TriAevum / Echoes of Time) by coccofresco. Features modern NRI/Vulkan renderer, single-screen UI layout, high frame rate interpolation (60/90+ FPS), and HD UI/textures. First launch runs TriAevumForge to extract game assets from user's decrypted 3DS ROM (.3ds/.cci, EUR/USA). Supports Windows and Linux."
     }
   ]
 }
