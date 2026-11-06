@@ -1738,6 +1738,9 @@ void PopulateSystemsMenu() {
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Configuracoes", "Settings"), ">", false, true, 20});
   items.push_back({Tr("Atualizacao", "Update"), ">", false, true, 30});
+#ifdef __linux__
+  items.push_back({Tr("Area de Trabalho", "Desktop Mode"), ">", false, true, 98});
+#endif
   items.push_back({std::string(Tr("Sair do ", "Exit ")) + APP_NAME, "", false, true, 99});
 
   // Counted here rather than written down somewhere else: this is the list.
@@ -4547,6 +4550,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
 
     if (item.action_id == 99) // Exit
     {
+      MenuRequestQuit();
+    } else if (item.action_id == 98) // Desktop Mode (Karamelo OS)
+    {
+      FILE* f = fopen("/tmp/karamelo_switch_desktop", "w");
+      if (f) {
+        fputs("desktop\n", f);
+        fclose(f);
+      }
       MenuRequestQuit();
     } else if (item.action_id == 997) // Back from Cores List -> About
     {

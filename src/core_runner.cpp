@@ -249,8 +249,12 @@ static bool SystemNeedsKeyboardBridge(const std::string& system_dir)
 // fires the D-Pad's OWN action every single step - confirmed against PSP:
 // walking with the analog stick also punched out whatever the game's D-Pad
 // is bound to, i.e. one push producing two unrelated actions. Systems whose
-// only real control IS the D-Pad (NES, SNES, Genesis, arcade, ...) still get
-// the full mirroring - there is nothing for it to collide with there.
+// only real control IS the D-Pad (NES, SNES, Genesis, Saturn, arcade, ...)
+// still get the full mirroring - there is nothing for it to collide with there.
+// NOTE: Saturn is intentionally EXCLUDED from independent analog: standard
+// Saturn controllers are pure digital Control Pads. Modern gamepads (and 6-button
+// pads like the 8BitDo M30 in X-Input mode) route directional inputs via Left
+// Stick axes, so mirroring to D-Pad is required for games to register movement.
 static bool SystemHasIndependentAnalogStick(const std::string& core_dll_path)
 {
 	std::string s = core_dll_path;
@@ -258,7 +262,6 @@ static bool SystemHasIndependentAnalogStick(const std::string& core_dll_path)
 	return s.find("n64") != std::string::npos ||
 	       s.find("psx") != std::string::npos ||
 	       s.find("ps2") != std::string::npos ||
-	       s.find("saturn") != std::string::npos ||
 	       s.find("dreamcast") != std::string::npos ||
 	       s.find("gamecube") != std::string::npos ||
 	       s.find("psp") != std::string::npos ||
