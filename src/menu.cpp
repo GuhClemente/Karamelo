@@ -1170,49 +1170,63 @@ static void AudioTestCurrent() {
 }
 
 // Written by the pairing thread and read by the menu: always through these two.
+// One search at a time; kind 0 = controle, 1 = teclado, 2 = mouse.
 static std::mutex s_bt_status_mtx;
-static std::string s_bt_status_msg = "";
+static std::string s_bt_status_msg[3];
 static std::atomic<bool> s_bt_scanning{false};
+static std::atomic<int> s_bt_scan_kind{0};
 
-static void BtSetStatus(const std::string& msg) {
+static void BtSetStatus(int kind, const std::string& msg) {
   std::lock_guard<std::mutex> lock(s_bt_status_mtx);
-  s_bt_status_msg = msg;
+  s_bt_status_msg[kind] = msg;
 }
 
-static std::string BtStatusLabel(const char* scanning_label) {
-  if (s_bt_scanning.load()) return scanning_label;
+static std::string BtStatusLabel(int kind, const char* scanning_label) {
+  if (s_bt_scanning.load() && s_bt_scan_kind.load() == kind) return scanning_label;
   std::lock_guard<std::mutex> lock(s_bt_status_mtx);
-  return s_bt_status_msg.empty() ? std::string("[Auto-Pair]") : s_bt_status_msg;
+  return s_bt_status_msg[kind].empty() ? std::string("[Procurar]") : s_bt_status_msg[kind];
 }
 
-static void BluetoothStartAutoPair() {
-  if (!KarameloIsAppliance()) return;
+// Text after "<tag>" up to the end of that line, cut to fit the OSD.
+static std::string BtLineAfter(const std::string& text, const char* tag) {
+  size_t pos = text.find(tag);
+  if (pos == std::string::npos) return "";
+  std::string out = text.substr(pos + strlen(tag));
+  size_t eol = out.find_first_of("\r\n");
+  if (eol != std::string::npos) out.resize(eol);
+  if (out.size() > 20) out = out.substr(0, 18) + "..";
+  return out;
+}
+
+static void BluetoothStartAutoPair(int kind) {
+  if (!KarameloIsAppliance() || kind < 0 || kind > 2) return;
   bool expected = false;
   if (!s_bt_scanning.compare_exchange_strong(expected, true)) return;
-  BtSetStatus("Procurando (12s)...");
-  std::thread([]() {
+  s_bt_scan_kind.store(kind);
+  BtSetStatus(kind, "Procurando (12s)...");
+  std::thread([kind]() {
 #ifdef __linux__
-    FILE* fp = popen("/usr/local/bin/karamelo-bluetooth-pair auto 12 2>/dev/null", "r");
-    std::string result = "";
+    static const char* const kKinds[3] = {"controle", "teclado", "mouse"};
+    char cmd[160];
+    snprintf(cmd, sizeof(cmd), "/usr/local/bin/karamelo-bluetooth-pair auto 12 %s 2>/dev/null", kKinds[kind]);
+    FILE* fp = popen(cmd, "r");
+    std::string result;
     if (fp) {
       char buf[256];
-      while (fgets(buf, sizeof(buf), fp)) {
-        result += buf;
-      }
+      while (fgets(buf, sizeof(buf), fp)) result += buf;
       pclose(fp);
     }
-    if (result.find("SUCESSO:") != std::string::npos) {
-      size_t pos = result.find("SUCESSO: Conectado a ");
-      if (pos != std::string::npos) {
-        std::string name = result.substr(pos + 21);
-        while (!name.empty() && (name.back() == '\r' || name.back() == '\n')) name.pop_back();
-        if (name.size() > 20) name = name.substr(0, 18) + "..";
-        BtSetStatus("OK: " + name);
-      } else {
-        BtSetStatus("OK: Conectado!");
-      }
+    std::string name = BtLineAfter(result, "SUCESSO: Conectado a ");
+    if (!name.empty()) {
+      BtSetStatus(kind, "OK: " + name);
+    } else if (result.find("nenhum ") != std::string::npos && result.find("FALHA:") != std::string::npos) {
+      BtSetStatus(kind, "Nenhum encontrado");
+    } else if (result.find("pareado, mas nao conectou") != std::string::npos) {
+      BtSetStatus(kind, "Pareou, sem conexao");
+    } else if (result.find("FALHA:") != std::string::npos) {
+      BtSetStatus(kind, "Falhou ao parear");
     } else {
-      BtSetStatus("Nenhum detectado");
+      BtSetStatus(kind, "Erro no Bluetooth");
     }
 #endif
     s_bt_scanning.store(false);
@@ -1238,9 +1252,9 @@ void PopulateWizard() {
 
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("--- 2. CONTROLE BLUETOOTH ---", "--- 2. BLUETOOTH PAD ---"), "", false, false, 0});
-  items.push_back({Tr("Parear Controle BT", "Pair Controller"),
-                   BtStatusLabel(Tr("Procurando...", "Scanning...")),
-                   false, true, 535});
+  items.push_back({Tr("Parear Controle", "Pair Controller"), BtStatusLabel(0, Tr("Procurando...", "Scanning...")), false, true, 535});
+  items.push_back({Tr("Parear Teclado", "Pair Keyboard"), BtStatusLabel(1, Tr("Procurando...", "Scanning...")), false, true, 536});
+  items.push_back({Tr("Parear Mouse", "Pair Mouse"), BtStatusLabel(2, Tr("Procurando...", "Scanning...")), false, true, 537});
 
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Concluir e Jogar!", "Finish & Play!"), "[Confirmar]", false, true, 227});
@@ -1824,8 +1838,11 @@ void PopulateControllerSettings() {
     Tr("Arcade 6-Botoes", "Arcade 6-Button")
   };
   items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
-  if (KarameloIsAppliance())
-    items.push_back({Tr("Parear Bluetooth", "Pair Bluetooth"), BtStatusLabel(Tr("Buscando...", "Scanning...")), false, true, 535});
+  if (KarameloIsAppliance()) {
+    items.push_back({Tr("Parear Controle BT", "Pair BT Controller"), BtStatusLabel(0, Tr("Buscando...", "Scanning...")), false, true, 535});
+    items.push_back({Tr("Parear Teclado BT", "Pair BT Keyboard"), BtStatusLabel(1, Tr("Buscando...", "Scanning...")), false, true, 536});
+    items.push_back({Tr("Parear Mouse BT", "Pair BT Mouse"), BtStatusLabel(2, Tr("Buscando...", "Scanning...")), false, true, 537});
+  }
 
 
   // Per-System Remap:
@@ -5033,10 +5050,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
           PopulateControllerSettings();
           SelectByAction(530, 2);
         }
-      } else if (item.action_id == 535) {
-        BluetoothStartAutoPair();
+      } else if (item.action_id >= 535 && item.action_id <= 537) {
+        const int bt_action = item.action_id;
+        BluetoothStartAutoPair(bt_action - 535);
         PopulateControllerSettings();
-        SelectByAction(535, 2);
+        SelectByAction(bt_action, 2);
       } else if (item.action_id == 500) {
         setting_pad_device = (setting_pad_device + 1) % 2;
         PopulateControllerSettings();
@@ -5213,10 +5231,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
         SelectByAction(404, 1);
       } else if (item.action_id == 405) {
         AudioTestCurrent();
-      } else if (item.action_id == 535) {
-        BluetoothStartAutoPair();
+      } else if (item.action_id >= 535 && item.action_id <= 537) {
+        const int bt_action = item.action_id;
+        BluetoothStartAutoPair(bt_action - 535);
         PopulateWizard();
-        SelectByAction(535, 4);
+        SelectByAction(bt_action, 4);
       } else if (item.action_id == 227) {
         if (KarameloIsAppliance()) {
           std::error_code done_ec;
