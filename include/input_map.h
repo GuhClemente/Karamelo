@@ -138,6 +138,15 @@ bool InputBindDeleteSystemProfile(const char* system_name);
 void InputBindRestoreGlobal();
 // Name of the profile currently swapped in, or NULL for the global bindings.
 const char* InputBindActiveProfile();
+
+// Built-in layout for 6-button pads (bottom row A B C, top row X Y Z, like a
+// Mega Drive or Saturn pad: 8BitDo M30 and similar, read as Xbox A B RB /
+// X Y LB). Swapped in like a system profile, for Genesis, Mega CD, Sega 32X,
+// Saturn, 3DO and arcade fighting games. `labels` are the core's own names
+// for the RetroPad buttons, indexed by RETRO_DEVICE_ID_JOYPAD_* (0..15, NULL
+// where the core gave none): arcade punches and kicks are placed by name.
+// Returns false, changing nothing, when the system has no such layout.
+bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16]);
 int InputBindGetGlobalKey(int bind);
 int InputBindGetGlobalPad(int bind);
 

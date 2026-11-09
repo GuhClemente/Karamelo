@@ -276,6 +276,10 @@ static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
 // Tatsujin apertava o start do 2P. O mouse de verdade funciona sempre.
 static int setting_pad_mouse = 0;
 static int setting_pad_menu_toggle = 0;
+// 6-button pad (Mega Drive / Saturn style, e.g. 8BitDo M30): built-in layout
+// per system (input_map.cpp). Cannot be detected - over USB an M30 reads as an
+// "Xbox 360 Controller" - so the player says so here.
+static int setting_six_button = 0;
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
 // Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
 // the mixer on a loaded machine; above 512ms the delay is audible against input.
@@ -1671,6 +1675,41 @@ void MenuHideEmptySystems() {
   s_systems_dirty = true;
 }
 
+// Bindings for the system that is running: the player's own saved profile for
+// it wins; otherwise, with "Controle 6 Botoes" on, the built-in 6-button layout
+// for that system; otherwise the global bindings.
+static void ApplySystemPadLayout() {
+  InputBindRestoreGlobal();
+  if (!CoreIsRunning()) return;
+  std::string sys_name = CoreGetCoreName();
+  if (sys_name.empty()) return;
+  if (InputBindHasSystemProfile(sys_name.c_str())) {
+    InputBindLoadSystemProfile(sys_name.c_str());
+    return;
+  }
+  if (!setting_six_button) return;
+  const char* labels[16] = {};
+  for (int id = 0; id < 16; id++) labels[id] = CoreGetButtonLabel(id);
+  InputBindApplySixButtonLayout(sys_name.c_str(), labels);
+}
+
+// Karamelo OS power entry waiting for its confirming second press (96 restart,
+// 97 power off), 0 when none.
+static int s_power_pending = 0;
+
+// The app asks karamelo-session to restart or power off, then quits normally:
+// the core unloads and writes its saves first, and only then does the session
+// call systemctl. Powering off with the app still running could lose a save.
+static void RequestPowerAction(const char* action) {
+  FILE* f = fopen("/tmp/karamelo_power", "w");
+  if (f) {
+    fputs(action, f);
+    fputs("\n", f);
+    fclose(f);
+  }
+  MenuRequestQuit();
+}
+
 void PopulateSystemsMenu() {
   items.clear();
   current_title = APP_NAME;
@@ -1770,9 +1809,17 @@ void PopulateSystemsMenu() {
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Configuracoes", "Settings"), ">", false, true, 20});
   items.push_back({Tr("Atualizacao", "Update"), ">", false, true, 30});
-  if (KarameloIsAppliance())
+  if (KarameloIsAppliance()) {
+    // On Karamelo OS there is nothing to exit to: the app is the console and
+    // systemd starts it again, so "Exit" was ten seconds of black screen.
+    // The power entries ask once more before acting (a stray button press on
+    // the couch must not turn the TV box off).
     items.push_back({Tr("Area de Trabalho", "Desktop Mode"), ">", false, true, 98});
-  items.push_back({std::string(Tr("Sair do ", "Exit ")) + APP_NAME, "", false, true, 99});
+    items.push_back({Tr("Reiniciar o PC", "Restart PC"), s_power_pending == 96 ? Tr("[Confirmar?]", "[Confirm?]") : "", false, true, 96});
+    items.push_back({Tr("Desligar", "Power Off"), s_power_pending == 97 ? Tr("[Confirmar?]", "[Confirm?]") : "", false, true, 97});
+  } else {
+    items.push_back({std::string(Tr("Sair do ", "Exit ")) + APP_NAME, "", false, true, 99});
+  }
 
   // Counted here rather than written down somewhere else: this is the list.
   g_system_count = 0;
@@ -1838,6 +1885,7 @@ void PopulateControllerSettings() {
     Tr("Arcade 6-Botoes", "Arcade 6-Button")
   };
   items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
+  items.push_back({Tr("Controle 6 Botoes", "6-Button Pad"), setting_six_button ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 533});
   if (KarameloIsAppliance()) {
     items.push_back({Tr("Parear Controle BT", "Pair BT Controller"), BtStatusLabel(0, Tr("Buscando...", "Scanning...")), false, true, 535});
     items.push_back({Tr("Parear Teclado BT", "Pair BT Keyboard"), BtStatusLabel(1, Tr("Buscando...", "Scanning...")), false, true, 536});
@@ -1961,6 +2009,7 @@ static void ResetAllSettingsToDefault() {
   setting_deadzone = 1;
   setting_pad_mouse = 0;
   setting_pad_menu_toggle = 0;
+  setting_six_button = 0;
   setting_latency = 1;
   setting_driver = 0;
   setting_sync = 1;
@@ -3125,6 +3174,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "deadzone", setting_deadzone);
   AppendSetting(out, "pad_mouse", setting_pad_mouse);
   AppendSetting(out, "pad_menu_toggle", setting_pad_menu_toggle);
+  AppendSetting(out, "pad_six_button", setting_six_button);
   AppendSetting(out, "latency", setting_latency);
   AppendSetting(out, "driver", setting_driver);
   AppendSetting(out, "sync", setting_sync);
@@ -3256,6 +3306,8 @@ static void MenuLoadSettings() {
       setting_pad_mouse = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "pad_menu_toggle"))
       setting_pad_menu_toggle = ClampInt(iv, 0, 4);
+    else if (!strcmp(key, "pad_six_button"))
+      setting_six_button = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "pad_device"))
       setting_pad_device = ClampInt(iv, 0, 1);
     else if (InputBindFromConfigKey(key) >= 0)
@@ -3616,10 +3668,7 @@ void MenuRun() {
   static bool s_was_core_running = false;
   bool core_running_now = CoreIsRunning();
   if (core_running_now && !s_was_core_running) {
-    InputBindRestoreGlobal();
-    std::string sys_name = CoreGetCoreName();
-    if (!sys_name.empty() && InputBindHasSystemProfile(sys_name.c_str()))
-      InputBindLoadSystemProfile(sys_name.c_str());
+    ApplySystemPadLayout();
   }
   s_was_core_running = core_running_now;
 
@@ -4006,6 +4055,8 @@ static void MenuGoBack() {
 
 static void MenuProcessKeyImpl(MenuKey key) {
   g_last_input_tick = TickCountMs();
+  const int power_pending_before = s_power_pending;
+  if (key != KEY_SELECT) s_power_pending = 0;
 
   // While waiting for a key to bind, the menu must not also act on it,
   // except for KEY_CANCEL (ESC) which aborts the capture / wizard.
@@ -4539,6 +4590,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
       MenuSetLanguage(setting_language);
       PopulateSettings();
       SelectByAction(item.action_id, 0);
+    } else if (item.action_id == 533) // Controle 6 Botoes
+    {
+      setting_six_button = !setting_six_button;
+      MenuSaveSettings();
+      ApplySystemPadLayout();
+      PopulateControllerSettings();
+      SelectByAction(item.action_id, 3);
     } else if (item.action_id == 530) // Preset Botoes
     {
       int cur_preset = InputBindGetPreset();
@@ -4583,6 +4641,16 @@ static void MenuProcessKeyImpl(MenuKey key) {
     if (item.action_id == 99) // Exit
     {
       MenuRequestQuit();
+    } else if ((item.action_id == 96 || item.action_id == 97) && KarameloIsAppliance()) // Restart / Power off
+    {
+      if (power_pending_before == item.action_id) {
+        s_power_pending = 0;
+        RequestPowerAction(item.action_id == 97 ? "poweroff" : "reboot");
+      } else {
+        s_power_pending = item.action_id;
+        PopulateSystemsMenu();
+        SelectByAction(item.action_id, 0);
+      }
     } else if (item.action_id == 98 && KarameloIsAppliance()) // Desktop Mode (Karamelo OS)
     {
       FILE* f = fopen("/tmp/karamelo_switch_desktop", "w");
@@ -5024,7 +5092,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
         CoreSetToast(Tr("CONFIGURACOES RESTAURADAS AO PADRAO", "SETTINGS RESTORED TO DEFAULT"), 180);
       }
     } else if (current_state == STATE_CONTROLLER) {
-      if (item.action_id == 530) {
+      if (item.action_id == 533) {
+        setting_six_button = !setting_six_button;
+        MenuSaveSettings();
+        ApplySystemPadLayout();
+        PopulateControllerSettings();
+        SelectByAction(item.action_id, 3);
+      } else if (item.action_id == 530) {
         int cur_preset = InputBindGetPreset();
         int next_preset = (cur_preset + 1) % 4;
         InputBindApplyPreset(next_preset);

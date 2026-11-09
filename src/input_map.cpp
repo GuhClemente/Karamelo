@@ -106,6 +106,7 @@ extern "C" SHORT GetAsyncKeyState(int vk)
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string>
 #include <filesystem>
@@ -650,6 +651,135 @@ bool InputBindLoadSystemProfile(const char* system_name)
 	memcpy(s_pads, pads, sizeof(s_pads));
 	s_profile_active = true;
 	s_profile_name = system_name;
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// 6-button pads. Physical buttons of the pad, as SDL/XInput reads an 8BitDo M30:
+// bottom row A B C = Xbox A, B, RB; top row X Y Z = Xbox X, Y, LB.
+// Each system's table comes from that core's own RetroPad mapping (libretro
+// docs), so the console's A B C / X Y Z land where they sit on the real pad:
+//   Genesis Plus GX / PicoDrive: Y=A  B=B  A=C  L=X  X=Y  R=Z
+//   Beetle Saturn:               B=A  A=B  R=C  Y=X  X=Y  L=Z  (L2/R2 = L/R)
+//   Opera (3DO):                 Y=A  B=B  A=C  L=L  R=R  (Select=X, Start=P)
+// Arcade goes by the button names the core gives for the loaded game.
+// ---------------------------------------------------------------------------
+namespace {
+const int kSixA = PAD_BTN_A, kSixB = PAD_BTN_B, kSixC = PAD_BTN_RB;
+const int kSixX = PAD_BTN_X, kSixY = PAD_BTN_Y, kSixZ = PAD_BTN_LB;
+
+int BindForRetroId(int id)
+{
+	switch (id)
+	{
+	case 0: return BIND_B;   case 1: return BIND_Y;
+	case 8: return BIND_A;   case 9: return BIND_X;
+	case 10: return BIND_L;  case 11: return BIND_R;
+	case 12: return BIND_L2; case 13: return BIND_R2;
+	default: return -1;
+	}
+}
+
+bool LabelHas(const char* label, const char* word)
+{
+	if (!label || !word) return false;
+	const size_t n = strlen(word);
+	for (const char* p = label; *p; ++p)
+	{
+		size_t i = 0;
+		while (i < n && p[i] && tolower((unsigned char)p[i]) == tolower((unsigned char)word[i])) i++;
+		if (i == n) return true;
+	}
+	return false;
+}
+
+// 0 weak, 1 medium, 2 heavy; -1 when the label says neither. Capcom's own
+// names call the medium punch "Strong", FBNeo calls the heavy one "Strong
+// Punch" next to a "Medium Punch" - so "strong" means heavy only when the
+// game also has a "medium" button.
+int StrengthOf(const char* label, bool game_has_medium)
+{
+	if (LabelHas(label, "weak") || LabelHas(label, "light") || LabelHas(label, "jab") || LabelHas(label, "short") || LabelHas(label, "fraco")) return 0;
+	if (LabelHas(label, "medium") || LabelHas(label, "forward") || LabelHas(label, "medio")) return 1;
+	if (LabelHas(label, "heavy") || LabelHas(label, "hard") || LabelHas(label, "fierce") || LabelHas(label, "roundhouse") || LabelHas(label, "forte")) return 2;
+	if (LabelHas(label, "strong")) return game_has_medium ? 2 : 1;
+	return -1;
+}
+} // namespace
+
+bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16])
+{
+	if (!system_name) return false;
+	const std::string sys = system_name;
+	int layout[BIND_COUNT];
+	for (int i = 0; i < BIND_COUNT; i++) layout[i] = -1;   // -1 = keep the global binding
+
+	auto clear_face = [&]() {
+		for (int b : {BIND_B, BIND_A, BIND_Y, BIND_X, BIND_L, BIND_R}) layout[b] = PAD_BTN_NONE;
+	};
+
+	if (sys == "Genesis" || sys == "Mega CD" || sys == "Sega 32X")
+	{
+		clear_face();
+		layout[BIND_Y] = kSixA; layout[BIND_B] = kSixB; layout[BIND_A] = kSixC;
+		layout[BIND_L] = kSixX; layout[BIND_X] = kSixY; layout[BIND_R] = kSixZ;
+	}
+	else if (sys == "Saturn")
+	{
+		clear_face();
+		layout[BIND_B] = kSixA; layout[BIND_A] = kSixB; layout[BIND_R] = kSixC;
+		layout[BIND_Y] = kSixX; layout[BIND_X] = kSixY; layout[BIND_L] = kSixZ;
+	}
+	else if (sys == "3DO")
+	{
+		clear_face();
+		layout[BIND_Y] = kSixA; layout[BIND_B] = kSixB; layout[BIND_A] = kSixC;
+		layout[BIND_L] = kSixX; layout[BIND_R] = kSixZ;
+	}
+	else if (sys == "Arcade")
+	{
+		if (!labels) return false;
+		bool has_medium = false;
+		for (int id = 0; id < 16; id++)
+			if (labels[id] && (LabelHas(labels[id], "medium") || LabelHas(labels[id], "medio"))) has_medium = true;
+		int punch[3] = {-1, -1, -1}, kick[3] = {-1, -1, -1};
+		int found = 0;
+		for (int id = 0; id < 16; id++)
+		{
+			const int bind = BindForRetroId(id);
+			if (bind < 0 || !labels[id]) continue;
+			const bool is_punch = LabelHas(labels[id], "punch") || LabelHas(labels[id], "soco");
+			const bool is_kick = LabelHas(labels[id], "kick") || LabelHas(labels[id], "chute");
+			const int s = StrengthOf(labels[id], has_medium);
+			if (s < 0 || (!is_punch && !is_kick)) continue;
+			int* row = is_punch ? punch : kick;
+			if (row[s] < 0) { row[s] = bind; found++; }
+		}
+		if (found < 4) return false;   // not a punch/kick fighting game
+		clear_face();
+		const int top[3] = {kSixX, kSixY, kSixZ}, bottom[3] = {kSixA, kSixB, kSixC};
+		for (int s = 0; s < 3; s++)
+		{
+			if (punch[s] >= 0) layout[punch[s]] = top[s];
+			if (kick[s] >= 0) layout[kick[s]] = bottom[s];
+		}
+	}
+	else
+	{
+		return false;
+	}
+
+	if (!s_profile_active)
+	{
+		memcpy(s_global_keys, s_keys, sizeof(s_keys));
+		memcpy(s_global_pads, s_pads, sizeof(s_pads));
+	}
+	memcpy(s_keys, s_global_keys, sizeof(s_keys));
+	memcpy(s_pads, s_global_pads, sizeof(s_pads));
+	for (int b = 0; b < BIND_COUNT; b++)
+		if (layout[b] >= 0) s_pads[b] = layout[b];
+	s_profile_active = true;
+	s_profile_name = sys + " (6 botoes)";
 	return true;
 }
 

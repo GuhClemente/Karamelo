@@ -62,9 +62,140 @@ static int FindSlotByInstanceId(SDL_JoystickID id)
 	return -1;
 }
 
+// A controller SDL has no mapping for arrives only as a joystick, and only
+// SDL_EVENT_GAMEPAD_ADDED was handled: such a pad was never opened, so it did
+// nothing in the menu or in games. Seen with 8BitDo pads paired over
+// Bluetooth (D-input/Android/macOS modes), on Windows and on Linux, while the
+// same pad over USB (X-input) worked. A plain default mapping is registered
+// for it - first two buttons confirm/back, last two are Select/Start, hat or
+// first two axes move - and SDL then announces it as a gamepad, which goes
+// through the normal path below. The log line carries what is needed to write
+// a proper mapping for that pad later.
+static void MapUnknownJoystick(SDL_JoystickID id)
+{
+	if (SDL_IsGamepad(id)) return; // a real mapping exists: GAMEPAD_ADDED follows
+
+	SDL_Joystick* js = SDL_OpenJoystick(id);
+	if (!js)
+	{
+		GamepadLog("joystick %u sem mapeamento e nao abriu - %s", (unsigned)id, SDL_GetError());
+		return;
+	}
+	const char* name = SDL_GetJoystickName(js);
+	char guid[64] = {};
+	SDL_GUIDToString(SDL_GetJoystickGUID(js), guid, sizeof(guid));
+	const int axes = SDL_GetNumJoystickAxes(js);
+	const int buttons = SDL_GetNumJoystickButtons(js);
+	const int hats = SDL_GetNumJoystickHats(js);
+	SDL_CloseJoystick(js);
+
+	GamepadLog("joystick sem mapeamento: \"%s\" guid=%s eixos=%d botoes=%d hats=%d",
+		name ? name : "?", guid, axes, buttons, hats);
+	if (buttons < 2 || (hats < 1 && axes < 2))
+	{
+		GamepadLog("  poucos controles para servir de gamepad - ignorado");
+		return;
+	}
+
+	char map[512];
+	int n = snprintf(map, sizeof(map), "%s,%s,a:b0,b:b1", guid, "Karamelo generic");
+	if (buttons > 2) n += snprintf(map + n, sizeof(map) - n, ",x:b2");
+	if (buttons > 3) n += snprintf(map + n, sizeof(map) - n, ",y:b3");
+	if (buttons > 5) n += snprintf(map + n, sizeof(map) - n, ",leftshoulder:b4,rightshoulder:b5");
+	if (buttons > 7) n += snprintf(map + n, sizeof(map) - n, ",back:b%d,start:b%d", buttons - 2, buttons - 1);
+	else if (buttons > 4) n += snprintf(map + n, sizeof(map) - n, ",start:b%d", buttons - 1);
+	if (hats > 0) n += snprintf(map + n, sizeof(map) - n, ",dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8");
+	if (axes >= 2) n += snprintf(map + n, sizeof(map) - n, ",leftx:a0,lefty:a1");
+	if (axes >= 4) n += snprintf(map + n, sizeof(map) - n, ",rightx:a2,righty:a3");
+
+	if (SDL_AddGamepadMapping(map) < 0)
+	{
+		GamepadLog("  mapeamento padrao recusado pelo SDL - %s", SDL_GetError());
+		return;
+	}
+	GamepadLog("  mapeamento padrao aplicado: %s", map);
+
+	// Open it right away through the normal path instead of relying on SDL to
+	// announce it; if SDL does announce it later, the slot lookup sees it is
+	// already open and nothing is opened twice.
+	if (SDL_IsGamepad(id))
+	{
+		SDL_Event added;
+		SDL_zero(added);
+		added.type = SDL_EVENT_GAMEPAD_ADDED;
+		added.gdevice.which = id;
+		GamepadHandleDeviceEvent(&added);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Hot swap. Slots used to be handed out in connection order and kept for good:
+// take the P1 pad away and the pad left in the player's hands stayed P2, which
+// nothing reads in a one-player game. The rules now:
+//  1. A pad that drops and comes back gets its old slot back (identified by
+//     GUID + serial), so a flat battery or a Bluetooth blip does not reshuffle
+//     players.
+//  2. A pad that arrives takes the first empty slot - including the one a
+//     dropped pad left - so plugging another pad in when P1 died makes it P1.
+//  3. When only one pad is left and it is not P1, it becomes P1 at once.
+//  4. With two or more pads left nobody moves on their own (a two-player match
+//     must not swap characters); START on a pad claims an empty P1.
+//  5. Every change is announced on screen through the notice callback.
+// ---------------------------------------------------------------------------
+static char s_slot_key[4][160] = {};   // identity of the pad that owns / owned the slot
+static bool s_slot_reserved[4] = {};   // empty, but kept for that pad if it returns
+static void (*s_notice_cb)(const char*) = nullptr;
+
+void GamepadSetNoticeCallback(void (*cb)(const char* message))
+{
+	s_notice_cb = cb;
+}
+
+static void Notice(const char* fmt, ...)
+{
+	char buf[200];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	GamepadLog("%s", buf);
+	if (s_notice_cb) s_notice_cb(buf);
+}
+
+static void PadKey(SDL_Gamepad* gp, SDL_JoystickID id, char* out, size_t out_size)
+{
+	char guid[64] = {};
+	SDL_GUIDToString(SDL_GetJoystickGUIDForID(id), guid, sizeof(guid));
+	const char* serial = gp ? SDL_GetGamepadSerial(gp) : nullptr;
+	snprintf(out, out_size, "%s|%s", guid, serial ? serial : "");
+}
+
+static const char* PadName(SDL_Gamepad* gp)
+{
+	const char* n = gp ? SDL_GetGamepadName(gp) : nullptr;
+	return (n && n[0]) ? n : "Controle";
+}
+
+// Moves the pad in `from` to `to` (which must be empty). Caller holds the lock.
+static void MoveSlot(int from, int to)
+{
+	s_pads[to] = s_pads[from];
+	s_pads[from] = nullptr;
+	SDL_strlcpy(s_slot_key[to], s_slot_key[from], sizeof(s_slot_key[to]));
+	s_slot_key[from][0] = '\0';
+	s_slot_reserved[to] = false;
+	s_slot_reserved[from] = false;
+}
+
 void GamepadHandleDeviceEvent(const SDL_Event* event)
 {
 	if (!event) return;
+
+	if (event->type == SDL_EVENT_JOYSTICK_ADDED)
+	{
+		MapUnknownJoystick(event->jdevice.which);
+		return;
+	}
 
 	if (event->type == SDL_EVENT_GAMEPAD_ADDED)
 	{
@@ -76,15 +207,26 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 			ReleaseSRWLockExclusive(&s_pads_lock);
 			return;
 		}
-		int slot = FindFreeSlot();
-		if (slot < 0)
+		if (FindFreeSlot() < 0)
 		{
 			ReleaseSRWLockExclusive(&s_pads_lock);
 			GamepadLog("conectado mas os 4 slots ja estao ocupados - ignorado");
 			return;
 		}
 		SDL_Gamepad* opened = SDL_OpenGamepad(id);
-		s_pads[slot] = opened;
+		int slot = -1;
+		bool returned = false;
+		if (opened)
+		{
+			char key[160];
+			PadKey(opened, id, key, sizeof(key));
+			for (int i = 0; i < 4 && slot < 0; i++)  // rule 1: its own slot
+				if (!s_pads[i] && s_slot_reserved[i] && strcmp(s_slot_key[i], key) == 0) { slot = i; returned = true; }
+			if (slot < 0) slot = FindFreeSlot();     // rule 2: first empty slot
+			s_pads[slot] = opened;
+			SDL_strlcpy(s_slot_key[slot], key, sizeof(s_slot_key[slot]));
+			s_slot_reserved[slot] = false;
+		}
 		ReleaseSRWLockExclusive(&s_pads_lock);
 
 		// Logged outside the lock: this writes to disk, and GamepadGetState is
@@ -93,13 +235,38 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 		// closes a pad, and it is not inside another event right now.
 		if (opened)
 		{
-			GamepadLog("slot %d: %s (tipo=%d)", slot,
-				SDL_GetGamepadName(opened),
-				(int)SDL_GetGamepadType(opened));
+			GamepadLog("slot %d: %s (tipo=%d)", slot, SDL_GetGamepadName(opened), (int)SDL_GetGamepadType(opened));
+			Notice(returned ? "%s voltou como P%d" : "%s conectado como P%d", PadName(opened), slot + 1);
 		}
 		else
 		{
-			GamepadLog("slot %d: SDL_OpenGamepad falhou - %s", slot, SDL_GetError());
+			char err[256];
+			SDL_strlcpy(err, SDL_GetError(), sizeof(err));
+			// The same device kept coming back and failing: one line per device,
+			// not one per attempt (a single session grew karamelo.log to 29 MB).
+			static SDL_JoystickID s_last_failed_id = 0;
+			if (id != s_last_failed_id)
+			{
+				s_last_failed_id = id;
+				GamepadLog("SDL_OpenGamepad falhou - %s", err);
+			}
+			// 8BitDo pads paired over Bluetooth in Switch mode present themselves
+			// as a Nintendo Switch Pro Controller. SDL's own Switch driver then
+			// tries to read the stick calibration the way a Nintendo pad stores
+			// it, the clone does not answer, and the open fails - the pad worked
+			// in Windows itself but never in Karamelo, on Windows or Linux.
+			// Turning that driver off makes SDL re-detect the pad through the
+			// generic path (DirectInput on Windows, evdev on Linux), which opens
+			// it. Only done after such a failure, so a genuine Switch controller
+			// that opens fine keeps the full driver.
+			static bool s_switch_driver_off = false;
+			if (!s_switch_driver_off && SDL_strcasestr(err, "calibration"))
+			{
+				s_switch_driver_off = true;
+				GamepadLog("controle em modo Switch sem calibracao (8BitDo e outros): "
+				           "abrindo pelo driver generico do SDL");
+				SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_SWITCH, "0");
+			}
 		}
 	}
 	else if (event->type == SDL_EVENT_GAMEPAD_REMOVED)
@@ -110,16 +277,55 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 		// put the free right back in the window where a reader on the core
 		// thread can be inside SDL_GetGamepadButton on that pointer - the
 		// exact use-after-free this lock exists to close.
+		char gone_name[96] = {};
+		int promoted_from = -1;
+		int left = 0;
 		AcquireSRWLockExclusive(&s_pads_lock);
 		int slot = FindSlotByInstanceId(event->gdevice.which);
 		if (slot >= 0)
 		{
+			SDL_strlcpy(gone_name, PadName(s_pads[slot]), sizeof(gone_name));
 			SDL_CloseGamepad(s_pads[slot]);
 			s_pads[slot] = nullptr;
+			s_slot_reserved[slot] = true; // rule 1: kept for this pad
+			int only = -1;
+			for (int i = 0; i < 4; i++) if (s_pads[i]) { left++; only = i; }
+			if (left == 1 && only != 0 && !s_pads[0]) // rule 3
+			{
+				MoveSlot(only, 0);
+				promoted_from = only;
+			}
 		}
+		char promoted_name[96] = {};
+		if (promoted_from >= 0) SDL_strlcpy(promoted_name, PadName(s_pads[0]), sizeof(promoted_name));
 		ReleaseSRWLockExclusive(&s_pads_lock);
 
-		if (slot >= 0) GamepadLog("slot %d desconectado", slot);
+		if (slot >= 0)
+		{
+			GamepadLog("slot %d desconectado (%s)", slot, gone_name);
+			if (promoted_from >= 0)
+				Notice("%s agora e P1", promoted_name);
+			else if (slot == 0 && left >= 2)
+				Notice("P1 desconectado: reconecte ou aperte START no controle que vai ser o P1");
+			else
+				Notice("%s (P%d) desconectado", gone_name, slot + 1);
+		}
+	}
+	else if (event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event->gbutton.button == SDL_GAMEPAD_BUTTON_START)
+	{
+		// Rule 4: START claims an empty P1.
+		char name[96] = {};
+		bool moved = false;
+		AcquireSRWLockExclusive(&s_pads_lock);
+		int slot = FindSlotByInstanceId(event->gbutton.which);
+		if (slot > 0 && !s_pads[0])
+		{
+			MoveSlot(slot, 0);
+			SDL_strlcpy(name, PadName(s_pads[0]), sizeof(name));
+			moved = true;
+		}
+		ReleaseSRWLockExclusive(&s_pads_lock);
+		if (moved) Notice("%s agora e P1", name);
 	}
 }
 

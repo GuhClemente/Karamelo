@@ -47,10 +47,16 @@ int GamepadGetDeviceType(int slot);
 // Returns a user-friendly model name (e.g. "DualSense (PS5)", "Xbox One/Series", "Switch Pro").
 const char* GamepadGetDeviceTypeName(int slot);
 
-// Feed every SDL event from the main loop here - it only acts on
-// SDL_EVENT_GAMEPAD_ADDED/SDL_EVENT_GAMEPAD_REMOVED, ignoring the rest, so
-// slot assignment stays in sync with what is actually plugged in.
+// Feed every SDL event from the main loop here - it acts on joystick/gamepad
+// added and removed and on START, ignoring the rest, so slot assignment stays
+// in sync with what is actually plugged in. Hot swap: a pad that comes back
+// gets its old slot, a new pad takes the first empty one, a lone pad left
+// becomes P1, and START claims an empty P1 (rules in gamepad_sdl.cpp).
 void GamepadHandleDeviceEvent(const SDL_Event* event);
+
+// Called on the main thread with a short message ("8BitDo agora e P1") every
+// time a pad connects, leaves or changes slot. The app shows it as a toast.
+void GamepadSetNoticeCallback(void (*cb)(const char* message));
 
 // Closes all open gamepad handles on shutdown.
 void GamepadShutdown();

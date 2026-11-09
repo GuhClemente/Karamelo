@@ -1598,6 +1598,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// input/audio code is touched. Nothing downstream depends on this yet.
 	{
 		FILE* lf = fopen("karamelo.log", "a");
+		// Hot swap notices ("8BitDo agora e P1") on screen, about 3 seconds.
+		GamepadSetNoticeCallback([](const char* message) { CoreSetToast(message, 180); });
 		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
 		{
 			if (lf) fprintf(lf, "[INFO] [SDL3] inicializado, versao=%d\n", SDL_GetVersion());

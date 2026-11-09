@@ -1314,6 +1314,8 @@ int main(int argc, char* argv[])
 	InstallLinuxDesktopEntry();
 #endif
 
+	// Hot swap notices ("8BitDo agora e P1") on screen, about 3 seconds.
+	GamepadSetNoticeCallback([](const char* message) { CoreSetToast(message, 180); });
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
 	{
 		fprintf(stderr, "[ERROR] [SDL3] SDL_Init falhou: %s\n", SDL_GetError());
