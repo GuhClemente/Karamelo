@@ -1178,11 +1178,14 @@ bool PortAutoSetupRom(const std::string& port_id) {
         return false;
     }
 
-    // 2. SNES Recomps (SuperMetroidRecomp, SuperMarioWorldRecomp, StarFoxEnhanced, JungleStrikeSNES)
+    // 2. SNES Recomps (SuperMetroidRecomp, SuperMarioWorldRecomp, StarFoxEnhanced, JungleStrikeSNES,
+    //    TopGearPC). The player's ROM is taken from roms/SNES, where the SNES
+    //    core already reads it.
     if (port_id.find("SuperMetroid") != std::string::npos ||
         port_id.find("SuperMarioWorld") != std::string::npos ||
         port_id.find("StarFox") != std::string::npos ||
-        port_id.find("JungleStrike") != std::string::npos) {
+        port_id.find("JungleStrike") != std::string::npos ||
+        port_id == "TopGearPC") {
         for (const auto& f : fs::directory_iterator(target_dir, ec)) {
             std::string ext = ToLowerStr(f.path().extension().string());
             if (ext == ".sfc" || ext == ".smc") return true;
@@ -1199,6 +1202,10 @@ bool PortAutoSetupRom(const std::string& port_id) {
                 if (ext != ".sfc" && ext != ".smc") continue;
                 if (!RomNameMatches(*def, fname)) continue;
                 fs::path dest = fs::path(target_dir) / entry.path().filename();
+                // Top Gear PC only looks next to topgear.exe for "Top Gear (USA)
+                // .sfc/.smc" (or topgear.sfc), whatever the player named the file;
+                // the game then checks the ROM's own SHA-256.
+                if (port_id == "TopGearPC") dest = fs::path(target_dir) / ("Top Gear (USA)" + ext);
                 fs::copy_file(entry.path(), dest, fs::copy_options::overwrite_existing, ec);
                 if (port_id == "JungleStrikeSNES") {
                     fs::path rom_dir = fs::path(target_dir) / "Rom";

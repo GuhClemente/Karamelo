@@ -381,11 +381,11 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 05/11/2026:** são **95** jogos de "Ports & Recomp" (95 🪟, 60 🐧, 42 🍎) — 42 até
-11/09, +1 em 30/10 (Project Tandem — ver seção 51), +1 em 05/11 (The Legend of Zelda: Ocarina of Time 3D / TriAevum — ver seção 59), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
+**Atualizado em 09/11/2026:** são **96** jogos de "Ports & Recomp" (96 🪟, 61 🐧, 42 🍎) — 42 até
+11/09, +1 em 30/10 (Project Tandem — ver seção 51), +1 em 05/11 (The Legend of Zelda: Ocarina of Time 3D / TriAevum — ver seção 59), +1 em 09/11 (Top Gear — ver seção 61), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
-nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 61, 62, 70, 80, 89, 96) de outra página no futuro. É coincidência
+nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 62, 70, 80, 89, 94, 95) de outra página no futuro. É coincidência
 infeliz que 39 já tenha sido, um dia, o número errado de motores — não
 confunda os dois.
 
@@ -480,8 +480,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **95** jogos de Ports & Recomp (atualizado em 05/11/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40, 41, 51 e 59),
+- Os **96** jogos de Ports & Recomp (atualizado em 09/11/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40, 41, 51, 59 e 61),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -1600,7 +1600,7 @@ arquivo `data/ports.json` do repositório, publicado em
 > **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
 > arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
 > `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
-> Hoje: **95 jogos — 95 Windows 🪟, 60 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem; seção 59 para o TriAevum).
+> Hoje: **96 jogos — 96 Windows 🪟, 61 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem; seção 59 para o TriAevum; seção 61 para o Top Gear).
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
@@ -1874,7 +1874,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
    - Visão consolidada da arquitetura multi-OS do projeto:
      - 🪟 **Windows (x86_64)**: Win32 puro, Direct3D 11, WASAPI, System Tray com menu completo e Web Studio (Ativo).
      - 🍎 **macOS (Apple Silicon M1-M4)**: Cocoa, Metal/OpenGL, SDL3 estático sem Homebrew e 42 PC Ports Mach-O ARM64 (Pronto).
-     - 🐧 **Linux (x86_64 / Steam Deck)**: SDL3 nativo, PipeWire/ALSA e 60 PC Ports nativos ELF64 (Pronto).
+     - 🐧 **Linux (x86_64 / Steam Deck)**: SDL3 nativo, PipeWire/ALSA e 61 PC Ports nativos ELF64 (Pronto).
      - 📀 **Karamelo OS**: Distro Linux própria minimalista com boot < 3s direto no OSD (Em desenvolvimento).
      - 🍓 **Raspberry Pi & SBCs (ARM64)**: Suporte nativo e imagem para Raspberry Pi 4/5, Orange Pi e TV Boxes (`docs/RASPBERRY_PI.md`).
      - 📱 **Android**: Target futuro C++20 via NDK + Vulkan API + touch gamepad overlay (`docs/ANDROID.md`).
@@ -1917,7 +1917,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
 | **Tempo de Boot** | Vários segundos carregando temas e Python | **Instantâneo (< 1 segundo)** |
 | **Consumo de Memória** | Alto (EmulationStation + scripts + emulador filho) | **Mínimo (~30 MB de RAM em repouso)** |
 | **Multiplataforma** | **Apenas Windows** | **Windows, Linux e macOS Apple Silicon (M1-M4) nativo** |
-| **PC Ports & Recompilados** | Depende de configurações manuais | **95 PC Ports com catalogação e atualização integrada** |
+| **PC Ports & Recompilados** | Depende de configurações manuais | **96 PC Ports com catalogação e atualização integrada** |
 | **Gerenciamento Remoto** | Não possui | **Karamelo Studio (Web Admin Wi-Fi / TV Remote)** |
 | **Nuvem Pessoal** | Depende de ferramentas externas | **Sincronização de saves com o Google Drive do jogador** |
 | **Menu OSD** | Abrir o menu fecha ou minimiza o jogo ativo | **OSD MiSTer integrado que sobrepõe sem perder foco** |
@@ -2325,10 +2325,33 @@ Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 95 jo
 ## 60. Preparação da Versão 0.982 (Em desenvolvimento)
 
 Versão em preparação (Windows, Linux e macOS).
-Contagens: **37 sistemas, 42 motores; 95 ports — 95 Windows 🪟, 60 Linux 🐧, 42 macOS 🍎**.
+Contagens: **37 sistemas, 42 motores; 96 ports — 96 Windows 🪟, 61 Linux 🐧, 42 macOS 🍎**.
 
 Novidades em andamento:
 - **The Legend of Zelda: Ocarina of Time 3D (TriAevum)**: integração do recompilado nativo de 3DS para PC (Windows e Linux), com renderizador Vulkan/NRI, single-screen HD e assistente TriAevumForge.
+- **Top Gear (SNES)**: decompilação para PC do clássico de corrida, Windows e Linux (seção 61).
+- **Troca de controles inteligente (hot swap)**: o controle que cai e volta retorna ao mesmo jogador; um controle novo ocupa o lugar vazio; se sobrar um controle só, ele vira o Jogador 1 na hora; com dois ou mais, ninguém troca de lugar sozinho e START assume o Jogador 1 vago. Cada mudança aparece como aviso na tela. Windows, Linux e macOS.
+- **Controles 8BitDo pelo Bluetooth**: passam a funcionar no Karamelo (antes o Windows reconhecia, mas o Karamelo não abria o controle no modo Switch). Controles sem mapeamento conhecido recebem um mapeamento padrão em vez de serem ignorados.
+- **Opção "Controle 6 Botões"** (Configurações > Controles): para controles no estilo Mega Drive / Saturn, como o 8BitDo M30. Mega Drive, Mega CD, 32X, Saturn e 3DO ficam com A-B-C embaixo e X-Y-Z em cima, como no controle original; em jogos de luta de arcade, socos em cima e chutes embaixo, pelos nomes que o emulador dá aos botões de cada jogo.
+- **Karamelo OS**: "Sair do Karamelo" virou **Desligar** e **Reiniciar o PC** (com confirmação), e a atualização do app baixada no Karamelo OS passa a continuar valendo depois de reiniciar.
 - *(Novas melhorias e adições sendo integradas antes do empacotamento oficial)*.
+
+---
+
+## 61. Adição de 09/11/2026 — Top Gear (SNES)
+
+Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 96 jogos — 96 Windows 🪟, 61 Linux 🐧, 42 macOS 🍎.**
+
+- **Projeto**: [thebradshaw/topgear-pc](https://github.com/thebradshaw/topgear-pc) (Vibe Slop Studios). O repositório **não declara licença** — não escreva "código aberto sob licença X" para este jogo.
+- **Sistemas**: **Windows 🪟 e Linux 🐧**.
+  - **Windows (x64)**: zip oficial com o jogo `topgear.exe` e o `topgear-launcher.exe`.
+  - **Linux (x86_64)**: tar.gz oficial. O próprio autor marca o build Linux como **experimental** ("ainda não testado em máquinas reais") — diga isso na página.
+  - **macOS 🍎**: **sem build upstream**. Não anuncie versão Mac.
+- **Versão no catálogo**: `v1.2.0` (fixada com SHA-256).
+- **O que é**: decompilação para PC do jogo de corrida de 1992 do Super Nintendo. As corridas rodam em C traduzido; os menus ainda rodam o código original no emulador de referência embutido (LakeSnes, MIT).
+- **Destaques**: widescreen opcional (até 21:9), visão de tela cheia para 1 jogador, movimento suave e alta taxa de quadros em monitores de 120 Hz ou mais, carro fantasma, vibração no controle, 2 jogadores lado a lado em widescreen e salvamento automático do progresso.
+- **O que o jogador precisa**: a **ROM própria** de **Top Gear (USA)**, 524.288 bytes (um cabeçalho de copiadora de 512 bytes é removido sozinho), conferida pelo SHA-256 `ca9889f17f184b3d99a2eaaa82af73e366f03ed00313fdd369e5e023b208e788`. A ROM não vem no download.
+- **Como funciona no Karamelo**: o jogador deixa a ROM em `roms/SNES` (a mesma pasta do emulador de Super Nintendo). Ao instalar ou abrir o port, o Karamelo copia a ROM para a pasta do port com o nome que o jogo procura (`Top Gear (USA).sfc` ou `.smc`) e abre o jogo direto, sem passar pelo launcher.
+- **Aviso legal para a página**: projeto de fã, sem relação com Kemco, Gremlin Graphics ou Nintendo. Top Gear é marca de seus donos.
 
 

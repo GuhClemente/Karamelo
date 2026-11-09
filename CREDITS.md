@@ -215,10 +215,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Crash Team Racing (High Octane) | 🪟 | [Rinnegatamante/Crash-Team-Racing-High-Octane](https://github.com/Rinnegatamante/Crash-Team-Racing-High-Octane) |
 | The Legend of Zelda: The Minish Cap | 🪟🐧🍎 | [999sian/tmc](https://github.com/999sian/tmc) |
 | The Legend of Zelda: Ocarina of Time 3D (TriAevum) | 🪟🐧 | [coccofresco/TriAevum](https://github.com/coccofresco/TriAevum) |
+| Top Gear | 🪟🐧 | [thebradshaw/topgear-pc](https://github.com/thebradshaw/topgear-pc) |
 
-**60 de 95 têm build Linux** e **42 de 95 têm build macOS** (Apple Silicon /
-Universal), verificado em 05/11/2026 contra a release mais recente de cada
-repositório (adicionados 24 ports nas Ondas 1, 2 e 3 + TriAevum: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap e TriAevum; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
+**61 de 96 têm build Linux** e **42 de 96 têm build macOS** (Apple Silicon /
+Universal), verificado em 09/11/2026 contra a release mais recente de cada
+repositório (adicionados 25 ports nas Ondas 1, 2 e 3 + TriAevum e Top Gear: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum e Top Gear; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -303,6 +304,16 @@ taxa de quadros (60/90+ FPS). Publica builds oficiais para Windows (ZIP x64) e L
 gráfico TriAevumForge extrai os recursos do jogo a partir da ROM desencriptada do jogador
 (.3ds ou .cci, USA ou EUR) e compila os shaders para a GPU do sistema, gerando o executável
 TriAevum.exe para as sessões seguintes.
+
+Um detalhe da linha do Top Gear: é a decompilação para PC do jogo de corrida de 1992 do
+Super Nintendo, por thebradshaw (Vibe Slop Studios). As corridas rodam em C traduzido; os
+menus ainda rodam o código original no emulador de referência embutido (LakeSnes, MIT).
+Traz widescreen opcional, visão de tela cheia para 1 jogador, alta taxa de quadros e
+carro fantasma. Publica builds para Windows (zip x64) e Linux (tar.gz x64, marcado como
+experimental pelo autor); não há build para macOS. Precisa da ROM do próprio jogador:
+Top Gear (USA), 524.288 bytes, conferida pelo SHA-256. O Karamelo pega a ROM em
+`roms/SNES` e a copia para a pasta do port com o nome que o jogo procura,
+`Top Gear (USA).sfc` (ou `.smc`, mantendo a extensão). O repositório não declara licença.
 
 Um detalhe da linha do Conker's Bad Fur Day: é o port nativo de **Conker's Bad Fur
 Day** (Nintendo 64) via recompilação estática com RT64 (código por sciaschi,
