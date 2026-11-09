@@ -183,7 +183,7 @@ inline bool IsValidRomEntry(const std::filesystem::directory_entry& entry, bool 
       ".j64", ".jag", ".ws", ".wsc", ".ngp", ".ngc", ".mx1", ".mx2", ".dsk",
       ".adf", ".d64", ".prg", ".tap", ".tzx", ".z80", ".sna", ".hdi", ".fdi",
       ".d88", ".mec", ".nvm", ".wav", ".exe", ".com", ".bat", ".m3u", ".gdi",
-      ".toc"
+      ".toc", ".a52", ".a26", ".a78"
     };
     for (const char* a : kExts) {
       if (ext == a) return true;
