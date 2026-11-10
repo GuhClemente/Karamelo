@@ -2323,20 +2323,22 @@ Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 95 jo
 
 ---
 
-## 60. Preparação da Versão 0.982 (Em desenvolvimento)
+## 60. Versão 0.982
 
-Versão em preparação (Windows, Linux e macOS).
+**Estado**: pacotes de **Windows** e **Linux** prontos em 10/11/2026; o **macOS** sai pela build do Mac. Só anuncie como publicada depois que o deploy estiver no ar (o `version.json` do site passa a dizer 0.982).
 Contagens: **37 sistemas, 42 motores; 96 ports — 96 Windows 🪟, 61 Linux 🐧, 42 macOS 🍎**.
 
-Novidades em andamento:
-- **The Legend of Zelda: Ocarina of Time 3D (TriAevum)**: integração do recompilado nativo de 3DS para PC (Windows e Linux), com renderizador Vulkan/NRI, single-screen HD e assistente TriAevumForge.
-- **Top Gear (SNES)**: decompilação para PC do clássico de corrida, Windows e Linux (seção 61).
+Novidades para o jogador:
+
+- **2 jogos novos em Ports & Recompilados**: **The Legend of Zelda: Ocarina of Time 3D (TriAevum)**, recompilação nativa do 3DS (Windows e Linux; seção 59), e **Top Gear**, decompilação do clássico de corrida do Super Nintendo (Windows e Linux; seção 61).
+- **Super Mario Strikers v2.0.0**: o Karamelo reconhece o disco do jogador em `roms/GameCube` e o entrega ao jogo sozinho, inclusive o *Mario Smash Football* europeu (seção 62).
 - **Troca de controles inteligente (hot swap)**: o controle que cai e volta retorna ao mesmo jogador; um controle novo ocupa o lugar vazio; se sobrar um controle só, ele vira o Jogador 1 na hora; com dois ou mais, ninguém troca de lugar sozinho e START assume o Jogador 1 vago. Cada mudança aparece como aviso na tela. Windows, Linux e macOS.
-- **Controles 8BitDo pelo Bluetooth**: passam a funcionar no Karamelo (antes o Windows reconhecia, mas o Karamelo não abria o controle no modo Switch). Controles sem mapeamento conhecido recebem um mapeamento padrão em vez de serem ignorados.
-- **Opção "Controle 6 Botões"** (Configurações > Controles): para controles no estilo Mega Drive / Saturn, como o 8BitDo M30. Mega Drive, Mega CD, 32X, Saturn e 3DO ficam com A-B-C embaixo e X-Y-Z em cima, como no controle original; em jogos de luta de arcade, socos em cima e chutes embaixo, pelos nomes que o emulador dá aos botões de cada jogo.
-- **Karamelo OS**: "Sair do Karamelo" virou **Desligar** e **Reiniciar o PC** (com confirmação), e a atualização do app baixada no Karamelo OS passa a continuar valendo depois de reiniciar.
-- **Super Mario Strikers v2.0.0**: o Karamelo passa a entregar o disco do jogador ao jogo sozinho (seção 62).
-- *(Novas melhorias e adições sendo integradas antes do empacotamento oficial)*.
+- **Controles 8BitDo pelo Bluetooth**: passam a funcionar no Karamelo (antes o Windows reconhecia o controle, mas o Karamelo não o abria no modo Switch). Controles sem mapeamento conhecido recebem um mapeamento padrão em vez de serem ignorados.
+- **Opção "Controle 6 Botões"** (Configurações > Controles): para controles no estilo Mega Drive / Saturn, como o 8BitDo M30. Mega Drive, Mega CD, 32X, Saturn e 3DO ficam com A-B-C embaixo e X-Y-Z em cima, como no controle original; em jogos de luta de arcade, socos em cima e chutes embaixo, pelos nomes que o emulador dá aos botões de cada jogo. Um remapeamento salvo pelo jogador continua valendo.
+- **Atari 2600, 5200 e 7800**: jogos soltos em `.a26`, `.a52` e `.a78` (fora de `.zip`) passam a aparecer no menu.
+- **Karamelo OS**: "Sair do Karamelo" virou **Desligar** e **Reiniciar o PC** (com confirmação); a atualização do app baixada no Karamelo OS continua valendo depois de reiniciar; pareamento Bluetooth separado para controle, teclado e mouse.
+
+Não anuncie: melhorias de bastidor (verificação automática de versões dos ports) não são novidade para o jogador.
 
 ---
 
