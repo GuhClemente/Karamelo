@@ -740,6 +740,7 @@ Em 21/09/2026, o catálogo de "Ports & Recomp" foi expandido de 47 para **55 tí
    - Port nativo completo de Super Mario Strikers / Mario Smash Football (GameCube).
    - Compatibilidade Triple Crown: **Windows** (.zip), **Linux** (.tar.gz) e **macOS** (.tar.gz ARM64).
    - Suporte a 60fps+, widescreen e compilação de shaders em segundo plano.
+   - Atualizado para a **v2.0.0** em 10/11/2026 — ver seção 62.
 7. **Pikmin (Open Nectar)** (`SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port` — 🪟🐧):
    - Port nativo de Pikmin 1 (GameCube).
    - Suporte nativo para **Windows** e **Linux**.
@@ -2334,6 +2335,7 @@ Novidades em andamento:
 - **Controles 8BitDo pelo Bluetooth**: passam a funcionar no Karamelo (antes o Windows reconhecia, mas o Karamelo não abria o controle no modo Switch). Controles sem mapeamento conhecido recebem um mapeamento padrão em vez de serem ignorados.
 - **Opção "Controle 6 Botões"** (Configurações > Controles): para controles no estilo Mega Drive / Saturn, como o 8BitDo M30. Mega Drive, Mega CD, 32X, Saturn e 3DO ficam com A-B-C embaixo e X-Y-Z em cima, como no controle original; em jogos de luta de arcade, socos em cima e chutes embaixo, pelos nomes que o emulador dá aos botões de cada jogo.
 - **Karamelo OS**: "Sair do Karamelo" virou **Desligar** e **Reiniciar o PC** (com confirmação), e a atualização do app baixada no Karamelo OS passa a continuar valendo depois de reiniciar.
+- **Super Mario Strikers v2.0.0**: o Karamelo passa a entregar o disco do jogador ao jogo sozinho (seção 62).
 - *(Novas melhorias e adições sendo integradas antes do empacotamento oficial)*.
 
 ---
@@ -2354,4 +2356,17 @@ Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 96 jo
 - **Como funciona no Karamelo**: o jogador deixa a ROM em `roms/SNES` (a mesma pasta do emulador de Super Nintendo). Ao instalar ou abrir o port, o Karamelo copia a ROM para a pasta do port com o nome que o jogo procura (`Top Gear (USA).sfc` ou `.smc`) e abre o jogo direto, sem passar pelo launcher.
 - **Aviso legal para a página**: projeto de fã, sem relação com Kemco, Gremlin Graphics ou Nintendo. Top Gear é marca de seus donos.
 
+---
 
+## 62. Atualização de 10/11/2026 — Super Mario Strikers v2.0.0
+
+O jogo já estava no catálogo; **as contagens não mudam** (96 jogos — 96 Windows 🪟, 61 Linux 🐧, 42 macOS 🍎).
+
+- **Projeto**: [new-coke/strikers](https://github.com/new-coke/strikers). Port nativo feito a partir da decompilação da comunidade (Yannick Suter), com o renderizador Aurora (Direct3D 12, Vulkan e Metal).
+- **Versão no catálogo**: `v2.0.0` (antes `v1.3.0`), fixada com SHA-256 — os valores batem com o `SHA256SUMS` publicado pelo próprio autor.
+- **Sistemas**: **Windows 🪟** (zip x64), **Linux 🐧** (tar.gz e AppImage, x86_64 e ARM64) e **macOS 🍎** (Apple Silicon). O autor também publica para Nintendo Switch, mas isso não faz parte do Karamelo.
+- **Destaques da versão atual** (do README do projeto): alta taxa de quadros, widescreen e ultrawide, resolução interna maior com MSAA 4x e filtro anisotrópico 16x, pacotes de texturas, **jogo online com rollback** (rede local ou internet), controles Xbox, PlayStation, Switch Pro e adaptador de GameCube, discos dos EUA, da Europa e do Japão no mesmo executável, e um app de configurações próprio.
+- **O que o jogador precisa**: o **disco próprio** do jogo — Super Mario Strikers (EUA), Mario Smash Football (Europa) ou a versão japonesa — em `.iso`, `.gcm`, `.ciso` ou `.gcz`. Nada do jogo vem no download.
+- **Como funciona no Karamelo** (novo): o jogador deixa o disco em `roms/GameCube` (a mesma pasta do emulador de GameCube). Ao abrir o jogo, o Karamelo reconhece o disco pelo código gravado nele (G4QE01, G4QP01 ou G4QJ01 — por isso acha também o *Mario Smash Football* europeu, que não tem "Strikers" no nome) e o entrega ao jogo. Se o jogador escolheu outro disco no app de configurações do próprio jogo, essa escolha é respeitada. Sem disco, o Karamelo avisa onde colocá-lo em vez de abrir o jogo só para dar erro.
+- **Licença**: mista. O código de port do autor é CC0; o código reconstruído do jogo não reivindica direitos. Não escreva "código aberto sob licença X" para este jogo.
+- **Aviso legal para a página**: projeto não oficial, sem relação com a Nintendo ou a Next Level Games.

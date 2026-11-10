@@ -1,5 +1,5 @@
 {
-  "catalog_version": 8,
+  "catalog_version": 9,
   "ports": [
     {
       "id": "DrMario64",
@@ -762,18 +762,18 @@
       "display_name": "Super Mario Strikers",
       "repo": "new-coke/strikers",
       "exe_hint": "strikers.exe",
-      "needs_rom": true,
-      "rom_keywords": ["strikers"],
       "has_linux_build": true,
       "has_macos_build": true,
-      "release_tag": "v1.3.0",
+      "release_tag": "v2.0.0",
       "asset_sha256": {
-        "strikers-linux-arm64.tar.gz": "05dbccd7a43ab677d765ab9c330cbda24d5ab62be95fa65691ed41938bf5a2be",
-        "strikers-linux-x86_64.tar.gz": "196de1cfdeb47db3cffc643331a67db64064e19d3e0ad734d98b589c385d290d",
-        "strikers-macos-arm64.tar.gz": "caeb28642ab7eb6d49368b9201e68e70f7fc0bcce9423f84c9c6b2f9b65b9d50",
-        "strikers-switch.zip": "bb8d7d0142ffa6d46aaa06cffa14764808093d7d092d66013307cc02f4ad07ed",
-        "strikers-windows-x86_64.zip": "1f42a9e3c2eabe828311f706151b9efe170c2bb6410feb6a531780e89cd93f5c"
-      }
+        "strikers-linux-arm64.AppImage": "7bd32e316e0d3799f23af69a4c551fb0039ff049815ff1868ffd9254232a8fb3",
+        "strikers-linux-arm64.tar.gz": "925f1be821a35d786553dacbbfdf42325cc2c62d0286a15eef7794596783dc8d",
+        "strikers-linux-x86_64.AppImage": "5989b97246ea3999545dc6505e3255a71bfbb303a35fd9525df867124c57f6e7",
+        "strikers-linux-x86_64.tar.gz": "bc87a4ecde176d400745aead7482fdf43472d0279168fa1e9dcb6ad6ea97e3cd",
+        "strikers-macos-arm64.tar.gz": "ea21b1d2ec58d229086ab763c8ae8c9a160d45605fc3c6c8604e9fe45d8736c0",
+        "strikers-windows-x86_64.zip": "14888779c899d592358e6d54a392c7ce863d3ec476416f8af7c72602bc7a26c7"
+      },
+      "notes": "Native port of Super Mario Strikers (GameCube) from the community decomp (Yannick Suter), by new-coke; Aurora renderer (D3D12/Vulkan/Metal). Checked 10/11/2026 against v2.0.0 (hashes match the release's own SHA256SUMS): Windows zip, Linux x86_64/arm64 tar.gz and AppImage, macOS arm64 tar.gz, all with strikers(.exe) at the root beside strikers-settings(.exe/.app); exe_hint picks the game. It is not a ROM port: the game reads the player's disc (ISO/GCM, CISO, GCZ, or an extracted files/ folder) from STRIKERS_DATA, the data key in strikers.ini beside it, a files/ folder or a disc image beside it - the environment wins over the ini. PrepareStrikersData (port_runner) leaves a data key or data beside the game alone; otherwise it finds the disc in roms/GameCube by its disc id (G4QE01 USA, G4QP01 Europe - Mario Smash Football, G4QJ01 Japan; CISO/GCZ by name) and sets STRIKERS_DATA for the launch, which also works for the AppImage. v1.9.x were prereleases; v2.0.0 added the AppImages and dropped the Switch zip from the PC pin. Upstream licensing is mixed (porting code CC0; reconstructed game code claims no rights)."
     },
     {
       "id": "OpenNectar",

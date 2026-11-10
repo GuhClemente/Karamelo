@@ -1695,6 +1695,83 @@ static void WaitForDetachedGame(const std::wstring& exe_name, const std::wstring
 }
 #endif
 
+// -------------------------------------------------------------
+// Super Mario Strikers (new-coke/strikers): the player's disc
+// -------------------------------------------------------------
+// The port reads the game from STRIKERS_DATA, else the `data` key of
+// strikers.ini beside it, else a files/ folder or a disc image beside it - and
+// an environment variable wins over the ini. So: a `data` key the player set
+// (strikers-settings writes it) or data already beside the game is left alone;
+// otherwise the disc is looked for where Karamelo keeps GameCube games and
+// handed over through STRIKERS_DATA for this launch only. That also covers the
+// AppImage, whose strikers.ini would sit inside the read-only image.
+static void PortSetEnv(const char* name, const char* value) {
+#ifdef _WIN32
+    _putenv_s(name, value ? value : "");   // "" removes it; also updates the OS block CreateProcess inherits
+#else
+    if (value) setenv(name, value, 1); else unsetenv(name);
+#endif
+}
+
+static bool IsStrikersDiscImage(const fs::path& p) {
+    std::string ext = ToLowerStr(p.extension().string());
+    if (ext == ".iso" || ext == ".gcm") {
+        // GameCube disc header: game id at offset 0. G4Q + region letter:
+        // E (USA), P (Europe - "Mario Smash Football"), J (Japan).
+        std::ifstream f(p, std::ios::binary);
+        char id[6] = {};
+        if (!f.read(id, sizeof(id))) return false;
+        return id[0] == 'G' && id[1] == '4' && id[2] == 'Q' && (id[3] == 'E' || id[3] == 'P' || id[3] == 'J');
+    }
+    if (ext == ".ciso" || ext == ".gcz") {
+        // Compressed images do not start with the disc header: go by the name.
+        std::string n = ToLowerStr(p.filename().string());
+        return n.find("strikers") != std::string::npos || n.find("smash football") != std::string::npos;
+    }
+    return false;
+}
+
+// True when strikers.ini in `dir` has an active (uncommented) `data =` line.
+static bool StrikersIniHasData(const fs::path& dir) {
+    std::ifstream f(dir / "strikers.ini");
+    std::string line;
+    while (std::getline(f, line)) {
+        size_t i = line.find_first_not_of(" \t");
+        if (i == std::string::npos || line[i] == '#' || line[i] == ';') continue;
+        std::string key = ToLowerStr(line.substr(i, 4));
+        if (key != "data") continue;
+        size_t j = line.find_first_not_of(" \t", i + 4);
+        if (j != std::string::npos && line[j] == '=') return true;
+    }
+    return false;
+}
+
+// Returns false (with a toast) when the game would have no data at all.
+static bool PrepareStrikersData(const std::string& exe_path) {
+    PortSetEnv("STRIKERS_DATA", nullptr);
+    std::error_code ec;
+    const fs::path game_dir = fs::path(exe_path).parent_path();
+    if (StrikersIniHasData(game_dir)) return true;
+    if (fs::is_directory(game_dir / "files", ec)) return true;
+    for (const auto& e : fs::directory_iterator(game_dir, ec))
+        if (e.is_regular_file(ec) && IsStrikersDiscImage(e.path())) return true;
+
+    static const char* const dirs[] = {"roms/GameCube", "app/roms/GameCube", "roms", "app/roms"};
+    for (const char* d : dirs) {
+        if (!fs::is_directory(d, ec)) continue;
+        for (const auto& e : fs::directory_iterator(d, ec)) {
+            if (ec || !e.is_regular_file(ec) || !IsStrikersDiscImage(e.path())) continue;
+            std::string disc = fs::absolute(e.path(), ec).string();
+            PortSetEnv("STRIKERS_DATA", disc.c_str());
+            PortLog("MarioStrikers: disco " + disc);
+            return true;
+        }
+    }
+    CoreSetToast(Tr("COLOQUE SEU DISCO DE SUPER MARIO STRIKERS EM roms/GameCube",
+                    "PUT YOUR SUPER MARIO STRIKERS DISC IN roms/GameCube"), 360);
+    return false;
+}
+
 // Does the actual OS-level work of launching an already-installed port:
 // ROM auto-copy, stopping any running libretro core, minimizing the window,
 // launching the process, and spawning the exit-monitor thread. Must only
@@ -1729,6 +1806,9 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     };
     std::vector<std::string> extra_args = def ? def->launch_args : std::vector<std::string>{};
     if (!resolve_iso(extra_args)) return false;
+
+    // 1b1. Super Mario Strikers gets the player's disc through STRIKERS_DATA.
+    if (def && def->id == "MarioStrikers" && !PrepareStrikersData(exe_path)) return false;
 
     // 1b2. First use of a port that compiles itself from the user's disc.
     std::vector<std::string> setup_args;
