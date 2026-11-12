@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The logo of Odin, the rune ansuz as the icon of its window draws it
+     (src/odin/host/ui/logo.hpp: RUNE_OUTLINE_BOLD, RUNE_GOLD); its outline
+     that of Junicode 2.226 by Peter S. Baker, SIL Open Font License 1.1 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.130 1.130 21.739 21.739" width="256" height="256">
+  <path fill="#D8AA4C" d="M8.16,22 L8.16,2 L11.24,2 L15.73,5.69 L14.49,7.48 L11.24,4.92 L11.24,7.84 L15.84,11.61 L14.49,13.57 L11.24,10.98 L11.24,22 Z"/>
+</svg>

@@ -1,0 +1,205 @@
+INSTALL
+=======
+
+How to build Odin, install it and start playing. Every option and setting
+is in OPTIONS.
+
+
+BUILD
+-----
+
+Linux. You need GCC (C++20), CMake 3.20 or later, pkg-config, awk,
+glslangValidator, the OpenGL and X11 development files and an OpenGL 4.3
+driver. SDL 3, GLEW, Jansson and the Vulkan headers come from the system,
+or from 3rdparty/ when it has none:
+
+ $ git clone --recurse-submodules <repository> odin && cd odin
+ $ cmake -B build
+ $ cmake --build build -j
+
+The program is build/bin/odin, its data build/share/odin.
+
+Windows. Build with MSYS2 UCRT64:
+
+ $ pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
+       mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-glslang gawk git
+ $ cmake -B build -G Ninja -DODIN_BUNDLED_LIBS=ON && cmake --build build
+
+macOS. Install the Xcode Command Line Tools, CMake and the LunarG Vulkan
+SDK (then: source ~/VulkanSDK/<version>/setup-env.sh), or use Homebrew:
+
+ $ brew install cmake pkgconf sdl3 glew jansson vulkan-headers vulkan-loader \
+       molten-vk glslang
+ $ cmake -B build && cmake --build build -j
+ $ cmake --install build --prefix stage
+ $ MOLTENVK=$(brew --prefix molten-vk)/lib/libMoltenVK.dylib \
+       dist/macos/make-app.sh stage Odin.app
+
+Build options (cmake -B build -D<option>=<value>):
+
+ ODIN_NATIVE=OFF         No -march=native (for packages).
+ ODIN_LTO=OFF            No link-time optimization.
+ ODIN_PGO=generate|use   Profile-guided build: 4 to 15 % faster.
+ ODIN_GLES=ON            OpenGL ES 3.1 instead of OpenGL (Linux).
+ ODIN_BUNDLED_LIBS=ON    Always use 3rdparty/ (OFF: never).
+ ODIN_OPT_FLAGS=<flags>  Default "-O3 -fomit-frame-pointer
+                         -fno-stack-protector".
+ ODIN_VERSION=<text>     The version, when building without git.
+ GLSLANG=<path>          The glslangValidator to use.
+
+Leave CMAKE_BUILD_TYPE empty (Release turns the asserts off).
+
+Profile-guided build: build with ODIN_PGO=generate, play a few games, then
+build again with ODIN_PGO=use.
+
+
+INSTALL
+-------
+
+ $ cmake -B build -DCMAKE_INSTALL_PREFIX=$HOME/.local
+ $ cmake --build build -j && cmake --install build
+
+The default prefix is /usr/local. For a package:
+
+ $ DESTDIR=<root> cmake --install build --prefix /usr
+
+
+FIRST START
+-----------
+
+1. Put the games in one folder, as MAME keeps them: a zip, a 7z or a folder
+   per game, named after its MAME set: airtrix, airtrixo, braveff,
+   pharrier, sgnascar, sgnascaro, swracer, von4. Two shared sets are
+   needed too, in the same folder (or in a BIOS folder): hikaru and mie.
+   The Gaelco games (atvtrack, atvtracka, gfootbal, smashdrv, smashdrvb,
+   smashdrvs) go in the same folder. They need no shared set, and keep
+   their operator settings and scores in kept.bin in their saves folder.
+
+2. Start Odin. Its library shows the games. Click "Games folder..." and
+   choose your folder. A game with missing files says which files, and in
+   which MAME set they are.
+
+3. Choose a game with the arrows, a gamepad or the mouse, then press Enter
+   (or click it again).
+
+4. The first time you play a game, calibrate its controls first, in its
+   test menu (TEST: key 0, or Guide held with R3), as on the cabinet:
+   every game has a page for it (Air Trix: CALIBRATION, Brave
+   Firefighters: NOZZLE SENSOR SETTING...). The game then reads your
+   controls right.
+
+From a terminal:
+
+ $ odin -R <games folder> -r <game>
+
+Pictures: the title screens of the library and the bezels (around the
+game, page Display, Bezel) come in Odin-Artwork.zip, released with Odin.
+Extract it beside the program: it makes the folder artwork/ there, which
+Odin then uses (an installed Odin: extract it into Odin's folder, see
+FILES). Pictures of your own go there under the same names.
+
+Optional sets: jvs13551 (the program of the I/O board), and for NASCAR
+18wheelr (its I/O board) and srally2 (its drive board, the motor of the
+wheel). Without them Odin imitates those boards; the games play the same.
+
+
+PLAYING
+-------
+
+Keyboard (all keys can be changed, page Hotkeys and page Input):
+
+ Escape, F10   menu (the game pauses)
+ 1, 2          Start of player 1, 2
+ 5, 6          coins
+ 0, 9          TEST and SERVICE (the test menus), with any device
+ P             pause
+ F2, F4        save, load the state
+ Ctrl+R        reset
+ F11           full screen
+ F6            Virtual-On card in or out
+ F7            hide the cursor or show it
+ Ctrl+C        close the game (back to the library)
+ Ctrl+Q        quit
+
+Gamepad: Guide opens the menu, Select puts in a coin. Guide held with
+Start quits, with Back pauses, with RB saves, with LB loads, with B
+closes the game. A gamepad without Guide (or whose Guide another program
+takes) holds another button instead, set on the page Hotkeys; the menu is
+then that button with A.
+
+Moving the mouse over the window shows a bar at its top: it sets the same
+things as the menu, without pausing the game (not while the cursor is
+hidden, as when the mouse aims in Brave Firefighters: F7 shows it).
+
+
+LIGHT GUNS
+----------
+
+In Brave Firefighters the mouse aims for player 1. A light gun (Sinden,
+GUN4IR, XGunner, Aimtrak, GunCon...) or a second mouse can play for each
+player: choose it on the page Input. On Linux your user must be in the
+group input.
+
+A Sinden needs its white border: page Input, options, Sinden border.
+
+Light guns with recoil or a vibration motor can follow the game, as on
+the cabinet (the nozzle of Brave Firefighters). Turn on page Outputs, Send
+outputs: a program that reads the outputs of MAME (Hook Of The Reaper,
+QMamehook, OutputHooker, the Sinden software) then drives the gun. Odin
+can also drive some guns itself, without such a program: page Outputs,
+Light guns lists them. On Linux your user must be in the group of the
+gun's serial port (uucp or dialout).
+
+
+WHEELS
+------
+
+NASCAR, ATV Track and Smashing Drive steer with a wheel: one player per
+cabinet, so one wheel per Odin (link cabinets to race each other). Choose
+the wheel on the page Input. A known wheel (Logitech G25 to G923,
+Thrustmaster T150 or T300, MOZA R12 and others; only the G29 was tried)
+comes with its pedals, paddles, Start and Select set. On another, only the
+steering: click a control there, then move the pedal or press the button
+you want for it. A wheel with force feedback turns as the game asks. Set
+how far it turns (Wheel rotation: Full, its whole turn, unless you choose
+an angle) and how hard (Wheel force) in its options on the page Input. On
+Linux your user must be in the group input for the force feedback.
+
+Other joysticks (a flight stick for Planet Harriers) are set the same way.
+
+
+LINKED CABINETS
+---------------
+
+Linked cabinets: Planet Harriers 2, Star Wars Racer and Virtual-On 4,
+NASCAR 8. Each cabinet is one Odin, on one computer or several of a local
+network (by cable). On the page Link of each Odin: the network board on, a
+cabinet number (1 is the master), and the address of the next cabinet;
+the last one points to the first. Two Odins on one computer each need
+their own folder (portable copies, see FILES) and their own port (page
+Link, Port), each pointing at the other: 127.0.0.1:<its port>.
+
+
+VIRTUAL-ON CARD
+---------------
+
+Virtual-On saves the player's progress on a card, as the cabinet did (the
+Japanese cabinet only, Odin's default). FILE > New card... makes one;
+F6 puts it in when the game asks, and takes it back at the end.
+
+
+FILES
+-----
+
+Odin keeps its settings (odin.ini), the saves of each game, the states,
+the artwork and its log (odin.log) in its folder:
+
+ Linux    ~/.local/share/odin
+ Windows  %APPDATA%\odin
+ macOS    ~/Library/Application Support/odin
+
+Each folder can be changed on the page Paths of the menu (games, BIOS,
+artwork, saves, states, log). Another settings file: odin -c <file>.
+
+Portable copy: put an empty file portable.txt beside the program; Odin
+then keeps everything in that folder.

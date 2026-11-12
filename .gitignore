@@ -29,6 +29,7 @@
 /app/*.exe
 /app/*.pdb
 /app/last_wer_check.txt
+/app/odin-games.json
 *.json.old
 psx_last_run_report.json
 /app/psx_last_run_report.json
@@ -216,3 +217,5 @@ cloud_token*.bin
 /videos_gravados/
 /docs/images/
 /scratch/
+/tools/glslang/
+/third_party/odin/build/

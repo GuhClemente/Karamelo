@@ -1,0 +1,548 @@
+TODO
+====
+
+What Odin gets wrong, lacks or only guesses; files are under src/odin.
+Each HEURISTIC (a guess) or HACK (a stand-in) in the source has an item.
+
+
+KNOWN ISSUES
+------------
+
+What a player can see or hear that is wrong or missing.
+
+airtrix (Air Trix)
+
+- OUTPUT TEST: output 4 goes off once after all six are lit, while the
+  screen still says ON. Why is not known.
+- A wooden board on a brick wall is lit in the first demo loop after
+  power-on, then dark from the second loop on, as on the cabinet (to check).
+- One or two frames in 30 s can come a few ms late: a small stutter.
+
+braveff (Brave Firefighters)
+
+- The gun sight reaches the edge of the screen before the mouse does,
+  until NOZZLE SENSOR SETTING has been done once with the mouse.
+- When the control room takes fire, the door, the walls and the
+  switchboard are a little darker than on the cabinet during the flash.
+- A few frames stutter, always at the same places: the emulated board
+  itself runs late there. Which chip takes the time is not known.
+- On a weak graphics card (Intel HD 520) the scenes with the most
+  translucent polygons are far too slow.
+
+pharrier (Planet Harriers)
+
+- Linked cabinets stay linked only while a frame goes round the ring in
+  less than 1 ms, the time its master leaves.
+- EXIT from the SYSTEM MENU stops the game on "I/O BD is not connected to
+  game BD.": a request to the I/O board outlasts its 10 ms, perhaps as the
+  SH-4 takes no bus time (below). Off and on brings the game back.
+
+sgnascar (NASCAR Arcade)
+
+- The demo car is not the one of the cabinet video (HOME DEPOT, not CAT):
+  the game picks it from its clock and from fine timing (to check).
+- OUTPUT TEST: BASS SHAKER (FRONT+REAR) changes no output. The REAR ON
+  output of the cabinet wiring is not known.
+- A few frames stutter, always at the same places: the emulated board
+  itself runs late there. Which chip takes the time is not known.
+- The rear-view mirror shows the track as Demul does. Never checked on a
+  cabinet (to check).
+
+swracer (Star Wars Racer Arcade)
+
+- The far rocks come in little by little through a dot pattern (501).
+  Never checked against a cabinet video (to check).
+
+von4 (Cyber Troopers Virtual-On Force)
+
+- The demo scenes do not come in the order of the cabinet video.
+- The card reader answers at once: no busy time while it reads or writes,
+  and nothing is printed on the card.
+- CARD R/W CLEANING in the test menu shows a title and nothing else.
+- Its dot patterns (501) were never checked against a cabinet video (to
+  check).
+- Of the game's passwords only _LANDING_FORCE was tried (to check).
+
+All games
+
+- The 24 kHz screen (DISPLAY MODE 24KHz) is not supported: the emulator
+  stops and says why.
+- Shadow polygons (types 2 and 3) are drawn as plain polygons: the shadows
+  of the hardware are not done. No demo loop sends any.
+- Settings, records and the clock are saved on exit only: a crash loses
+  what the session changed.
+- A save state loads only in the build that wrote it.
+- No frame is skipped: a graphics card slower than the game slows the
+  game down.
+- A shader program missing from the list of the game makes one short
+  stutter the first time it is met.
+- With -x 2 and up the dot patterns (501) are finer than on the cabinet,
+  and the first two frames after loading a state are coarser.
+- At the highest -x values the translucent polygons need a lot of video
+  memory: a list that does not fit loses some; running out stops Odin.
+- Mesa's software renderer (llvmpipe) crashes when it builds a shader.
+  Intel cards under Mesa were not tried.
+- With Vulkan, a card with neither geometry nor tessellation shaders draws
+  no translucent polygons.
+- Only the first screen of each test menu entry was checked; the pages
+  behind them and the menu sounds were not (to check).
+
+
+Gaelco games (atvtrack, gfootbal, smashdrv)
+
+- Smashing Drive's demo and ATV Track's menus and start of a race match
+  videos of cabinets, taken with a camera (colours not judged). Gaelco
+  Football was never compared: no video of its cabinet is known.
+- Smashing Drive's cabinet shows its logo between two demo loops 1.3 s
+  longer than Odin, which loads at once.
+- Two ATV Track linked over a network slow down when a word of the cable
+  takes 5 ms or more each way, and lose the link at 10 ms: Wi-Fi peaks do
+  that. 2 ms is fine. The cable answers in microseconds; Smashing Drive
+  was not tried so.
+- Two ATV Track linked on one computer never link when the second starts
+  2 s after the first ("Link Error!!! Waiting remote ID"); started together
+  they race. Cause not found (the order of the first words?).
+- The ball sensors of Gaelco Football have a program of their own (a
+  PIC) that was never dumped: the kick is modelled (see below).
+
+
+NOT EMULATED OR GUESSED
+-----------------------
+
+The board and its memory
+
+- The dot clock is MAME's 25.94729 MHz (60.08 frames a second): no game
+  or manual gives it. To measure on a board (hikaru.cpp).
+- Before a game sets its frame, some 30 frames after power-on, the frame
+  is taken to be the one it sets (eurasia.cpp).
+- The reset line of the slave SH-4 resets the CPU as at power-on, but not
+  its bridge (hikaru.cpp).
+- The waits the ROM board adds while the game is copied at boot are not
+  known, so Odin loads faster than a cabinet (to measure; hikaru.cpp).
+- Past its registers the bridge reads 0. SWRACER and SGNASCAR read there
+  while the BOOTROM copies them (memctl.cpp).
+- A DMA of the bridge ends at once, when it is started (memctl.cpp).
+- A DMA of the bridge of the slave stops the emulator: where its
+  interrupt goes is not known. No game is known to start one (memctl.cpp).
+- The command RAM is mirrored up to 14FFFFFF, its two top address lines
+  taken as not wired (hikaru_bus.cpp).
+- The 8 MB of RAM that the RAM test does not reach (IC 33 to 36) are not
+  placed (hikaru_bus.cpp).
+- A read that nothing answers gives 0 and a write is dropped: what the bus
+  gives there is not known (hikaru_bus.cpp).
+- Only the main board 837-14097 is done. How the 837-13402 differs is not
+  known, beyond bit 0 of 15002000 (antarctic_io.cpp).
+- The resets of the system and of CN4 stop the emulator (hikaru.cpp).
+- The pins of port D of the MIE (the resets, the video clock) read high
+  while the MIE does not drive them (mie_board.hpp).
+- What the bus reads and writes in a graphics chip held in reset is not
+  known (hikaru_gpu.cpp).
+- A short list VON4 writes to 120FEE00 at its GPU reset meets nothing:
+  what answers there is not known (hikaru_bus.cpp).
+- Bit 7 of 15000088 follows the causes of the display chip rather than
+  staying set until written (antarctic_io.cpp, hikaru_gpu.cpp).
+- The second sound board shares the interrupt line of the first, whose
+  handler acknowledges both (hikaru.cpp).
+- The MIE lets no interrupt through, and pins 4 to 6 of its port F ask for
+  none, until it drives them (mie_board.hpp).
+- Nothing pulls the NMI pin of the master SH-4 (hikaru.cpp).
+- After a GPU reset no cause interrupts until 15000084 is written; bits 0
+  to 6 of that reset value are guessed (antarctic.cpp).
+- The slave pulling its interrupt line to the master is not done: the
+  emulator stops (hikaru_bus.cpp).
+- Code: move the access of the slave to the GPU from hikaru_bus.cpp to
+  hikaru_gpu.cpp.
+
+The ROM board and the EEPROMs
+
+- The 315-5881 never reads busy, as in MAME (crypt_315_5881.cpp; to
+  check).
+- Bit 3 of byte +26 of the bridge makes the local bus of the ROM board 32
+  bits wide (memctl.hpp).
+- The 64 KB RAM of the local bus is also there on the boards without a
+  315-5881, BRAVEFF and VON4 (rom_board.cpp).
+- A 32-bit access to that RAM reads 0 in its high half (rom_board.cpp).
+- An empty ROM socket reads 0 (rom_board.cpp).
+- The security FPGA of SGNASCAR: its other status bits, and what bits 30,
+  1 and 0 of its control do, are not known (actel_m1.cpp).
+- X76F100: whether SDA floats once the chip is deselected (it reads low,
+  as in MAME) and whether a read goes past the end (x76f100.cpp).
+- VON4 has no manual here: the settings of its new cabinet, 2 players and
+  the attract sound on, are guessed (odin-games.json).
+
+SH-4
+
+- Bus time: the waits a device adds (RDY) are taken as none, and a 64-bit
+  access as one data phase (sh4_onchip.cpp).
+- The memories reached in place, the DMAC and the store queues take no bus
+  time (sh4_onchip.cpp).
+- The FPU rounds to the nearest and keeps denormals, whatever FPSCR.RM and
+  FPSCR.DN ask; the games ask for both (sh4_ops.cpp).
+- No FPU exception is raised, though the slave of PHARRIER enables the
+  one for a division by zero (sh4_ops.cpp).
+- A NaN comes out as the host makes it, not as the 7FBFFFFF of the SH-4
+  (sh4_ops.cpp).
+- FTRC out of range gives 80000000, where the SH-4 saturates
+  (sh4_ops.cpp).
+- A double with an odd register, an undefined code nobody has measured,
+  takes the pair below it (sh4_ops.cpp).
+- FSRRA, FIPR and FTRV are worked out by the host, not with the tables and
+  error bounds of the SH-4 (sh4_ops.cpp).
+- FSCA uses frozen sine and cosine values (those of glibc): the table of
+  the SH-4 is not known (sh4_fsca.cpp).
+- A store queue write goes to its target at once, and PREF sends nothing
+  (sh4.cpp, sh4_ops.cpp).
+- The DMAC moves its whole count within the write that starts it
+  (sh4_onchip.cpp).
+- The divider of the timers starts with the reset; a write to FRQCR does
+  not bring the timers up to date (sh4_onchip.cpp).
+- Every mode of a performance counter counts cycles (sh4.cpp).
+- RFCR and WTCSR read as port A; BCR1 resets to 80000000 on both CPUs
+  (sh4_onchip.cpp).
+- A pin of port A that is not an output reads high, even with its pull-up
+  off (sh4_onchip.cpp).
+- IRQ10 has the code of IRQ11; the manual says 0x340 (sh4.cpp).
+- One instruction takes one cycle (sh4.cpp).
+- Not done, the emulator stops: TRAPA and the exceptions (illegal code or
+  slot, address error, FPU disable, privilege) (sh4_ops.cpp).
+- Not done, the emulator stops: MAC.L with S set, a write to the cache or
+  TLB arrays (sh4_ops.cpp, sh4.cpp).
+- Not done, the emulator stops: a timer on the RTC or an outside clock, a
+  clock ratio of FRQCR in no whole cycles (sh4_onchip.cpp).
+- Not done, the emulator stops: an IRL pin held while ICR.IRLM is clear,
+  the four pins as one level (sh4.cpp).
+- Not done: the input capture of the timers, the MMU and the caches
+  (LDTLB, OCBI, OCBP, OCBWB do nothing) (sh4_onchip.cpp, sh4_ops.cpp).
+- SLEEP stops the CPU for good (sh4_ops.cpp).
+- Speed: chain the blocks directly, FTRV and FIPR in host code, host code
+  entered in the middle of a block (sh4_host.cpp).
+
+GPU and rendering
+
+- A display list runs one instruction a cycle of the SH-4, and the ends of
+  its analysis and of its plot are told together (hikaru.cpp).
+- A texture transfer copies one entry a line; a blit is done at once
+  (antarctic_io.cpp, eurasia.cpp).
+- A list starts with the stacks, the bases and the scratch objects
+  cleared (antarctic.cpp).
+- A strip of triangles is cut when a list is launched: it does not go on
+  into the next list (antarctic.cpp).
+- The call stack of the command processor is in the command RAM, where
+  15000074 and 15000078 point (antarctic_ops.cpp).
+- 1A000024 written while a list is asked does not launch it again; written
+  with none, it stops reading busy at once (hikaru_gpu.cpp).
+- What 1A000024 reads while the board plots is not known (hikaru_gpu.cpp).
+- Read as 0 for want of a source: the counters 15002800 to 15002848,
+  1A000020 and 1A08006C (antarctic_io.cpp, eurasia.cpp).
+- Written but not understood: 1A000000, 1A000004, 1502C100, 1502C104,
+  15040E00, 1A0000C4, 1A0000D0, 1A0A1600, 1A0A1FFC (eurasia.cpp).
+- The error bits 1 and 3 to 6 of 15000088 are never raised
+  (antarctic_io.cpp).
+- A texture transfer (IDMA) runs to its end whatever is written to its
+  control register, which reads busy until then (antarctic_io.cpp).
+- A transfer that asks for more bytes than its levels hold copies the
+  levels; what the board does with the rest is not known (antarctic_io.cpp).
+- Texture format 4 is read as LA8 (antarctic_io.cpp).
+- Texture format 2 (4 bits a texel) gives its value to all four channels
+  (renderer_textures.cpp).
+- The mipmap levels go down to one texel on the smaller side
+  (renderer_textures.cpp).
+- A write to the texture RAM drops the textures of its bank, not the
+  levels they keep in the other bank (renderer_textures.cpp).
+- The base and the index of a texhead recall (0C3) are added on 16 bits;
+  the texhead number of the 0E8 is taken on 16 bits (antarctic_ops.cpp).
+- The sign of the UV offsets of the 0D1 is guessed (antarctic_mesh.cpp).
+- Filter mode 3 of the 0C1 is trilinear (hikaru_draw.hpp).
+- The level bias byte of the 0C1 counts eighths of a level; how the board
+  picks a level is not known (hikaru_draw.hpp, antarctic_ops.cpp).
+- Not worked out: the effect of the mesh LOD on texturing, and when the
+  mipmaps are off (the 0C1?).
+- The values 3, 6 and 7 of the texel combine field of the 2C1 mean plain
+  texturing (renderer_scene.cpp).
+- A 2D layer covers the 3D where its pixel has the alpha bit, layer 1 over
+  layer 2, as bit (bank - 1) of 3C says: seen on two cabinets (compose.frag).
+- A 2D layer whose bit of 38 is clear sits below the 3D (compose.frag).
+- The A2BGR10 layers are shown four times as bright (hikaru_draw.hpp).
+- A 2D layer as an input of the blender is done for the PHARRIER logo
+  screens only, rounded by the host (renderer_layers.cpp; to check).
+- The blender (781, 181) rounds as the example of US patent 6,549,209 and
+  blends the alpha of a buffer as a colour (blend.frag).
+- The emphasis bit of the patent, which keeps a pixel out of the blend, is
+  not looked for (blend.frag).
+- The plot of a list fits in a frame whatever its size; the 781 and the
+  181 act at once, as the clear colour does (renderer.cpp).
+- Two 3D buffers are blended when their list is drawn, with the textures
+  of the frame of the launch (renderer.cpp).
+- The far clipping plane is put at 1e5: the planes the games send seem
+  scaled by a value that is not known (hikaru_draw.hpp).
+- The sign of the X offset of a viewport (221) is assumed: no game sends a
+  negative one (antarctic_ops.cpp).
+- The top three bits of the 421 number the viewports, drawn lowest first,
+  each with a depth buffer of its own (antarctic_ops.cpp).
+- The depth format of the hardware and its use of the 421 range are not
+  known; Odin keeps a log of the eye depth (mesh.frag).
+- The size tests of a model (012 conditions 5 and 9, D after a 055): the
+  formula and the unit are guessed (antarctic_ops.cpp).
+- The local matrix (161 bit 13) lasts until the next row of the modelview;
+  a second one replaces it (antarctic_ops.cpp).
+- What the local matrix does to the second modelview, and what bits 18
+  and 19 of these rows mean, is not known (antarctic_ops.cpp).
+- A 043 without its bit 12 recalls the lightset too (antarctic_ops.cpp).
+- The second word of an A91 is dropped; the board may run it as a C81
+  (antarctic_ops.cpp).
+- The depth offset of the 101 is read two ways, and within a family only
+  (bit 26); units not known (depth_bias.hpp, antarctic_ops.cpp).
+- The 501 dot pattern starts at the top left pixel and takes the low five
+  bits; a subroutine returns to the pattern it had (antarctic_ops.cpp).
+- A depth queue without colour (621 bit 17) fades the opaque polygons into
+  what is behind them (renderer_scene.cpp).
+- Not known for that queue: types 2, 4 and 6, bit 16, and whether the
+  punch-through polygons fade (taken so) (renderer_scene.cpp).
+- The types of the coloured depth queue are ignored (renderer_scene.cpp).
+- Translucent polygons are blended far to near at each pixel, ties in the
+  order sent, without writing depth (renderer_translucent.cpp).
+- Each blend of translucent polygons is rounded to 8 bits (sort.frag).
+- The table of a spot (194): first point at the cutoff, last at the cone
+  angle, nothing lit beyond the cutoff, 0x400 is 1.0 (mesh.frag).
+- Of the four tables of a light, the first is used (antarctic_mesh.cpp).
+- The scale of a spot is read as (1 + mantissa / 16) * 2^exponent
+  (antarctic_mesh.cpp).
+- A light has a cone only when the list sent an axis (B61)
+  (antarctic_mesh.cpp).
+- The ambient level of a light (051 bits 19:16) adds level / 16 of its
+  colour, cut by the distance and the cone (mesh.frag).
+- A parallel light sent with no direction lights every side
+  (renderer_scene.cpp).
+- The back of a polygon drawn on both faces is lit with its normal
+  reversed (antarctic_mesh.cpp).
+- The specular colour (491) is in 1/64, and the lobe follows the reflected
+  ray, not the half vector (antarctic_mesh.cpp, mesh.frag).
+- A blended colour is weighted by its alpha before it is clamped: a lit
+  colour above 1 keeps its excess (mesh.frag).
+- A lightset never committed has no light; what the board holds there is
+  not known (antarctic_mesh.cpp).
+- What bits 14 and 13 of the 961 mean is not known (the light 0 of
+  BRAVEFF; antarctic_mesh.cpp).
+- The shadows (polygon types 2 and 3) are not done: drawn as opaque. The
+  types 0 and 7 are not drawn (antarctic_ops.cpp).
+- Sent by the games and read by nothing: 881 bit 21 (Highlight Mode), the
+  301, 2C1 bit 15, 621 bit 16, 051 bit 23 (antarctic_ops.cpp).
+- The alpha thresholds of the 154 table are not used (antarctic_ops.cpp).
+- 006 and 046 do nothing here; what they change is not known
+  (antarctic_ops.cpp).
+- Never sent by the demo loops, so not judged: 881 bits 22, 23 and 31:24,
+  the vertices 1Ax, the 0E8, the 081, the polygon types 0, 2, 3 and 7.
+- The debug menus of AIRTRIX, SWRACER and SGNASCAR were not searched for
+  the names of these fields.
+
+Sound (AICA, ARM7, sound boards)
+
+- The first word of bus page 8C (a sound board with A31 set): bit 2 set,
+  the others 0; A31 changes nothing elsewhere (hikaru_bus.cpp).
+- The optional sound board feeds the outside inputs (EXTS) of the AICA of
+  the main board: no schematic says so (hikaru.cpp).
+- The level of the optional board in the mix ("option_level"): no source
+  gives the law of the volume of the cabinet (games.hpp).
+- The ARM7 runs at 22.5792 MHz with no wait state (sound_board.hpp).
+- FIQ: the level follows the pending sources while the line is up, as in
+  MAME; Flycast does it another way (aica.cpp).
+- Envelope: with KRS the octave counts twice, as in Flycast; MAME and
+  Corlett count it once (aica_voice.hpp).
+- The fastest envelope rates (49 to 60) do not quite match the table of
+  the manual (aica_voice.cpp).
+- LSA past LEA plays up to LSA and stops; the samples are read at once,
+  with no pipeline; one noise generator for all slots (aica_voice.cpp).
+- The -3 dB steps of DISDL, DIPAN and MVOL are a factor 3/4 or a shift;
+  the depth of the pitch LFO is Corlett's (aica_voice.cpp).
+- The low-pass filter is Flycast's (one source); its envelope steps as the
+  one of the level (aica_voice.hpp).
+- DSP, guessed: the registers kept from a sample to the next, the memory
+  reached at odd steps only, the layout of TEMP and MEMS (aica_dsp.cpp).
+
+MIE, JVS and I/O boards
+
+- The Z80 of the MIE sees one bus request, made while either SH-4 asks;
+  the rest of the window of the slave is not known (mie_board.hpp).
+- The MIE ports 40, 60, 80 and 81, touched at the start, are not known:
+  they are only logged (mie.cpp).
+- The reply delays of the serial block (ports 09 to 0E) are not measured
+  (mie.cpp).
+- The MIE on the I/O board of NASCAR: the input at vector FE, enabled by
+  bit 7 of port 30, is read from epr-21868 (mie.hpp).
+- On that board its internal RAM and Maple block are left out below 8000,
+  where its program does not reach them (mie.cpp).
+- After a RESET a JVS board is ready again at once, where the programs
+  first test their memory (io_837_13551_imitation.cpp).
+- The imitation of the 837-13551 replies after a delay that is not
+  measured (JVS_TURNAROUND_BYTES, mie.cpp).
+- The two imitations count a coin as its key is pressed: no debounce, no
+  coin jam, no coin meter fault (io_837_13741_imitation.cpp).
+- Not copied in the imitations: DATA_RETRANSMIT, the odd SWITCH_INPUTS and
+  ANALOG_INPUTS counts, SET_ADDRESS to a board that has one.
+- 837-13551: its 14.7456 MHz crystal is taken as that of the UART of the
+  MIE; a coin closes 50 ms, then opens 50 ms (io_837_13551.hpp).
+- TMP90PH44: no data sheet of the TMP90C844; its registers where MAME has
+  them, T01MOD and T23MOD as MAME reads them (tmp90ph44.cpp).
+- TMP90PH44: timers 0 and 2 ask for nothing; INTEH bit 2 enables 0028 and
+  bit 0 0038 (tmp90ph44.cpp).
+- TMP90PH44: which bits of INTEL and INTEH enable the serial interrupts,
+  and the bits of IRFH but bit 2, are guessed (tmp90ph44.cpp).
+- TMP90PH44: P5 reads its latch; the latch of P3 is at 1 after the reset;
+  ADMOD F7 converts AN0 to AN3 over and over (tmp90ph44.cpp).
+- TMP90PH44: INTWD waits for the interrupts to be open, where on the
+  TMP90C840 it does not (tmp90ph44.cpp).
+- 837-13551 on the bench: P3 bits 0-1 read 3 with no board after it, and
+  the bytes it sends are not heard back (io_837_13551.cpp; to check).
+- 837-13741: its crystal is taken as that of the UART of the MIE; a coin
+  closes 50 ms, then opens 50 ms (io_837_13741.hpp).
+- 837-13741: its 315-6146 runs at the clock of the MIE; vector F8 is its
+  UART, FE its timer, every 1 ms (io_837_13741.cpp).
+- 837-13741: the D71054 counts the 16 MHz of the Z80; its wiring, and the
+  first pulse a period after the load, are guessed (d71054.hpp).
+- 837-13741: port 91 reads FF, as with no board after it and its DIP
+  switches off (io_837_13741.cpp).
+- With epr-21868 run, a switch reaches the game a frame later than with
+  the imitation (io_837_13741.cpp; to check).
+- Card reader of VON4: the cleaning card is given at once, and a new card
+  has 69 zeros on its track 1 (card_reader.cpp).
+- Card reader of VON4: the time its mechanism takes and its printing are
+  not done (card_reader.cpp).
+
+Network board
+
+- The 68000 runs at 10 MHz (40 MHz / 4); it is a 12 MHz part
+  (netbd_837_13404.hpp).
+- IRQ5 comes when a 15-bit counter of 0.5 us ticks reaches the count in
+  40000+C0; a write of 40000+E0 clears it (netbd_837_13404.cpp, .hpp).
+- A write of 40000+E0 gives an IRQ5 at once only when the count gave none
+  since the write before (netbd_837_13404.cpp).
+- The fibre runs at 10 Mbit/s, 2 bytes around a frame; a frame goes out at
+  1D = 8C and comes in at 17 = 8C (netbd_837_13404.hpp).
+- A frame waits 1 ms at most for its 68000 to receive, and is lost while
+  that 68000 is in reset (netbd_837_13404.cpp, .hpp).
+- A frame that goes out is read whole at its start (netbd_837_13404.cpp).
+- The receive and send status read 05, "done", as in MAME and Supermodel
+  (netbd_837_13404.cpp).
+- A write of the host to the mailbox raises IRQ2, as in MAME
+  (netbd_837_13404.cpp).
+- The host sees the bank of the communication RAM that the 68000 does not
+  use, a byte at the offset XOR 3 (netbd_837_13404.cpp).
+- The 68000 waits 4 clocks for the E clock on an autovectored interrupt
+  (m68000.cpp).
+- A ring closed on itself takes 10 us around (hikaru_netbd.cpp).
+- Linked by TCP, a frame comes in as late after the fastest recent one as
+  9 in 10 of them came, 0.2 ms at most (netbd_ring.hpp).
+- Linked games differ from a run to the next, and save states are refused
+  while linked.
+- Linked play on Windows was not tried (netbd_ring.cpp; to check).
+
+Inputs and outputs
+
+- The drive board of NASCAR: the motor board behind it (838-12912: its
+  spring FC, register FD, torque curve FE) is not known.
+- The strength of that motor against a host wheel (FE 41 or BF taken as
+  the most) and the clock of its Z80 are guessed (drive_838_13366.cpp).
+- One term of the force of NASCAR (car +0xDC) was never seen at work in
+  the races tried (to check).
+- Wheels with force feedback were not tried on Windows (wheel_force.cpp).
+- The known wheels (wheels.cpp) are those of Batocera's es_input.cfg, and
+  only the G29 was tried: the pedals of the others are taken over their
+  whole axis, and the steering of the MOMO may turn the other way.
+- A pedal of a wheel presses a switch (the pedals of Smashing Drive) from
+  half its way: where the cabinet's switches close is not known.
+- The force of NASCAR on a pad (experimental): how much of each jump
+  reaches the pad is guessed (drive_board.hpp).
+- The vibration of the SWRACER panel on a pad (experimental): its strength
+  and smoothing are guessed; a pad is not a shaker (audio_out.hpp).
+- The shaking of a light gun goes to an XGunner only; other guns
+  (RetroShooter 3...) are not done yet (gun_serial.cpp).
+- The drive board of NASCAR is not sent on the network outputs yet
+  (outputs_network.cpp).
+
+Gaelco boards
+
+- The FPGA's image has no POF header: its memory blocks are placed as in
+  the one known dump (atvtrack_fpga.cpp).
+- The DAC of Gaelco Football plays the 33 MHz crystal divided by 1024,
+  as the cabinets of the other two sound: its own was never heard
+  (atvtrack.hpp).
+- The status of the first control registers reads all ones (atvtrack.cpp).
+- A render of the 3D core ends when the PMX1 core next runs: how long the
+  chip takes is not known (atvtrack.cpp).
+- The motion platform of ATV Track moves at a guessed speed: 0.44 a frame
+  at full speed, 2.5 s to reach it. No manual gives its speed nor its
+  inverters' ramp (atvtrack.cpp).
+- The chips of the ball sensors of Gaelco Football are not known: their
+  signals follow what the program reads (atvtrack.cpp).
+- A real foot's kick is not known: the travel of the right stick, cubed,
+  gives the program a power of 10 to 127 (atvtrack_play.cpp).
+- The speed of the link cable is in the FPGA, not known: a word comes in
+  at the first slice of the SH-4 after it arrives (atvtrack.hpp).
+- A new mode of the link's port drops the words that came in before it
+  (atvtrack.cpp).
+- The link's queue to send in the FPGA never fills, plugged or not, and
+  an idle port takes nothing in (atvtrack.cpp).
+
+PowerVR Neon 250 (PMX1)
+
+- The core runs one instruction a cycle and its reads answer at once: so
+  the return link the DAC thread leaves in D0.0 at start-up is lost. What
+  the boards do is not known (pmx1_core.cpp).
+- A read of the core is done when it is queued; the chip answers a few
+  cycles later (pmx1_core.cpp).
+- Of the core's real-time threads, 3 runs before 1: the documents do not
+  give their order (pmx1_core.cpp).
+- Thread 2 is never run (pmx1_core.cpp).
+- The word that opens a thread's code (F1, a register, 2) does nothing:
+  its meaning is not known (pmx1_core.cpp).
+- A count of the core's cycles is taken as free-running (pmx1_core.cpp).
+- Implicit registers the games write that Odin does not emulate (-v says
+  so once, pmx1_core.cpp). Seen to change nothing: the GART remaps
+  (289-28E) keep their reset values, which never remap (CMP 0xFF); the
+  3D address base (286) sends the region, object, list and link
+  addresses into the frame buffer, as Odin takes them (the textures'
+  only by their pictures); the DAC's scaler is never on (its interpolation
+  bit in 0A6), its blend mode shows the main picture alone (0B1, so no
+  colour key, 0B2-0B3) and its gamma table (0B4-0B5) is a straight ramp,
+  said in odin.log if one is not. Timing only, which Odin does not keep:
+  the SDRAM and its arbiter (280-285), the DAC's flow, bursts and FIFO
+  split (0A0-0A2). Taken from the guide: the sync polarities (0A6), the
+  cursor's place with no cursor turned on (0A7-0A8), the CRC test (0AA).
+  Not known: 078-079 and 085-08D, which the guide does not give.
+- An instruction that none of the three games uses stops its thread of the
+  PMX1, said once (pmx1_core.cpp).
+- Guesses still to check: the SH-4's serial ports send at once (sh4.hpp);
+  a DREQ unit moves at once (sh4_onchip.cpp); a thread's read queue holds
+  16 (pmx1_core.hpp); Racer's Mini Deluxe seat shaker takes the main board
+  below 120 Hz (session.hpp); the coin pulse, the kick's timing and the
+  ball's height of Gaelco Football, how long Odin holds the volume buttons
+  of Smashing Drive (atvtrack_play.cpp).
+- The TA's user clip, its modes past copythrough, and reads or copies
+  outside the frame buffer are not done; odin.log says so (pmx1_ta.cpp).
+- When the host's GPU cannot sort translucent pixels, the first pass's
+  translucent polygons are sorted polygon by polygon and those of the
+  other passes keep their order (pmx1_scene.cpp).
+- A triangle whose 1/W is not a number is not drawn (pmx1_scene.cpp).
+- The smaller levels of a palettised texture are taken after its palette,
+  as VQ's are: the guide does not say where they are (pmx1_scene.cpp).
+
+Host and user interface
+
+- The list of the files a game lacks, on its sheet in the library,
+  scrolls with the mouse alone, not with a gamepad or the keys
+  (menu_library.cpp).
+- The filters of the cabinets' screens (filters/lola-retro) take their
+  sizes from the manuals; the pitch, mask, beam spots, convergence and
+  curvature of their tubes are guessed, none was measured (each .glslp
+  says which).
+- The drawing thread was never run under a race detector: TSan falls over
+  in the NVIDIA driver and in llvmpipe (worker.hpp, display.cpp).
+- The time the shader programs take to get ready at the first start on a
+  slow PC is not measured yet (renderer_programs.cpp; to check).
+- Debug key 2 changed nothing in the scenes tried, none of which shows a
+  second layer (renderer_debug.cpp; to check).
+- A key is the one that writes its name, not the one at a place: on an
+  AZERTY keyboard, Q, W, A and Z are not where a QWERTY has them, nor
+  where a device that sends keys puts them (keyboard.hpp; to check).
+- On the page Input, X and Y of a gamepad clear a control or set it back
+  at once, with no Undo: only Clear all has one (menu_session_input.cpp).

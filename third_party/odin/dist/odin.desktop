@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Odin
+GenericName=Sega Hikaru and Gaelco emulator
+Comment=Play Sega Hikaru and Gaelco ATV Track arcade games
+Exec=odin
+Icon=odin
+Terminal=false
+Categories=Game;Emulator;

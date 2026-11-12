@@ -1,0 +1,581 @@
+OPTIONS
+=======
+
+Everything you can set in Odin: its files, the command line, the file
+odin.ini and the environment variables. The menu (Escape, F10 or Guide)
+sets most of it too and writes the changes to odin.ini for you.
+
+
+FILES
+-----
+
+Odin keeps its files in one folder:
+ Linux     ~/.local/share/odin  (or $XDG_DATA_HOME/odin)
+ Windows   %APPDATA%\odin
+ macOS     ~/Library/Application Support/odin
+ Portable  beside the program: put an empty portable.txt (or odin.ini)
+           there, and Odin keeps everything in that folder.
+
+In it:
+ odin.ini                 The settings.
+ odin.log                 What Odin says, rewritten at each start
+                          (odin-previous.log: the one before); its folder
+                          can be changed ([paths] log).
+ saves/<game>/            What the board keeps without power: mie_eeprom,
+                          nvram, main_eeprom, rombd_eeprom, clock, cards/.
+ states/                  Saved states (<game>.odinstate).
+ artwork/                 The pictures of the games, from
+                          Odin-Artwork.zip or your own: <game>_title.png
+                          (the library; a <game>_logo.png is shown
+                          instead), <game>_bezel.png and
+                          <game>_bezel.info (Batocera's format). A
+                          version of a game uses its parent's pictures.
+
+Elsewhere: the shader lists and the driver's programs, rebuilt when
+missing (page Paths, Shader lists): cache/ beside a portable Odin, else
+$XDG_CACHE_HOME/odin, else .cache/odin in the home folder.
+
+
+COMMAND LINE
+------------
+
+ odin [options]
+
+ -r <game>        Play this game (its MAME name: airtrix, braveff...).
+                  Without -r, Odin opens its library.
+ -R <folder>      Folder of the games (one folder, zip or 7z per game).
+ -B <folder>      Folder of the shared sets (hikaru, mie; optional:
+                  jvs13551, 18wheelr, srally2). Default: the folder of the
+                  games.
+ -c <file>        The settings file to use instead of odin.ini.
+ -x <1 to 6>      Draw the 3D this many times finer than 640 x 480.
+ -a <2 to 16>     Anisotropic filtering of the textures (the board has none).
+ -w <n>           Window n times 640 x 480, as far as the display has
+                  room.
+ -f               Full screen (F11 or Alt+Enter switches).
+ -o <mode>        Sound: main, option, mix, quad or off (see [sound.<game>]).
+ -u               No speed limit (faster than 60 frames per second), no
+                  sound.
+ -l <file>        Load a saved state at start.
+ -s <n>[,<n>...]  Save <game>-<nnnnnn>.odinstate (the frame on six
+                  digits) in the current folder after these frames.
+ -n <n>           Stop after frame n.
+ -v               Detailed log of the board (slow).
+ -V, --version    Show the version (e.g. Odin v0.1.1) and exit.
+ -h, --help       Show the help.
+
+The command line comes before odin.ini.
+
+
+ODIN.INI
+--------
+
+Where it is: in Odin's folder (see FILES above), or the file given by
+-c <file> or ODIN_CONFIG=<file>.
+
+Odin writes every setting it knows. A line that starts with # is at its
+default value: remove the # and change the value. A wrong line is ignored
+and said in the log.
+
+Values: on/off, numbers, names, folders. An input list is several inputs
+apart by commas (see INPUTS below).
+
+
+[display]
+
+ scale         1 to 6          3D resolution, times 640 x 480. Default 1.
+ upscale_mode  raw, snap,      How flat 2D pieces (HUD, text) are drawn
+               native          above scale 1. raw: fine like the rest;
+                               snap: corners on the board's pixels;
+                               native: as on the board. Default raw.
+ anisotropy    1 to 16         Texture filtering. Default 1 (none).
+ window        1 to 6, or      Window size: times 640 x 480, or a size.
+               <w>x<h>         Default 1.
+ fullscreen    on, off         Default off.
+ vsync         off, on,        Wait for the display. adaptive: a late
+               adaptive        frame does not wait. Default off.
+ unthrottled   on, off         No speed limit, no sound. Default off.
+ show_speed    on, off         Frames per second in the title. Default on.
+ api           opengl, vulkan  What draws, from the next start.
+                               Default vulkan on macOS, opengl elsewhere.
+ gpu           a card name     The card Vulkan draws on, as page Display
+                               names it ("... (2)" for a second of a
+                               kind). Default empty: the best one.
+ bezel        off, blur,      Around the game: black, its blurred edges,
+               image           or its bezel picture (black without
+                               one). Default image.
+ filter        none, or a      CRT filter (page Display, CRT screen).
+               filter name     Default none. The screens of the
+                               cabinets:
+                                 lola-retro/sega-monitor-29
+                                 lola-retro/sega-projector-50
+                                 lola-retro/gaelco-monitor-28
+                                 lola-retro/gaelco-monitor-34
+
+[sound]
+
+ device        a device name   The sound device (page Audio lists them).
+                               Default: the system's.
+ volume        0 to 100        Default 100.
+ background    on, off         Sound when the window is in the background.
+                               Default on.
+
+[menu]
+
+ theme         runasteinn,     Colours of the menu, bar and library.
+               edda, raf,      Default runasteinn.
+               heimdall
+ classic       on, off         Page Input as a list. Default off.
+ animations    on, off         Default on.
+
+ Menu buttons (keys, gamepad buttons and half axes only):
+ up            key:Up, pad:dpup, pad:-lefty
+ down          key:Down, pad:dpdown, pad:+lefty
+ left          key:Left, pad:dpleft, pad:-leftx
+ right         key:Right, pad:dpright, pad:+leftx
+ press         key:Return, pad:a
+ back          pad:b
+ clear         pad:x
+ default       pad:y
+ page_before   pad:leftshoulder
+ page_after    pad:rightshoulder
+ game_before   pad:lefttrigger
+ game_after    pad:righttrigger
+
+[hotkeys]
+
+ Up to two keys each (Ctrl+Q written like that) and one gamepad input:
+ pad:guide alone, or pad:guide+<button>. none: nothing. test and service
+ take keys without Ctrl, Alt or Shift.
+
+ button        guide, back, start,     The hotkey button: "guide" in the
+               leftstick, rightstick,  lines below. Another one than Guide
+               leftshoulder,           goes to the game at each press, in
+               rightshoulder, misc1,   a shortcut too (back: a coin), so
+               touchpad                the menu is then pad:guide+a, and an
+                                       action that takes that button by
+                                       default has none (pause, with back);
+                                       while it is held, only the buttons
+                                       of its shortcuts leave the game.
+                                       Default guide.
+ menu          Escape, F10, pad:guide
+ pause         P, pad:guide+back
+ save_state    F2, pad:guide+rightshoulder
+ load_state    F4, pad:guide+leftshoulder
+ reset         Ctrl+R
+ fullscreen    F11, Alt+Return
+ card          F6, pad:guide+y          (Virtual-On card in or out)
+ light_gun     F7                       (hide the cursor or show it)
+ test          0, pad:guide+rightstick  (TEST of the cabinet, held)
+ service       9, pad:guide+leftstick   (SERVICE of player 1, held)
+ close_game    Ctrl+C, pad:guide+b      (back to the library)
+ quit          Ctrl+Q, pad:guide+start
+
+[gamepads]
+
+ dead_zone          0 to 30   Stick dead zone, in %. Default 3.
+ trigger_threshold  0 to 50   Trigger travel before it presses, in %.
+                              Default 3.
+
+[gamepad.<GUID>]
+
+ The same two keys for one make and model of gamepad (the GUID of its
+ line in [players.<game>]).
+
+[library]
+
+ owned_only    on, off         Only the games whose files are all there.
+                               Default off.
+ variants      on, off         Also show versions of a game (airtrixo...).
+                               Default on.
+ systems       hikaru, gaelco  Only these systems, apart by commas.
+                               Default: all.
+
+[paths]
+
+ roms          a folder        Games. Default: none (choose it in the
+                               library or with -R).
+ bios          a folder        Shared sets (hikaru, mie...). Default:
+                               roms.
+ saves         a folder        What each game keeps without power.
+                               Default: saves/ in Odin's folder.
+ states        a folder        Saved states (F2, F4).
+                               Default: states/ in Odin's folder.
+ artwork       a folder        Pictures (titles, logos, bezels).
+                               Default: artwork/ in Odin's folder.
+ log           a folder        Where odin.log goes, from the next start.
+                               Default: Odin's folder.
+
+ Beside the program, folders named roms, bios and artwork are used when
+ nothing else is set.
+
+[log]
+
+ verbose       on, off         Detailed log of the board (slow).
+                               Default off.
+
+[outputs]
+
+ network       on, off         Send the outputs (lamps, vibration...) to
+                               other programs, as MAME does: port 8000 of
+                               this computer (Hook Of The Reaper,
+                               QMamehook, OutputHooker, the Sinden
+                               software drive the light guns from it).
+                               Default off.
+
+[network]
+
+ Link cabinets (Virtual-On, NASCAR, Star Wars Racer, Planet Harriers, ATV
+ Track, Smashing Drive): each cabinet is one Odin.
+
+ board         none, loop,     none: no link. loop: the cable looped back
+               ring            on itself (a Gaelco game: as none). ring:
+                               linked to other Odins. Default none.
+ port          a port          Where the cabinet before connects.
+                               Default 13404.
+ next          address[:port]  The cabinet after. Empty: this one.
+ cabinet       1 to 8          Which cabinet this is. 1 is the master.
+                               Default 1.
+
+
+PER GAME
+--------
+
+<game> is the MAME name: airtrix, braveff, pharrier, sgnascar, swracer,
+von4; atvtrack, gfootbal, smashdrv. A version of a game (airtrixo,
+sgnascaro, atvtracka, smashdrvb, smashdrvs) shares the sections of its
+parent; the lines of a section of its own (an older Odin wrote one) still
+count, after its parent's.
+
+[players.<game>]
+
+ p1, p2           <GUID> <name>   Gamepad of player 1, 2.
+ joy1, joy2       <GUID> <name>   Wheel or other joystick of player 1, 2
+                                  (a wheel: NASCAR, ATV Track, Smashing
+                                  Drive, one player).
+ p1_path,         <path>          The very gamepad of player 1, 2 when two
+ p2_path,                         alike share a GUID: its path, as the log
+ joy1_path,                       names it ("pad: ... plugged, <GUID> at
+ joy2_path                        <path>"); on Linux, for a path
+                                  /dev/input/event..., a link to it of
+                                  /dev/input/by-path or by-id too. The
+                                  page Input and the bar write it when two
+                                  alike are plugged in. Gone or changed: any
+                                  of the GUID asked. On Windows an Xbox pad is
+                                  XInput#0 to #3; the SDL 2 of a frontend
+                                  (before 2.33) names it by its raw input
+                                  path, as Odin does when started with
+                                  SDL_JOYSTICK_RAWINPUT=1.
+ device1,         keyboard, pad,  What the player plays with (it alone
+ device2          joystick        shakes or turns). Default: Odin picks.
+ gun1, gun2       <identity>      Light gun of player 1, 2, as the log
+                  <name>          names it ("pointer: ..."), e.g.
+                                  "vidpid:1209:0001 GUN4IR".
+ hide_cursor      on, off         No cursor, no bar: the mouse controls
+                                  the game (off: a normal pointer).
+                                  Default on when a control of player 1
+                                  or of the cabinet (coin, test...) uses
+                                  the mouse (the sight of braveff), else
+                                  off. light_gun_mode before 0.1.1.
+ sinden_border    on, off         White border for a Sinden gun.
+                                  Default off.
+ sinden_border_   game, window    Border around the game (4:3) or the
+ style                            whole window. Default game.
+ sinden_border_   2 to 30         Border width in pixels. Default 2.
+ size
+ vibration        on, off         The device shakes with the game.
+                                  Default on.
+ vibration_force  0 to 200        Shake strength, in %. Default 100.
+ wheel_force      0 to 200        Force feedback strength, in % (NASCAR,
+                                  ATV Track, Smashing Drive). Default 100.
+ wheel_rotation   0, 270, 360,    How far the wheel turns from one end to
+                  540, 900, 1080  the other (0: all the way). Default 0.
+ invert           <id>, ...       Controls turned the other way, on every
+                                  device: pharrier stick_v (push up to
+                                  climb; the cabinet's stick climbs pulled
+                                  back). Default none.
+ cabinet          standard,       The cabinet model: deluxe (NASCAR),
+                  deluxe,         minideluxe (Star Wars Racer), vibrator
+                  minideluxe,     (ATV Track: Odin sets its MOTION SYSTEM
+                  vibrator,       to VIBRATOR; on another cabinet, a
+                  upright         VIBRATOR goes back to PLATFORM HARD),
+                                  upright (Smashing Drive). Default
+                                  standard.
+ card             <name>          Virtual-On card in hand (von4).
+
+[sound.<game>]
+
+ Games with a second sound board: pharrier, sgnascar, swracer.
+
+ mode             main, mix, quad  main: main board only. mix: both on two
+                                   speakers. quad: four channels.
+                                   Default mix (swracer: main).
+ option_level     -60 to 12       Level of the second board, in dB.
+                                  Default 0 (NASCAR -12, swracer -13).
+
+ Games with a woofer: the Gaelco games (atvtrack, gfootbal, smashdrv).
+
+ mode             main, mix, quad  main: left and right only. mix: the
+                                   woofer's lows in both. quad: left,
+                                   right, woofer and the board's fourth
+                                   channel. Default mix. With -o option:
+                                   the woofer's channel alone.
+ woofer_level     -60 to 12       Level of the woofer in the mix, in dB.
+                                  Default 0.
+ woofer_cutoff    80, 120, 160,   The woofer's lows below that many Hz in
+                  200, off        the mix (off: all of its channel).
+                                  Default 120.
+ start_volume     0, 25, 50, 75,  Smashing Drive (smashdrv): the volume
+                  96              Odin sets at each power-on, holding
+                                  VOLUME - then VOLUME + (a new board is
+                                  silent). Default 75.
+
+[outputs.<game>]
+
+ <output id>      none, gun1,      Where a vibration of the cabinet goes:
+                  gun1 recoil,     the motor or the recoil of a player's
+                  gun2,            light gun that Odin drives itself
+                  gun2 recoil      (page Outputs, Light guns lists
+                                   them). Default none. Other guns:
+                                   [outputs] network.
+ braveff: 1p_nozzle_vibration, 2p_nozzle_vibration.
+
+[controls.<game>]
+
+ <control id> = <input list>. Defaults below. A control that moves (a
+ stick, a wheel) also has <id>_left / <id>_right or <id>_up / <id>_down
+ for keys and buttons. Every start also takes joy:start, the Start of a
+ known wheel (see joy:gas below).
+
+ Every game ([hotkeys] test and service give 1p_service, 2p_service and
+ test to every game, the gamepad of player 2 for its SERVICE; a line here
+ wins for that game):
+  1p_service    key:9, pad:guide+leftstick
+  2p_service    pad:guide+leftstick
+  coin1         key:5, pad:back, joy:select
+  coin2         key:6, pad:back
+  test          key:0, pad:guide+rightstick
+  board_test    (none)
+  board_service (none)
+
+ airtrix:
+  start         key:1, pad:start
+  left          key:X, pad:dpleft
+  right         key:C, pad:dpright
+  up            key:Up, pad:leftshoulder
+  down          key:Down, pad:rightshoulder
+  yaw           pad:leftx            (yaw_left key:Left, yaw_right key:Right)
+  roll          pad:rightx           (roll_left key:D, roll_right key:G)
+
+ braveff:
+  1p_water      key:Left Ctrl, pad:righttrigger, mouse:left
+  1p_fog        key:Left Alt, pad:lefttrigger, mouse:right
+  1p_start      key:1, pad:start, mouse:middle
+  1p_sight_x    pad:leftx, mouse:x   (_left key:Left, _right key:Right)
+  1p_sight_y    pad:lefty, mouse:y   (_up key:Up, _down key:Down)
+  2p_water      key:A, pad:righttrigger, mouse:left
+  2p_fog        key:S, pad:lefttrigger, mouse:right
+  2p_start      key:2, pad:start, mouse:middle
+  2p_sight_x    pad:leftx, mouse:x   (_left key:D, _right key:G)
+  2p_sight_y    pad:lefty, mouse:y   (_up key:R, _down key:F)
+
+ pharrier:
+  bullet        key:Left Ctrl, pad:righttrigger
+  missile       key:Left Alt, pad:lefttrigger
+  bomb          key:Left Shift, pad:a
+  vr_l          key:X, pad:leftshoulder
+  vr_r          key:C, pad:rightshoulder
+  start         key:1, pad:start
+  stick_h       pad:leftx            (_left key:Left, _right key:Right)
+  stick_v       pad:lefty            (_up key:Up, _down key:Down)
+ The stick can follow the mouse (or a trackball): stick_h = pad:leftx,
+ mouse:x and stick_v = pad:lefty, mouse:y in [controls.pharrier].
+
+ swracer:
+  boost         key:C, pad:a
+  brake         key:X, pad:righttrigger
+  left_button   key:Left, pad:dpleft
+  right_button  key:Right, pad:dpright
+  start         key:1, pad:start
+  left_lever    pad:lefty            (_up key:Up, _down key:Down)
+  right_lever   pad:righty           (_up key:R, _down key:F)
+
+ sgnascar:
+  steering_wheel pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  gas_pedal     pad:righttrigger, joy:gas, key:Up
+  brake_pedal   pad:lefttrigger, joy:brake, key:Down
+  gear_down     key:X, pad:leftshoulder, joy:paddle_left
+  gear_up       key:C, pad:rightshoulder, joy:paddle_right
+  start         key:1, pad:start, joy:start
+  view_change   key:Z, pad:y
+
+ von4:
+  left_lever_up     key:E, pad:-lefty
+  left_lever_down   key:D, pad:+lefty
+  left_lever_left   key:S, pad:-leftx
+  left_lever_right  key:F, pad:+leftx
+  left_trigger      key:Left Ctrl, pad:lefttrigger
+  left_turbo        key:Left Alt, pad:leftshoulder
+  right_lever_up    key:I, pad:-righty
+  right_lever_down  key:K, pad:+righty
+  right_lever_left  key:J, pad:-rightx
+  right_lever_right key:L, pad:+rightx
+  right_trigger     key:Space, pad:righttrigger
+  right_turbo       key:Left Shift, pad:rightshoulder
+  start             key:1, pad:start
+  pib               key:Z, pad:y
+
+ atvtrack:
+  handlebar     pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  throttle      pad:righttrigger, joy:gas, key:Up
+  left_brake    key:Z, pad:lefttrigger, joy:paddle_left
+  right_brake   key:X, pad:rightshoulder, joy:paddle_right
+  start         key:1, pad:start, joy:start
+  volume_up     key:=, pad:dpup
+  volume_down   key:-, pad:dpdown
+
+ gfootbal:
+  1p_up         key:Up, pad:dpup, pad:-lefty
+  1p_down       key:Down, pad:dpdown, pad:+lefty
+  1p_left       key:Left, pad:dpleft, pad:-leftx
+  1p_right      key:Right, pad:dpright, pad:+leftx
+  1p_button1    key:Left Ctrl, pad:a
+  1p_button2    key:Left Alt, pad:b
+  1p_button3    key:Left Shift, pad:x
+  1p_kick_x     pad:rightx           (_left key:D, _right key:G)
+  1p_kick_y     pad:righty           (_up key:R, _down key:F)
+  1p_start      key:1, pad:start
+  2p_up         key:R, pad:dpup, pad:-lefty
+  2p_down       key:F, pad:dpdown, pad:+lefty
+  2p_left       key:D, pad:dpleft, pad:-leftx
+  2p_right      key:G, pad:dpright, pad:+leftx
+  2p_button1    key:A, pad:a
+  2p_button2    key:S, pad:b
+  2p_button3    key:Q, pad:x
+  2p_kick_x     pad:rightx
+  2p_kick_y     pad:righty
+  2p_start      key:2, pad:start
+  volume_up     key:=, pad:leftshoulder
+  volume_down   key:-, pad:rightshoulder
+
+ smashdrv:
+  wheel         pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  gas_pedal     key:Up, pad:righttrigger, joy:gas
+  brake_pedal   key:Down, pad:lefttrigger, joy:brake
+  horn          key:1, pad:start, joy:start
+  volume_up     key:=, pad:dpup
+  volume_down   key:-, pad:dpdown
+
+ A Gaelco cabinet has one coin entry and one SERVICE button: coin2,
+ 2p_service, board_test and board_service go nowhere there.
+
+
+INPUTS
+------
+
+ key:<name>          A key, by SDL's name: key:A, key:Left Ctrl, key:Space.
+ pad:<button>        A gamepad button, by SDL's name: a, b, x, y, back,
+                     guide, start, leftstick, rightstick, leftshoulder,
+                     rightshoulder, dpup, dpdown, dpleft, dpright, misc1
+                     to misc6, paddle1 to paddle4, touchpad.
+ pad:<axis>          A whole axis: leftx, lefty, rightx, righty,
+                     lefttrigger, righttrigger.
+ pad:-<axis>         Half an axis: pad:-lefty is the left stick up,
+ pad:+<axis>         pad:+leftx the left stick right.
+ pad:<axis>:invert   A whole stick axis turned over (not a trigger).
+ pad:<a>+<b>         Button b while a is held: pad:guide+x, pad:back+start
+                     (what the hotkey button holds for a shortcut is not
+                     seen by the game; Guide, all it holds).
+ joy:axis<n>         An axis of a wheel or joystick; joy:-axis<n> and
+                     joy:+axis<n> its halves; joy:axis<n>:invert turned
+                     over. A pedal goes away from where it rests, as
+                     written or not; :invert only picks the half of an
+                     axis two pedals share.
+ joy:button<n>       A button of a wheel or joystick.
+ joy:hat<n>_up       A hat direction (_up, _down, _left, _right).
+ joy:gas             The gas pedal of a known wheel, whatever its numbers
+                     (Logitech G25 to G923, PRO, Driving Force, MOMO;
+                     Thrustmaster FFB Wheel, T150, T300, Advance Racer;
+                     MOZA R12); nothing on another joystick. joy:brake,
+                     joy:paddle_left, joy:paddle_right, joy:start and
+                     joy:select the same. On a button, a pedal presses it
+                     from half its way.
+ joy@<GUID>:<input>  The same on another joystick than the player's (a
+                     shifter or pedals of their own), by its GUID as the
+                     log names it, e.g.
+                     joy@030000006d0400001ac2000000000000:button1. The
+                     page Input writes it when it catches such a joystick.
+ mouse:left          Mouse or light gun buttons: left, middle, right, side,
+                     extra.
+ mouse:x, mouse:y    Where the mouse or the light gun aims.
+
+The log names each joystick when it is plugged in, with how many axes,
+buttons and hats it has (numbered from 0).
+
+
+ENVIRONMENT
+-----------
+
+For players:
+
+ ODIN_CONFIG=<file>         Read another odin.ini (before -c); none: no
+                            settings file.
+ ODIN_SAVES=<folder>        Another saves folder; none: keep nothing.
+ ODIN_ARTWORK=<folder>      Another artwork folder; none: no pictures.
+ ODIN_LOG=<file>            Another log file (before [paths] log);
+                            none: no log file.
+ ODIN_CONTROLLERS=none      No gamepads, joysticks, mouse or light guns.
+ ODIN_STOP_BOX=0            No error box when the board stops (for a
+                            frontend).
+ ODIN_DRIVE=imitation       NASCAR's drive board imitated, not run.
+ ODIN_IO=imitation          The I/O board imitated, not run.
+ ODIN_CARD_FILE=<file>      The Virtual-On card in hand.
+ ODIN_MIE_EEPROM=<file>     Keep the cabinet settings (MIE EEPROM) elsewhere.
+ ODIN_CLOCK_FILE=<file>     Keep the board's clock elsewhere.
+ SDL_JOYSTICK_HIDAPI_LG4FF=1  Use SDL's own driver for Logitech wheels
+                            (it turns their centring spring off).
+
+For developers (tests and debugging):
+
+ ODIN_SCREENSHOT=<prefix>   <prefix>-<frame>.ppm every 60 frames
+ ODIN_SCREENSHOT_EVERY=<n>  ... or every n frames.
+ ODIN_WINDOW_SHOT=<prefix>  The whole window, to <prefix>-<what>-<frame>.ppm.
+ ODIN_PICTURE_FP=1          A fingerprint of each picture on stderr.
+ ODIN_WINDOW_FP=1           The same for the whole window.
+ ODIN_LIST_FP=1             A fingerprint of each display list.
+ ODIN_LIST_DUMP=<n>         ... with a line for each mesh of frame n.
+ ODIN_LISTS_TEST=1          No room for translucent pieces at first (a
+                            test of the lists).
+ ODIN_SPEED=1               Frames per second every 60 frames, on stderr.
+ ODIN_STATS=1               Drawing and waiting times at the end.
+ ODIN_DRAW_TIMES=1          The cost of each part of a frame's drawing.
+ ODIN_LATE_DRAW=1           Draw a frame after the board ran the next one.
+ ODIN_DEBUG_KEYS=1          Keys that switch 2D layers, 3D, textures,
+                            lighting... (see renderer_debug.cpp).
+ HR_LOG=1, HR_LOG_FRAME=<n> Log of what is drawn (every frame, or one).
+ GPU_LOG_CP=1, GPU_LOG_DMA=1, GPU_LOG_IDMA=1
+                            Log of the GPU's commands and transfers.
+ ODIN_VK_VALIDATION=1       Vulkan validation layers.
+ ODIN_DUMPS=1               Each memory to <game>-<memory>.bin at the end.
+ ODIN_WAV=<file>            The sound to a WAV file.
+ ODIN_LOG_REPEATS=1         Every repeated log line (not only the first).
+ ODIN_SH4_MHZ=<n>           A slower SH-4 clock (faster tests).
+ ODIN_SH4_NO_FMA=1          The SH-4 path of hosts without FMA.
+ ODIN_SH4_TRANSLATE=0       The SH-4 interpreted, not translated.
+ ODIN_SH4_TRACE=<prefix>    A trace of the SH-4s, a line per slice.
+ ODIN_ARM7_TRANSLATE=0      The ARM7 interpreted, not translated.
+ ODIN_PMX1_TRANSLATE=0      The Neon 250's blocks run from their decoded ops.
+ ODIN_ARM7_DECODED=0        The ARM7 decodes every instruction.
+ ODIN_ARM7_TRACE=<prefix>   A trace of the ARM7s.
+ ODIN_TURNS=0               Waiting loops run, not counted.
+ ODIN_MIE_TRACE=<file>      A trace of the MIE's Z80
+ ODIN_MIE_TRACE_N=<n>       ... for n instructions (300000)
+ ODIN_MIE_TRACE_START=<pc>  ... from that address.
+ ODIN_CARD=none|reader      Virtual-On's card line: open, or a reader in
+                            any game.
+ ODIN_CARD_TRACE=1          Every frame of the card line, on stderr.
+ ODIN_NETBD=none|loop|ring  A network board in any game, with
+ ODIN_NETBD_PORT, ODIN_NETBD_NEXT, ODIN_NETBD_CABINET.
+ ODIN_GAMES_TEST=<g>,...    These games after the first, in one window.
+ ODIN_MENU_TEST, ODIN_MENU_PAGE, ODIN_BAR_MENU
+                            Menu tests.

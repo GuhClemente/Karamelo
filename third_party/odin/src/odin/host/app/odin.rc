@@ -1,0 +1,58 @@
+/*
+ *  ██████╗ ██████╗ ██╗███╗   ██╗
+ * ██╔═══██╗██╔══██╗██║████╗  ██║
+ * ██║   ██║██║  ██║██║██╔██╗ ██║
+ * ██║   ██║██║  ██║██║██║╚██╗██║
+ * ╚██████╔╝██████╔╝██║██║ ╚████║
+ *  ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝
+ *
+ * Copyright (C) 2026 Réda Chérif-Touil
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma code_page(65001)
+#include "odin_version.h"
+
+/* Windows: the manifest of odin.exe (1, RT_MANIFEST); its icon, the logo
+ * of dist/odin.svg from 16 to 256 pixels */
+/* 1 24 "odin.manifest" */
+1 ICON "odin.ico"
+
+/* Its version in its properties (odin_version.h, CMakeLists.txt): the
+ * numbers of the tag, and the tag or the commit as written; for Windows
+ * NT (0x40004), an application (1) */
+1 VERSIONINFO
+FILEVERSION ODIN_VERSION_NUMBERS
+PRODUCTVERSION ODIN_VERSION_NUMBERS
+FILEOS 0x40004
+FILETYPE 1
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904B0"
+		BEGIN
+			VALUE "FileDescription", "Odin"
+			VALUE "FileVersion", ODIN_VERSION_DOTS
+			VALUE "ProductName", "Odin"
+			VALUE "ProductVersion", ODIN_VERSION_TEXT
+			VALUE "OriginalFilename", "odin.exe"
+			VALUE "LegalCopyright", "Copyright (C) 2026 Reda Cherif-Touil, GNU GPL 3 or later"
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x409, 1200
+	END
+END

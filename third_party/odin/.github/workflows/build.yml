@@ -1,0 +1,284 @@
+name: Build
+
+# A push to Odin updates the dev pre-release; only a tag v* publishes a
+# release, with the artwork pack.
+on:
+  push:
+    branches: [ Odin ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ Odin ]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# The version Odin shows (page About): the name of a tag, else its commit
+env:
+  ODIN_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            flags: -march=x86-64-v2
+            options: ""
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            flags: ""
+            options: -DODIN_GLES=ON
+    name: Linux ${{ matrix.arch }} (AppImage + tarball)
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          # Ubuntu 24.04 has no SDL 3: its build dependencies
+          sudo apt-get install -y \
+            cmake ninja-build build-essential pkg-config glslang-tools gawk \
+            libgl-dev libgles-dev libegl-dev libvulkan-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols libdecor-0-dev \
+            libdrm-dev libgbm-dev libasound2-dev libpulse-dev libudev-dev \
+            ccache file desktop-file-utils
+
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: linux-${{ matrix.arch }}
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_C_FLAGS="${{ matrix.flags }}" -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" \
+            -DODIN_NATIVE=OFF -DODIN_BUNDLED_LIBS=ON ${{ matrix.options }} \
+            -DCMAKE_INSTALL_PREFIX=/usr -DODIN_VERSION="$ODIN_VERSION"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: |
+          build/bin/odin -h > /dev/null
+          ldd build/bin/odin
+
+      - name: Build AppImage
+        run: |
+          DESTDIR=$PWD/AppDir cmake --install build --strip
+          cp dist/odin.png AppDir/odin.png
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.arch }}.AppImage
+          chmod +x linuxdeploy-${{ matrix.arch }}.AppImage
+          ./linuxdeploy-${{ matrix.arch }}.AppImage --appimage-extract-and-run \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/odin \
+            --desktop-file AppDir/usr/share/applications/odin.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/odin.svg \
+            --output appimage
+          mkdir -p out
+          mv "$(find . -maxdepth 1 -name 'Odin*.AppImage')" out/odin-${{ matrix.arch }}.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-linux-${{ matrix.arch }}-appimage
+          path: out/odin-${{ matrix.arch }}.AppImage
+          retention-days: 7
+
+      - name: Build tarball
+        run: |
+          dir="odin-${VERSION}-linux-${{ matrix.arch }}"
+          cmake --install build --strip --prefix "$dir"
+          cp README INSTALL OPTIONS LICENSE "$dir/"
+          tar czf "out/$dir.tar.gz" "$dir"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-linux-${{ matrix.arch }}-tarball
+          path: out/odin-${{ env.VERSION }}-linux-${{ matrix.arch }}.tar.gz
+          retention-days: 7
+
+  macos:
+    name: macOS (dmg)
+    runs-on: macos-15
+    env:
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install the Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          install_runtime: true
+          cache: true
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G "Unix Makefiles" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 \
+            -DODIN_NATIVE=OFF -DODIN_BUNDLED_LIBS=ON -DODIN_VERSION="$ODIN_VERSION"
+
+      - name: Build
+        run: cmake --build build -j "$(sysctl -n hw.ncpu)"
+
+      - name: Build Odin.app
+        run: |
+          cmake --install build --strip --prefix stage
+          dist/macos/make-app.sh stage Odin.app "${VERSION#v}"
+
+      - name: Test
+        run: |
+          otool -L Odin.app/Contents/MacOS/odin
+          if otool -L Odin.app/Contents/MacOS/odin | grep -E '/opt/homebrew|/usr/local/'; then
+            echo "Odin.app links a library outside the system" >&2
+            exit 1
+          fi
+          Odin.app/Contents/MacOS/odin -h > /dev/null
+
+      - name: Build dmg
+        run: |
+          mkdir -p dmg out
+          cp -R Odin.app dmg/
+          cp README INSTALL OPTIONS LICENSE dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname Odin -srcfolder dmg -ov -format UDZO out/odin-macos.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-macos-dmg
+          path: out/odin-macos.dmg
+          retention-days: 7
+
+  windows:
+    name: Windows x86_64 (zip)
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-glslang
+            mingw-w64-ucrt-x86_64-ccache
+            gawk
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_C_FLAGS=-march=x86-64-v2 -DCMAKE_CXX_FLAGS=-march=x86-64-v2 \
+            -DODIN_NATIVE=OFF -DODIN_BUNDLED_LIBS=ON -DODIN_VERSION="$ODIN_VERSION"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Build zip
+        run: |
+          dir="odin-${VERSION}-windows-x86_64"
+          cmake --install build --strip --prefix stage
+          mkdir -p "$dir" out
+          cp stage/bin/odin.exe README INSTALL OPTIONS LICENSE "$dir/"
+          cp -R stage/share/odin/. "$dir/"
+          "$dir/odin.exe" -h > /dev/null
+          objdump -p "$dir/odin.exe" | grep "DLL Name"
+          powershell -Command "Compress-Archive -Path '$dir' -DestinationPath 'out/$dir.zip'"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-windows-x86_64-zip
+          path: out/odin-${{ env.VERSION }}-windows-x86_64.zip
+          retention-days: 7
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ linux, macos, windows ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # The artwork pack (titles and bezels), kept in the draft release
+      # Artwork, which is never published
+      - name: Add the artwork pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api --paginate "repos/${{ github.repository }}/releases" \
+            --jq '.[] | select(.draft and .name == "Artwork") | .assets[] | select(.name == "Odin-Artwork.zip") | .id')
+          test -n "$id"
+          gh api -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$id" \
+            > artifacts/Odin-Artwork.zip
+          unzip -tq artifacts/Odin-Artwork.zip
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/*
+
+  dev-release:
+    name: Publish the dev pre-release
+    if: github.ref == 'refs/heads/Odin' && github.event_name == 'push'
+    needs: [ linux, macos, windows ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Move the tag dev to this commit
+        run: |
+          git tag -f dev
+          git push origin dev --force
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Name the files without the commit
+        run: |
+          cd artifacts
+          for f in odin-*-linux-*.tar.gz odin-*-windows-*.zip; do
+            mv "$f" "$(echo "$f" | sed -E 's/^odin-[^-]+-/odin-/')"
+          done
+          ls -l
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          name: Dev build (${{ github.sha }})
+          body: The latest build of the branch Odin, commit ${{ github.sha }}.
+          prerelease: true
+          files: artifacts/*

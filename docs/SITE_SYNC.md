@@ -94,6 +94,9 @@ A quantidade de jogos em "Ports & Recomp" **não** está no `app_info.h` — o a
 conta em tempo de execução. Se precisar publicar, conte as entradas de
 `CREDITS.md` na seção de ports, ou omita o número.
 
+### Próximos Cores em Integração (Roadmap & Créditos)
+- **Sega Hikaru (`cores/hikaru.dll`)**: Motor **Odin** (autores: Réda Chérif-Touil / *Tovarichtch* e Stefano Teso / *Valkyrie*, sob licença **GPL-3.0** — repositório: `https://github.com/Tovarichtch/Odin`). Emulação de arcades Sega Hikaru (*Star Wars Racer Arcade*, *Planet Harriers*, *Cyber Troopers Virtual-On Force*, *Air Trix*, *NASCAR Arcade*, *Brave Firefighters*) e Gaelco 3D. O core é baseado em wrapper Libretro nativo em C++20 com renderização OpenGL por hardware. *Nota: não altere a contagem de `APP_CORE_ENGINES = 42` no site até a compilação e release oficial do binário.*
+
 ---
 
 ## 3. Downloads e versão

@@ -387,6 +387,15 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 			std::string stem = fs::path(file_path).stem().string();
 			std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
 
+			// 0. Sega Hikaru & Gaelco 3D arcade games -> Odin (hikaru.dll)
+			if (stem == "swracer" || stem == "pharrier" || stem == "von4" ||
+				stem == "airtrix" || stem == "airtrixo" || stem == "braveff" ||
+				stem == "sgnascar" || stem == "sgnascaro" ||
+				stem == "smashdrv" || stem == "smashdrvb" || stem == "smashdrvs" ||
+				stem == "atvtrack" || stem == "atvtracka" || stem == "gfootbal") {
+				return "cores/hikaru.dll";
+			}
+
 			// 1. Sega NAOMI / Sammy Atomiswave 3D arcade games -> Flycast
 			if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2mf" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
 				stem == "mslug6" || stem == "slasho" || stem == "hokuto" || stem == "fotns" ||

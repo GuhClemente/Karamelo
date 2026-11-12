@@ -1,0 +1,3453 @@
+{
+  "version": 2,
+  "roms": [
+    {
+      "name": "bootrom",
+      "title": "Hikaru BIOS",
+      "mach": "hikaru",
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "airtrix",
+      "title": "Air Trix",
+      "mach": "hikaru",
+      "sound_parts": [
+        {
+          "part": "speaker",
+          "at": "front_left",
+          "board": "main"
+        },
+        {
+          "part": "speaker",
+          "at": "front_right",
+          "board": "main"
+        },
+        {
+          "part": "woofer",
+          "at": "base",
+          "board": "main"
+        }
+      ],
+      "rom_board": {
+        "eprom_mb": 4,
+        "315-5881": "291B02C7"
+      },
+      "mie_eeprom": "42434f30010101001800040101010100121200000000000000000000060041495254524958300000000000000100010100000000000000000000000000007e4442434f30010101001800040101010100121200000000000000000000060041495254524958300000000000000100010100000000000000000000000000007e44",
+      "controls": [
+        {
+          "name": "START",
+          "id": "start",
+          "switch": "1P START",
+          "role": "start"
+        },
+        {
+          "name": "LEFT",
+          "id": "left",
+          "switch": "1P PUSH1",
+          "role": "left",
+          "keys": [
+            "X"
+          ]
+        },
+        {
+          "name": "RIGHT",
+          "id": "right",
+          "switch": "1P PUSH2",
+          "role": "right",
+          "keys": [
+            "C"
+          ]
+        },
+        {
+          "name": "UP",
+          "id": "up",
+          "switch": "1P UP",
+          "role": "button5",
+          "keys": [
+            "Up"
+          ]
+        },
+        {
+          "name": "DOWN",
+          "id": "down",
+          "switch": "1P DOWN",
+          "role": "button6",
+          "keys": [
+            "Down"
+          ]
+        },
+        {
+          "name": "YAW",
+          "id": "yaw",
+          "analog": 0,
+          "low": "left",
+          "role": "stick_x"
+        },
+        {
+          "name": "ROLL",
+          "id": "roll",
+          "analog": 1,
+          "low": "left",
+          "role": "stick2_x"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LOCK MECHA.",
+          "id": "lock_mecha",
+          "output": 1,
+          "role": "lock"
+        },
+        {
+          "name": "LEFT LOWER LAMP",
+          "id": "left_lower_lamp",
+          "output": 2,
+          "role": "lamp"
+        },
+        {
+          "name": "START LAMP",
+          "id": "start_lamp",
+          "output": 3,
+          "role": "lamp"
+        },
+        {
+          "name": "LEFT UPPER LAMP",
+          "id": "left_upper_lamp",
+          "output": 4,
+          "role": "lamp"
+        },
+        {
+          "name": "RIGHT UPPER LAMP",
+          "id": "right_upper_lamp",
+          "output": 5,
+          "role": "lamp"
+        },
+        {
+          "name": "RIGHT LOWER LAMP",
+          "id": "right_lower_lamp",
+          "output": 6,
+          "role": "lamp"
+        }
+      ],
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "315-6215.bin",
+              "size": 16384,
+              "crc": "98202738",
+              "set": "jvs13551"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr23601a.ic29",
+              "size": 4194304,
+              "crc": "cd3ccc05"
+            },
+            {
+              "name": "epr23602a.ic30",
+              "size": 4194304,
+              "crc": "24f1bca9"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-23573.ic37",
+              "size": 16777216,
+              "crc": "e22a0734"
+            },
+            {
+              "name": "mpr-23577.ic38",
+              "size": 16777216,
+              "crc": "d007680d"
+            },
+            {
+              "name": "mpr-23574.ic41",
+              "size": 16777216,
+              "crc": "a77034a5"
+            },
+            {
+              "name": "mpr-23578.ic42",
+              "size": 16777216,
+              "crc": "db612dd6"
+            },
+            {
+              "name": "mpr-23575.ic45",
+              "size": 16777216,
+              "crc": "fe660f06"
+            },
+            {
+              "name": "mpr-23579.ic46",
+              "size": 16777216,
+              "crc": "55e656d2"
+            },
+            {
+              "name": "mpr-23576.ic49",
+              "size": 16777216,
+              "crc": "c01e0329"
+            },
+            {
+              "name": "mpr-23580.ic50",
+              "size": 16777216,
+              "crc": "d260f39c"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "airtrixo",
+      "title": "Air Trix (original)",
+      "parent": "airtrix",
+      "mach": "hikaru",
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "315-6215.bin",
+              "size": 16384,
+              "crc": "98202738",
+              "set": "jvs13551"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr-23601.ic29",
+              "size": 4194304,
+              "crc": "e0c642cb"
+            },
+            {
+              "name": "epr-23602.ic30",
+              "size": 4194304,
+              "crc": "fac11d21"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-23573.ic37",
+              "size": 16777216,
+              "crc": "e22a0734",
+              "set": "airtrix"
+            },
+            {
+              "name": "mpr-23577.ic38",
+              "size": 16777216,
+              "crc": "d007680d",
+              "set": "airtrix"
+            },
+            {
+              "name": "mpr-23574.ic41",
+              "size": 16777216,
+              "crc": "a77034a5",
+              "set": "airtrix"
+            },
+            {
+              "name": "mpr-23578.ic42",
+              "size": 16777216,
+              "crc": "db612dd6",
+              "set": "airtrix"
+            },
+            {
+              "name": "mpr-23575.ic45",
+              "size": 16777216,
+              "crc": "fe660f06",
+              "set": "airtrix"
+            },
+            {
+              "name": "mpr-23579.ic46",
+              "size": 16777216,
+              "crc": "55e656d2",
+              "set": "airtrix"
+            },
+            {
+              "name": "mpr-23576.ic49",
+              "size": 16777216,
+              "crc": "c01e0329",
+              "set": "airtrix"
+            },
+            {
+              "name": "mpr-23580.ic50",
+              "size": 16777216,
+              "crc": "d260f39c",
+              "set": "airtrix"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "braveff",
+      "title": "Brave Firefighters",
+      "mach": "hikaru",
+      "rom_board": {
+        "eprom_mb": 2
+      },
+      "mie_eeprom": "42414b300201010018000401010101002211111100000000000000000600010010a1040404003083de1770d03c7cc52083b50080ff000000000000000000f1cc42414b300201010018000401010101002211111100000000000000000600010010a1040404003083de1770d03c7cc52083b50080ff000000000000000000f1cc",
+      "controls": [
+        {
+          "name": "1P WATER",
+          "id": "1p_water",
+          "switch": "1P PUSH1",
+          "role": "button1",
+          "pad": [
+            "righttrigger"
+          ]
+        },
+        {
+          "name": "1P FOG",
+          "id": "1p_fog",
+          "switch": "1P PUSH3",
+          "role": "button2",
+          "pad": [
+            "lefttrigger"
+          ]
+        },
+        {
+          "name": "1P START",
+          "id": "1p_start",
+          "switch": "1P START",
+          "role": "start"
+        },
+        {
+          "name": "1P X AXIS",
+          "id": "1p_sight_x",
+          "analog": 0,
+          "low": "left",
+          "role": "gun_x"
+        },
+        {
+          "name": "1P Y AXIS",
+          "id": "1p_sight_y",
+          "analog": 1,
+          "low": "up",
+          "role": "gun_y"
+        },
+        {
+          "name": "1P OUT OF SCREEN",
+          "id": "1p_out_of_screen",
+          "switch": "1P PUSH2",
+          "role": "gun_offscreen"
+        },
+        {
+          "name": "2P WATER",
+          "id": "2p_water",
+          "switch": "2P PUSH1",
+          "role": "button1",
+          "player": 2,
+          "pad": [
+            "righttrigger"
+          ]
+        },
+        {
+          "name": "2P FOG",
+          "id": "2p_fog",
+          "switch": "2P PUSH3",
+          "role": "button2",
+          "player": 2,
+          "pad": [
+            "lefttrigger"
+          ]
+        },
+        {
+          "name": "2P START",
+          "id": "2p_start",
+          "switch": "2P START",
+          "role": "start",
+          "player": 2
+        },
+        {
+          "name": "2P X AXIS",
+          "id": "2p_sight_x",
+          "analog": 2,
+          "low": "left",
+          "role": "gun_x",
+          "player": 2
+        },
+        {
+          "name": "2P Y AXIS",
+          "id": "2p_sight_y",
+          "analog": 3,
+          "low": "up",
+          "role": "gun_y",
+          "player": 2
+        },
+        {
+          "name": "2P OUT OF SCREEN",
+          "id": "2p_out_of_screen",
+          "switch": "2P PUSH2",
+          "role": "gun_offscreen",
+          "player": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "1P START LAMP",
+          "id": "1p_start_lamp",
+          "output": 1,
+          "role": "lamp"
+        },
+        {
+          "name": "1P NOZZLE VIBRATION",
+          "id": "1p_nozzle_vibration",
+          "output": 2,
+          "role": "rumble"
+        },
+        {
+          "name": "LEFT REVOLVING LIGHT",
+          "id": "left_revolving_light",
+          "output": 3,
+          "role": "lamp"
+        },
+        {
+          "name": "2P START LAMP",
+          "id": "2p_start_lamp",
+          "output": 4,
+          "role": "lamp",
+          "player": 2
+        },
+        {
+          "name": "2P NOZZLE VIBRATION",
+          "id": "2p_nozzle_vibration",
+          "output": 5,
+          "role": "rumble",
+          "player": 2
+        },
+        {
+          "name": "RIGHT REVOLVING LIGHT",
+          "id": "right_revolving_light",
+          "output": 6,
+          "role": "lamp"
+        }
+      ],
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "315-6215.bin",
+              "size": 16384,
+              "crc": "98202738",
+              "set": "jvs13551"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr-21994.ic29",
+              "size": 2097152,
+              "crc": "31b0a754"
+            },
+            {
+              "name": "epr-21995.ic30",
+              "size": 2097152,
+              "crc": "bcccb56b"
+            },
+            {
+              "name": "epr-21996.ic31",
+              "size": 2097152,
+              "crc": "a8f88e17"
+            },
+            {
+              "name": "epr-21997.ic32",
+              "size": 2097152,
+              "crc": "36641a7f"
+            },
+            {
+              "name": "epr-21998.ic33",
+              "size": 2097152,
+              "crc": "bd1df696"
+            },
+            {
+              "name": "epr-21999.ic34",
+              "size": 2097152,
+              "crc": "9425eee0"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-22000.ic37",
+              "size": 8388608,
+              "crc": "53d641d6"
+            },
+            {
+              "name": "mpr-22001.ic38",
+              "size": 8388608,
+              "crc": "234bc48f"
+            },
+            {
+              "name": "mpr-22002.ic39",
+              "size": 8388608,
+              "crc": "d8f3aa9e"
+            },
+            {
+              "name": "mpr-22003.ic40",
+              "size": 8388608,
+              "crc": "2560fe98"
+            },
+            {
+              "name": "mpr-22004.ic41",
+              "size": 8388608,
+              "crc": "4e24d71d"
+            },
+            {
+              "name": "mpr-22005.ic42",
+              "size": 8388608,
+              "crc": "2b96c97f"
+            },
+            {
+              "name": "mpr-22006.ic43",
+              "size": 8388608,
+              "crc": "f793a3ba"
+            },
+            {
+              "name": "mpr-22007.ic44",
+              "size": 8388608,
+              "crc": "62616e31"
+            },
+            {
+              "name": "mpr-22008.ic45",
+              "size": 8388608,
+              "crc": "e6905de8"
+            },
+            {
+              "name": "mpr-22009.ic46",
+              "size": 8388608,
+              "crc": "c37dfa5c"
+            },
+            {
+              "name": "mpr-22010.ic47",
+              "size": 8388608,
+              "crc": "b570b46c"
+            },
+            {
+              "name": "mpr-22011.ic48",
+              "size": 8388608,
+              "crc": "d1f5fb58"
+            },
+            {
+              "name": "mpr-22012.ic49",
+              "size": 8388608,
+              "crc": "3ab79029"
+            },
+            {
+              "name": "mpr-22013.ic50",
+              "size": 8388608,
+              "crc": "42d8d00b"
+            },
+            {
+              "name": "mpr-22014.ic51",
+              "size": 8388608,
+              "crc": "0f49c00f"
+            },
+            {
+              "name": "mpr-22015.ic52",
+              "size": 8388608,
+              "crc": "d3696e61"
+            },
+            {
+              "name": "mpr-22016.ic53s",
+              "size": 8388608,
+              "crc": "c1015e00"
+            },
+            {
+              "name": "mpr-22017.ic54s",
+              "size": 8388608,
+              "crc": "222a7cb0"
+            },
+            {
+              "name": "mpr-22018.ic55s",
+              "size": 8388608,
+              "crc": "f160e115"
+            },
+            {
+              "name": "mpr-22019.ic56s",
+              "size": 8388608,
+              "crc": "468b2f10"
+            },
+            {
+              "name": "mpr-22020.ic57s",
+              "size": 8388608,
+              "crc": "0c018d8a"
+            },
+            {
+              "name": "mpr-22021.ic58s",
+              "size": 8388608,
+              "crc": "43b08604"
+            },
+            {
+              "name": "mpr-22022.ic59s",
+              "size": 8388608,
+              "crc": "abd3d888"
+            },
+            {
+              "name": "mpr-22023.ic60s",
+              "size": 8388608,
+              "crc": "07f00869"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pharrier",
+      "title": "Planet Harriers",
+      "link": {
+        "cabinets": 2
+      },
+      "mach": "hikaru",
+      "seated": true,
+      "sound_parts": [
+        {
+          "part": "speaker",
+          "at": "front_left",
+          "board": "main"
+        },
+        {
+          "part": "speaker",
+          "at": "front_right",
+          "board": "main"
+        },
+        {
+          "part": "woofer",
+          "at": "base",
+          "board": "main"
+        },
+        {
+          "part": "speaker",
+          "at": "seat_left",
+          "board": "option"
+        },
+        {
+          "part": "speaker",
+          "at": "seat_right",
+          "board": "option"
+        }
+      ],
+      "rom_board": {
+        "eprom_mb": 4,
+        "315-5881": "2912C68A"
+      },
+      "option_speakers": true,
+      "mie_eeprom": "42434e000201010018000401010101002100000000000000000000000600000000000000000000000000000000000000000000000000000000000000000061a442434e000201010018000401010101002100000000000000000000000600000000000000000000000000000000000000000000000000000000000000000061a4",
+      "controls": [
+        {
+          "name": "BULLET",
+          "id": "bullet",
+          "switch": "1P PUSH1",
+          "role": "button1",
+          "pad": [
+            "righttrigger"
+          ]
+        },
+        {
+          "name": "MISSILE",
+          "id": "missile",
+          "switch": "1P PUSH2",
+          "role": "button2",
+          "pad": [
+            "lefttrigger"
+          ]
+        },
+        {
+          "name": "BOMB",
+          "id": "bomb",
+          "switch": "1P PUSH3",
+          "role": "button3",
+          "pad": [
+            "a"
+          ]
+        },
+        {
+          "name": "VR L",
+          "id": "vr_l",
+          "switch": "1P LEFT",
+          "role": "button5"
+        },
+        {
+          "name": "VR R",
+          "id": "vr_r",
+          "switch": "1P RIGHT",
+          "role": "button6"
+        },
+        {
+          "name": "START",
+          "id": "start",
+          "switch": "1P START",
+          "role": "start"
+        },
+        {
+          "name": "STICK H",
+          "id": "stick_h",
+          "analog": 1,
+          "low": "left",
+          "role": "stick_x"
+        },
+        {
+          "name": "STICK V",
+          "id": "stick_v",
+          "analog": 0,
+          "low": "down",
+          "role": "stick_y",
+          "invertible": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "START",
+          "id": "start_lamp",
+          "output": 1,
+          "role": "lamp"
+        },
+        {
+          "name": "VR R",
+          "id": "vr_r_lamp",
+          "output": 2,
+          "role": "lamp"
+        },
+        {
+          "name": "VR L",
+          "id": "vr_l_lamp",
+          "output": 3,
+          "role": "lamp"
+        },
+        {
+          "name": "BOMB",
+          "id": "bomb_lamp",
+          "output": 5,
+          "role": "lamp"
+        },
+        {
+          "name": "BILLBOARD",
+          "id": "billboard",
+          "output": 6,
+          "role": "lamp"
+        }
+      ],
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "315-6215.bin",
+              "size": 16384,
+              "crc": "98202738",
+              "set": "jvs13551"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr23565a.ic29",
+              "size": 4194304,
+              "crc": "ca9af8a7"
+            },
+            {
+              "name": "epr23566a.ic30",
+              "size": 4194304,
+              "crc": "aad0057c"
+            },
+            {
+              "name": "epr23567.ic31",
+              "size": 4194304,
+              "crc": "f0e3dcdc"
+            },
+            {
+              "name": "epr23568.ic32",
+              "size": 4194304,
+              "crc": "6eee734c"
+            },
+            {
+              "name": "epr23569.ic33",
+              "size": 4194304,
+              "crc": "867c7064"
+            },
+            {
+              "name": "epr23570.ic34",
+              "size": 4194304,
+              "crc": "556ff58b"
+            },
+            {
+              "name": "epr23571.ic35",
+              "size": 4194304,
+              "crc": "5a75fa92"
+            },
+            {
+              "name": "epr23572.ic36",
+              "size": 4194304,
+              "crc": "46054067"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-23549.ic37",
+              "size": 16777216,
+              "crc": "ed764200"
+            },
+            {
+              "name": "mpr-23553.ic38",
+              "size": 16777216,
+              "crc": "5e70ae78"
+            },
+            {
+              "name": "mpr-23550.ic41",
+              "size": 16777216,
+              "crc": "841b4d3b"
+            },
+            {
+              "name": "mpr-23554.ic42",
+              "size": 16777216,
+              "crc": "5cce99de"
+            },
+            {
+              "name": "mpr-23551.ic45",
+              "size": 16777216,
+              "crc": "71f61d04"
+            },
+            {
+              "name": "mpr-23555.ic46",
+              "size": 16777216,
+              "crc": "582e5453"
+            },
+            {
+              "name": "mpr-23552.ic49",
+              "size": 16777216,
+              "crc": "32487181"
+            },
+            {
+              "name": "mpr-23556.ic50",
+              "size": 16777216,
+              "crc": "45002955"
+            },
+            {
+              "name": "mpr-23557.ic53",
+              "size": 16777216,
+              "crc": "c20dff1b"
+            },
+            {
+              "name": "mpr-23561.ic54",
+              "size": 16777216,
+              "crc": "01237844"
+            },
+            {
+              "name": "mpr-23558.ic57",
+              "size": 16777216,
+              "crc": "e93cc8d7"
+            },
+            {
+              "name": "mpr-23562.ic58",
+              "size": 16777216,
+              "crc": "85e0816c"
+            },
+            {
+              "name": "mpr-23559.ic61",
+              "size": 16777216,
+              "crc": "1a7f2ba0"
+            },
+            {
+              "name": "mpr-23563.ic62",
+              "size": 16777216,
+              "crc": "e3dc328b"
+            },
+            {
+              "name": "mpr-23560.ic65",
+              "size": 16777216,
+              "crc": "24bb7072"
+            },
+            {
+              "name": "mpr-23564.ic66",
+              "size": 16777216,
+              "crc": "255724b6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "swracer",
+      "title": "Star Wars Racer Arcade",
+      "link": {
+        "cabinets": 4,
+        "seat": {
+          "in": "backup",
+          "byte": "0007",
+          "bits": 2
+        }
+      },
+      "mach": "hikaru",
+      "seated": true,
+      "cabinets": [
+        {
+          "id": "minideluxe",
+          "name": "Mini Deluxe"
+        }
+      ],
+      "sound_parts": [
+        {
+          "part": "speaker",
+          "at": "front_left",
+          "board": "main"
+        },
+        {
+          "part": "speaker",
+          "at": "front_right",
+          "board": "main"
+        },
+        {
+          "part": "woofer",
+          "at": "base",
+          "board": "main",
+          "cabinet": "standard"
+        },
+        {
+          "part": "shaker",
+          "at": "panel",
+          "board": "option",
+          "cabinet": "standard"
+        },
+        {
+          "part": "woofer",
+          "at": "seat",
+          "board": "main",
+          "cabinet": "minideluxe"
+        },
+        {
+          "part": "shaker",
+          "at": "seat",
+          "board": "main",
+          "cabinet": "minideluxe"
+        },
+        {
+          "part": "unwired",
+          "board": "option",
+          "cabinet": "minideluxe"
+        }
+      ],
+      "rom_board": {
+        "eprom_mb": 4,
+        "315-5881": "2903DAD5"
+      },
+      "option_vibration": true,
+      "option_level": -13,
+      "mie_eeprom": "4242502d02010100180004010101010010000000000000000000000006001b17000006080500ffffff1fffffffffffffffffffffffffffffffffffffffff18e84242502d02010100180004010101010010000000000000000000000006001b17000006080500ffffff1fffffffffffffffffffffffffffffffffffffffff18e8",
+      "controls": [
+        {
+          "name": "BOOST",
+          "id": "boost",
+          "switch": "1P PUSH1",
+          "role": "button6",
+          "pad": [
+            "a"
+          ]
+        },
+        {
+          "name": "BRAKE",
+          "id": "brake",
+          "switch": "1P PUSH2",
+          "role": "button5",
+          "pad": [
+            "righttrigger"
+          ]
+        },
+        {
+          "name": "LEFT BUTTON",
+          "id": "left_button",
+          "switch": "1P RIGHT",
+          "role": "left"
+        },
+        {
+          "name": "RIGHT BUTTON",
+          "id": "right_button",
+          "switch": "1P LEFT",
+          "role": "right"
+        },
+        {
+          "name": "START",
+          "id": "start",
+          "switch": "1P START",
+          "role": "start"
+        },
+        {
+          "name": "LEFT LEVER",
+          "id": "left_lever",
+          "analog": 0,
+          "low": "up",
+          "role": "stick_y"
+        },
+        {
+          "name": "RIGHT LEVER",
+          "id": "right_lever",
+          "analog": 1,
+          "low": "up",
+          "role": "stick2_y"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "START LAMP",
+          "id": "start_lamp",
+          "output": 1,
+          "role": "lamp"
+        },
+        {
+          "name": "BOOST LAMP",
+          "id": "boost_lamp",
+          "output": 4,
+          "role": "lamp"
+        },
+        {
+          "name": "BOOST LOCK",
+          "id": "boost_lock",
+          "output": 5,
+          "role": "lock"
+        }
+      ],
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "315-6215.bin",
+              "size": 16384,
+              "crc": "98202738",
+              "set": "jvs13551"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr-23174.ic29",
+              "size": 4194304,
+              "crc": "eae62b46"
+            },
+            {
+              "name": "epr-23175.ic30",
+              "size": 4194304,
+              "crc": "b92da060"
+            },
+            {
+              "name": "epr-23176.ic31",
+              "size": 4194304,
+              "crc": "2f2824a7"
+            },
+            {
+              "name": "epr-23177.ic32",
+              "size": 4194304,
+              "crc": "7a5e3f0f"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-23086.ic37",
+              "size": 8388608,
+              "crc": "ef6f20f1"
+            },
+            {
+              "name": "mpr-23087.ic38",
+              "size": 8388608,
+              "crc": "54389822"
+            },
+            {
+              "name": "mpr-23088.ic39",
+              "size": 8388608,
+              "crc": "9f1a382e"
+            },
+            {
+              "name": "mpr-23089.ic40",
+              "size": 8388608,
+              "crc": "6aae64fc"
+            },
+            {
+              "name": "mpr-23090.ic41",
+              "size": 8388608,
+              "crc": "ba857872"
+            },
+            {
+              "name": "mpr-23091.ic42",
+              "size": 8388608,
+              "crc": "66a73e27"
+            },
+            {
+              "name": "mpr-23092.ic43",
+              "size": 8388608,
+              "crc": "4f20a0f5"
+            },
+            {
+              "name": "mpr-23093.ic44",
+              "size": 8388608,
+              "crc": "e74d7d64"
+            },
+            {
+              "name": "mpr-23094.ic45",
+              "size": 8388608,
+              "crc": "90f04c14"
+            },
+            {
+              "name": "mpr-23095.ic46",
+              "size": 8388608,
+              "crc": "cc67cb5b"
+            },
+            {
+              "name": "mpr-23096.ic47",
+              "size": 8388608,
+              "crc": "799ab79e"
+            },
+            {
+              "name": "mpr-23097.ic48",
+              "size": 8388608,
+              "crc": "f68439de"
+            },
+            {
+              "name": "mpr-23098.ic49",
+              "size": 8388608,
+              "crc": "a1e2009c"
+            },
+            {
+              "name": "mpr-23099.ic50",
+              "size": 8388608,
+              "crc": "ce36f642"
+            },
+            {
+              "name": "mpr-23100.ic51",
+              "size": 8388608,
+              "crc": "0f966653"
+            },
+            {
+              "name": "mpr-23101.ic52",
+              "size": 8388608,
+              "crc": "2640fbaa"
+            },
+            {
+              "name": "mpr-23102.ic53s",
+              "size": 8388608,
+              "crc": "080c5bcb"
+            },
+            {
+              "name": "mpr-23103.ic54s",
+              "size": 8388608,
+              "crc": "19c7758f"
+            },
+            {
+              "name": "mpr-23104.ic55s",
+              "size": 8388608,
+              "crc": "4ca74216"
+            },
+            {
+              "name": "mpr-23105.ic56s",
+              "size": 8388608,
+              "crc": "e2dd35ba"
+            },
+            {
+              "name": "mpr-23106.ic57s",
+              "size": 8388608,
+              "crc": "dd325515"
+            },
+            {
+              "name": "mpr-23107.ic58s",
+              "size": 8388608,
+              "crc": "a527a22a"
+            },
+            {
+              "name": "mpr-23108.ic59s",
+              "size": 8388608,
+              "crc": "47817d9a"
+            },
+            {
+              "name": "mpr-23109.ic60s",
+              "size": 8388608,
+              "crc": "8c61dec4"
+            },
+            {
+              "name": "mpr-23110.ic61s",
+              "size": 8388608,
+              "crc": "4ddae9f1"
+            },
+            {
+              "name": "mpr-23111.ic62s",
+              "size": 8388608,
+              "crc": "c404cb1c"
+            },
+            {
+              "name": "mpr-23112.ic63s",
+              "size": 8388608,
+              "crc": "d001fe59"
+            },
+            {
+              "name": "mpr-23113.ic64s",
+              "size": 8388608,
+              "crc": "f241cfd5"
+            },
+            {
+              "name": "mpr-23114.ic65s",
+              "size": 8388608,
+              "crc": "80049d7c"
+            },
+            {
+              "name": "mpr-23115.ic66s",
+              "size": 8388608,
+              "crc": "4fc540fe"
+            },
+            {
+              "name": "mpr-23116.ic67s",
+              "size": 8388608,
+              "crc": "9f567fce"
+            },
+            {
+              "name": "mpr-23117.ic68s",
+              "size": 8388608,
+              "crc": "9d4d3529"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sgnascar",
+      "title": "NASCAR Arcade",
+      "link": {
+        "cabinets": 8,
+        "seat": {
+          "in": "backup",
+          "byte": "14E3",
+          "shift": 2,
+          "bits": 4,
+          "first": 1
+        }
+      },
+      "mach": "hikaru",
+      "seated": true,
+      "sound_parts": [
+        {
+          "part": "speaker",
+          "at": "front_left",
+          "board": "main"
+        },
+        {
+          "part": "speaker",
+          "at": "front_right",
+          "board": "main"
+        },
+        {
+          "part": "speaker",
+          "at": "seat_left",
+          "board": "option"
+        },
+        {
+          "part": "speaker",
+          "at": "seat_right",
+          "board": "option"
+        },
+        {
+          "part": "shaker",
+          "at": "panel",
+          "board": "option",
+          "cabinet": "deluxe"
+        },
+        {
+          "part": "shaker",
+          "at": "seat",
+          "board": "option",
+          "cabinet": "deluxe"
+        }
+      ],
+      "rom_board": {
+        "eprom_mb": 4,
+        "actel": {
+          "key": "56DEDF33",
+          "id": "4252"
+        }
+      },
+      "option_speakers": true,
+      "option_level": -12,
+      "drive_board": {
+        "first_output": 15
+      },
+      "mie_eeprom": "424252000101010018000401010101001000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000031a5424252000101010018000401010101001000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000031a5",
+      "io": "837-13741",
+      "controls": [
+        {
+          "name": "STEERING WHEEL",
+          "id": "steering_wheel",
+          "analog": 0,
+          "low": "left",
+          "role": "steer"
+        },
+        {
+          "name": "GAS PEDAL",
+          "id": "gas_pedal",
+          "analog": 1,
+          "low": "released",
+          "role": "accel"
+        },
+        {
+          "name": "BRAKE PEDAL",
+          "id": "brake_pedal",
+          "analog": 2,
+          "low": "released",
+          "role": "brake"
+        },
+        {
+          "name": "GEAR POSITION",
+          "id": "gear",
+          "positions": [
+            {
+              "name": "N",
+              "switches": []
+            },
+            {
+              "name": "1",
+              "switches": [
+                "2P LEFT",
+                "2P UP"
+              ]
+            },
+            {
+              "name": "2",
+              "switches": [
+                "2P LEFT",
+                "2P DOWN"
+              ]
+            },
+            {
+              "name": "3",
+              "switches": [
+                "2P UP"
+              ]
+            },
+            {
+              "name": "4",
+              "switches": [
+                "2P DOWN"
+              ]
+            }
+          ],
+          "role": "gear"
+        },
+        {
+          "name": "START BUTTON",
+          "id": "start",
+          "switch": "1P START",
+          "role": "start"
+        },
+        {
+          "name": "VIEW CHANGE BUTTON",
+          "id": "view_change",
+          "switch": "1P DOWN",
+          "role": "button4"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "BASS SHAKER MUTE",
+          "id": "bass_shaker_mute",
+          "output": 14,
+          "role": "mute"
+        }
+      ],
+      "cabinets": [
+        {
+          "id": "deluxe",
+          "name": "Deluxe",
+          "grounded": [
+            "1P PUSH1"
+          ],
+          "controls": {
+            "steering_wheel": {
+              "low": "right"
+            },
+            "view_change": {
+              "switch": "1P UP"
+            }
+          }
+        }
+      ],
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "epr-21868.ic7",
+              "size": 65536,
+              "crc": "c306a51f",
+              "set": "18wheelr"
+            }
+          ]
+        },
+        {
+          "name": "drive_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "epr-20512.bin",
+              "size": 65536,
+              "crc": "cf64350d",
+              "set": "srally2"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr-23485a.ic35",
+              "size": 4194304,
+              "crc": "1072f531"
+            },
+            {
+              "name": "epr-23486a.ic36",
+              "size": 4194304,
+              "crc": "02d4aab6"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-23469.ic19",
+              "size": 16777216,
+              "crc": "89cbad8d"
+            },
+            {
+              "name": "mpr-23473.ic20",
+              "size": 16777216,
+              "crc": "977b87d6"
+            },
+            {
+              "name": "mpr-23470.ic21",
+              "size": 16777216,
+              "crc": "faf4940f"
+            },
+            {
+              "name": "mpr-23474.ic22",
+              "size": 16777216,
+              "crc": "faf69ac5"
+            },
+            {
+              "name": "mpr-23471.ic23",
+              "size": 16777216,
+              "crc": "a3aad8ac"
+            },
+            {
+              "name": "mpr-23475.ic24",
+              "size": 16777216,
+              "crc": "5f51597c"
+            },
+            {
+              "name": "mpr-23472.ic25",
+              "size": 16777216,
+              "crc": "2495f678"
+            },
+            {
+              "name": "mpr-23476.ic26",
+              "size": 16777216,
+              "crc": "927cf31c"
+            },
+            {
+              "name": "mpr-23477.ic27",
+              "size": 16777216,
+              "crc": "b4b7c477"
+            },
+            {
+              "name": "mpr-23481.ic28",
+              "size": 16777216,
+              "crc": "27b8eb7d"
+            },
+            {
+              "name": "mpr-23478.ic29",
+              "size": 16777216,
+              "crc": "1fac431c"
+            },
+            {
+              "name": "mpr-23482.ic30",
+              "size": 16777216,
+              "crc": "2e9a0420"
+            },
+            {
+              "name": "mpr-23479.ic31",
+              "size": 16777216,
+              "crc": "9704e393"
+            },
+            {
+              "name": "mpr-23483.ic32",
+              "size": 16777216,
+              "crc": "c37adebe"
+            },
+            {
+              "name": "mpr-23480.ic33",
+              "size": 16777216,
+              "crc": "f517b8b3"
+            },
+            {
+              "name": "mpr-23484.ic34",
+              "size": 16777216,
+              "crc": "2ebe1aa1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sgnascaro",
+      "title": "NASCAR Arcade (original)",
+      "parent": "sgnascar",
+      "mach": "hikaru",
+      "sections": [
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "epr-21868.ic7",
+              "size": 65536,
+              "crc": "c306a51f",
+              "set": "18wheelr"
+            }
+          ]
+        },
+        {
+          "name": "drive_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "epr-20512.bin",
+              "size": 65536,
+              "crc": "cf64350d",
+              "set": "srally2"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr-23485.ic35",
+              "size": 4194304,
+              "crc": "13b44fbf"
+            },
+            {
+              "name": "epr-23486.ic36",
+              "size": 4194304,
+              "crc": "ac3acd19"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-23469.ic19",
+              "size": 16777216,
+              "crc": "89cbad8d",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23473.ic20",
+              "size": 16777216,
+              "crc": "977b87d6",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23470.ic21",
+              "size": 16777216,
+              "crc": "faf4940f",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23474.ic22",
+              "size": 16777216,
+              "crc": "faf69ac5",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23471.ic23",
+              "size": 16777216,
+              "crc": "a3aad8ac",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23475.ic24",
+              "size": 16777216,
+              "crc": "5f51597c",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23472.ic25",
+              "size": 16777216,
+              "crc": "2495f678",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23476.ic26",
+              "size": 16777216,
+              "crc": "927cf31c",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23477.ic27",
+              "size": 16777216,
+              "crc": "b4b7c477",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23481.ic28",
+              "size": 16777216,
+              "crc": "27b8eb7d",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23478.ic29",
+              "size": 16777216,
+              "crc": "1fac431c",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23482.ic30",
+              "size": 16777216,
+              "crc": "2e9a0420",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23479.ic31",
+              "size": 16777216,
+              "crc": "9704e393",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23483.ic32",
+              "size": 16777216,
+              "crc": "c37adebe",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23480.ic33",
+              "size": 16777216,
+              "crc": "f517b8b3",
+              "set": "sgnascar"
+            },
+            {
+              "name": "mpr-23484.ic34",
+              "size": 16777216,
+              "crc": "2ebe1aa1",
+              "set": "sgnascar"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "von4",
+      "title": "Virtual-On",
+      "link": {
+        "cabinets": 4,
+        "seat": {
+          "in": "mie",
+          "byte": "001E",
+          "letter": true
+        }
+      },
+      "mach": "hikaru",
+      "card_reader": "CRP-1231BR-10",
+      "rom_board": {
+        "eprom_mb": 4
+      },
+      "mie_eeprom": "4244583002000100180004010101010011000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000349f4244583002000100180004010101010011000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000349f",
+      "controls": [
+        {
+          "name": "LEFT-LEVER UP",
+          "id": "left_lever_up",
+          "switch": "1P UP",
+          "role": "stick_up",
+          "keys": [
+            "E"
+          ]
+        },
+        {
+          "name": "LEFT-LEVER DOWN",
+          "id": "left_lever_down",
+          "switch": "1P DOWN",
+          "role": "stick_down",
+          "keys": [
+            "D"
+          ]
+        },
+        {
+          "name": "LEFT-LEVER LEFT",
+          "id": "left_lever_left",
+          "switch": "1P LEFT",
+          "role": "stick_left",
+          "keys": [
+            "S"
+          ]
+        },
+        {
+          "name": "LEFT-LEVER RIGHT",
+          "id": "left_lever_right",
+          "switch": "1P RIGHT",
+          "role": "stick_right",
+          "keys": [
+            "F"
+          ]
+        },
+        {
+          "name": "LEFT-LEVER TRIGGER",
+          "id": "left_trigger",
+          "switch": "1P PUSH1",
+          "role": "button7",
+          "keys": [
+            "Left Ctrl"
+          ]
+        },
+        {
+          "name": "LEFT-LEVER TURBO",
+          "id": "left_turbo",
+          "switch": "1P PUSH2",
+          "role": "button5",
+          "keys": [
+            "Left Alt"
+          ]
+        },
+        {
+          "name": "RIGHT-LEVER UP",
+          "id": "right_lever_up",
+          "switch": "2P UP",
+          "role": "stick2_up",
+          "keys": [
+            "I"
+          ]
+        },
+        {
+          "name": "RIGHT-LEVER DOWN",
+          "id": "right_lever_down",
+          "switch": "2P DOWN",
+          "role": "stick2_down",
+          "keys": [
+            "K"
+          ]
+        },
+        {
+          "name": "RIGHT-LEVER LEFT",
+          "id": "right_lever_left",
+          "switch": "2P LEFT",
+          "role": "stick2_left",
+          "keys": [
+            "J"
+          ]
+        },
+        {
+          "name": "RIGHT-LEVER RIGHT",
+          "id": "right_lever_right",
+          "switch": "2P RIGHT",
+          "role": "stick2_right",
+          "keys": [
+            "L"
+          ]
+        },
+        {
+          "name": "RIGHT-LEVER TRIGGER",
+          "id": "right_trigger",
+          "switch": "2P PUSH1",
+          "role": "button8",
+          "keys": [
+            "Space"
+          ]
+        },
+        {
+          "name": "RIGHT-LEVER TURBO",
+          "id": "right_turbo",
+          "switch": "2P PUSH2",
+          "role": "button6",
+          "keys": [
+            "Left Shift"
+          ]
+        },
+        {
+          "name": "START",
+          "id": "start",
+          "switch": "1P START",
+          "role": "start"
+        },
+        {
+          "name": "P.I.B.",
+          "id": "pib",
+          "switch": "1P PUSH3",
+          "role": "button4"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "START LAMP",
+          "id": "start_lamp",
+          "output": 1,
+          "role": "lamp"
+        },
+        {
+          "name": "WINNER LAMP",
+          "id": "winner_lamp",
+          "output": 6,
+          "role": "lamp"
+        }
+      ],
+      "sections": [
+        {
+          "name": "bootrom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "hikaru_0.96.bin",
+              "size": 2097152,
+              "crc": "2aa906a7",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.92.bin",
+              "size": 2097152,
+              "crc": "3d557104",
+              "set": "hikaru"
+            },
+            {
+              "name": "hikaru_0.84.bin",
+              "size": 2097152,
+              "crc": "d96298b6",
+              "set": "hikaru"
+            }
+          ]
+        },
+        {
+          "name": "mie",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "315-6146.bin",
+              "size": 2048,
+              "crc": "9b197e35",
+              "set": "mie"
+            }
+          ]
+        },
+        {
+          "name": "io_rom",
+          "type": "alternative",
+          "optional": true,
+          "data": [
+            {
+              "name": "315-6215.bin",
+              "size": 16384,
+              "crc": "98202738",
+              "set": "jvs13551"
+            }
+          ]
+        },
+        {
+          "name": "eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "93c46.ic115",
+              "size": 128,
+              "crc": "737dc714",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "rombd_eeprom",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "x76f100.ic85",
+              "size": 132,
+              "crc": "194c6c18",
+              "set": "hikaru"
+            }
+          ],
+          "optional": true
+        },
+        {
+          "name": "eprom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "epr23766e.ic29",
+              "size": 4194304,
+              "crc": "188e93bc"
+            },
+            {
+              "name": "epr23767e.ic30",
+              "size": 4194304,
+              "crc": "d39e7ff1"
+            },
+            {
+              "name": "epr23768a.ic31",
+              "size": 4194304,
+              "crc": "2e1b3812"
+            },
+            {
+              "name": "epr23769a.ic32",
+              "size": 4194304,
+              "crc": "34e95687"
+            }
+          ]
+        },
+        {
+          "name": "maskrom",
+          "type": "interleave",
+          "amnt": 2,
+          "data": [
+            {
+              "name": "mpr-23750.ic37",
+              "size": 16777216,
+              "crc": "2e40b246"
+            },
+            {
+              "name": "mpr-23751.ic38",
+              "size": 16777216,
+              "crc": "f345e8b3"
+            },
+            {
+              "name": "mpr-23752.ic41",
+              "size": 16777216,
+              "crc": "2b8c33e1"
+            },
+            {
+              "name": "mpr-23753.ic42",
+              "size": 16777216,
+              "crc": "9e928f82"
+            },
+            {
+              "name": "mpr-23754.ic45",
+              "size": 16777216,
+              "crc": "a7129d77"
+            },
+            {
+              "name": "mpr-23755.ic46",
+              "size": 16777216,
+              "crc": "fbfc0470"
+            },
+            {
+              "name": "mpr-23756.ic49",
+              "size": 16777216,
+              "crc": "c5e9abb1"
+            },
+            {
+              "name": "mpr-23757.ic50",
+              "size": 16777216,
+              "crc": "c8f1316e"
+            },
+            {
+              "name": "mpr-23758.ic53",
+              "size": 16777216,
+              "crc": "054e408a"
+            },
+            {
+              "name": "mpr-23759.ic54",
+              "size": 16777216,
+              "crc": "e49c6ed7"
+            },
+            {
+              "name": "mpr-23760.ic57",
+              "size": 16777216,
+              "crc": "261c24d0"
+            },
+            {
+              "name": "mpr-23761.ic58",
+              "size": 16777216,
+              "crc": "be3681fa"
+            },
+            {
+              "name": "mpr-23762.ic61",
+              "size": 16777216,
+              "crc": "d3aa6caf"
+            },
+            {
+              "name": "mpr-23763.ic62",
+              "size": 16777216,
+              "crc": "648aecb0"
+            },
+            {
+              "name": "mpr-23764.ic65",
+              "size": 16777216,
+              "crc": "0aa472aa"
+            },
+            {
+              "name": "mpr-23765.ic66",
+              "size": 16777216,
+              "crc": "d904250f"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "atvtrack",
+      "title": "ATV Track",
+      "mach": "atvtrack",
+      "seated": true,
+      "sound_parts": [
+        {
+          "part": "speaker",
+          "at": "front_left",
+          "channel": 3
+        },
+        {
+          "part": "speaker",
+          "at": "front_right",
+          "channel": 2
+        },
+        {
+          "part": "woofer",
+          "at": "base",
+          "channel": 1
+        },
+        {
+          "part": "unwired",
+          "channel": 0
+        }
+      ],
+      "woofer": true,
+      "wheel_motor": true,
+      "link": {
+        "cabinets": 2,
+        "seat": {
+          "in": "nand",
+          "byte": "0017",
+          "first": 1
+        }
+      },
+      "motion_platform": true,
+      "cabinets": [
+        {
+          "id": "vibrator",
+          "name": "Vibrator",
+          "motion_platform": false,
+          "grounded_analog": [
+            2,
+            3
+          ],
+          "nand_setting": {
+            "byte": "0016",
+            "value": 3,
+            "standard": 2
+          },
+          "outputs": [
+            {
+              "name": "STOP LAMP",
+              "id": "stop_lamp",
+              "output": 5,
+              "role": "lamp"
+            },
+            {
+              "name": "COIN COUNTER",
+              "id": "coin_counter",
+              "output": 4,
+              "role": "counter"
+            },
+            {
+              "name": "SEAT MOTOR",
+              "id": "seat_motor",
+              "output": 19,
+              "role": "rumble"
+            }
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "name": "HANDLEBAR POSITION",
+          "id": "handlebar",
+          "analog": 0,
+          "low": "left",
+          "span": [
+            254,
+            2
+          ],
+          "role": "steer"
+        },
+        {
+          "name": "THROTTLE",
+          "id": "throttle",
+          "analog": 1,
+          "low": "released",
+          "span": [
+            6,
+            230
+          ],
+          "role": "accel"
+        },
+        {
+          "name": "LEFT BRAKE LEVER",
+          "id": "left_brake",
+          "switch": "1P PUSH1",
+          "port": "1.4",
+          "role": "button1",
+          "keys": [
+            "Z"
+          ],
+          "pad": [
+            "lefttrigger"
+          ],
+          "wheel": "paddle_left"
+        },
+        {
+          "name": "RIGHT BRAKE LEVER",
+          "id": "right_brake",
+          "switch": "1P PUSH2",
+          "port": "1.5",
+          "role": "button2",
+          "keys": [
+            "X"
+          ],
+          "pad": [
+            "rightshoulder"
+          ],
+          "wheel": "paddle_right"
+        },
+        {
+          "name": "START BUTTON",
+          "id": "start",
+          "switch": "1P START",
+          "port": "1.7",
+          "role": "start"
+        },
+        {
+          "name": "VOLUME UP",
+          "id": "volume_up",
+          "switch": "1P PUSH5",
+          "port": "0.0",
+          "role": "button5",
+          "keys": [
+            "="
+          ],
+          "pad": [
+            "dpup"
+          ]
+        },
+        {
+          "name": "VOLUME DOWN",
+          "id": "volume_down",
+          "switch": "1P PUSH6",
+          "port": "0.2",
+          "role": "button6",
+          "keys": [
+            "-"
+          ],
+          "pad": [
+            "dpdown"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STOP LAMP",
+          "id": "stop_lamp",
+          "output": 5,
+          "role": "lamp"
+        },
+        {
+          "name": "COIN COUNTER",
+          "id": "coin_counter",
+          "output": 4,
+          "role": "counter"
+        },
+        {
+          "name": "PLATFORM LEFT",
+          "id": "platform_left",
+          "output": 19,
+          "role": "rumble"
+        },
+        {
+          "name": "PLATFORM RIGHT",
+          "id": "platform_right",
+          "output": 20,
+          "role": "rumble"
+        }
+      ],
+      "grounded": [
+        "1.6"
+      ],
+      "sections": [
+        {
+          "name": "nand0",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "15.bin",
+              "size": 17301504,
+              "crc": "84eaede7"
+            }
+          ]
+        },
+        {
+          "name": "nand1",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "20.bin",
+              "size": 17301504,
+              "crc": "649dc331"
+            }
+          ]
+        },
+        {
+          "name": "nand2",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "14.bin",
+              "size": 17301504,
+              "crc": "67983453"
+            }
+          ]
+        },
+        {
+          "name": "nand3",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "19.bin",
+              "size": 17301504,
+              "crc": "9fc5c579"
+            }
+          ]
+        },
+        {
+          "name": "fpga",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "epc1pc8.ic23",
+              "size": 130817,
+              "crc": "752444c7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "atvtracka",
+      "title": "ATV Track (set 2)",
+      "parent": "atvtrack",
+      "mach": "atvtrack",
+      "sections": [
+        {
+          "name": "nand0",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic15",
+              "size": 17301504,
+              "crc": "10730001"
+            }
+          ]
+        },
+        {
+          "name": "nand1",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic20",
+              "size": 17301504,
+              "crc": "b0c34433"
+            }
+          ]
+        },
+        {
+          "name": "nand2",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic14",
+              "size": 17301504,
+              "crc": "02a12085"
+            }
+          ]
+        },
+        {
+          "name": "nand3",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic19",
+              "size": 17301504,
+              "crc": "856c1e6a"
+            }
+          ]
+        },
+        {
+          "name": "fpga",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "epc1pc8.ic23",
+              "size": 130817,
+              "crc": "752444c7",
+              "set": "atvtrack"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gfootbal",
+      "title": "Gaelco Football",
+      "mach": "atvtrack",
+      "sound_parts": [
+        {
+          "part": "speaker",
+          "at": "front_left",
+          "channel": 3
+        },
+        {
+          "part": "speaker",
+          "at": "front_right",
+          "channel": 2
+        },
+        {
+          "part": "woofer",
+          "at": "base",
+          "channel": 1
+        }
+      ],
+      "woofer": true,
+      "controls": [
+        {
+          "name": "1P UP",
+          "id": "1p_up",
+          "switch": "1P UP",
+          "port": "1.0",
+          "role": "up",
+          "pad": [
+            "dpup",
+            "-lefty"
+          ]
+        },
+        {
+          "name": "1P DOWN",
+          "id": "1p_down",
+          "switch": "1P DOWN",
+          "port": "1.1",
+          "role": "down",
+          "pad": [
+            "dpdown",
+            "+lefty"
+          ]
+        },
+        {
+          "name": "1P LEFT",
+          "id": "1p_left",
+          "switch": "1P LEFT",
+          "port": "1.3",
+          "role": "left",
+          "pad": [
+            "dpleft",
+            "-leftx"
+          ]
+        },
+        {
+          "name": "1P RIGHT",
+          "id": "1p_right",
+          "switch": "1P RIGHT",
+          "port": "1.2",
+          "role": "right",
+          "pad": [
+            "dpright",
+            "+leftx"
+          ]
+        },
+        {
+          "name": "1P BUTTON A",
+          "id": "1p_button1",
+          "switch": "1P PUSH1",
+          "port": "1.4",
+          "role": "button1"
+        },
+        {
+          "name": "1P BUTTON B",
+          "id": "1p_button2",
+          "switch": "1P PUSH2",
+          "port": "1.5",
+          "role": "button2"
+        },
+        {
+          "name": "1P BUTTON C",
+          "id": "1p_button3",
+          "switch": "1P PUSH3",
+          "port": "1.6",
+          "role": "button3"
+        },
+        {
+          "name": "1P KICK SIDE",
+          "id": "1p_kick_x",
+          "analog": 0,
+          "low": "left",
+          "ball": "side",
+          "role": "stick2_x"
+        },
+        {
+          "name": "1P KICK FORWARD",
+          "id": "1p_kick_y",
+          "analog": 1,
+          "low": "up",
+          "ball": "forward",
+          "role": "stick2_y"
+        },
+        {
+          "name": "1P START",
+          "id": "1p_start",
+          "switch": "1P START",
+          "port": "1.7",
+          "role": "start"
+        },
+        {
+          "name": "2P UP",
+          "id": "2p_up",
+          "switch": "2P UP",
+          "port": "2.0",
+          "role": "up",
+          "player": 2,
+          "pad": [
+            "dpup",
+            "-lefty"
+          ]
+        },
+        {
+          "name": "2P DOWN",
+          "id": "2p_down",
+          "switch": "2P DOWN",
+          "port": "2.1",
+          "role": "down",
+          "player": 2,
+          "pad": [
+            "dpdown",
+            "+lefty"
+          ]
+        },
+        {
+          "name": "2P LEFT",
+          "id": "2p_left",
+          "switch": "2P LEFT",
+          "port": "2.3",
+          "role": "left",
+          "player": 2,
+          "pad": [
+            "dpleft",
+            "-leftx"
+          ]
+        },
+        {
+          "name": "2P RIGHT",
+          "id": "2p_right",
+          "switch": "2P RIGHT",
+          "port": "2.2",
+          "role": "right",
+          "player": 2,
+          "pad": [
+            "dpright",
+            "+leftx"
+          ]
+        },
+        {
+          "name": "2P BUTTON A",
+          "id": "2p_button1",
+          "switch": "2P PUSH1",
+          "port": "2.4",
+          "role": "button1",
+          "player": 2
+        },
+        {
+          "name": "2P BUTTON B",
+          "id": "2p_button2",
+          "switch": "2P PUSH2",
+          "port": "2.5",
+          "role": "button2",
+          "player": 2
+        },
+        {
+          "name": "2P BUTTON C",
+          "id": "2p_button3",
+          "switch": "2P PUSH3",
+          "port": "2.6",
+          "role": "button3",
+          "player": 2
+        },
+        {
+          "name": "2P KICK SIDE",
+          "id": "2p_kick_x",
+          "analog": 2,
+          "low": "left",
+          "ball": "side",
+          "role": "stick2_x",
+          "player": 2
+        },
+        {
+          "name": "2P KICK FORWARD",
+          "id": "2p_kick_y",
+          "analog": 3,
+          "low": "up",
+          "ball": "forward",
+          "role": "stick2_y",
+          "player": 2
+        },
+        {
+          "name": "2P START",
+          "id": "2p_start",
+          "switch": "2P START",
+          "port": "2.7",
+          "role": "start",
+          "player": 2
+        },
+        {
+          "name": "VOLUME UP",
+          "id": "volume_up",
+          "switch": "1P PUSH5",
+          "port": "0.0",
+          "role": "button5",
+          "keys": [
+            "="
+          ]
+        },
+        {
+          "name": "VOLUME DOWN",
+          "id": "volume_down",
+          "switch": "1P PUSH6",
+          "port": "0.2",
+          "role": "button6",
+          "keys": [
+            "-"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "1P START LAMP",
+          "id": "1p_start_lamp",
+          "output": 5,
+          "role": "lamp"
+        },
+        {
+          "name": "2P START LAMP",
+          "id": "2p_start_lamp",
+          "output": 6,
+          "role": "lamp",
+          "player": 2
+        },
+        {
+          "name": "COIN COUNTER",
+          "id": "coin_counter",
+          "output": 4,
+          "role": "counter"
+        }
+      ],
+      "sections": [
+        {
+          "name": "nand0",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic15",
+              "size": 17301504,
+              "crc": "876ca493"
+            }
+          ]
+        },
+        {
+          "name": "nand1",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic20",
+              "size": 17301504,
+              "crc": "df9cf6e2"
+            }
+          ]
+        },
+        {
+          "name": "nand2",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic14",
+              "size": 17301504,
+              "crc": "48d901a3"
+            }
+          ]
+        },
+        {
+          "name": "nand3",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "k9f2808u0b.ic19",
+              "size": 17301504,
+              "crc": "2db6c016"
+            }
+          ]
+        },
+        {
+          "name": "fpga",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "epc1pc8.ic23",
+              "size": 130817,
+              "crc": "752444c7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "smashdrv",
+      "title": "Smashing Drive",
+      "mach": "smashdrv",
+      "seated": true,
+      "sound_parts": [
+        {
+          "part": "speaker",
+          "at": "front_left",
+          "channel": 3
+        },
+        {
+          "part": "speaker",
+          "at": "front_right",
+          "channel": 2
+        },
+        {
+          "part": "woofer",
+          "at": "base",
+          "channel": 1
+        },
+        {
+          "part": "unwired",
+          "channel": 0
+        }
+      ],
+      "woofer": true,
+      "wheel_motor": true,
+      "link": {
+        "cabinets": 2,
+        "seat": {
+          "in": "flash",
+          "byte": "01E1",
+          "first": 1
+        }
+      },
+      "controls": [
+        {
+          "name": "STEERING WHEEL",
+          "id": "wheel",
+          "analog": 0,
+          "low": "left",
+          "span": [
+            2,
+            254
+          ],
+          "role": "steer"
+        },
+        {
+          "name": "ACCELERATOR",
+          "id": "gas_pedal",
+          "switch": "1P PUSH1",
+          "port": "1.4",
+          "role": "button1",
+          "keys": [
+            "Up"
+          ],
+          "pad": [
+            "righttrigger"
+          ],
+          "wheel": "gas"
+        },
+        {
+          "name": "BRAKE",
+          "id": "brake_pedal",
+          "switch": "1P PUSH2",
+          "port": "1.5",
+          "role": "button2",
+          "keys": [
+            "Down"
+          ],
+          "pad": [
+            "lefttrigger"
+          ],
+          "wheel": "brake"
+        },
+        {
+          "name": "HORN",
+          "id": "horn",
+          "switch": "1P START",
+          "port": "1.6",
+          "role": "start"
+        },
+        {
+          "name": "VOLUME UP",
+          "id": "volume_up",
+          "switch": "1P PUSH5",
+          "port": "0.0",
+          "role": "button5",
+          "keys": [
+            "="
+          ],
+          "pad": [
+            "dpup"
+          ]
+        },
+        {
+          "name": "VOLUME DOWN",
+          "id": "volume_down",
+          "switch": "1P PUSH6",
+          "port": "0.2",
+          "role": "button6",
+          "keys": [
+            "-"
+          ],
+          "pad": [
+            "dpdown"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LAMP",
+          "id": "lamp",
+          "output": 5,
+          "role": "lamp"
+        },
+        {
+          "name": "COIN COUNTER",
+          "id": "coin_counter",
+          "output": 4,
+          "role": "counter"
+        },
+        {
+          "name": "SEAT MOTOR",
+          "id": "seat_motor",
+          "output": 19,
+          "role": "rumble"
+        }
+      ],
+      "cabinets": [
+        {
+          "id": "upright",
+          "name": "Upright",
+          "seated": false,
+          "outputs": [
+            {
+              "name": "LAMP",
+              "id": "lamp",
+              "output": 5,
+              "role": "lamp"
+            },
+            {
+              "name": "COIN COUNTER",
+              "id": "coin_counter",
+              "output": 4,
+              "role": "counter"
+            }
+          ]
+        }
+      ],
+      "sections": [
+        {
+          "name": "program",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "prg_world.ic23",
+              "size": 4194304,
+              "crc": "c642b059"
+            }
+          ]
+        },
+        {
+          "name": "sdra",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdra.ic15",
+              "size": 16777216,
+              "crc": "cf702287"
+            }
+          ]
+        },
+        {
+          "name": "sdrb",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdrb.ic14",
+              "size": 16777216,
+              "crc": "39b76f0e"
+            }
+          ]
+        },
+        {
+          "name": "sdrc",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdrc.ic20",
+              "size": 16777216,
+              "crc": "c9021dd7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "smashdrvb",
+      "title": "Smashing Drive (UK)",
+      "parent": "smashdrv",
+      "mach": "smashdrv",
+      "sections": [
+        {
+          "name": "program",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "prg.ic23",
+              "size": 4194304,
+              "crc": "5cc6d3ac"
+            }
+          ]
+        },
+        {
+          "name": "sdra",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdra.ic15",
+              "size": 16777216,
+              "crc": "cf702287",
+              "set": "smashdrv"
+            }
+          ]
+        },
+        {
+          "name": "sdrb",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdrb.ic14",
+              "size": 16777216,
+              "crc": "39b76f0e",
+              "set": "smashdrv"
+            }
+          ]
+        },
+        {
+          "name": "sdrc",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdrc.ic20",
+              "size": 16777216,
+              "crc": "c9021dd7",
+              "set": "smashdrv"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "smashdrvs",
+      "title": "Smashing Drive (Spain, Portugal)",
+      "parent": "smashdrv",
+      "mach": "smashdrv",
+      "sections": [
+        {
+          "name": "program",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "prg_spain.ic23",
+              "size": 4194304,
+              "crc": "66b80283"
+            }
+          ]
+        },
+        {
+          "name": "sdra",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdra.ic15",
+              "size": 16777216,
+              "crc": "cf702287",
+              "set": "smashdrv"
+            }
+          ]
+        },
+        {
+          "name": "sdrb",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdrb.ic14",
+              "size": 16777216,
+              "crc": "39b76f0e",
+              "set": "smashdrv"
+            }
+          ]
+        },
+        {
+          "name": "sdrc",
+          "type": "alternative",
+          "data": [
+            {
+              "name": "sdrc.ic20",
+              "size": 16777216,
+              "crc": "c9021dd7",
+              "set": "smashdrv"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -82,6 +82,15 @@ BLOQUEANTE - sem isso o sistema nao roda NENHUM jogo
     2608_bd.wav, 2608_sd.wav, 2608_top.wav, 2608_hh.wav, 2608_tom.wav, 2608_rim.wav [presentes - ritmos YM2608]
   Pasta: PRECISA estar em app/bios/np2kai/ (subpasta dedicada do core).
 
+[Sega Hikaru] cores/hikaru.dll (Odin)
+  Status: BLOQUEANTE para Sega Hikaru (Gaelco 3D roda sem BIOS)
+    hikaru.zip         Boot ROM principal da placa-mae (epr-23164.ic1)
+    mie.zip            Firmware da placa controladora Sega MIE / JVS
+  Pasta: app/bios/ ou na mesma pasta das ROMs (app/roms/Hikaru/)
+  Opcionais: jvs13551.zip (I/O board), srally2.zip / 18wheelr.zip (force feedback)
+  Nota: Jogos Gaelco 3D (Smashing Drive, ATV Track, Gaelco Football) rodam direto
+  da ROM zip/7z, sem necessidade de BIOS.
+
 
 --------------------------------------------------------------------------
 JA COMPLETO - confira o MD5 se algum jogo especifico reclamar

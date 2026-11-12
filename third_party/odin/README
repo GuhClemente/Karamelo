@@ -1,0 +1,95 @@
+ ██████╗ ██████╗ ██╗███╗   ██╗
+██╔═══██╗██╔══██╗██║████╗  ██║
+██║   ██║██║  ██║██║██╔██╗ ██║
+██║   ██║██║  ██║██║██║╚██╗██║
+╚██████╔╝██████╔╝██║██║ ╚████║
+ ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝
+
+Odin (ᚨ), Copyright (C) 2026 Réda Chérif-Touil
+Released under the GNU GPL, version 3 or later (see LICENSE).
+
+Odin emulates two arcade systems, for Linux, Windows and macOS, drawing with
+OpenGL or Vulkan:
+
+ SEGA Hikaru       low-level, running the real chips' programs where known
+ Gaelco ATV Track  low-level too, the Neon 250's microcoded core running its
+                   own code (its 3D drawn from the scene it builds)
+
+Odin runs the six Hikaru games, two of them in two versions, and the Gaelco
+games. They play with a keyboard, gamepads, wheels with force feedback
+(NASCAR, ATV Track, Smashing Drive) or light guns (Brave Firefighters).
+Virtual-On saves to its card.
+Odin links cabinets over the network and sends the cabinet outputs as MAME
+does.
+
+
+GAMES
+=====
+
+SEGA Hikaru
+ airtrix    Air Trix
+ airtrixo   Air Trix (original)
+ braveff    Brave Firefighters
+ pharrier   Planet Harriers
+ sgnascar   NASCAR Arcade
+ sgnascaro  NASCAR Arcade (original)
+ swracer    Star Wars Racer Arcade
+ von4       Cyber Troopers Virtual-On Force
+
+Gaelco ATV Track (see INSTALL)
+ atvtrack   ATV Track
+ atvtracka  ATV Track (set 2)
+ gfootbal   Gaelco Football
+ smashdrv   Smashing Drive
+ smashdrvb  Smashing Drive (UK)
+ smashdrvs  Smashing Drive (Spain, Portugal)
+
+
+Each name is a MAME set. The Hikaru games also need the shared sets hikaru
+and mie; jvs13551, 18wheelr and srally2 are optional.
+
+The title screens and bezels of the games come in a separate pack,
+Odin-Artwork.zip, released with Odin: extract it beside the program. All
+rights to these pictures are reserved by SEGA.
+
+INSTALL tells how to build and start Odin, OPTIONS lists every option and
+setting, TODO what is missing or guessed.
+
+The three Gaelco games use Odin's controls. In Gaelco Football the right
+stick kicks: pull it back first to lift the ball.
+
+
+REPORTING A PROBLEM
+===================
+
+Ask for help in the Arcade Community Discord: https://arcade.community
+Report a bug of Odin on GitHub: https://github.com/Tovarichtch/Odin/issues
+
+Odin writes what it does to odin.log, in its folder (see FILES in INSTALL),
+at each start; the start before is kept as odin-previous.log. When
+something goes wrong, send odin.log (and odin-previous.log after a crash)
+with your report: what you did, which game, which computer.
+
+If we ask for more: turn on the detailed log (page Paths, Detailed log, or
+the bar, DEBUG), start the game again and send the new odin.log. It makes
+the game much slower and the file much bigger: turn it off afterwards.
+
+
+CREDITS
+=======
+
+Odin is a hard fork of Valkyrie, the Hikaru emulator by Stefano Teso,
+Copyright (C) 2011-2013, GNU GPL version 3 or later.
+The ATV Track board follows MAME's atvtrack driver; its boot program stays
+under the BSD-3-Clause licence, Copyright (c) Samuele Zannoli.
+
+Daniel Martin (dmanlfc) contributed to Odin and brought it the Gaelco
+boards: ATV Track, Gaelco Football and Smashing Drive.
+
+Thanks to the developers of MAME (its Hikaru driver) and Flycast, and to
+Neill Corlett for his documentation of the AICA.
+
+Odin also uses Dear ImGui, SDL 3, GLEW, Jansson, Vulkan-Headers, miniz,
+the LZMA SDK, the Lola Retro CRT filters, the Cozette and Junicode fonts
+and AL2009man's gamepad drawings. Their licences are on the page About of
+the menu and beside their sources.

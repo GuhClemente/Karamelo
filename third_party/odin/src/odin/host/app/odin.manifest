@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+      ██████╗ ██████╗ ██╗███╗   ██╗
+     ██╔═══██╗██╔══██╗██║████╗  ██║
+     ██║   ██║██║  ██║██║██╔██╗ ██║
+     ██║   ██║██║  ██║██║██║╚██╗██║
+     ╚██████╔╝██████╔╝██║██║ ╚████║
+      ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝
+
+     Odin, Copyright (C) 2026 Réda Chérif-Touil, GPL 3 or later (see LICENSE).
+
+     Windows: the narrow strings of Odin (the command line, the environment,
+     the names fopen takes) are UTF-8, as SDL and std::filesystem take them,
+     so a folder of any name works (Windows 10 1903 and later). -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

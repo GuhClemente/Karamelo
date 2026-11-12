@@ -1,0 +1,12 @@
+[submodule "3rdparty/SDL"]
+	path = 3rdparty/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "3rdparty/jansson"]
+	path = 3rdparty/jansson
+	url = https://github.com/akheron/jansson.git
+[submodule "3rdparty/glew"]
+	path = 3rdparty/glew
+	url = https://github.com/Perlmint/glew-cmake.git
+[submodule "3rdparty/Vulkan-Headers"]
+	path = 3rdparty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git

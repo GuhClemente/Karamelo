@@ -55,6 +55,9 @@ TEST_CASE(ArchiveResolveCoreIntelligentRouting)
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/C64/gianna.d64", ""), "cores/c64.dll");
 
 	// 2. Intelligent Arcade Auto-Routing
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/swracer.zip", "roms/Arcade"), "cores/hikaru.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/pharrier.zip", "roms/Arcade"), "cores/hikaru.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/smashdrv.zip", "roms/Arcade"), "cores/hikaru.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mvsc2.zip", "roms/Arcade"), "cores/dreamcast.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mslug6.zip", "roms/Arcade"), "cores/dreamcast.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mk.zip", "roms/Arcade"), "cores/mame2003.dll");

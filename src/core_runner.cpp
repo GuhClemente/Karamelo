@@ -3783,7 +3783,8 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		 core_dll.find("mame2003") != std::string::npos ||
 		 core_dll.find("mame2010") != std::string::npos ||
 		 core_dll.find("dreamcast") != std::string::npos ||
-		 core_dll.find("dosbox") != std::string::npos);
+		 core_dll.find("dosbox") != std::string::npos ||
+		 core_dll.find("hikaru") != std::string::npos);
 
 	if (ArchiveIsCompressed(rom_path) && !core_reads_archive)
 	{
@@ -3847,7 +3848,8 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		 rom_path.find("Arcade") != std::string::npos ||
 		 core_dll.find("arcade_fbneo") != std::string::npos ||
 		 core_dll.find("mame2003") != std::string::npos ||
-		 core_dll.find("mame2010") != std::string::npos);
+		 core_dll.find("mame2010") != std::string::npos ||
+		 core_dll.find("hikaru") != std::string::npos);
 
 	bool loaded = false;
 
@@ -3921,6 +3923,24 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 					candidate_cores.insert(candidate_cores.begin(), fly);
 				}
 			}
+			// Sega Hikaru & Gaelco 3D titles: Odin (hikaru.dll) goes to the front
+			else if (stem == "swracer" || stem == "pharrier" || stem == "von4" ||
+				stem == "airtrix" || stem == "airtrixo" || stem == "braveff" ||
+				stem == "sgnascar" || stem == "sgnascaro" ||
+				stem == "smashdrv" || stem == "smashdrvb" || stem == "smashdrvs" ||
+				stem == "atvtrack" || stem == "atvtracka" || stem == "gfootbal")
+			{
+				const std::string hik = "cores/hikaru.dll";
+				auto it = std::find(candidate_cores.begin(), candidate_cores.end(), hik);
+				if (it != candidate_cores.end())
+				{
+					if (it != candidate_cores.begin()) std::rotate(candidate_cores.begin(), it, it + 1);
+				}
+				else if (CoreBinaryExists(hik.c_str()))
+				{
+					candidate_cores.insert(candidate_cores.begin(), hik);
+				}
+			}
 		}
 
 		for (size_t i = 0; i < candidate_cores.size(); i++)
@@ -3928,14 +3948,11 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			const std::string& cand_dll = candidate_cores[i];
 			bool is_last_candidate = (i == candidate_cores.size() - 1);
 
-			// Flycast reads zip/7z natively and needs to for a Naomi title:
-			// the .chd extraction above throws away whatever else the romset
-			// carried alongside the GD-ROM image, and a bare .chd loads fine
-			// as generic Dreamcast content but boots straight to Flycast's
-			// own BIOS dashboard instead of recognising the actual game.
+			// Flycast and Hikaru read zip/7z natively and need to for an arcade romset:
+			// the extraction above throws away whatever else the romset carried.
 			// Give it the intact original archive instead.
 			std::string effective_load_path =
-				(cand_dll.find("dreamcast") != std::string::npos && ArchiveIsCompressed(original_rom_path))
+				((cand_dll.find("dreamcast") != std::string::npos || cand_dll.find("hikaru") != std::string::npos) && ArchiveIsCompressed(original_rom_path))
 					? original_rom_path : rom_path;
 
 			// Handle Naomi GD-ROM aliases for Flycast (e.g. cvs2gd / cvs2gd-chd -> cvs2mf / cvs2)
@@ -4842,7 +4859,7 @@ static bool CoreLoad(const char* core_dll_path)
 	else if (strstr(core_dll_path, "pcfx")) loaded_core_name = "PC-FX";
 	else if (strstr(core_dll_path, "fmtowns")) loaded_core_name = "FM Towns";
 	else if (strstr(core_dll_path, "pc98")) loaded_core_name = "PC-98";
-	else if (strstr(core_dll_path, "arcade") || strstr(core_dll_path, "fbneo") || strstr(core_dll_path, "mame")) loaded_core_name = "Arcade";
+	else if (strstr(core_dll_path, "arcade") || strstr(core_dll_path, "fbneo") || strstr(core_dll_path, "mame") || strstr(core_dll_path, "hikaru")) loaded_core_name = "Arcade";
 	LeaveCriticalSection(&name_lock);
 
 	return true;

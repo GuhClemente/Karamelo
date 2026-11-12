@@ -100,6 +100,16 @@ Três observações:
 - `coleco.dll` é um core libretro válido e aceita `col|cv|bin|rom`, mas não
   declara um nome que permita identificar o motor com segurança.
 
+### Novos Cores & Integrações em Desenvolvimento
+
+- **Sega Hikaru (`cores/hikaru.dll`)**:
+  - **Motor**: Odin
+  - **Sistemas**: Sega Hikaru (*Star Wars Racer Arcade*, *Planet Harriers*, *Cyber Troopers Virtual-On Force*, *Air Trix*, *NASCAR Arcade*, *Brave Firefighters*) e Gaelco 3D (*Smashing Drive*, *ATV Track*)
+  - **Autores originais**: Réda Chérif-Touil (*Tovarichtch*) e Stefano Teso (*Valkyrie*)
+  - **Repositório oficial**: [Tovarichtch/Odin](https://github.com/Tovarichtch/Odin)
+  - **Licença**: GNU General Public License v3.0 (GPL-3.0)
+  - **Arquitetura de Integração**: Core Libretro C++20 nativo conectando o núcleo da máquina (`odin::Board` / `odin::Hikaru`) diretamente à API Libretro, com renderização por hardware OpenGL FBO (`hw_render.cpp`) e áudio 44.1 kHz PCM estéreo via Yamaha AICA.
+
 ## Ports & Recomp
 
 Diferente dos cores acima, esses não são emulados: são jogos "recompilados"
