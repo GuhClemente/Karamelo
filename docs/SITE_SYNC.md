@@ -384,8 +384,8 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 09/11/2026:** são **96** jogos de "Ports & Recomp" (96 🪟, 61 🐧, 42 🍎) — 42 até
-11/09, +1 em 30/10 (Project Tandem — ver seção 51), +1 em 05/11 (The Legend of Zelda: Ocarina of Time 3D / TriAevum — ver seção 59), +1 em 09/11 (Top Gear — ver seção 61), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
+**Atualizado em 13/11/2026:** são **97** jogos de "Ports & Recomp" (97 🪟, 62 🐧, 42 🍎) — 42 até
+11/09, +1 em 30/10 (Project Tandem — ver seção 51), +1 em 05/11 (The Legend of Zelda: Ocarina of Time 3D / TriAevum — ver seção 59), +1 em 09/11 (Top Gear — ver seção 61), +1 em 13/11 (Super Street Fighter II Turbo HD Remix — ver seção 63), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
 nenhum número antigo (39, 40, 41, 42, 47, 55, 56, 57, 58, 59, 60, 62, 70, 80, 89, 94, 95) de outra página no futuro. É coincidência
@@ -483,8 +483,8 @@ que é a página onde a marca de terceiro mais aparece.
 
 ### 9.9 O que está certo — não mexa
 
-- Os **96** jogos de Ports & Recomp (atualizado em 09/11/2026 — ver seções
-  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40, 41, 51, 59 e 61),
+- Os **97** jogos de Ports & Recomp (atualizado em 13/11/2026 — ver seções
+  10, 11, 13, 15, 16, 18, 19, 20, 23, 25, 26, 27, 30, 33, 38, 39, 40, 41, 51, 59, 61 e 63),
   e o texto explicando que o app baixa só o binário de cada projeto direto do
   GitHub. Uma ressalva nova a partir de agora: nem todo projeto da lista é
   "código aberto" no sentido estrito — a maioria é, mas ao menos um
@@ -1604,7 +1604,7 @@ arquivo `data/ports.json` do repositório, publicado em
 > **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
 > arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
 > `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
-> Hoje: **96 jogos — 96 Windows 🪟, 61 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem; seção 59 para o TriAevum; seção 61 para o Top Gear).
+> Hoje: **97 jogos — 97 Windows 🪟, 62 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem; seção 59 para o TriAevum; seção 61 para o Top Gear; seção 63 para o SSF2T HD Remix).
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
@@ -1878,7 +1878,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
    - Visão consolidada da arquitetura multi-OS do projeto:
      - 🪟 **Windows (x86_64)**: Win32 puro, Direct3D 11, WASAPI, System Tray com menu completo e Web Studio (Ativo).
      - 🍎 **macOS (Apple Silicon M1-M4)**: Cocoa, Metal/OpenGL, SDL3 estático sem Homebrew e 42 PC Ports Mach-O ARM64 (Pronto).
-     - 🐧 **Linux (x86_64 / Steam Deck)**: SDL3 nativo, PipeWire/ALSA e 61 PC Ports nativos ELF64 (Pronto).
+     - 🐧 **Linux (x86_64 / Steam Deck)**: SDL3 nativo, PipeWire/ALSA e 62 PC Ports nativos ELF64 (Pronto).
      - 📀 **Karamelo OS**: Distro Linux própria minimalista com boot < 3s direto no OSD (Em desenvolvimento).
      - 🍓 **Raspberry Pi & SBCs (ARM64)**: Suporte nativo e imagem para Raspberry Pi 4/5, Orange Pi e TV Boxes (`docs/RASPBERRY_PI.md`).
      - 📱 **Android**: Target futuro C++20 via NDK + Vulkan API + touch gamepad overlay (`docs/ANDROID.md`).
@@ -1921,7 +1921,7 @@ O Karamelo agora conta com o **Karamelo Studio**, um centro de controle e gerenc
 | **Tempo de Boot** | Vários segundos carregando temas e Python | **Instantâneo (< 1 segundo)** |
 | **Consumo de Memória** | Alto (EmulationStation + scripts + emulador filho) | **Mínimo (~30 MB de RAM em repouso)** |
 | **Multiplataforma** | **Apenas Windows** | **Windows, Linux e macOS Apple Silicon (M1-M4) nativo** |
-| **PC Ports & Recompilados** | Depende de configurações manuais | **96 PC Ports com catalogação e atualização integrada** |
+| **PC Ports & Recompilados** | Depende de configurações manuais | **97 PC Ports com catalogação e atualização integrada** |
 | **Gerenciamento Remoto** | Não possui | **Karamelo Studio (Web Admin Wi-Fi / TV Remote)** |
 | **Nuvem Pessoal** | Depende de ferramentas externas | **Sincronização de saves com o Google Drive do jogador** |
 | **Menu OSD** | Abrir o menu fecha ou minimiza o jogo ativo | **OSD MiSTer integrado que sobrepõe sem perder foco** |
@@ -2329,7 +2329,7 @@ Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 95 jo
 ## 60. Versão 0.982
 
 **Estado**: pacotes de **Windows** e **Linux** prontos em 10/11/2026; o **macOS** sai pela build do Mac. Só anuncie como publicada depois que o deploy estiver no ar (o `version.json` do site passa a dizer 0.982).
-Contagens: **37 sistemas, 42 motores; 96 ports — 96 Windows 🪟, 61 Linux 🐧, 42 macOS 🍎**.
+Contagens: **37 sistemas, 42 motores; 97 ports — 97 Windows 🪟, 62 Linux 🐧, 42 macOS 🍎**.
 
 Novidades para o jogador:
 
@@ -2375,3 +2375,28 @@ O jogo já estava no catálogo; **as contagens não mudam** (96 jogos — 96 Win
 - **Como funciona no Karamelo** (novo): o jogador deixa o disco em `roms/GameCube` (a mesma pasta do emulador de GameCube). Ao abrir o jogo, o Karamelo reconhece o disco pelo código gravado nele (G4QE01, G4QP01 ou G4QJ01 — por isso acha também o *Mario Smash Football* europeu, que não tem "Strikers" no nome) e o entrega ao jogo. Se o jogador escolheu outro disco no app de configurações do próprio jogo, essa escolha é respeitada. Sem disco, o Karamelo avisa onde colocá-lo em vez de abrir o jogo só para dar erro.
 - **Licença**: mista. O código de port do autor é CC0; o código reconstruído do jogo não reivindica direitos. Não escreva "código aberto sob licença X" para este jogo.
 - **Aviso legal para a página**: projeto não oficial, sem relação com a Nintendo ou a Next Level Games.
+
+---
+
+## 63. Adição de 13/11/2026 — Super Street Fighter II Turbo HD Remix (Xbox 360 / XBLA)
+
+Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 97 jogos — 97 Windows 🪟, 62 Linux 🐧, 42 macOS 🍎.**
+
+- **Projeto**: [saulob/ssf2t-hd-remix-recompiled](https://github.com/saulob/ssf2t-hd-remix-recompiled).
+- **Licença**: GNU General Public License v2.0 (GPL-2.0-only).
+- **Sistemas**: **Windows 🪟 e Linux 🐧**.
+  - **Windows (x64)**: zip oficial (`SSF2THDRemix-v0.4.0-windows-x64.zip`) com `ssf2t_hd_remix.exe`.
+  - **Linux (x86_64)**: AppImage oficial (`SSF2THDRemix-v0.4.0-x86_64.AppImage`).
+  - **macOS 🍎**: **sem build upstream**. Não anuncie versão Mac.
+- **Versão no catálogo**: `v0.4.0` (fixada com SHA-256).
+- **O que é**: Recompilação estática nativa (sem emulador) do clássico de luta lançado para Xbox 360 (Xbox Live Arcade), utilizando o ReXGlue SDK.
+- **Destaques**:
+  - Resoluções de 720p até 4K/5K (4x) mantendo 60 FPS cravados.
+  - Widescreen e ultrawide (16:9, 16:10, 21:9, 32:9, 4:3, 5:4) com opções de preenchimento de área de combate (Original ou Fill 16:9).
+  - Jogo online com rollback netplay, UDP direto, friend codes e lobby público.
+  - Suporte nativo a controles Xbox, conquistas offline (200G), e suporte a idioma Português do Brasil (PT-BR).
+  - Lutas contra CPU no modo Local Match, seleção facilitada de Akuma e novos lutadores secretos opcionais (Evil Ryu e Violent Ken).
+  - Launcher integrado TRG com instalador de pacote do jogo e suporte opcional ao Title Update #1 (versões 0.0.1.3 e 0.0.2.3).
+- **O que o jogador precisa**: O pacote original do jogo para Xbox 360 (XBLA), extraído do console (arquivo único com nome hexadecimal sem extensão em `Content\0000000000000000\584108A4\000D0000\`). Opcionalmente, o pacote do Title Update #1 (`...000B0000\`). Nenhum arquivo de jogo protegido por direitos autorais acompanha o download.
+- **Como funciona no Karamelo**: O Karamelo baixa e descompacta a release diretamente em `ports/SSF2THDRemix/`. Ao iniciar, o jogo abre o launcher integrado onde o jogador pode clicar em "Install Game" e selecionar seu pacote XBLA para extração automática na pasta `game/`. Após isso, o jogo fica pronto para jogar diretamente.
+- **Aviso legal para a página**: Projeto de fã não oficial, sem afiliação ou endosso da Capcom ou Microsoft. Super Street Fighter II Turbo HD Remix é marca registrada de seus respectivos proprietários.

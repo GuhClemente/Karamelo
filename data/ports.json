@@ -1,5 +1,5 @@
 {
-  "catalog_version": 9,
+  "catalog_version": 10,
   "ports": [
     {
       "id": "DrMario64",
@@ -1527,6 +1527,19 @@
         "topgear-pc-windows-x64.zip": "5a686a8c53f470de41b229cb7f0a7c806a842a22d3bb6b40daad30c219527904"
       },
       "notes": "Top Gear (SNES, 1992) PC decomp by thebradshaw (Vibe Slop Studios): races in translated C, menus still on the embedded LakeSnes (MIT). Checked 09/11/2026 against v1.2.0: Windows zip and Linux tar.gz, each a single topgear-pc/ folder (flattened on install) holding topgear(.exe), the game, and topgear-launcher(.exe); exe_hint picks the game, not the launcher. No macOS build. The game looks next to topgear.exe for \"Top Gear (USA).sfc\", \"Top Gear (USA).smc\" or \"topgear.sfc\" and checks the ROM's SHA-256 (USA, 524288 bytes, copier header removed), so PortAutoSetupRom copies the player's ROM from roms/SNES under that name. The repository declares no license."
+    },
+    {
+      "id": "SSF2THDRemix",
+      "display_name": "Super Street Fighter II Turbo HD Remix",
+      "repo": "saulob/ssf2t-hd-remix-recompiled",
+      "exe_hint": "ssf2t_hd_remix.exe",
+      "has_linux_build": true,
+      "release_tag": "v0.4.0",
+      "asset_sha256": {
+        "SSF2THDRemix-v0.4.0-windows-x64.zip": "6591054b96cdf2338d3a3119930ac4f3b4002a55d47d88f596345170d43de3ed",
+        "SSF2THDRemix-v0.4.0-x86_64.AppImage": "a09706f5f832aae91ff27ce984284189507639646888db3ae7c4329a70c805d8"
+      },
+      "notes": "Xbox 360 XBLA static recomp of Super Street Fighter II Turbo HD Remix by saulob using ReXGlue SDK. Built-in TRG launcher with game package installer, rollback netplay, 4K rendering, widescreen/ultrawide support, and secret fighters. Checked 13/11/2026 against v0.4.0: Windows zip and Linux x86_64 AppImage; exe_hint picks ssf2t_hd_remix.exe. No macOS build."
     }
   ]
 }
