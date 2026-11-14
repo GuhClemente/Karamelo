@@ -127,3 +127,15 @@ Por isso o número correto passou de 41 para **40**. O site publica **41** —
 a contagem de arquivos de antes da limpeza, que conta o mesmo emulador duas
 vezes. A auditoria de 09/09/2026 achou esse número em oito lugares da página,
 listados em [SITE_SYNC.md](SITE_SYNC.md), seção 9.3.
+
+---
+
+## Motores em Avaliação / Planejamento Futuro (v0.9.8+)
+
+Com base na auditoria do Batocera 44 (*Malachite*), os seguintes motores estão em fase de teste e homologação arquitetural para inclusão futura no pacote oficial:
+
+1. **AnyBOR-libretro** (`cores/anybor.*`): Core Libretro multi-engine para a biblioteca de beat'em ups OpenBOR (`roms/OpenBOR/*.pak`), compatível com Windows x64, Linux x64 e macOS ARM64.
+2. **SM2-EMU** (`cores/sm2.*`): Motor C++ moderno com backend Vulkan e OpenGL para arcades 3D Sega Model 1 e Model 2 (revisões 2A, 2B, 2C).
+3. **Odin** (Sega Hikaru / Gaelco 3D): Código já presente em `third_party/odin` (`cores/hikaru.dll`), com refinamento planejado para calibração de controles analógicos do NASCAR Arcade (`sgnascar.zip`).
+
+*Nota de Governança*: Até a homologação oficial e empacotamento destes cores nas releases públicas, o valor canônico de motores ativos permanece estritamente fixado em **42 motores em 37 sistemas** (conforme definido em `include/app_info.h`). Detalhes adicionais no [ROADMAP.md](ROADMAP.md) e em [AUDITORIA_BATOCERA_44_E_OPORTUNIDADES.md](AUDITORIA_BATOCERA_44_E_OPORTUNIDADES.md).

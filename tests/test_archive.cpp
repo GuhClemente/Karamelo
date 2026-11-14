@@ -58,6 +58,8 @@ TEST_CASE(ArchiveResolveCoreIntelligentRouting)
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/swracer.zip", "roms/Arcade"), "cores/hikaru.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/pharrier.zip", "roms/Arcade"), "cores/hikaru.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/smashdrv.zip", "roms/Arcade"), "cores/hikaru.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/daytona.zip", "roms/Arcade"), "cores/sm2.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/vf2.zip", "roms/Arcade"), "cores/sm2.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mvsc2.zip", "roms/Arcade"), "cores/dreamcast.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mslug6.zip", "roms/Arcade"), "cores/dreamcast.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Arcade/mk.zip", "roms/Arcade"), "cores/mame2003.dll");
@@ -78,4 +80,9 @@ TEST_CASE(ArchiveResolveCoreIntelligentRouting)
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/starfox.v64", "roms/Nintendo64"), "cores/n64.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/game.zip", "roms/Nintendo64"), "cores/n64.dll");
 	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/Nintendo64/game.7z", "roms/Nintendo64"), "cores/n64.dll");
+
+	// 5. OpenBOR packages (.pak / .bor)
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/OpenBOR/game.pak", "roms/OpenBOR"), "cores/anybor.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/OpenBOR/game.bor", "roms/OpenBOR"), "cores/anybor.dll");
+	ASSERT_STR_EQ(ArchiveResolveCoreForPath("roms/OpenBOR/mod.zip", "roms/OpenBOR"), "cores/anybor.dll");
 }

@@ -266,8 +266,43 @@ Antes de qualquer transmissão de log ou dump de erro:
 | **🛡️ Crash Reporter Nativo Multiplataforma** | **v0.9.7** | Crítico | Média |
 | **💬 Discord Rich Presence** | **v0.9.7** | Alto | Média |
 | **🖼️ Molduras e Bezels Handheld/CRT** | **v0.9.7** | Muito Alto | Média |
+| **🎮 Refinamento do Odin (Hikaru / NASCAR)** | **v0.9.7** | Médio | Baixa |
+| **🥊 AnyBOR-libretro (OpenBOR Multi-Engine)** | **v0.9.8** | Alto | Média |
+| **🏎️ SM2-EMU (Sega Model 1 & 2 Vulkan/GL)** | **v0.9.8** | Muito Alto | Alta |
 | **🔄 Auto-Update de Ports no OSD** | **v0.9.8** | Alto | Média |
 | **🌐 Netplay Lobby & Descoberta Local** | **v1.0.0** | Muito Alto | Alta |
+
+---
+
+## 7. Expansão de Motores e Arcades (Lições do Batocera 44)
+
+Com base na auditoria aprofundada do Batocera 44 ("Malachite" Ep. IV — veja o documento completo em [AUDITORIA_BATOCERA_44_E_OPORTUNIDADES.md](AUDITORIA_BATOCERA_44_E_OPORTUNIDADES.md)), três frentes de emulação e preservação arcade foram priorizadas para implementação no Karamelo Emulador:
+
+### 7.1 `AnyBOR-libretro` (A Solução Definitiva para OpenBOR)
+- **Contexto**: A comunidade OpenBOR produziu centenas de beat'em ups espetaculares (*Streets of Rage Remake*, *Avengers United Battle Force*, *TMNT Shellshock*, *He-Man*), mas os arquivos de módulo (`.pak`) foram compilados contra versões incompatíveis da engine criadas ao longo de 20 anos. Usar um binário moderno trava jogos antigos; usar um binário antigo quebra jogos modernos.
+- **Arquitetura da Solução**:
+  - Adotar o core Libretro unificado **`AnyBOR-libretro`** (`retrodiv/AnyBOR-libretro`), que embute múltiplos sub-motores OpenBOR (v3.0 build 3xxx, build 4xxx, v4.0 e nightly) em um único `.dll` / `.so` / `.dylib`.
+  - Ao carregar um arquivo `.pak` em `roms/OpenBOR/`, o core inspeciona o cabeçalho e scripts do mod, seleciona a versão exata do motor em tempo de execução e executa o jogo de forma 100% transparente.
+- **Implementação no Karamelo**:
+  - Compilar `cores/anybor.dll` (Windows x64), `cores/anybor.so` (Linux x64) e `cores/anybor.dylib` (macOS ARM64).
+  - Adicionar a pasta `roms/OpenBOR/` na árvore de sistemas e mapear as extensões `.pak` e `.bor`.
+  - Mapeamento universal dos 6 botões de arcade (Ataque, Pulo, Especial, Bloqueio, Ataque 2, Provocação) via `input_map.cpp`.
+
+### 7.2 `SM2-EMU` (Sega Model 1 e Model 2 em C++ com Vulkan / OpenGL)
+- **Contexto**: Os clássicos 3D da Sega do início dos anos 90 (*Virtua Fighter*, *Virtua Racing*, *Daytona USA*, *Sega Rally Championship*, *Star Wars Arcade*) sofrem com opções legadas: o *Model 2 Emulator* de ElSemi é de código fechado, 32-bit exclusivo de Windows com DirectX 9 antigo, enquanto o MAME exige CPUs pesadíssimas e não entrega 60 FPS cravados em Mini-PCs modestos (como Intel N100 ou Celeron).
+- **Arquitetura da Solução**:
+  - Integrar o motor moderno **`SM2-EMU`** (desenvolvido por dmanlfc para o ecossistema Batocera), escrito em C++ moderno e portável.
+  - Renderizadores nativos de alta performance: **Vulkan** e **OpenGL 3.3+**, funcionando perfeitamente em Windows x64, Linux x64 e macOS ARM64 (via MoltenVK).
+- **Implementação no Karamelo**:
+  - Backend dedicado para ROMs Model 1 e Model 2 (revisões 2A, 2B e 2C) em `roms/Model1/`, `roms/Model2/` ou via detecção no diretório `roms/Arcade/`.
+  - Suporte total a periféricos analógicos: volante de corrida com force feedback, pedais lineares e gatilhos de acelerador/freio de gamepads modernos (XInput e SDL_Gamepad).
+
+### 7.3 Refinamento do `Odin` (Sega Hikaru / Gaelco 3D)
+- **Contexto**: O Karamelo já conta com o código-fonte do Odin em `third_party/odin` (`cores/hikaru.dll`), mas jogos complexos como *NASCAR Arcade* (`sgnascar.zip`) e *Brave Firefighters* apresentavam falhas de inicialização ou incompatibilidade de input.
+- **Melhorias Importadas do Batocera 44**:
+  - **Calibração de Acelerador/Freio do NASCAR**: Mapear os eixos analógicos 0-255 com zona morta ajustada para evitar o travamento na tela de *Hardware Check / Steering Error*.
+  - **Mapeamento de Mira / Lightgun**: Suporte ao mouse e analógico direito para os jatos d'água de *Brave Firefighters*.
+  - **Patches de EEPROM**: Inclusão de dados de calibração padrão embutidos no carregamento da ROM.
 
 ---
 

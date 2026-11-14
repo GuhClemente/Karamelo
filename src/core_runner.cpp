@@ -569,6 +569,7 @@ static LARGE_INTEGER s_rate_last = { 0 };
 static size_t   s_samples_accum = 0;
 static double   s_prev_measure = 0.0;
 static int      s_agree_count = 0;
+static int      s_rate_windows = 0;
 static double   s_locked_step = 0.0;   // 0 while still measuring
 static double   s_step = 0.0;
 
@@ -585,6 +586,7 @@ static void ResetAudioRateController()
 	s_samples_accum = 0;
 	s_prev_measure = 0.0;
 	s_agree_count = 0;
+	s_rate_windows = 0;
 	s_locked_step = 0.0;
 	s_step = 0.0;
 	s_tempo_ema = 1.0;
@@ -1069,35 +1071,66 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 	double elapsed = (double)(now.QuadPart - s_rate_last.QuadPart) / (double)freq.QuadPart;
 	if (elapsed >= 0.5)
 	{
+		s_rate_windows++;
 		double measured = (double)s_samples_accum / elapsed;
 		if (measured >= 8000.0 && measured <= 192000.0)
 		{
+			// Sanity check: if the core declared a valid sample rate (> 8000), measured rate
+			// must be within 15% of declared. Unthrottled catchup/loading bursts
+			// (e.g. 88 kHz when declared is 44.1 kHz) must never lock s_locked_step.
+			bool rate_sane = (g_core_sample_rate <= 0.0) ||
+			                 (fabs(measured - g_core_sample_rate) <= g_core_sample_rate * 0.15);
+
+			if (!rate_sane)
+			{
+				s_agree_count = 0;
+				s_prev_measure = 0.0;
+			}
+
 			if (s_locked_step <= 0.0)
 			{
-				// Within 1% of the previous window counts as agreement.
-				if (s_prev_measure > 0.0 &&
-				    fabs(measured - s_prev_measure) < s_prev_measure * 0.01)
+				if (rate_sane)
 				{
-					if (++s_agree_count >= 3)
+					// Within 1% of the previous window counts as agreement.
+					if (s_prev_measure > 0.0 &&
+					    fabs(measured - s_prev_measure) < s_prev_measure * 0.01)
 					{
-						s_locked_step = measured / (double)g_output_sample_rate;
-						FILE* lf = fopen("karamelo.log", "a");
-						if (lf)
+						if (++s_agree_count >= 3)
 						{
-							fprintf(lf, "[INFO] [AUDIO] taxa travada em %.0f Hz (declarada %.0f Hz), passo %.5f\n",
-								measured, g_core_sample_rate, s_locked_step);
-							fclose(lf);
+							s_locked_step = measured / (double)g_output_sample_rate;
+							FILE* lf = fopen("karamelo.log", "a");
+							if (lf)
+							{
+								fprintf(lf, "[INFO] [AUDIO] taxa travada em %.0f Hz (declarada %.0f Hz), passo %.5f\n",
+									measured, g_core_sample_rate, s_locked_step);
+								fclose(lf);
+							}
 						}
 					}
-				}
-				else
-				{
-					s_agree_count = 0;
-				}
-				s_prev_measure = measured;
+					else
+					{
+						s_agree_count = 0;
+					}
+					s_prev_measure = measured;
 
-				// Glide toward the reading only while still searching.
-				s_step = s_step * 0.7 + (measured / (double)g_output_sample_rate) * 0.3;
+					// Glide toward the reading only while still searching and reading is sane.
+					s_step = s_step * 0.7 + (measured / (double)g_output_sample_rate) * 0.3;
+				}
+
+				// If 8 windows (4.0s) have passed without locking (e.g. erratic bursts during load),
+				// fallback to locking at the core's declared rate to prevent permanent pitch drift.
+				if (s_locked_step <= 0.0 && s_rate_windows >= 8 && g_core_sample_rate > 0.0)
+				{
+					s_locked_step = g_core_sample_rate / (double)g_output_sample_rate;
+					s_step = s_locked_step;
+					FILE* lf = fopen("karamelo.log", "a");
+					if (lf)
+					{
+						fprintf(lf, "[INFO] [AUDIO] taxa fixada pelo padrao declarado: %.0f Hz, passo %.5f\n",
+							g_core_sample_rate, s_locked_step);
+						fclose(lf);
+					}
+				}
 			}
 			else
 			{
@@ -1106,7 +1139,7 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 				// percent off for a window or two, and following it detunes the sound, so
 				// this waits for 2 s of windows that agree with each other.
 				double expected_hz = s_locked_step * (double)g_output_sample_rate;
-				if (fabs(measured - expected_hz) > expected_hz * 0.04)
+				if (rate_sane && fabs(measured - expected_hz) > expected_hz * 0.04)
 				{
 					if (s_prev_measure > 0.0 && fabs(measured - s_prev_measure) < s_prev_measure * 0.01)
 						s_agree_count++;
@@ -3307,7 +3340,7 @@ static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, 
 {
 	// Only the two pads are shared between the machines. A keyboard or mouse read
 	// here would differ from the other player's and split the two games apart.
-	if (s_np_frame_ready && device != RETRO_DEVICE_JOYPAD && device != RETRO_DEVICE_ANALOG)
+	if (s_np_frame_ready && device != RETRO_DEVICE_JOYPAD && device != RETRO_DEVICE_ANALOG && device != RETRO_DEVICE_LIGHTGUN)
 		return 0;
 
 	if (port >= 4) return 0;
@@ -3441,6 +3474,33 @@ static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, 
 		case RETRO_DEVICE_ID_POINTER_Y:       return (int16_t)(xy & 0xFFFF);
 		case RETRO_DEVICE_ID_POINTER_PRESSED: return (int16_t)g_pointer_down;
 		case RETRO_DEVICE_ID_POINTER_COUNT:   return g_pointer_down ? 1 : 0;
+		default: return 0;
+		}
+	}
+	else if (device == RETRO_DEVICE_LIGHTGUN && port == 0)
+	{
+		InterlockedExchange(&g_core_reads_mouse, 1);
+		if (OsdIsEnabled()) return 0;
+		LONG xy = g_pointer_xy;
+		LONG btns = g_mouse_buttons;
+		switch (id)
+		{
+		case 13: /* RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X */
+			return (int16_t)((xy >> 16) & 0xFFFF);
+		case 14: /* RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y */
+			return (int16_t)(xy & 0xFFFF);
+		case 15: /* RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN */
+			return (btns & 2) ? 1 : 0;
+		case 2:  /* RETRO_DEVICE_ID_LIGHTGUN_TRIGGER */
+			return ((btns & 1) || g_pointer_down || joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_A] || joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_R2]) ? 1 : 0;
+		case 16: /* RETRO_DEVICE_ID_LIGHTGUN_RELOAD */
+			return ((btns & 2) || joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_B] || joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_L2]) ? 1 : 0;
+		case 3:  /* RETRO_DEVICE_ID_LIGHTGUN_AUX_A */
+			return (btns & 4) ? 1 : 0;
+		case 6:  /* RETRO_DEVICE_ID_LIGHTGUN_START */
+			return joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_START] ? 1 : 0;
+		case 7:  /* RETRO_DEVICE_ID_LIGHTGUN_SELECT */
+			return joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_SELECT] ? 1 : 0;
 		default: return 0;
 		}
 	}
@@ -3658,7 +3718,7 @@ int CoreRunInputProbe(std::string& report)
 				ok = port == 0 && (device == RETRO_DEVICE_JOYPAD || device == RETRO_DEVICE_ANALOG ||
 				     device == RETRO_DEVICE_KEYBOARD);
 			else
-				ok = device == RETRO_DEVICE_MOUSE || device == RETRO_DEVICE_POINTER;
+				ok = device == RETRO_DEVICE_MOUSE || device == RETRO_DEVICE_POINTER || device == RETRO_DEVICE_LIGHTGUN;
 			if (ok) continue;
 			char buf[64];
 			snprintf(buf, sizeof(buf), "%sporta %u %s %u", leaked.empty() ? "" : ", ", port + 1, ProbeDeviceName(device), id);
@@ -3896,7 +3956,9 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		 core_dll.find("mame2010") != std::string::npos ||
 		 core_dll.find("dreamcast") != std::string::npos ||
 		 core_dll.find("dosbox") != std::string::npos ||
-		 core_dll.find("hikaru") != std::string::npos);
+		 core_dll.find("hikaru") != std::string::npos ||
+		 core_dll.find("sm2") != std::string::npos ||
+		 core_dll.find("anybor") != std::string::npos);
 
 	if (ArchiveIsCompressed(rom_path) && !core_reads_archive)
 	{
@@ -3961,7 +4023,8 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		 core_dll.find("arcade_fbneo") != std::string::npos ||
 		 core_dll.find("mame2003") != std::string::npos ||
 		 core_dll.find("mame2010") != std::string::npos ||
-		 core_dll.find("hikaru") != std::string::npos);
+		 core_dll.find("hikaru") != std::string::npos ||
+		 core_dll.find("sm2") != std::string::npos);
 
 	bool loaded = false;
 
@@ -4052,6 +4115,31 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 				{
 					candidate_cores.insert(candidate_cores.begin(), hik);
 				}
+				// NASCAR Arcade: default to imitation drive board so steering calibration passes without serial hardware
+				if ((stem == "sgnascar" || stem == "sgnascaro") && !getenv("ODIN_DRIVE"))
+				{
+					_putenv("ODIN_DRIVE=imitation");
+				}
+			}
+			// Sega Model 1 & Model 2 titles: SM2-EMU (cores/sm2.dll) goes to the front when available
+			else if (stem == "daytona" || stem == "daytonam" || stem == "daytonas" || stem == "daytonase" || stem == "daytonat" ||
+				stem == "srallyc" || stem == "srallycb" || stem == "vf2" || stem == "vf2a" || stem == "vf2o" ||
+				stem == "vf" || stem == "vformula" || stem == "vr" || stem == "swar" || stem == "wingwar" ||
+				stem == "motoraid" || stem == "manxtt" || stem == "manxttc" || stem == "waverunr" ||
+				stem == "sgt24h" || stem == "indy500" || stem == "topskater" || stem == "desert" ||
+				stem == "overrev" || stem == "zerfgt" || stem == "stwing" || stem == "dynamite" ||
+				stem == "houseatt" || stem == "vsgolf" || stem == "schamp" || stem == "pilotids")
+			{
+				const std::string sm2 = "cores/sm2.dll";
+				auto it = std::find(candidate_cores.begin(), candidate_cores.end(), sm2);
+				if (it != candidate_cores.end())
+				{
+					if (it != candidate_cores.begin()) std::rotate(candidate_cores.begin(), it, it + 1);
+				}
+				else if (CoreBinaryExists(sm2.c_str()))
+				{
+					candidate_cores.insert(candidate_cores.begin(), sm2);
+				}
 			}
 		}
 
@@ -4078,11 +4166,11 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			const std::string& cand_dll = candidate_cores[i];
 			bool is_last_candidate = (i == candidate_cores.size() - 1);
 
-			// Flycast and Hikaru read zip/7z natively and need to for an arcade romset:
+			// Flycast, Hikaru, and SM2-EMU read zip/7z natively and need to for an arcade romset:
 			// the extraction above throws away whatever else the romset carried.
 			// Give it the intact original archive instead.
 			std::string effective_load_path =
-				((cand_dll.find("dreamcast") != std::string::npos || cand_dll.find("hikaru") != std::string::npos) && ArchiveIsCompressed(original_rom_path))
+				((cand_dll.find("dreamcast") != std::string::npos || cand_dll.find("hikaru") != std::string::npos || cand_dll.find("sm2") != std::string::npos) && ArchiveIsCompressed(original_rom_path))
 					? original_rom_path : rom_path;
 
 			// Handle Naomi GD-ROM aliases for Flycast (e.g. cvs2gd / cvs2gd-chd -> cvs2mf / cvs2)
@@ -4197,7 +4285,16 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			}
 			else if (any_probation_failure)
 			{
-				CoreSetToast(Tr("ROMSET INCOMPATIVEL COM OS CORES DE ARCADE", "ROMSET DOES NOT MATCH ANY ARCADE CORE"), 360);
+				std::string stem = fs::path(original_rom_path).stem().string();
+				std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
+				if (stem == "vhunt2" || stem == "vsav2")
+				{
+					CoreSetToast(Tr("CLONE CPS-2 REQUER ROMSET PAI (VSAV/VHUNTJR)", "CPS-2 CLONE REQUIRES PARENT ROMSET"), 480);
+				}
+				else
+				{
+					CoreSetToast(Tr("ROMSET INCOMPATIVEL COM OS CORES DE ARCADE", "ROMSET DOES NOT MATCH ANY ARCADE CORE"), 360);
+				}
 			}
 		}
 	}
@@ -5049,6 +5146,8 @@ static bool CoreLoad(const char* core_dll_path)
 	else if (strstr(core_dll_path, "pcfx")) loaded_core_name = "PC-FX";
 	else if (strstr(core_dll_path, "fmtowns")) loaded_core_name = "FM Towns";
 	else if (strstr(core_dll_path, "pc98")) loaded_core_name = "PC-98";
+	else if (strstr(core_dll_path, "anybor")) loaded_core_name = "OpenBOR";
+	else if (strstr(core_dll_path, "sm2")) loaded_core_name = "Sega Model 1/2";
 	else if (strstr(core_dll_path, "arcade") || strstr(core_dll_path, "fbneo") || strstr(core_dll_path, "mame") || strstr(core_dll_path, "hikaru")) loaded_core_name = "Arcade";
 	LeaveCriticalSection(&name_lock);
 

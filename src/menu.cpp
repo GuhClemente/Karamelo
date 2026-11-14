@@ -746,6 +746,19 @@ static const char *GetArcadeCoreDll(const std::string &file_path = "") {
       return "cores/hikaru.dll";
     }
 
+    // 0b. Sega Model 1 & Model 2 arcade games -> SM2-EMU (sm2.dll)
+    if (CoreBinaryExists("cores/sm2.dll")) {
+      if (stem == "daytona" || stem == "daytonam" || stem == "daytonas" || stem == "daytonase" || stem == "daytonat" ||
+          stem == "srallyc" || stem == "srallycb" || stem == "vf2" || stem == "vf2a" || stem == "vf2o" ||
+          stem == "vf" || stem == "vformula" || stem == "vr" || stem == "swar" || stem == "wingwar" ||
+          stem == "motoraid" || stem == "manxtt" || stem == "manxttc" || stem == "waverunr" ||
+          stem == "sgt24h" || stem == "indy500" || stem == "topskater" || stem == "desert" ||
+          stem == "overrev" || stem == "zerfgt" || stem == "stwing" || stem == "dynamite" ||
+          stem == "houseatt" || stem == "vsgolf" || stem == "schamp" || stem == "pilotids") {
+        return "cores/sm2.dll";
+      }
+    }
+
     // 1. Sega NAOMI / Sammy Atomiswave 3D arcade games -> Flycast
     if (stem == "mvsc2" || stem == "cvs2" || stem == "cvs2mf" || stem == "cvs2gd" || stem == "cvs2gd-chd" ||
         stem == "mslug6" || stem == "slasho" || stem == "hokuto" || stem == "fotns" ||
@@ -853,6 +866,8 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
   };
 
   // Unambiguous extensions: one system owns them.
+  if (ext == ".pak" || ext == ".bor")
+    return "cores/anybor.dll";
   if (ext == ".z64" || ext == ".n64" || ext == ".v64")
     return GetN64CoreDll();
   if (ext == ".nes" || ext == ".fds")
@@ -1088,6 +1103,10 @@ std::string MenuResolveCoreForPath(const std::string &file_path,
       return "cores/pc98.dll";
     if (in("FMTowns") || in("Towns") || in("Marty"))
       return "cores/fmtowns.dll";
+    if (in("OpenBOR"))
+      return "cores/anybor.dll";
+    if (in("Model1") || in("Model2"))
+      return "cores/sm2.dll";
     return GetArcadeCoreDll(file_path);
   }
 
@@ -1405,7 +1424,8 @@ static const SystemCore kSystemCores[] = {
     {134, "cores/lynx.dll"},
     {135, "cores/pcfx.dll"},
     {136, "cores/pc98.dll"},
-    {137, "cores/fmtowns.dll"}
+    {137, "cores/fmtowns.dll"},
+    {138, "cores/anybor.dll"}
 };
 
 // NULL above means the system has its own core selector; ask that instead.
@@ -1789,6 +1809,8 @@ void PopulateSystemsMenu() {
     items.push_back({"Nintendo 64", ">", true, true, 107});
   if (SystemHasCore(114) && MenuIsSystemVisible(114))
     items.push_back({"Nintendo DS", ">", true, true, 114});
+  if (SystemHasCore(138) && MenuIsSystemVisible(138))
+    items.push_back({"OpenBOR", ">", true, true, 138});
   if (SystemHasCore(127) && MenuIsSystemVisible(127))
     items.push_back({"Panasonic 3DO", ">", true, true, 127});
   if (SystemHasCore(135) && MenuIsSystemVisible(135))
@@ -2704,7 +2726,9 @@ void PopulateCoresList() {
     {"NEC PC-98", "NP2kai", "cores/pc98.dll"},
     {"FM Towns", "Geartowns", "cores/fmtowns.dll"},
     {"ZX Spectrum", "Fuse", "cores/spectrum.dll"},
-    {"WonderSwan", "Beetle Cygne", "cores/wswan.dll"}
+    {"WonderSwan", "Beetle Cygne", "cores/wswan.dll"},
+    {"OpenBOR", "AnyBOR", "cores/anybor.dll"},
+    {"Arcade Model 1/2", "SM2-EMU", "cores/sm2.dll"}
   };
 
   for (const auto& c : kAllCores) {
@@ -4758,7 +4782,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
           UpdaterCheckAsync(true);
         }
         PopulateUpdate();
-      } else if (item.action_id >= 101 && item.action_id <= 137) {
+      } else if (item.action_id >= 101 && item.action_id <= 138) {
         main_menu_saved_idx = selected_idx;
         if (item.action_id == 101) {
           current_state = STATE_BROWSE;
@@ -4871,6 +4895,9 @@ static void MenuProcessKeyImpl(MenuKey key) {
         } else if (item.action_id == 137) {
           current_state = STATE_BROWSE;
           PopulateBrowse("roms/FMTowns");
+        } else if (item.action_id == 138) {
+          current_state = STATE_BROWSE;
+          PopulateBrowse("roms/OpenBOR");
         }
       }
       // 140 (Ports & Recomp) is not in the 101-135 system range above, so it

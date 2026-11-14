@@ -318,6 +318,7 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 	if (ext == ".tzx" || ext == ".tap" || ext == ".z80" || ext == ".sna") return "cores/spectrum.dll";
 	if (ext == ".pcfx") return "cores/pcfx.dll";
 	if (ext == ".cso") return "cores/psp.dll";
+	if (ext == ".pak" || ext == ".bor") return "cores/anybor.dll";
 	// Same table as MenuResolveCoreForPath in menu.cpp - .hdd is decided by the
 	// folder there too, so a game resolves to one core however it is opened.
 	if (ext == ".hdd") return (in("FMTowns") || in("Towns") || in("Marty")) ? "cores/fmtowns.dll" : "cores/pc98.dll";
@@ -394,6 +395,17 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 				stem == "smashdrv" || stem == "smashdrvb" || stem == "smashdrvs" ||
 				stem == "atvtrack" || stem == "atvtracka" || stem == "gfootbal") {
 				return "cores/hikaru.dll";
+			}
+
+			// 0b. Sega Model 1 & Model 2 arcade games -> SM2-EMU (cores/sm2.dll)
+			if (stem == "daytona" || stem == "daytonam" || stem == "daytonas" || stem == "daytonase" || stem == "daytonat" ||
+				stem == "srallyc" || stem == "srallycb" || stem == "vf2" || stem == "vf2a" || stem == "vf2o" ||
+				stem == "vf" || stem == "vformula" || stem == "vr" || stem == "swar" || stem == "wingwar" ||
+				stem == "motoraid" || stem == "manxtt" || stem == "manxttc" || stem == "waverunr" ||
+				stem == "sgt24h" || stem == "indy500" || stem == "topskater" || stem == "desert" ||
+				stem == "overrev" || stem == "zerfgt" || stem == "stwing" || stem == "dynamite" ||
+				stem == "houseatt" || stem == "vsgolf" || stem == "schamp" || stem == "pilotids") {
+				return "cores/sm2.dll";
 			}
 
 			// 1. Sega NAOMI / Sammy Atomiswave 3D arcade games -> Flycast
@@ -487,6 +499,8 @@ std::string ArchiveResolveCoreForPath(const std::string& file_path, const std::s
 		if (in("GameCube")) return "cores/gamecube.dll";
 		if (in("PlayStation2") || in("PS2")) return "cores/ps2.dll";
 		if (in("PlayStation")) return "cores/psx.dll";
+		if (in("OpenBOR")) return "cores/anybor.dll";
+		if (in("Model1") || in("Model2")) return "cores/sm2.dll";
 		return "cores/arcade_fbneo.dll";
 	}
 

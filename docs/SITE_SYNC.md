@@ -2400,3 +2400,39 @@ Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 97 jo
 - **O que o jogador precisa**: O pacote original do jogo para Xbox 360 (XBLA), extraído do console (arquivo único com nome hexadecimal sem extensão em `Content\0000000000000000\584108A4\000D0000\`). Opcionalmente, o pacote do Title Update #1 (`...000B0000\`). Nenhum arquivo de jogo protegido por direitos autorais acompanha o download.
 - **Como funciona no Karamelo**: O Karamelo baixa e descompacta a release diretamente em `ports/SSF2THDRemix/`. Ao iniciar, o jogo abre o launcher integrado onde o jogador pode clicar em "Install Game" e selecionar seu pacote XBLA para extração automática na pasta `game/`. Após isso, o jogo fica pronto para jogar diretamente.
 - **Aviso legal para a página**: Projeto de fã não oficial, sem afiliação ou endosso da Capcom ou Microsoft. Super Street Fighter II Turbo HD Remix é marca registrada de seus respectivos proprietários.
+
+---
+
+## 64. Atualização de 14/11/2026 — Branch de Staging (`feat/batocera-app-upgrades`) & Novidades Técnicas
+
+Esta seção instrui a IA mantenedora do site sobre as implementações técnicas realizadas na branch isolada `feat/batocera-app-upgrades` (provenientes da auditoria de engenharia do Batocera 44 e refinamentos de telemetria):
+
+### 1. Status de Lançamento e Regra de Contagens
+> [!IMPORTANT]
+> **REGRA DE OURO PARA O SITE**: As implementações abaixo residem na branch `feat/batocera-app-upgrades` para homologação e compilação multiplataforma dos novos binários `.dll` / `.so` / `.dylib`. **NÃO ALTERE AS CONTAGENS PÚBLICAS NO SITE OFICIAL AINDA.** A contagem oficial de produção permanece rigorosamente em:
+> - **37 Sistemas Nativos**
+> - **42 Motores de Emulação** (`APP_CORE_ENGINES = 42`)
+> - **97 Ports e Recompilados** (97 Windows 🪟, 62 Linux 🐧, 42 macOS 🍎)
+> 
+> A contagem só será atualizada para 38 sistemas / 44 motores no momento em que a branch for mesclada à `main` e a versão 0.983 for compilada e distribuída oficialmente.
+
+### 2. O que foi implementado no Aplicativo (Karamelo App)
+1. **Suporte Nativo a OpenBOR (`cores/anybor.dll`)**:
+   - Resolução unificada de módulos `.pak` e `.bor` na pasta `roms/OpenBOR/`.
+   - Utiliza a arquitetura do `AnyBOR-libretro`, chaveando internamente a versão compatível de execução para cada módulo, eliminando falhas históricas de quebra de versão em beat'em ups da comunidade.
+2. **Suporte Dedicado a Arcades Sega Model 1 e Model 2 (`cores/sm2.dll`)**:
+   - Roteamento especializado para os clássicos 3D da Sega (*Daytona USA*, *Virtua Fighter 1 e 2*, *Virtua Racing*, *Sega Rally Championship*, *Star Wars Arcade*) via `SM2-EMU`.
+   - Compatibilidade com formatos compactados (`.zip` e `.7z`) e renderização em alta performance por hardware.
+3. **Refinamento do Motor Odin (Sega Hikaru & Gaelco 3D em `cores/hikaru.dll`)**:
+   - Correção do travamento de calibração em *NASCAR Arcade* (`sgnascar` / `sgnascaro`): injeção automática de bypass da placa de drive serial (`ODIN_DRIVE=imitation`).
+   - Implementação nativa de `RETRO_DEVICE_LIGHTGUN` para suporte a jogos de tiro como *Brave Firefighters*.
+4. **Correção do Bug de Áudio ("Efeito Esquilos") no Dreamcast (Flycast)**:
+   - Trava de sanidade de ±15% no cálculo dinâmico de taxa de amostragem no ring buffer de áudio. Surtos de carregamento inicial não aceleram mais o pitch para 1.83x (duplo). Fallback seguro de 48.000 Hz garantido.
+5. **Diagnóstico Inteligente para Sets CPS-2**:
+   - Aviso visual imediato (toast OSD) caso clones como *Vampire Hunter 2* ou *Vampire Savior 2* sejam iniciados sem as ROMsets pai na pasta.
+
+### 3. Roadmap Oficial do Karamelo OS (`c:\github\Karamelo Linux`)
+Para menções no site nas seções de console de sala de estar (`/comparativo` e `/recursos`):
+- **Modo Console Steam**: Integração do inicializador Steam Big Picture (`steam -gamepadui -steamos3`) dentro da sessão do Gamescope, permitindo transição perfeita entre títulos retrô do Karamelo e a biblioteca de jogos Steam de PC sem sair do sofá.
+- **Arquitetura Otimizada x86-64-v3 (ALHP)**: Instruções vetoriais modernas (AVX2/FMA) compiladas nativamente no kernel e emuladores do sistema operacional, oferecendo entre 10% e 25% de ganho de FPS em Mini-PCs modernos (Intel N100, AMD Ryzen).
+- **Contêineres SquashFS para PC Ports**: Montagem instantânea de jogos pesados em arquivos únicos compactados via kernel Linux, reduzindo em até 60% o consumo de armazenamento e protegendo contra fragmentação.
