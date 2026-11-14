@@ -21,8 +21,16 @@
 /cache/
 /saves/
 /screenshots/
+/record_staging/
+/test_out/
+/videos_gravados/
 *.mp4
+*.webm
+*.webp
+*.wav
 /app/*.mp4
+/app/*.webm
+/app/*.webp
 *.log
 *.log.old
 /app/*.log*
