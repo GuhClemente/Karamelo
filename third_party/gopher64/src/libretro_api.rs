@@ -315,6 +315,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const retro_game_info) -> bool {
         // not start with the last samples of the previous one.
         CURRENT_SAMPLE_RATE.store(0, Ordering::Relaxed);
         ui::audio::LIBRETRO_AUDIO_BUF.lock().unwrap().clear();
+        STATE_SIZE.store(0, Ordering::Relaxed);
 
         // Query frontend for Analogue 3D Upscale mode (0=Off 320x240, 1=Analogue 3D 640x240, 2=Analogue 3D Ultra 1280x240)
         let mut upscale_mode: u32 = 0;
@@ -502,19 +503,84 @@ pub unsafe extern "C" fn retro_get_memory_size(id: c_uint) -> usize {
     }
 }
 
+// The size promised to the frontend for one save state. libretro wants a figure
+// that does not move while a game runs, and the real one does, a little: the
+// machine is written with variable-length integers. So the first state of a
+// game is measured and the promise is that plus a quarter and 1 MiB; the block
+// carries its own lengths, and the slack is zero padding.
+static STATE_SIZE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_serialize_size() -> usize {
-    0
+    let promised = STATE_SIZE.load(Ordering::Relaxed);
+    if promised != 0 {
+        return promised;
+    }
+    let result = std::panic::catch_unwind(|| {
+        let mut guard = device_lock();
+        let Some(dev) = guard.as_mut() else {
+            return 0;
+        };
+        match crate::savestates::serialize_to_vec(dev) {
+            Some(blob) => blob.len() + blob.len() / 4 + (1 << 20),
+            None => 0,
+        }
+    });
+    let size = result.unwrap_or(0);
+    STATE_SIZE.store(size, Ordering::Relaxed);
+    size
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn retro_serialize(_data: *mut c_void, _size: usize) -> bool {
-    false
+pub unsafe extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
+    if data.is_null() || size == 0 {
+        return false;
+    }
+    let result = std::panic::catch_unwind(|| {
+        let mut guard = device_lock();
+        let Some(dev) = guard.as_mut() else {
+            return false;
+        };
+        let Some(blob) = crate::savestates::serialize_to_vec(dev) else {
+            return false;
+        };
+        if blob.len() > size {
+            eprintln!("[Gopher64] save state of {} bytes does not fit the {} promised", blob.len(), size);
+            return false;
+        }
+        let out = unsafe { std::slice::from_raw_parts_mut(data as *mut u8, size) };
+        out[..blob.len()].copy_from_slice(&blob);
+        out[blob.len()..].fill(0);
+        true
+    });
+    result.unwrap_or(false)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn retro_unserialize(_data: *const c_void, _size: usize) -> bool {
-    false
+pub unsafe extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
+    if data.is_null() || size == 0 {
+        return false;
+    }
+    let result = std::panic::catch_unwind(|| {
+        // Same as retro_run: loading a state can reach code that expects the
+        // Tokio runtime to be entered.
+        let rt_guard = runtime_lock();
+        let _enter = rt_guard.as_ref().map(|rt| rt.enter());
+
+        let mut guard = device_lock();
+        let Some(dev) = guard.as_mut() else {
+            return false;
+        };
+        let blob = unsafe { std::slice::from_raw_parts(data as *const u8, size) };
+        crate::savestates::unserialize_from_slice(dev, blob)
+    });
+    match result {
+        Ok(ok) => ok,
+        Err(err) => {
+            eprintln!("[Gopher64] Panic during retro_unserialize: {:?}", err);
+            false
+        }
+    }
 }
 
 #[unsafe(no_mangle)]

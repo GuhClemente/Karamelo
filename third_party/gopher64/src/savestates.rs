@@ -251,114 +251,10 @@ pub fn load_savestate(device: &mut device::Device, rewind: bool, rewind_frame: O
         None
     };
 
-    if let Some(mut state) = state_data
+    if let Some(state) = state_data
         && device.rdram.size == state.device.rdram.size
     {
-        if device.netplay.is_none() {
-            ui::video::idle();
-        }
-
-        device.savestate.last_rewind_saved = state.device.vi.elapsed_time;
-
-        std::mem::swap(&mut device.rng, &mut state.device.rng);
-
-        std::mem::swap(&mut device.ui.storage.saves, &mut state.saves);
-
-        std::mem::swap(&mut device.cpu, &mut state.device.cpu);
-        std::mem::swap(&mut device.pif, &mut state.device.pif);
-
-        std::mem::swap(&mut device.cart, &mut state.device.cart);
-        std::mem::swap(&mut device.cart.rom, &mut state.device.cart.rom); // ROM is not included in the savestate
-
-        std::mem::swap(&mut device.memory, &mut state.device.memory);
-        std::mem::swap(&mut device.rsp, &mut state.device.rsp);
-        std::mem::swap(&mut device.rdp, &mut state.device.rdp);
-
-        device.rdram.mem.copy_from_slice(&state.device.rdram.mem); // RDRAM address should not change
-        std::mem::swap(&mut device.rdram.regs, &mut state.device.rdram.regs);
-
-        std::mem::swap(&mut device.mi, &mut state.device.mi);
-        std::mem::swap(&mut device.pi, &mut state.device.pi);
-        std::mem::swap(&mut device.vi, &mut state.device.vi);
-        std::mem::swap(&mut device.ai, &mut state.device.ai);
-        std::mem::swap(&mut device.si, &mut state.device.si);
-        std::mem::swap(&mut device.ri, &mut state.device.ri);
-        std::mem::swap(&mut device.vru, &mut state.device.vru);
-        std::mem::swap(&mut device.cheats, &mut state.device.cheats);
-
-        std::mem::swap(&mut device.transferpaks, &mut state.device.transferpaks);
-        for (i, item) in device.transferpaks.iter_mut().enumerate() {
-            std::mem::swap(
-                &mut item.cart.rom,
-                &mut state.device.transferpaks[i].cart.rom,
-            ); // ROM is not included in the savestate
-        }
-
-        device::memory::init(device);
-        device::vi::set_expected_refresh_rate(device);
-        device::cpu::map_instructions(device);
-        device::cop0::map_instructions(device);
-        device::cop1::map_instructions(device);
-        device::cop2::map_instructions(device);
-        device::rsp_cpu::map_instructions(device);
-
-        let mut mem_addr = 0x1000;
-        while mem_addr < 0x2000 {
-            let data =
-                u32::from_be_bytes(device.rsp.mem[mem_addr..mem_addr + 4].try_into().unwrap());
-            device.rsp.cpu.instructions[(mem_addr & 0xFFF) / 4].func =
-                device::rsp_cpu::decode_opcode(device, data);
-            device.rsp.cpu.instructions[(mem_addr & 0xFFF) / 4].opcode = data;
-            mem_addr += 4;
-        }
-
-        for line_index in 0..512 {
-            for i in 0..8 {
-                device.memory.icache[line_index].instruction[i] =
-                    device::cpu::decode_opcode(device, device.memory.icache[line_index].words[i]);
-            }
-        }
-
-        device::pif::connect_pif_channels(device);
-        for i in 0..4 {
-            if let Some(handler) = device.pif.channels[i].pak_handler {
-                if handler.pak_type == device::controller::PakType::RumblePak {
-                    let rumblepak_handler = device::controller::PakHandler {
-                        read: device::controller::rumble::read,
-                        write: device::controller::rumble::write,
-                        pak_type: device::controller::PakType::RumblePak,
-                    };
-                    device.pif.channels[i].pak_handler = Some(rumblepak_handler);
-                } else if handler.pak_type == device::controller::PakType::MemPak {
-                    let mempak_handler = device::controller::PakHandler {
-                        read: device::controller::mempak::read,
-                        write: device::controller::mempak::write,
-                        pak_type: device::controller::PakType::MemPak,
-                    };
-                    device.pif.channels[i].pak_handler = Some(mempak_handler);
-                } else if handler.pak_type == device::controller::PakType::TransferPak {
-                    let tpak_handler = device::controller::PakHandler {
-                        read: device::controller::transferpak::read,
-                        write: device::controller::transferpak::write,
-                        pak_type: device::controller::PakType::TransferPak,
-                    };
-                    device.pif.channels[i].pak_handler = Some(tpak_handler);
-                }
-            }
-        }
-
-        ui::audio::update_freq(device);
-        ui::video::load_state(device, state.rdp_state.as_ptr());
-
-        if !state.ra_state.is_empty() {
-            retroachievements::load_state(state.ra_state.as_ptr(), state.ra_state.len());
-        } else {
-            retroachievements::load_state(std::ptr::null(), 0);
-        }
-
-        if device.cheats.enabled {
-            cheats::execute_cheats(device, device.cheats.cheats.clone());
-        }
+        apply_state(device, state);
 
         if !rewind {
             ui::video::onscreen_message(
@@ -391,6 +287,214 @@ pub fn load_savestate(device: &mut device::Device, rewind: bool, rewind_frame: O
         };
         ui::video::onscreen_message(&message, length);
     }
+}
+
+// Puts a state into the running machine. Shared by the file savestates, the
+// rewind pool and the libretro retro_unserialize path.
+fn apply_state(device: &mut device::Device, mut state: SavestateData) {
+    if device.netplay.is_none() {
+        ui::video::idle();
+    }
+
+    device.savestate.last_rewind_saved = state.device.vi.elapsed_time;
+
+    std::mem::swap(&mut device.rng, &mut state.device.rng);
+
+    std::mem::swap(&mut device.ui.storage.saves, &mut state.saves);
+
+    std::mem::swap(&mut device.cpu, &mut state.device.cpu);
+    std::mem::swap(&mut device.pif, &mut state.device.pif);
+
+    std::mem::swap(&mut device.cart, &mut state.device.cart);
+    std::mem::swap(&mut device.cart.rom, &mut state.device.cart.rom); // ROM is not included in the savestate
+
+    std::mem::swap(&mut device.memory, &mut state.device.memory);
+    std::mem::swap(&mut device.rsp, &mut state.device.rsp);
+    std::mem::swap(&mut device.rdp, &mut state.device.rdp);
+
+    device.rdram.mem.copy_from_slice(&state.device.rdram.mem); // RDRAM address should not change
+    std::mem::swap(&mut device.rdram.regs, &mut state.device.rdram.regs);
+
+    std::mem::swap(&mut device.mi, &mut state.device.mi);
+    std::mem::swap(&mut device.pi, &mut state.device.pi);
+    std::mem::swap(&mut device.vi, &mut state.device.vi);
+    std::mem::swap(&mut device.ai, &mut state.device.ai);
+    std::mem::swap(&mut device.si, &mut state.device.si);
+    std::mem::swap(&mut device.ri, &mut state.device.ri);
+    std::mem::swap(&mut device.vru, &mut state.device.vru);
+    std::mem::swap(&mut device.cheats, &mut state.device.cheats);
+
+    std::mem::swap(&mut device.transferpaks, &mut state.device.transferpaks);
+    for (i, item) in device.transferpaks.iter_mut().enumerate() {
+        std::mem::swap(
+            &mut item.cart.rom,
+            &mut state.device.transferpaks[i].cart.rom,
+        ); // ROM is not included in the savestate
+    }
+
+    device::memory::init(device);
+    device::vi::set_expected_refresh_rate(device);
+    device::cpu::map_instructions(device);
+    device::cop0::map_instructions(device);
+    device::cop1::map_instructions(device);
+    device::cop2::map_instructions(device);
+    device::rsp_cpu::map_instructions(device);
+
+    let mut mem_addr = 0x1000;
+    while mem_addr < 0x2000 {
+        let data =
+            u32::from_be_bytes(device.rsp.mem[mem_addr..mem_addr + 4].try_into().unwrap());
+        device.rsp.cpu.instructions[(mem_addr & 0xFFF) / 4].func =
+            device::rsp_cpu::decode_opcode(device, data);
+        device.rsp.cpu.instructions[(mem_addr & 0xFFF) / 4].opcode = data;
+        mem_addr += 4;
+    }
+
+    for line_index in 0..512 {
+        for i in 0..8 {
+            device.memory.icache[line_index].instruction[i] =
+                device::cpu::decode_opcode(device, device.memory.icache[line_index].words[i]);
+        }
+    }
+
+    device::pif::connect_pif_channels(device);
+    for i in 0..4 {
+        if let Some(handler) = device.pif.channels[i].pak_handler {
+            if handler.pak_type == device::controller::PakType::RumblePak {
+                let rumblepak_handler = device::controller::PakHandler {
+                    read: device::controller::rumble::read,
+                    write: device::controller::rumble::write,
+                    pak_type: device::controller::PakType::RumblePak,
+                };
+                device.pif.channels[i].pak_handler = Some(rumblepak_handler);
+            } else if handler.pak_type == device::controller::PakType::MemPak {
+                let mempak_handler = device::controller::PakHandler {
+                    read: device::controller::mempak::read,
+                    write: device::controller::mempak::write,
+                    pak_type: device::controller::PakType::MemPak,
+                };
+                device.pif.channels[i].pak_handler = Some(mempak_handler);
+            } else if handler.pak_type == device::controller::PakType::TransferPak {
+                let tpak_handler = device::controller::PakHandler {
+                    read: device::controller::transferpak::read,
+                    write: device::controller::transferpak::write,
+                    pak_type: device::controller::PakType::TransferPak,
+                };
+                device.pif.channels[i].pak_handler = Some(tpak_handler);
+            }
+        }
+    }
+
+    ui::audio::update_freq(device);
+    ui::video::load_state(device, state.rdp_state.as_ptr());
+
+    // Under libretro the achievements belong to the frontend, and this core's
+    // own client is never created.
+    if !ui::video::LIBRETRO_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+        if !state.ra_state.is_empty() {
+            retroachievements::load_state(state.ra_state.as_ptr(), state.ra_state.len());
+        } else {
+            retroachievements::load_state(std::ptr::null(), 0);
+        }
+    }
+
+    if device.cheats.enabled {
+        cheats::execute_cheats(device, device.cheats.cheats.clone());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// libretro: the same state, to and from one block of memory.
+//
+// retro_serialize_size() used to answer 0, which is how a core says it has no
+// save states: the frontend could only refuse. The layout is a small header
+// (magic, three lengths) followed by the machine, the cartridge saves and the
+// RDP state, each exactly as the file savestate holds them, uncompressed.
+// ---------------------------------------------------------------------------
+const STATE_MAGIC: &[u8; 8] = b"KG64ST01";
+const STATE_HEADER: usize = 8 + 3 * 8;
+
+pub fn serialize_to_vec(device: &mut device::Device) -> Option<Vec<u8>> {
+    ui::video::idle();
+
+    let mut rdp_state: Vec<u8> = vec![0; ui::video::state_size()];
+    ui::video::save_state(rdp_state.as_mut_ptr());
+
+    let device_data = postcard::to_stdvec(&*device).ok()?;
+    let saves_data = postcard::to_stdvec(&device.ui.storage.saves).ok()?;
+
+    let mut out =
+        Vec::with_capacity(STATE_HEADER + device_data.len() + saves_data.len() + rdp_state.len());
+    out.extend_from_slice(STATE_MAGIC);
+    for part in [&device_data, &saves_data, &rdp_state] {
+        out.extend_from_slice(&(part.len() as u64).to_le_bytes());
+    }
+    out.extend_from_slice(&device_data);
+    out.extend_from_slice(&saves_data);
+    out.extend_from_slice(&rdp_state);
+    Some(out)
+}
+
+struct ParsedState(Box<device::Device>, ui::storage::Saves);
+// Built on a helper thread and handed straight back; nothing in it is shared.
+unsafe impl Send for ParsedState {}
+
+pub fn unserialize_from_slice(device: &mut device::Device, data: &[u8]) -> bool {
+    if data.len() < STATE_HEADER || &data[..8] != STATE_MAGIC {
+        return false;
+    }
+    let len = |i: usize| -> usize {
+        u64::from_le_bytes(data[8 + i * 8..16 + i * 8].try_into().unwrap()) as usize
+    };
+    let (device_len, saves_len, rdp_len) = (len(0), len(1), len(2));
+    let Some(total) = STATE_HEADER
+        .checked_add(device_len)
+        .and_then(|v| v.checked_add(saves_len))
+        .and_then(|v| v.checked_add(rdp_len))
+    else {
+        return false;
+    };
+    // The frontend pads the block up to retro_serialize_size(), so longer is fine.
+    if total > data.len() || rdp_len != ui::video::state_size() {
+        return false;
+    }
+
+    let device_bytes = &data[STATE_HEADER..STATE_HEADER + device_len];
+    let saves_bytes = &data[STATE_HEADER + device_len..STATE_HEADER + device_len + saves_len];
+    let rdp_bytes = &data[STATE_HEADER + device_len + saves_len..total];
+
+    // The machine is a large structure and serde builds it by value before
+    // boxing it. The frontend's core thread has a 1 MiB stack, so that part
+    // runs on a thread with room to spare.
+    let parsed = std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .stack_size(64 << 20)
+            .spawn_scoped(scope, || {
+                let state = postcard::from_bytes::<Box<device::Device>>(device_bytes).ok()?;
+                let saves = postcard::from_bytes::<ui::storage::Saves>(saves_bytes).ok()?;
+                Some(ParsedState(state, saves))
+            })
+            .ok()?
+            .join()
+            .ok()?
+    });
+    let Some(ParsedState(state, saves)) = parsed else {
+        return false;
+    };
+    if device.rdram.size != state.rdram.size {
+        return false;
+    }
+
+    apply_state(
+        device,
+        SavestateData {
+            device: state,
+            saves,
+            rdp_state: rdp_bytes.to_vec(),
+            ra_state: Vec::new(),
+        },
+    );
+    true
 }
 
 pub fn default_pak_handler() -> fn(&mut device::Device, usize, u16, usize, usize) {
