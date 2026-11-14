@@ -95,3 +95,76 @@ TEST_CASE(ViewportNeverExceedsSurface)
 		}
 	}
 }
+
+// Flycast hands back one retro_run() per picture the game presents, so a game
+// drawing at 30 fps delivers two frames of sound per call. Paced by calls alone
+// it ran at double speed, an octave up (Resident Evil Code: Veronica).
+TEST_CASE(FramePeriodsFollowTheAudioDelivered)
+{
+	const double per_frame = 44100.0 / 59.8266;
+	double carry = 0.0;
+
+	// A 60 fps game: one period per call, however long it runs.
+	for (int i = 0; i < 600; i++)
+		ASSERT_EQ(1, FramePeriodsForAudio(per_frame, per_frame, &carry));
+
+	// The game drops to 30 fps: two periods from the very first call.
+	for (int i = 0; i < 600; i++)
+		ASSERT_EQ(2, FramePeriodsForAudio(per_frame * 2.0, per_frame, &carry));
+
+	// A loading screen that draws nothing: three vblanks per call.
+	ASSERT_EQ(3, FramePeriodsForAudio(per_frame * 3.0, per_frame, &carry));
+
+	// And back to 60 fps.
+	for (int i = 0; i < 10; i++)
+		ASSERT_EQ(1, FramePeriodsForAudio(per_frame, per_frame, &carry));
+}
+
+TEST_CASE(FramePeriodsAbsorbUnevenDelivery)
+{
+	const double per_frame = 737.0;
+	double carry = 0.0;
+
+	// Threaded rendering uploads whatever the emulation thread wrote since the
+	// last call, so the batches wobble around the true figure. At 60 fps that
+	// must never add a period...
+	long total = 0;
+	for (int i = 0; i < 1000; i++)
+		total += FramePeriodsForAudio(per_frame * ((i & 1) ? 1.3 : 0.7), per_frame, &carry);
+	ASSERT_EQ(1000, total);
+
+	// ...and at 30 fps it must add up to two per call, not drift either way.
+	carry = 0.0;
+	total = 0;
+	for (int i = 0; i < 1000; i++)
+		total += FramePeriodsForAudio(per_frame * ((i & 1) ? 2.4 : 1.6), per_frame, &carry);
+	ASSERT_TRUE(total >= 1990 && total <= 2010);
+}
+
+TEST_CASE(FramePeriodsIgnoreRateDriftAndSilence)
+{
+	const double per_frame = 800.0;
+	double carry = 0.0;
+
+	// A real rate half a percent above the declared one is drift, not a second
+	// frame: an extra period here would be a visible hitch every few seconds.
+	for (int i = 0; i < 5000; i++)
+		ASSERT_EQ(1, FramePeriodsForAudio(per_frame * 1.005, per_frame, &carry));
+
+	// No sound at all (paused core, menu) is still one period, never zero.
+	carry = 0.0;
+	for (int i = 0; i < 100; i++)
+		ASSERT_EQ(1, FramePeriodsForAudio(0.0, per_frame, &carry));
+
+	// A call that delivers nothing followed by one that delivers double is two
+	// frames of sound over two calls: two periods in total, not three.
+	carry = 0.0;
+	int a = FramePeriodsForAudio(0.0, per_frame, &carry);
+	int b = FramePeriodsForAudio(per_frame * 2.0, per_frame, &carry);
+	ASSERT_EQ(2, a + b);
+
+	// Bad input changes nothing.
+	carry = 0.4;
+	ASSERT_EQ(1, FramePeriodsForAudio(100.0, 0.0, &carry));
+	ASSERT_EQ(1, FramePeriodsForAudio(100.0, per_frame, NULL));
+}

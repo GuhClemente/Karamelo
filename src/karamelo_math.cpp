@@ -70,3 +70,24 @@ void ComputeViewport(int aspect_mode, int dest_w, int dest_h,
 	if (out_w) *out_w = target_w;
 	if (out_h) *out_h = target_h;
 }
+
+int FramePeriodsForAudio(double samples, double samples_per_frame, double* carry)
+{
+	if (!carry) return 1;
+	if (samples_per_frame <= 0.0 || samples < 0.0)
+	{
+		*carry = 0.0;
+		return 1;
+	}
+
+	double total = *carry + samples / samples_per_frame;
+	int periods = (int)(total + 0.5);
+	if (periods < 1) periods = 1;
+	if (periods > 4) periods = 4;
+
+	double rest = (total - (double)periods) * 0.9;
+	if (rest > 1.0) rest = 1.0;
+	if (rest < -1.0) rest = -1.0;
+	*carry = rest;
+	return periods;
+}

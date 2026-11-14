@@ -5,6 +5,7 @@
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <xinput.h>
+#include <tlhelp32.h>
 #pragma comment(lib, "winmm.lib")
 #else
 #include "compat_win32.h"
@@ -322,6 +323,10 @@ static ToastLockInit g_toast_lock_init;
 // Multi-Threading Handles
 static HANDLE h_core_thread = NULL;
 static volatile LONG core_thread_running = 0;
+// Set by CoreShutdown only. core_thread_running cannot stand in for it: a core
+// may clear that one itself through RETRO_ENVIRONMENT_SHUTDOWN, some of them
+// while refusing a game, and the arcade chain must go on to the next core then.
+static volatile LONG s_stop_requested = 0;
 
 // Set around every LoadLibraryA/FreeLibrary call the core thread makes.
 // TerminateThread()-ing the core thread while it owns the process-wide
@@ -1391,6 +1396,59 @@ static struct retro_vfs_interface g_vfs_iface = {
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
+// What the core itself said while an arcade romset was being tried.
+//
+// A romset missing one file used to end in a toast that named a Naomi BIOS, for
+// a CPS-2 game, while the real answer sat in the log: "vsav2.key NOT FOUND".
+// The names a core reports as not found are kept here (first core first, since
+// the first one tried is the one the romset should match) and shown instead.
+//
+// The counter is for the other half of the same romsets: an older MAME accepts
+// the file names, cannot decrypt the program and runs garbage - no fault, a
+// black screen, and "unmapped memory" logged thousands of times a second.
+static std::mutex               s_missing_mtx;
+static std::vector<std::string> s_missing_files;
+static std::atomic<bool>        s_collect_missing{ false };
+static std::atomic<long>        s_unmapped_log_count{ 0 };
+
+static void NoteCoreLogLine(const char* text)
+{
+	if (strstr(text, "unmapped memory"))
+		s_unmapped_log_count.fetch_add(1, std::memory_order_relaxed);
+
+	if (!s_collect_missing.load(std::memory_order_relaxed)) return;
+
+	// One message can carry several lines ("a.key NOT FOUND (...)\nb.bin NOT FOUND").
+	const char* line = text;
+	while (line && *line)
+	{
+		const char* eol = strchr(line, '\n');
+		const size_t len = eol ? (size_t)(eol - line) : strlen(line);
+		std::string row(line, len);
+		line = eol ? eol + 1 : NULL;
+
+		const size_t at = row.find("NOT FOUND");
+		if (at == std::string::npos) continue;
+
+		// The file name is the last word before the marker.
+		std::string name = row.substr(0, at);
+		while (!name.empty() && isspace((unsigned char)name.back())) name.pop_back();
+		const size_t sp = name.find_last_of(" \t]");
+		if (sp != std::string::npos) name = name.substr(sp + 1);
+		if (name.empty() || name.size() > 40) continue;
+
+		bool plain = true;
+		for (char c : name)
+			if (!isalnum((unsigned char)c) && c != '.' && c != '_' && c != '-') { plain = false; break; }
+		if (!plain) continue;
+
+		std::lock_guard<std::mutex> lock(s_missing_mtx);
+		if (s_missing_files.size() < 16 &&
+			std::find(s_missing_files.begin(), s_missing_files.end(), name) == s_missing_files.end())
+			s_missing_files.push_back(name);
+	}
+}
+
 static const long long kCoreLogMaxBytes = 32 * 1024 * 1024;
 
 // One file per session would lose the crash before this one; one forever fills the
@@ -1417,6 +1475,8 @@ static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
+
+	NoteCoreLogLine(buf);
 
 	// Kept open: reopening per line meant 35 open/close pairs just to
 	// list the tracks of one CD image.
@@ -2143,6 +2203,37 @@ static bool CB_Environment(unsigned cmd, void* data)
 			// (Rusty, Touhou, Popful Mail, etc.) immediately playable with any controller.
 			else if (strcmp(var->key, "np2kai_joymode") == 0) var->value = "Keypad";
 
+			// 3DO (Opera): the core defaults to its built-in open BIOS, which
+			// boots Road Rash and not Super Street Fighter II Turbo - with the
+			// player's real BIOS sitting unused in bios/. The option's values
+			// are the file names the core found there, so a real one is chosen
+			// when it exists and the built-in stays as the fallback.
+			else if (strcmp(var->key, "opera_bios") == 0)
+			{
+				static const char* const kReal3doBios[] = {
+					"panafz10.bin", "panafz10-norsa.bin", "panafz1.bin", "goldstar.bin",
+					"sanyotry.bin", "panafz10e-anvil.bin", "panafz10e-anvil-norsa.bin", "panafz1j.bin"
+				};
+				const char* chosen = NULL;
+				for (const char* name : kReal3doBios)
+				{
+					std::error_code bec;
+					if (fs::exists(fs::path("bios") / name, bec)) { chosen = name; break; }
+				}
+				if (chosen)
+				{
+					var->value = chosen;
+				}
+				else
+				{
+					EnterCriticalSection(&options_lock);
+					auto d = g_core_defaults.find(var->key);
+					var->value = (d != g_core_defaults.end()) ? StableOptionValue(d->second) : NULL;
+					LeaveCriticalSection(&options_lock);
+					if (!var->value) return false;
+				}
+			}
+
 			// If no explicit override matched: hand back what the core itself declared as default.
 			else
 			{
@@ -2639,14 +2730,35 @@ void CoreStopAudioRecording()
 	if (old_fp) { fflush(old_fp); fclose(old_fp); }
 }
 
+// Audio frames the core handed over during the current retro_run(), and whether
+// this core's retro_run() can cover more than one video frame. Flycast returns
+// when the game presents a picture, not at every vblank: a game drawing at 30 fps
+// gives two frames of emulated time (and of sound) per call. Paced at 60 calls a
+// second, Resident Evil Code: Veronica ran at double speed with every voice an
+// octave up - the resampler measured 88 kHz and followed it faithfully. The run
+// loop reads this to wait as many frame periods as the call really covered
+// (FramePeriodsForAudio in karamelo_math.h).
+static std::atomic<long> s_run_audio_frames{ 0 };
+
+// The loaded core turned its game down (retro_load_game returned false). Read
+// by CoreUnload, for the one core that cannot be freed after that.
+static bool s_core_refused_game = false;
+// The loaded core is current MAME (library name "MAME", whatever the file is
+// called here). Its threads outlive retro_deinit - see CoreUnload.
+static bool s_core_is_current_mame = false;
+static bool   s_core_runs_span_frames = false;
+static double s_pace_carry = 0.0;
+
 static void CB_AudioSample(int16_t left, int16_t right)
 {
 	int16_t frame[2] = { left, right };
+	s_run_audio_frames.fetch_add(1, std::memory_order_relaxed);
 	SendAudioSamples(frame, 1);
 }
 
 static size_t CB_AudioSampleBatch(const int16_t* data, size_t frames)
 {
+	s_run_audio_frames.fetch_add((long)frames, std::memory_order_relaxed);
 	SendAudioSamples(data, frames);
 	if (VoiceChatIsActive()) VoiceChatFeedReferenceAudio(data, frames);
 	return frames;
@@ -3943,8 +4055,26 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			}
 		}
 
+		{
+			std::lock_guard<std::mutex> lock(s_missing_mtx);
+			s_missing_files.clear();
+		}
+		s_collect_missing.store(true);
+		bool any_probation_failure = false;
+
+		bool chain_cancelled = false;
 		for (size_t i = 0; i < candidate_cores.size(); i++)
 		{
+			// Closing the game or picking another one while the chain is still
+			// trying cores used to be ignored until every candidate had had its
+			// turn - several seconds each - and the wait for this thread gave
+			// up first and killed it in the middle of a core.
+			if (InterlockedCompareExchange(&s_stop_requested, 0, 0))
+			{
+				chain_cancelled = true;
+				break;
+			}
+
 			const std::string& cand_dll = candidate_cores[i];
 			bool is_last_candidate = (i == candidate_cores.size() - 1);
 
@@ -3993,18 +4123,38 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 					// with no indication anything else was ever available.
 					bool probation_ok = true;
 					const int kProbationFrames = 120;
+					s_unmapped_log_count.store(0);
 					for (int pf = 0; pf < kProbationFrames; pf++)
 					{
 						FrameRunResult pr = RunOneFrameGuarded();
 						if (!pr.ok)
 						{
 							CoreLogPrintf(RETRO_LOG_ERROR,
-								"[CoreRunner] %s travou no periodo de teste (frame %d/%d) apos carregar '%s'; tentando proximo core",
-								cand_dll.c_str(), pf, kProbationFrames, load_path.c_str());
+								"[CoreRunner] %s travou no periodo de teste (frame %d/%d, excecao 0x%08lX em %p) apos carregar '%s'; tentando proximo core",
+								cand_dll.c_str(), pf, kProbationFrames, (unsigned long)pr.exc_code, pr.exc_addr, load_path.c_str());
+							probation_ok = false;
+							break;
+						}
+
+						// No fault is not the same as running. MAME 2003 took a
+						// CPS-2 romset whose program it could not decrypt (vhunt2,
+						// no XOR tables), sat at one address writing to unmapped
+						// memory, and was committed as a success: a black screen
+						// the player had to back out of. A healthy game logs a
+						// handful of these, if any; that one logged thousands per
+						// frame, so it is caught within the first few frames
+						// rather than after two seconds of it.
+						const long unmapped = s_unmapped_log_count.load();
+						if (unmapped > kProbationFrames * 25)
+						{
+							CoreLogPrintf(RETRO_LOG_ERROR,
+								"[CoreRunner] %s aceitou '%s' mas executa lixo (%ld acessos a memoria nao mapeada em %d frames); tentando proximo core",
+								cand_dll.c_str(), load_path.c_str(), unmapped, pf + 1);
 							probation_ok = false;
 							break;
 						}
 					}
+					if (!probation_ok) any_probation_failure = true;
 
 					if (probation_ok)
 					{
@@ -4018,6 +4168,37 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 				}
 			}
 			CoreUnload();
+		}
+
+		s_collect_missing.store(false);
+		if (!loaded && !chain_cancelled)
+		{
+			// Say what is actually wrong with the romset. This replaces whatever
+			// the last candidate guessed at, which for a core that was never the
+			// right one for the game is a guess about the wrong hardware.
+			std::string missing;
+			size_t extra = 0;
+			{
+				std::lock_guard<std::mutex> lock(s_missing_mtx);
+				for (size_t m = 0; m < s_missing_files.size(); m++)
+				{
+					if (m < 3) missing += (m ? ", " : "") + s_missing_files[m];
+					else extra++;
+				}
+			}
+			char msg[224];
+			if (!missing.empty())
+			{
+				char more[24] = "";
+				if (extra) snprintf(more, sizeof(more), " (+%u)", (unsigned)extra);
+				snprintf(msg, sizeof(msg), Tr("ROMSET INCOMPLETO - FALTA: %s%s", "INCOMPLETE ROMSET - MISSING: %s%s"),
+					missing.c_str(), more);
+				CoreSetToast(msg, 480);
+			}
+			else if (any_probation_failure)
+			{
+				CoreSetToast(Tr("ROMSET INCOMPATIVEL COM OS CORES DE ARCADE", "ROMSET DOES NOT MATCH ANY ARCADE CORE"), 360);
+			}
 		}
 	}
 	else
@@ -4166,7 +4347,14 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 			tick = (LONGLONG)((double)freq.QuadPart / fps);
 		}
 
-		next.QuadPart += tick;
+		// One period per call, except for a core whose call can cover several
+		// frames: that one waits for as many as the sound it produced accounts for.
+		int periods = 1;
+		const long run_audio = s_run_audio_frames.exchange(0, std::memory_order_relaxed);
+		if (s_core_runs_span_frames && core_native_fps > 1.0)
+			periods = FramePeriodsForAudio((double)run_audio, core_native_sample_rate / core_native_fps, &s_pace_carry);
+
+		next.QuadPart += tick * periods;
 		QueryPerformanceCounter(&now);
 
 		LONGLONG remaining = next.QuadPart - now.QuadPart;
@@ -4409,6 +4597,7 @@ static bool WaitForCoreThread(HANDLE h, DWORD timeout_ms)
 void CoreShutdown(bool will_reload)
 {
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreShutdown] Inicio do shutdown...");
+	InterlockedExchange(&s_stop_requested, 1);
 	InterlockedExchange(&core_thread_running, 0);
 
 	if (h_core_thread)
@@ -4482,6 +4671,7 @@ bool CoreRequestLoad(const char* rom_path, const char* core_dll_hint)
 	core_fb_height = 240;
 
 	InterlockedExchange(&g_core_state, CORE_STATE_LOADING);
+	InterlockedExchange(&s_stop_requested, 0);
 	InterlockedExchange(&core_thread_running, 1);
 
 	h_core_thread = CreateThread(NULL, 0, CoreExecutionThreadProc, NULL, 0, NULL);
@@ -4881,6 +5071,14 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		sys_info.library_version ? sys_info.library_version : "?",
 		sys_info.valid_extensions ? sys_info.valid_extensions : "?");
 
+	// Flycast (Dreamcast, Naomi, Atomiswave) is the one core here whose
+	// retro_run() follows the game's own frame rate - see s_run_audio_frames.
+	s_core_runs_span_frames = sys_info.library_name && strstr(sys_info.library_name, "Flycast") != NULL;
+	s_pace_carry = 0.0;
+	s_run_audio_frames.store(0);
+	s_core_refused_game = false;
+	s_core_is_current_mame = sys_info.library_name && strcmp(sys_info.library_name, "MAME") == 0;
+
 	is_disc = (sys_info.need_fullpath || ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".m3u" || ext == ".pbp" || ext == ".toc" || ext == ".gcm" || ext == ".rvz");
 
 	// rom_path is CoreExecutionThreadProc's own local copy of g_pending_rom,
@@ -4983,6 +5181,7 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		// The load failed, so retro_unload_game() will not be called for it and
 		// nothing can still be holding the buffer - release it here instead.
 		FreeLoadedRomData();
+		s_core_refused_game = true;
 		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] Core failed to load game: %s", rom_path);
 
 		if (!suppress_toast)
@@ -5004,7 +5203,10 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 				needed = "bios/neocd/*.rom";
 			else if (strstr(sys, "NeoGeo"))
 				needed = "neogeo.zip";
-			else if (strstr(sys, "Arcade") || strstr(sys, "Dreamcast"))
+			// Only Flycast boots Naomi and Atomiswave. A MAME core refusing a
+			// CPS-2 romset has nothing to do with either BIOS, and saying so
+			// sent the player after a file the game never needed.
+			else if ((strstr(sys, "Arcade") && s_core_runs_span_frames) || strstr(sys, "Dreamcast"))
 				needed = "naomi.zip / awbios.zip (Naomi/Atomiswave)";
 
 			if (strstr(sys, "Dreamcast") || strstr(sys, "GameCube"))
@@ -5207,6 +5409,180 @@ static void CoreSaveBatterySram()
 	}
 }
 
+
+// Threads a core left behind inside its own DLL, dealt with before the DLL is
+// freed. Returns how many are still actively running there (the caller then
+// keeps the DLL mapped); the ones merely asleep are ended.
+//
+// What this is for: current MAME starts a worker thread during retro_load_game
+// and, when the load ends in "Required files are missing", retro_deinit returns
+// with that thread still asleep inside the DLL. FreeLibrary then unmapped the
+// code under it, and minutes later it woke up and the whole application died -
+// 0xC0000005 executing arcade_fbneo.dll_unloaded, on a thread whose entire
+// stack was msvcrt's thread start and that DLL (crash dump of 14/11, after a
+// CPS-2 romset with no .key file). Keeping the DLL mapped instead was tried and
+// is worse: the next game on the same core gets a module that still holds the
+// refused one's state, and faults.
+//
+// A thread is only ever touched when all of this holds:
+//   - it was not started by Karamelo itself nor by the Windows thread pool
+//     (its start address is outside Karamelo.exe and ntdll);
+//   - its stack holds a return address into executable code of this DLL, or it
+//     is executing there right now;
+// and it is ended only if it is parked in a system call (asleep or waiting).
+// One caught mid-work is left alone and reported, because ending a thread that
+// may hold the heap lock trades a crash for a hang.
+//
+// Between SuspendThread and ResumeThread nothing here may allocate or log: the
+// suspended thread can be the one holding the heap or the log's lock.
+static int ReapThreadsLeftInsideModule(HMODULE module)
+{
+#if defined(_WIN32) && defined(_M_X64)
+	if (!module) return 0;
+
+	typedef LONG (NTAPI* NtQueryInformationThreadFn)(HANDLE, int, PVOID, ULONG, PULONG);
+	HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+	NtQueryInformationThreadFn query = ntdll
+		? (NtQueryInformationThreadFn)GetProcAddress(ntdll, "NtQueryInformationThread") : NULL;
+	if (!query) return 0;
+
+	struct Range { ULONG_PTR lo, hi; };
+	auto image_range = [](HMODULE h) -> Range {
+		const BYTE* base = (const BYTE*)h;
+		const IMAGE_DOS_HEADER* dos = (const IMAGE_DOS_HEADER*)base;
+		const IMAGE_NT_HEADERS* nt = (const IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
+		return { (ULONG_PTR)base, (ULONG_PTR)base + nt->OptionalHeader.SizeOfImage };
+	};
+
+	// Executable sections of the DLL: a pointer into its data (a name, an option
+	// string) is not a return address and must never count.
+	Range code[16];
+	int code_count = 0;
+	{
+		const BYTE* base = (const BYTE*)module;
+		const IMAGE_DOS_HEADER* dos = (const IMAGE_DOS_HEADER*)base;
+		const IMAGE_NT_HEADERS* nt = (const IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
+		const IMAGE_SECTION_HEADER* sec = IMAGE_FIRST_SECTION(nt);
+		for (int i = 0; i < nt->FileHeader.NumberOfSections && code_count < 16; i++)
+		{
+			if (!(sec[i].Characteristics & IMAGE_SCN_MEM_EXECUTE)) continue;
+			code[code_count].lo = (ULONG_PTR)base + sec[i].VirtualAddress;
+			code[code_count].hi = code[code_count].lo + sec[i].Misc.VirtualSize;
+			code_count++;
+		}
+	}
+	if (code_count == 0) return 0;
+
+	const Range self = image_range(GetModuleHandleA(NULL));
+	const Range nt_range = image_range(ntdll);
+	const HANDLE process = GetCurrentProcess();
+
+	auto in_code = [&](ULONG_PTR a) {
+		for (int i = 0; i < code_count; i++)
+			if (a >= code[i].lo && a < code[i].hi) return true;
+		return false;
+	};
+	// A return address is preceded by the call that pushed it.
+	auto after_call = [&](ULONG_PTR a) {
+		BYTE b[8];
+		SIZE_T got = 0;
+		if (!ReadProcessMemory(process, (LPCVOID)(a - 7), b, 7, &got) || got != 7) return false;
+		if (b[2] == 0xE8) return true;                                   // call rel32
+		if (b[5] == 0xFF && (b[6] & 0x38) == 0x10) return true;          // call reg / [reg]
+		if (b[4] == 0xFF && (b[5] & 0x38) == 0x10) return true;          // call [reg+disp8]
+		if (b[1] == 0xFF && (b[2] & 0x38) == 0x10) return true;          // call [reg+disp32] / [rip+disp32]
+		if (b[0] == 0xFF && (b[1] & 0x38) == 0x10) return true;          // call [reg+idx+disp32]
+		return false;
+	};
+
+	DWORD ended[16]; int ended_count = 0;
+	DWORD kept[16];  int kept_count = 0;
+
+	const DWORD pid = GetCurrentProcessId();
+	const DWORD me = GetCurrentThreadId();
+	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	if (snap == INVALID_HANDLE_VALUE) return 0;
+
+	static ULONG_PTR stack_words[8192];   // 64 KiB of stack per read, no heap
+
+	THREADENTRY32 te;
+	te.dwSize = sizeof(te);
+	for (BOOL more = Thread32First(snap, &te); more; more = Thread32Next(snap, &te))
+	{
+		if (te.th32OwnerProcessID != pid || te.th32ThreadID == me) continue;
+
+		HANDLE th = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_TERMINATE,
+			FALSE, te.th32ThreadID);
+		if (!th) continue;
+
+		// Ours, or the thread pool's: never a candidate, and never suspended.
+		ULONG_PTR start = 0;
+		if (query(th, 9 /* ThreadQuerySetWin32StartAddress */, &start, sizeof(start), NULL) != 0 ||
+			(start >= self.lo && start < self.hi) || (start >= nt_range.lo && start < nt_range.hi))
+		{
+			CloseHandle(th);
+			continue;
+		}
+
+		if (SuspendThread(th) == (DWORD)-1) { CloseHandle(th); continue; }
+
+		bool inside = false;
+		bool parked = false;
+		CONTEXT ctx;
+		ctx.ContextFlags = CONTEXT_CONTROL;
+		struct { LONG status; PVOID teb; ULONG_PTR pid_, tid_; ULONG_PTR affinity; LONG prio, base_prio; } tbi;
+		SIZE_T got = 0;
+		if (GetThreadContext(th, &ctx) && query(th, 0 /* ThreadBasicInformation */, &tbi, sizeof(tbi), NULL) == 0 && tbi.teb)
+		{
+			ULONG_PTR stack_base = 0;
+			ReadProcessMemory(process, (const BYTE*)tbi.teb + 8, &stack_base, sizeof(stack_base), &got);
+
+			if (in_code(ctx.Rip)) inside = true;
+
+			ULONG_PTR at = ctx.Rsp & ~(ULONG_PTR)7;
+			while (!inside && stack_base && at < stack_base)
+			{
+				SIZE_T want = (SIZE_T)(stack_base - at);
+				if (want > sizeof(stack_words)) want = sizeof(stack_words);
+				if (!ReadProcessMemory(process, (LPCVOID)at, stack_words, want, &got) || got < sizeof(ULONG_PTR)) break;
+				for (SIZE_T i = 0; i < got / sizeof(ULONG_PTR) && !inside; i++)
+					if (in_code(stack_words[i]) && after_call(stack_words[i])) inside = true;
+				at += got;
+			}
+
+			if (inside && ctx.Rip >= nt_range.lo && ctx.Rip < nt_range.hi)
+			{
+				BYTE op[2] = { 0, 0 };
+				if (ReadProcessMemory(process, (LPCVOID)(ctx.Rip - 2), op, 2, &got) && got == 2)
+					parked = (op[0] == 0x0F && op[1] == 0x05);   // right after a syscall
+			}
+		}
+
+		if (inside && parked)
+		{
+			TerminateThread(th, 0);
+			WaitForSingleObject(th, 500);
+			if (ended_count < 16) ended[ended_count++] = te.th32ThreadID;
+		}
+		else
+		{
+			ResumeThread(th);
+			if (inside && kept_count < 16) kept[kept_count++] = te.th32ThreadID;
+		}
+		CloseHandle(th);
+	}
+	CloseHandle(snap);
+
+	for (int i = 0; i < ended_count; i++)
+		CoreLogPrintf(RETRO_LOG_WARN, "[CoreUnload] o core deixou a thread %lu dormindo dentro da DLL; encerrada antes de liberar", ended[i]);
+	for (int i = 0; i < kept_count; i++)
+		CoreLogPrintf(RETRO_LOG_WARN, "[CoreUnload] thread %lu do core ainda trabalhando dentro da DLL", kept[i]);
+	return kept_count;
+#else
+	(void)module;
+	return 0;
+#endif
+}
 static void CoreUnload()
 {
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Inicio: is_game_loaded=%d is_core_loaded=%d", is_game_loaded, is_core_loaded);
@@ -5408,6 +5784,17 @@ static void CoreUnload()
 		{
 			skip_free = true;
 		}
+
+		// MAME 2010 that refused a game. Its own unload routine never returns
+		// after that: FreeLibrary sat inside mame2010.dll's static destructors
+		// until the core thread was killed eight seconds later, with the loader
+		// lock held - so no other core could load and no thread could start
+		// until the application was restarted (a CPS-2 romset with no .key, on
+		// 14/11; a snapshot of the stuck process shows the core thread spinning
+		// in mame2010.dll under LdrUnloadDll). A game that ran is another
+		// matter: retro_unload_game shuts the machine down and the DLL frees.
+		if (s_core_refused_game && lower_path.find("mame2010") != std::string::npos)
+			skip_free = true;
 	}
 
 	if (h_core_dll)
@@ -5418,11 +5805,35 @@ static void CoreUnload()
 		}
 		else
 		{
-			CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando FreeLibrary(h_core_dll)...");
-			InterlockedExchange(&g_core_in_module_op, 1);
-			FreeLibrary(h_core_dll);
-			InterlockedExchange(&g_core_in_module_op, 0);
-			CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] FreeLibrary concluido.");
+			// A thread the core left asleep inside its own code dies the moment
+			// it wakes up in unmapped memory, and takes the process with it.
+			//
+			// Done in two cases only. After a refused game, which is the path
+			// retro_unload_game never gets to clean up. And for current MAME
+			// always: its DLL exit routine waits for one of its own threads to
+			// end while holding the loader lock that thread needs in order to
+			// end - FreeLibrary never returned after ANY arcade game, the core
+			// thread was killed 13 seconds later and nothing loaded again until
+			// the application was restarted (in 0.981 as published; snapshot of
+			// 14/11). With its sleeping threads ended first, the wait finds
+			// them already gone. Every other core that ran a game is left to
+			// stop its own threads, some of them only from that exit routine.
+			const bool reap = s_core_refused_game || s_core_is_current_mame;
+			const int busy = reap ? ReapThreadsLeftInsideModule(h_core_dll) : 0;
+			if (busy > 0)
+			{
+				CoreLogPrintf(RETRO_LOG_WARN,
+					"[CoreUnload] %d thread(s) do core ainda executando dentro da DLL; mantendo-a mapeada (%s)",
+					busy, s_loaded_core_path.c_str());
+			}
+			else
+			{
+				CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Chamando FreeLibrary(h_core_dll)...");
+				InterlockedExchange(&g_core_in_module_op, 1);
+				FreeLibrary(h_core_dll);
+				InterlockedExchange(&g_core_in_module_op, 0);
+				CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] FreeLibrary concluido.");
+			}
 		}
 		h_core_dll = NULL;
 	}
@@ -5430,6 +5841,8 @@ static void CoreUnload()
 	ResetCoreFunctionPointers();
 	s_loaded_core_is_pcsx2 = false;
 	s_loaded_core_path.clear();
+	s_core_refused_game = false;
+	s_core_is_current_mame = false;
 
 	CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Concluido com sucesso.");
 }
@@ -5457,7 +5870,10 @@ static bool DoSaveState(int slot)
 	size_t sz = RetroSerializeSizeGuarded();
 	if (sz == 0)
 	{
-		CoreSetToast(Tr("ERRO: TAMANHO DE ESTADO INVALIDO", "ERROR: INVALID STATE SIZE"), 120);
+		// A size of zero is how a core says it has no save states at all
+		// (Gopher64). "Invalid state size" read as a fault, and the player
+		// kept pressing save.
+		CoreSetToast(Tr("SAVESTATE INDISPONIVEL NESTE CORE", "SAVESTATE UNAVAILABLE ON THIS CORE"), 180);
 		return false;
 	}
 
