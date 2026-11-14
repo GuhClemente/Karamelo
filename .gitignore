@@ -209,6 +209,7 @@ cloud_token*.bin
 *.token.bin
 
 # Arquivos de Midia e Gravacoes de Benchmark/YouTube
+capa_*
 *.mp4
 *.webm
 *.avi
