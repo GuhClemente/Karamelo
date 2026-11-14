@@ -280,6 +280,7 @@ static int selected_state_slot = 0;
 // Audio and Controls State
 static int  master_volume = 100;
 static bool audio_muted = false;
+static bool s_playback_muted = false;
 static int16_t joypad_buttons[4][16] = { 0 };
 static int16_t analog_sticks[4][2][2] = { 0 };
 static int16_t s_injected_buttons[4][16] = { 0 };
@@ -956,6 +957,7 @@ static void InitAudio(int sample_rate)
 
 	if (g_audio_stream)
 	{
+		if (s_playback_muted) SDL_SetAudioStreamGain(g_audio_stream, 0.0f);
 		SDL_ResumeAudioStreamDevice(g_audio_stream);
 
 		// Prime the stream with silence up to the target queue depth - the
@@ -6919,6 +6921,7 @@ void CoreSetAnalogState(int player, int stick_id, int axis_id, int16_t value)
 	}
 }
 
+void CoreSetPlaybackMute(bool mute) { s_playback_muted = mute; if (g_audio_stream) SDL_SetAudioStreamGain(g_audio_stream, mute ? 0.0f : 1.0f); }
 void CoreSetVolume(int volume_percent) { master_volume = std::clamp(volume_percent, 0, 100); }
 int  CoreGetVolume() { return master_volume; }
 void CoreSetMute(bool mute) { audio_muted = mute; }

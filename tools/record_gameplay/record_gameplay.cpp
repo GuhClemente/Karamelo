@@ -366,6 +366,7 @@ int main(int argc, char **argv) {
   }
   SDL_InitSubSystem(SDL_INIT_AUDIO);
   CoreSetAudioCallback(RecordAudioCallback);
+  CoreSetPlaybackMute(true);
 
   printf("[INFO] Loading core: %s for %d seconds...\n", core_dll, duration_sec);
 

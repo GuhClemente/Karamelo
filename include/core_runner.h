@@ -103,6 +103,7 @@ void CoreSetVolume(int volume_percent);
 int  CoreGetVolume();
 void CoreSetMute(bool mute);
 bool CoreGetMute();
+void CoreSetPlaybackMute(bool mute);
 
 // HUD Toast Notification Engine
 // frames_duration e convertido para tempo de relogio (quadros a 60 fps) e a
