@@ -227,9 +227,15 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | The Legend of Zelda: Ocarina of Time 3D (TriAevum) | 🪟🐧 | [coccofresco/TriAevum](https://github.com/coccofresco/TriAevum) |
 | Top Gear | 🪟🐧 | [thebradshaw/topgear-pc](https://github.com/thebradshaw/topgear-pc) |
 | Super Street Fighter II Turbo HD Remix | 🪟🐧 | [saulob/ssf2t-hd-remix-recompiled](https://github.com/saulob/ssf2t-hd-remix-recompiled) |
+| Castlevania 64 | 🪟 | [DankZoneStudios/CV64Recomp](https://github.com/DankZoneStudios/CV64Recomp) |
+| Castlevania: Rondo of Blood | 🪟🐧 | [gminustwo/RondoRecomp](https://github.com/gminustwo/RondoRecomp) |
+| Street Fighter III (CPS-3 Trilogy) | 🪟🐧🍎 | [tmcleroy/sf3comp](https://github.com/tmcleroy/sf3comp) |
+| Animal Crossing: City Folk | 🪟🐧🍎 | [rob646464/city-folk-recompiled](https://github.com/rob646464/city-folk-recompiled) |
+| Road Rash Trilogy | 🪟 | [BTr-RJ/RoadRashTrilogy_Recomp](https://github.com/BTr-RJ/RoadRashTrilogy_Recomp) |
+| Syndicate Plus | 🪟🍎 | [Buyukcaglar/synd](https://github.com/Buyukcaglar/synd) |
 
-**62 de 97 têm build Linux** e **42 de 97 têm build macOS** (Apple Silicon /
-Universal), verificado em 13/11/2026 contra a release mais recente de cada
+**65 de 103 têm build Linux** e **45 de 103 têm build macOS** (Apple Silicon /
+Universal), verificado em 14/11/2026 contra a release mais recente de cada
 repositório (adicionados 25 ports nas Ondas 1, 2 e 3 + TriAevum, Top Gear e Super Street Fighter II Turbo HD Remix: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear e SSF2T HD Remix; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas

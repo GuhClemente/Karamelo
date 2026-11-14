@@ -2412,7 +2412,7 @@ Esta seção instrui a IA mantenedora do site sobre as implementações técnica
 > **REGRA DE OURO PARA O SITE**: As implementações abaixo residem na branch `feat/batocera-app-upgrades` para homologação e compilação multiplataforma dos novos binários `.dll` / `.so` / `.dylib`. **NÃO ALTERE AS CONTAGENS PÚBLICAS NO SITE OFICIAL AINDA.** A contagem oficial de produção permanece rigorosamente em:
 > - **37 Sistemas Nativos**
 > - **42 Motores de Emulação** (`APP_CORE_ENGINES = 42`)
-> - **97 Ports e Recompilados** (97 Windows 🪟, 62 Linux 🐧, 42 macOS 🍎)
+> - **103 Ports e Recompilados** (103 Windows 🪟, 65 Linux 🐧, 45 macOS 🍎)
 > 
 > A contagem só será atualizada para 38 sistemas / 44 motores no momento em que a branch for mesclada à `main` e a versão 0.983 for compilada e distribuída oficialmente.
 
@@ -2436,3 +2436,49 @@ Para menções no site nas seções de console de sala de estar (`/comparativo` 
 - **Modo Console Steam**: Integração do inicializador Steam Big Picture (`steam -gamepadui -steamos3`) dentro da sessão do Gamescope, permitindo transição perfeita entre títulos retrô do Karamelo e a biblioteca de jogos Steam de PC sem sair do sofá.
 - **Arquitetura Otimizada x86-64-v3 (ALHP)**: Instruções vetoriais modernas (AVX2/FMA) compiladas nativamente no kernel e emuladores do sistema operacional, oferecendo entre 10% e 25% de ganho de FPS em Mini-PCs modernos (Intel N100, AMD Ryzen).
 - **Contêineres SquashFS para PC Ports**: Montagem instantânea de jogos pesados em arquivos únicos compactados via kernel Linux, reduzindo em até 60% o consumo de armazenamento e protegendo contra fragmentação.
+
+---
+
+## 65. Adição de 14/11/2026 — Expansão de PC Ports & Recompilados (+6 Jogos)
+
+Foram integrados 6 novos títulos ao catálogo de Ports & Recompilados (`data/ports.json` versão 11), ultrapassando a marca histórica de 100 ports no Karamelo.
+
+**Novos totais oficiais**: **103 jogos — 103 Windows 🪟, 65 Linux 🐧, 45 macOS 🍎.**
+
+### Detalhamento dos Novos Títulos:
+
+1. **Castlevania 64** (`CV64Recomp`):
+   - **Projeto**: [DankZoneStudios/CV64Recomp](https://github.com/DankZoneStudios/CV64Recomp) (v0.8.1).
+   - **Sistemas**: **Windows 🪟**.
+   - **Destaques**: Recompilação estática de Nintendo 64 com renderizador moderno em Ray Tracing / Path Tracing em tempo real, 60 FPS reais, suporte nativo a gamepads modernos e texturas em alta definição.
+   - **Requisito**: ROM original de Castlevania 64 em `roms/N64`.
+
+2. **Castlevania: Rondo of Blood** (`RondoRecomp`):
+   - **Projeto**: [gminustwo/RondoRecomp](https://github.com/gminustwo/RondoRecomp) (v1.2).
+   - **Sistemas**: **Windows 🪟 e Linux 🐧**.
+   - **Destaques**: Recompilação nativa em C de *Akumajou Dracula X: Chi no Rondo* (PC Engine CD / TurboGrafx-CD). Suporte a leitura direta de imagens compactadas CHD, áudio Redbook sem delay e modo portátil.
+   - **Requisito**: Imagem do disco em `.chd`, `.iso`, `.cue` ou `.zip` em `roms/PCEngineCD`.
+
+3. **Street Fighter III (Trilogia CPS-3)** (`SF3comp`):
+   - **Projeto**: [tmcleroy/sf3comp](https://github.com/tmcleroy/sf3comp) (v0.1.0-beta.3).
+   - **Sistemas**: **Windows 🪟, Linux 🐧 e macOS 🍎**.
+   - **Destaques**: Recompilação estática nativa da arquitetura Capcom CPS-3 reunindo os três clássicos (*3rd Strike*, *2nd Impact*, *New Generation*). 60 FPS estáveis, carregamento instantâneo sem emulação de gravação de flash ROM, widescreen opcional e netcode com rollback.
+   - **Requisito**: Conjuntos de ROMs CPS-3 (`sfiii`, `sfiii2`, `sfiii3`) em `roms/Arcade` ou `roms/CPS3`.
+
+4. **Animal Crossing: City Folk** (`CityFolkRecomp`):
+   - **Projeto**: [rob646464/city-folk-recompiled](https://github.com/rob646464/city-folk-recompiled) (v1.0.2).
+   - **Sistemas**: **Windows 🪟, Linux 🐧 e macOS 🍎**.
+   - **Destaques**: Recompilação estática de Nintendo Wii com renderizadores modernos Direct3D 12, Vulkan e Metal, suporte a resoluções 4K e correções visuais de reflexo d'água.
+   - **Requisito**: Disco do jogo em `.iso`, `.rvz` ou `.wbfs` em `roms/Wii`.
+
+5. **Road Rash Trilogy** (`RoadRashTrilogy`):
+   - **Projeto**: [BTr-RJ/RoadRashTrilogy_Recomp](https://github.com/BTr-RJ/RoadRashTrilogy_Recomp) (v0.60).
+   - **Sistemas**: **Windows 🪟**.
+   - **Destaques**: Recompilação em C nativo da trilogia clássica de motociclismo e combate do Mega Drive, com multiplayer online, tela widescreen e atualizador automático.
+   - **Requisito**: ROMs de Road Rash em `roms/MegaDrive`.
+
+6. **Syndicate Plus** (`SyndicatePlus`):
+   - **Projeto**: [Buyukcaglar/synd](https://github.com/Buyukcaglar/synd) (v1.0).
+   - **Sistemas**: **Windows 🪟 e macOS 🍎**.
+   - **Destaques**: Recompilação nativa de 64-bit do clássico tático da Bullfrog de 1993 (*Syndicate* + expansão *American Revolt*) diretamente para PCs e Apple Silicon sem necessidade de DOSBox.
+   - **Requisito**: Arquivos originais do jogo.
