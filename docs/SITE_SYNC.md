@@ -2416,18 +2416,25 @@ Esta seção instrui a IA mantenedora do site sobre as implementações técnica
 > 
 > A contagem só será atualizada para 38 sistemas / 44 motores no momento em que a branch for mesclada à `main` e a versão 0.983 for compilada e distribuída oficialmente.
 
-### 2. O que foi implementado no Aplicativo (Karamelo App)
+### 2. O que foi implementado no Aplicativo (Karamelo App) — Cores, Autores e Licenças
 1. **Suporte Nativo a OpenBOR (`cores/anybor.dll`)**:
-   - Resolução unificada de módulos `.pak` e `.bor` na pasta `roms/OpenBOR/`.
-   - Utiliza a arquitetura do `AnyBOR-libretro`, chaveando internamente a versão compatível de execução para cada módulo, eliminando falhas históricas de quebra de versão em beat'em ups da comunidade.
+   - **Projeto & Repositório**: [retrodiv/AnyBOR-libretro](https://github.com/retrodiv/AnyBOR-libretro).
+   - **Autores & Créditos**: retrodiv e a equipe de desenvolvimento histórica do OpenBOR (Senile Team, Roel van Mastbergen, Neil Stevens, Plombo, SX, White Dragon, Damon Caskey, Kratus).
+   - **Licença**: BSD-style / GPL (mista).
+   - **Como funciona**: Resolução unificada de módulos `.pak` e `.bor` na pasta `roms/OpenBOR/`. O core Libretro unificado encapsula dinamicamente versões legadas e modernas do interpretador OpenBOR, chaveando a compatibilidade automaticamente pelo cabeçalho do arquivo `.pak`.
 2. **Suporte Dedicado a Arcades Sega Model 1 e Model 2 (`cores/sm2.dll`)**:
-   - Roteamento especializado para os clássicos 3D da Sega (*Daytona USA*, *Virtua Fighter 1 e 2*, *Virtua Racing*, *Sega Rally Championship*, *Star Wars Arcade*) via `SM2-EMU`.
-   - Compatibilidade com formatos compactados (`.zip` e `.7z`) e renderização em alta performance por hardware.
+   - **Projeto & Repositório**: [dmanlfc/sm2-emu](https://github.com/dmanlfc/sm2-emu).
+   - **Autores & Créditos**: dmanlfc e a comunidade de emulação de Sega Model 1 e 2 (com base nos trabalhos históricos de Bart Trzynadlowski e Elsemi).
+   - **Licença**: GNU General Public License v3.0 (GPL-3.0).
+   - **Como funciona**: Roteamento especializado para clássicos 3D da Sega (*Daytona USA*, *Virtua Fighter 1 e 2*, *Virtua Racing*, *Sega Rally Championship*, *Star Wars Arcade*) via renderizadores nativos Vulkan e OpenGL em C++ moderno, com suporte a ROMs compactadas em ZIP e 7Z.
 3. **Refinamento do Motor Odin (Sega Hikaru & Gaelco 3D em `cores/hikaru.dll`)**:
-   - Correção do travamento de calibração em *NASCAR Arcade* (`sgnascar` / `sgnascaro`): injeção automática de bypass da placa de drive serial (`ODIN_DRIVE=imitation`).
-   - Implementação nativa de `RETRO_DEVICE_LIGHTGUN` para suporte a jogos de tiro como *Brave Firefighters*.
+   - **Projeto & Repositório**: [Tovarichtch/Odin](https://github.com/Tovarichtch/Odin).
+   - **Autores & Créditos**: Réda Chérif-Touil (*Tovarichtch*) e Stefano Teso (*Valkyrie*).
+   - **Licença**: GNU General Public License v3.0 (GPL-3.0).
+   - **Como funciona**: Injeção automática de bypass da placa de drive serial (`ODIN_DRIVE=imitation`) para eliminar travamento de calibração em *NASCAR Arcade* (`sgnascar`), e implementação de `RETRO_DEVICE_LIGHTGUN` para jogos de tiro como *Brave Firefighters*.
 4. **Correção do Bug de Áudio ("Efeito Esquilos") no Dreamcast (Flycast)**:
-   - Trava de sanidade de ±15% no cálculo dinâmico de taxa de amostragem no ring buffer de áudio. Surtos de carregamento inicial não aceleram mais o pitch para 1.83x (duplo). Fallback seguro de 48.000 Hz garantido.
+   - **Motor**: Flycast (Flyinghead e equipe Flycast).
+   - **Fix técnico**: Trava de sanidade de ±15% no cálculo dinâmico de taxa de amostragem no ring buffer de áudio. Surtos de carregamento inicial não aceleram mais o pitch para 1.83x (duplo). Fallback seguro de 48.000 Hz garantido.
 5. **Diagnóstico Inteligente para Sets CPS-2**:
    - Aviso visual imediato (toast OSD) caso clones como *Vampire Hunter 2* ou *Vampire Savior 2* sejam iniciados sem as ROMsets pai na pasta.
 
@@ -2447,38 +2454,98 @@ Foram integrados 6 novos títulos ao catálogo de Ports & Recompilados (`data/po
 
 ### Detalhamento dos Novos Títulos:
 
-1. **Castlevania 64** (`CV64Recomp`):
-   - **Projeto**: [DankZoneStudios/CV64Recomp](https://github.com/DankZoneStudios/CV64Recomp) (v0.8.1).
-   - **Sistemas**: **Windows 🪟**.
-   - **Destaques**: Recompilação estática de Nintendo 64 com renderizador moderno em Ray Tracing / Path Tracing em tempo real, 60 FPS reais, suporte nativo a gamepads modernos e texturas em alta definição.
-   - **Requisito**: ROM original de Castlevania 64 em `roms/N64`.
+---
 
-2. **Castlevania: Rondo of Blood** (`RondoRecomp`):
-   - **Projeto**: [gminustwo/RondoRecomp](https://github.com/gminustwo/RondoRecomp) (v1.2).
-   - **Sistemas**: **Windows 🪟 e Linux 🐧**.
-   - **Destaques**: Recompilação nativa em C de *Akumajou Dracula X: Chi no Rondo* (PC Engine CD / TurboGrafx-CD). Suporte a leitura direta de imagens compactadas CHD, áudio Redbook sem delay e modo portátil.
-   - **Requisito**: Imagem do disco em `.chd`, `.iso`, `.cue` ou `.zip` em `roms/PCEngineCD`.
+### 1. Castlevania 64 (`CV64Recomp`)
+- **Projeto**: [DankZoneStudios/CV64Recomp](https://github.com/DankZoneStudios/CV64Recomp).
+- **Autores & Créditos**: DankZone Studios (Scavenger e equipe), construído sobre o ecossistema N64Recomp (Wiseguy) e biblioteca RT64.
+- **Licença**: GNU General Public License v3.0 (GPL-3.0) / MIT.
+- **Sistemas**: **Windows 🪟** (zip x64 oficial). Sem build upstream para Linux e macOS até o momento.
+- **Versão no catálogo**: `0.8.1` (fixada com SHA-256).
+- **O que é**: Recompilação estática nativa em C/C++ do clássico de ação e sobrevivência em 3D do Nintendo 64 (*Castlevania 64* / *Legacy of Darkness* engine).
+- **Destaques**: Renderizador Direct3D 12 de última geração com suporte opcional a iluminação global por Ray Tracing / Path Tracing em tempo real, 60 FPS cravados sem aceleração da física, câmera analógica livre em 360 graus com controle moderno, texturas em alta definição e tempos de carregamento nulos.
+- **O que o jogador precisa**: A ROM original de Castlevania 64 americana (`.z64`/`.n64`) em `roms/N64/`. O download do Karamelo não contém assets ou dados protegidos do jogo.
+- **Como funciona no Karamelo**: O jogador coloca a ROM em `roms/N64`. Ao abrir o port, o Karamelo valida a presença da ROM e a entrega ao executável do port.
+- **Aviso legal para a página**: Projeto não oficial de preservação e modernização feito por fãs, sem afiliação ou endosso da Konami Digital Entertainment ou da Nintendo.
 
-3. **Street Fighter III (Trilogia CPS-3)** (`SF3comp`):
-   - **Projeto**: [tmcleroy/sf3comp](https://github.com/tmcleroy/sf3comp) (v0.1.0-beta.3).
-   - **Sistemas**: **Windows 🪟, Linux 🐧 e macOS 🍎**.
-   - **Destaques**: Recompilação estática nativa da arquitetura Capcom CPS-3 reunindo os três clássicos (*3rd Strike*, *2nd Impact*, *New Generation*). 60 FPS estáveis, carregamento instantâneo sem emulação de gravação de flash ROM, widescreen opcional e netcode com rollback.
-   - **Requisito**: Conjuntos de ROMs CPS-3 (`sfiii`, `sfiii2`, `sfiii3`) em `roms/Arcade` ou `roms/CPS3`.
+---
 
-4. **Animal Crossing: City Folk** (`CityFolkRecomp`):
-   - **Projeto**: [rob646464/city-folk-recompiled](https://github.com/rob646464/city-folk-recompiled) (v1.0.2).
-   - **Sistemas**: **Windows 🪟, Linux 🐧 e macOS 🍎**.
-   - **Destaques**: Recompilação estática de Nintendo Wii com renderizadores modernos Direct3D 12, Vulkan e Metal, suporte a resoluções 4K e correções visuais de reflexo d'água.
-   - **Requisito**: Disco do jogo em `.iso`, `.rvz` ou `.wbfs` em `roms/Wii`.
+### 2. Castlevania: Rondo of Blood (`RondoRecomp`)
+- **Projeto**: [gminustwo/RondoRecomp](https://github.com/gminustwo/RondoRecomp).
+- **Autores & Créditos**: gminustwo, com mecânicas modernizadas inspiradas na versão de Pizzano (Super Rondo of Blood).
+- **Licença**: MIT / Clean-room C reimplementation.
+- **Sistemas**: **Windows 🪟 e Linux 🐧**.
+  - **Windows (x64)**: zip oficial (`RondoRecomp-1.2-windows-x64.zip`).
+  - **Linux (x86_64)**: AppImage oficial (`RondoRecomp-1.2-x86_64.AppImage`), compatível com Steam Deck e distros com glibc 2.35+.
+  - **macOS 🍎**: sem build upstream.
+- **Versão no catálogo**: `v1.2` (fixada com SHA-256).
+- **O que é**: Recompilação nativa em C do lendário *Akumajou Dracula X: Chi no Rondo* do PC Engine CD / TurboGrafx-CD.
+- **Destaques**: Leitura direta e transparente de imagens compactadas CHD (ocupando apenas 270 MB em vez de 500 MB descompactados), modo portátil isolado (`user/` local para saves e opções), suporte a áudio Redbook de alta fidelidade sem delay, e opções opcionais de movimentação modernizada (chicote em 8 direções e chicote solto estilo *Super Castlevania IV*).
+- **O que o jogador precisa**: O disco original do jogo em formato `.chd`, `.iso`, `.cue` ou `.zip` (versão original japonesa ou tradução em inglês da comunidade).
+- **Como funciona no Karamelo**: O jogador coloca o disco em `roms/PCEngineCD/` (ou `TG16CD/`). O Karamelo detecta automaticamente o disco pelas palavras-chave e extensões e inicia o jogo diretamente.
+- **Aviso legal para a página**: Projeto de fãs de código aberto sem vínculo comercial ou endosso da Konami Digital Entertainment.
 
-5. **Road Rash Trilogy** (`RoadRashTrilogy`):
-   - **Projeto**: [BTr-RJ/RoadRashTrilogy_Recomp](https://github.com/BTr-RJ/RoadRashTrilogy_Recomp) (v0.60).
-   - **Sistemas**: **Windows 🪟**.
-   - **Destaques**: Recompilação em C nativo da trilogia clássica de motociclismo e combate do Mega Drive, com multiplayer online, tela widescreen e atualizador automático.
-   - **Requisito**: ROMs de Road Rash em `roms/MegaDrive`.
+---
 
-6. **Syndicate Plus** (`SyndicatePlus`):
-   - **Projeto**: [Buyukcaglar/synd](https://github.com/Buyukcaglar/synd) (v1.0).
-   - **Sistemas**: **Windows 🪟 e macOS 🍎**.
-   - **Destaques**: Recompilação nativa de 64-bit do clássico tático da Bullfrog de 1993 (*Syndicate* + expansão *American Revolt*) diretamente para PCs e Apple Silicon sem necessidade de DOSBox.
-   - **Requisito**: Arquivos originais do jogo.
+### 3. Street Fighter III (Trilogia CPS-3) (`SF3comp`)
+- **Projeto**: [tmcleroy/sf3comp](https://github.com/tmcleroy/sf3comp).
+- **Autores & Créditos**: tmcleroy.
+- **Licença**: GNU General Public License v3.0 (GPL-3.0).
+- **Sistemas**: **Windows 🪟, Linux 🐧 e macOS 🍎** (Apple Silicon ARM64 nativo).
+  - **Windows (x64)**: zip oficial (`SF3comp-windows-x64.zip`).
+  - **Linux (x86_64)**: tar.gz oficial (`SF3comp-linux-x86_64.tar.gz`).
+  - **macOS (ARM64/Universal)**: zip oficial (`SF3comp-macOS.zip`).
+- **Versão no catálogo**: `v0.1.0-beta.3` (fixada com SHA-256).
+- **O que é**: Recompilação estática nativa da arquitetura Capcom CPS-3 reunindo os três jogos em um só executável: *Street Fighter III: 3rd Strike*, *Street Fighter III: 2nd Impact* e *Street Fighter III: New Generation*.
+- **Destaques**: Boot instantâneo eliminando os longos minutos de emulação de gravação das memórias Flash SIMM da placa arcade original, 60 FPS estáveis mesmo em CPUs muito modestas, suporte a proporção widescreen e ultrawide sem distorção e netcode moderno com rollback para partidas online.
+- **O que o jogador precisa**: Os conjuntos de ROMsets originais de arcade da CPS-3 (`sfiii.zip`, `sfiii2.zip`, `sfiii3.zip`) deixados em `roms/Arcade/` ou `roms/CPS3/`.
+- **Como funciona no Karamelo**: O Karamelo verifica os arquivos necessários e executa o jogo em tela cheia com integração direta com gamepads.
+- **Aviso legal para a página**: Projeto de fã não oficial, sem conexão com a Capcom Co., Ltd. Street Fighter é marca registrada de seus proprietários.
+
+---
+
+### 4. Animal Crossing: City Folk (`CityFolkRecomp`)
+- **Projeto**: [rob646464/city-folk-recompiled](https://github.com/rob646464/city-folk-recompiled).
+- **Autores & Créditos**: rob646464, utilizando o motor Aurora.
+- **Licença**: GNU General Public License v2.0 (GPL-2.0).
+- **Sistemas**: **Windows 🪟, Linux 🐧 e macOS 🍎**.
+  - **Windows (x64)**: zip oficial com Direct3D 12.
+  - **Linux (x86_64)**: tar.gz oficial com backend Vulkan nativo.
+  - **macOS (ARM64)**: tar.gz nativo com backend Apple Metal.
+- **Versão no catálogo**: `v1.0.2` (fixada com SHA-256).
+- **O que é**: Recompilação estática nativa para PC do clássico simulador de vida lançado para o Nintendo Wii.
+- **Destaques**: Resolução interna escalonada até 4K com MSAA, suporte a altas taxas de atualização (120 Hz+), física de reflexo de água nos rios e praia reformulada em tempo real, suporte total a gamepads modernos e teclado/mouse.
+- **O que o jogador precisa**: A imagem original do disco do jogo em `.iso`, `.rvz` ou `.wbfs` em `roms/Wii/`.
+- **Como funciona no Karamelo**: O Karamelo localiza a ISO na pasta de Wii via `{iso}` e inicializa o jogo diretamente no executável nativo.
+- **Aviso legal para a página**: Projeto independente sem afiliação ou licenciamento da Nintendo. Animal Crossing é marca registrada da Nintendo.
+
+---
+
+### 5. Road Rash Trilogy (`RoadRashTrilogy`)
+- **Projeto**: [BTr-RJ/RoadRashTrilogy_Recomp](https://github.com/BTr-RJ/RoadRashTrilogy_Recomp).
+- **Autores & Créditos**: BTr-RJ.
+- **Licença**: GNU General Public License v3.0 (GPL-3.0).
+- **Sistemas**: **Windows 🪟** (zip x64 oficial).
+- **Versão no catálogo**: `v0.60` (fixada com SHA-256).
+- **O que é**: Recompilação estática e tradução de código Motorola 68000 para C nativo da trilogia *Road Rash*, *Road Rash II* e *Road Rash 3* do Sega Mega Drive / Genesis.
+- **Destaques**: Campo de visão estendido em formato widescreen nativo (sem esticar os sprites na tela), alta taxa de quadros, suporte a multijogador em rede local e online, e atualizador automático integrado.
+- **O que o jogador precisa**: As ROMs originais dos jogos em `roms/MegaDrive/`.
+- **Como funciona no Karamelo**: O Karamelo confere a presença da ROM e executa a trilogia com controle total de gamepad e mapeamento dos botões de combate.
+- **Aviso legal para a página**: Projeto comunitário não oficial, sem relação com a Electronic Arts (EA). Road Rash é marca registrada da Electronic Arts.
+
+---
+
+### 6. Syndicate Plus (`SyndicatePlus`)
+- **Projeto**: [Buyukcaglar/synd](https://github.com/Buyukcaglar/synd).
+- **Autores & Créditos**: Buyukcaglar, com base na obra clássica de Peter Molyneux e Sean Cooper (Bullfrog Productions).
+- **Licença**: MIT / GPL.
+- **Sistemas**: **Windows 🪟 e macOS 🍎** (Apple Silicon e Intel).
+  - **Windows (x64)**: zip oficial (`Syndicate64-1.0-Windows.zip`).
+  - **macOS (Universal Mach-O)**: zip oficial (`Syndicate64-1.0-macOS.zip`).
+  - **Linux 🐧**: sem build binário pré-compilado oficial na v1.0.
+- **Versão no catálogo**: `v1.0` (fixada com SHA-256).
+- **O que é**: Recompilação estática de 16/32-bit DOS para programa nativo de 64-bit moderno do clássico jogo tático cyberpunk *Syndicate Plus* de 1993 (jogo base + expansão *American Revolt*).
+- **Destaques**: Execução nativa no sistema operacional sem necessidade de camadas de emulação como DOSBox, preservação exata da cadência de quadros e comportamento dos agentes cibernéticos, e sintetizador de áudio e música clássico.
+- **O que o jogador precisa**: Os arquivos de dados da instalação original do jogo em disquetes ou CD-ROM DOS.
+- **Como funciona no Karamelo**: O executável nativo é baixado e configurado na pasta de ports, permitindo inicialização instantânea e suporte a mouse e mapeamento no controle.
+- **Aviso legal para a página**: Projeto open-source de preservação técnica, sem vínculo com a Electronic Arts ou criadores originais da Bullfrog.

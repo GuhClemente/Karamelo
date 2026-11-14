@@ -102,6 +102,22 @@ Três observações:
 
 ### Novos Cores & Integrações em Desenvolvimento
 
+- **OpenBOR (`cores/anybor.dll`)**:
+  - **Motor**: AnyBOR (AnyBOR-libretro)
+  - **Sistemas**: Jogos e mods da engine OpenBOR / Beats of Rage (arquivos `.pak` e pastas `.bor`)
+  - **Autores originais**: retrodiv e equipe do OpenBOR (Senile Team, Roel van Mastbergen, Neil Stevens, Plombo, SX, White Dragon, Damon Caskey, Kratus)
+  - **Repositório oficial**: [retrodiv/AnyBOR-libretro](https://github.com/retrodiv/AnyBOR-libretro)
+  - **Licença**: BSD / GPL (mista)
+  - **Arquitetura de Integração**: Core Libretro C unificado que encapsula dinamicamente versões legadas e modernas do interpretador OpenBOR, selecionando a compatibilidade correta pelo cabeçalho do módulo `.pak`.
+
+- **Sega Model 1 & Model 2 (`cores/sm2.dll`)**:
+  - **Motor**: SM2-EMU
+  - **Sistemas**: Arcades Sega Model 1 (*Virtua Fighter*, *Virtua Racing*, *Wing War*, *Star Wars Arcade*) e Sega Model 2 (*Daytona USA*, *Virtua Fighter 2*, *Sega Rally Championship*, *Virtua Cop 1/2*)
+  - **Autores originais**: dmanlfc e colaboradores da emulação Sega Model 1/2 (com base nos trabalhos históricos de Bart Trzynadlowski e Elsemi)
+  - **Repositório oficial**: [dmanlfc/sm2-emu](https://github.com/dmanlfc/sm2-emu)
+  - **Licença**: GNU General Public License v3.0 (GPL-3.0)
+  - **Arquitetura de Integração**: Emulador C++ moderno com backend Vulkan e OpenGL nativo, roteado para carregar ROMsets compactadas em ZIP e 7Z diretamente pelo menu de arcade.
+
 - **Sega Hikaru (`cores/hikaru.dll`)**:
   - **Motor**: Odin
   - **Sistemas**: Sega Hikaru (*Star Wars Racer Arcade*, *Planet Harriers*, *Cyber Troopers Virtual-On Force*, *Air Trix*, *NASCAR Arcade*, *Brave Firefighters*) e Gaelco 3D (*Smashing Drive*, *ATV Track*)
@@ -236,7 +252,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 
 **65 de 103 têm build Linux** e **45 de 103 têm build macOS** (Apple Silicon /
 Universal), verificado em 14/11/2026 contra a release mais recente de cada
-repositório (adicionados 25 ports nas Ondas 1, 2 e 3 + TriAevum, Top Gear e Super Street Fighter II Turbo HD Remix: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear e SSF2T HD Remix; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
+repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy e Syndicate Plus; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -331,6 +347,61 @@ experimental pelo autor); não há build para macOS. Precisa da ROM do próprio 
 Top Gear (USA), 524.288 bytes, conferida pelo SHA-256. O Karamelo pega a ROM em
 `roms/SNES` e a copia para a pasta do port com o nome que o jogo procura,
 `Top Gear (USA).sfc` (ou `.smc`, mantendo a extensão). O repositório não declara licença.
+
+Um detalhe da linha do Super Street Fighter II Turbo HD Remix: é a recompilação estática
+nativa do clássico de luta lançado para Xbox 360 (Xbox Live Arcade), desenvolvido por
+saulob com o SDK ReXGlue, sob licença GPL-2.0. Publica builds oficiais para Windows (zip
+x64 com `ssf2t_hd_remix.exe`) e Linux (AppImage portátil x86_64); não há build para macOS.
+Traz resoluções de 720p até 4K/5K (4x) a 60 FPS cravados, widescreen e ultrawide
+(16:9, 16:10, 21:9, 32:9), netcode com rollback e lobby público, suporte a controles
+Xbox e conquistas offline. O jogador precisa fornecer o pacote original do jogo para
+Xbox 360 (arquivo hexadecimal sem extensão extraído do console), que é instalado via
+launcher integrado do jogo.
+
+Um detalhe da linha do Castlevania 64: é a recompilação estática nativa de **Castlevania 64**
+(Nintendo 64) por DankZone Studios com tecnologia N64Recomp (por Wiseguy) e RT64, sob
+licença GPL-3.0. Publica build para Windows (zip x64). Traz renderizador moderno com suporte
+opcional a iluminação por Ray Tracing / Path Tracing em tempo real, 60 FPS estáveis,
+suporte nativo a teclado/mouse e gamepads modernos, câmera analógica livre e texturas HD.
+O jogador fornece a ROM original em `roms/N64/`.
+
+Um detalhe da linha do Castlevania: Rondo of Blood: é a recompilação nativa em C de
+**Akumajou Dracula X: Chi no Rondo** (PC Engine CD / TurboGrafx-CD) por gminustwo, com
+mecânicas inspiradas na versão de Pizzano. Publica builds para Windows (zip x64) e
+Linux (AppImage x86_64, compatível com Steam Deck e distribuições glibc 2.35+); não há build
+para macOS. Traz suporte a leitura direta de imagens compactadas CHD sem descompactar,
+modo portátil com pasta `user/` local, e controles modernizados opcionais (chicote em 8
+direções no estilo Super Castlevania IV). O jogador fornece a imagem de disco original
+(`.chd`, `.iso`, `.cue` ou `.zip`) em `roms/PCEngineCD/`.
+
+Um detalhe da linha do Street Fighter III (CPS-3 Trilogy): é a recompilação estática nativa
+da placa arcade Capcom CPS-3 reunindo os três jogos (*3rd Strike*, *2nd Impact* e *New Generation*)
+em um único aplicativo por tmcleroy, sob licença GPL-3.0. Publica builds oficiais para Windows
+(zip x64), Linux (tar.gz x86_64) e macOS (zip nativo Apple Silicon / Universal). Elimina
+completamente os tempos de carregamento de gravação de flash ROM da placa original, mantém
+60 FPS sem engasgos, oferece suporte a telas widescreen/ultrawide e netcode moderno com rollback.
+O jogador fornece os conjuntos de ROMs originais CPS-3 (`sfiii`, `sfiii2`, `sfiii3`) em `roms/Arcade/`
+ou `roms/CPS3/`.
+
+Um detalhe da linha do Animal Crossing: City Folk: é a recompilação estática do jogo de
+Nintendo Wii por rob646464 utilizando o renderizador Aurora, sob licença GPL-2.0. Publica
+builds para Windows (zip x64 com Direct3D 12), Linux (tar.gz x86_64 com Vulkan) e macOS
+(tar.gz nativo Apple Silicon ARM64 com Metal). Roda em 4K nativo, com correções visuais
+de reflexo de água na praia e rios, e suporte a gamepads modernos. O jogador fornece o disco
+original (.iso, .rvz, .wbfs) em `roms/Wii/`, passado pelo Karamelo via `{iso}`.
+
+Um detalhe da linha do Road Rash Trilogy: é a recompilação estática nativa em C da trilogia
+clássica de corrida e combate de motocicletas do Mega Drive (Road Rash 1, 2 e 3) por BTr-RJ, sob
+licença GPL-3.0. Publica build para Windows (zip x64 com atualizador automático integrado).
+Traz suporte a telas widescreen sem esticar sprites, alta taxa de quadros e multiplayer online.
+O jogador fornece a ROM original do Mega Drive em `roms/MegaDrive/`.
+
+Um detalhe da linha do Syndicate Plus: é a recompilação nativa em 64-bit do clássico jogo tático
+de ficção científica de 1993 da Bullfrog Productions (*Syndicate* e a expansão *American Revolt*),
+originalmente de DOS, por Buyukcaglar. Publica builds nativos para Windows (zip x64) e macOS
+(zip nativo para Apple Silicon e Intel). Roda direto na CPU host sem depender de emulador de
+DOS (DOSBox), preservando a taxa de quadros original e o áudio sintetizado autêntico.
+O jogador fornece os arquivos de dados da instalação original do jogo.
 
 Um detalhe da linha do Conker's Bad Fur Day: é o port nativo de **Conker's Bad Fur
 Day** (Nintendo 64) via recompilação estática com RT64 (código por sciaschi,
