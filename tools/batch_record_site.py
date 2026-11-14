@@ -2090,6 +2090,12 @@ def record_single_game(entry):
     target_mp4 = os.path.join(STAGING_DIR, f"{base_id}.mp4")
     target_webm = os.path.join(STAGING_DIR, f"{base_id}.webm")
 
+    # If already recorded in staging with valid size and webm exists, validate screenshots and skip
+    if os.path.exists(target_mp4) and os.path.getsize(target_mp4) > 200000 and os.path.exists(target_webm) and os.path.getsize(target_webm) > 100000:
+        analyze_and_fix_screenshots(base_id, target_mp4, STAGING_DIR)
+        print(f"[CACHE] {base_id} ({game_name}) já gravado e validado em staging.")
+        return (base_id, True, "Cache")
+
     print(f"\n[INICIANDO] {base_id} -> {game_name} ({sys_name}) [{duration}s]...")
 
     cmd = [
