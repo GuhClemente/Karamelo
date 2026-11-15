@@ -1,5 +1,5 @@
 {
-  "catalog_version": 11,
+  "catalog_version": 12,
   "ports": [
     {
       "id": "DrMario64",
@@ -479,11 +479,33 @@
       "id": "SymphonyRecomp",
       "display_name": "Castlevania: Symphony of the Night",
       "repo": "GuhClemente/SymphonyRecomp",
+      "exe_hint": "sotn.exe",
       "needs_rom": true,
+      "has_macos_build": true,
+      "launch_args": [
+        "{iso}"
+      ],
+      "iso_keywords": [
+        "symphony"
+      ],
+      "iso_dirs": [
+        "PSX",
+        "PlayStation",
+        "PS1",
+        "SonyPlayStation"
+      ],
+      "iso_exts": [
+        ".chd",
+        ".cue",
+        ".iso",
+        ".bin"
+      ],
       "release_tag": "dev",
       "asset_sha256": {
-        "SymphonyRecomp-v1.0.0-windows-x64.zip": "d4e16ab5947e78f3b7216f48bf26ac534405f8af14ce8232a802c215e478bf7d"
-      }
+        "SymphonyRecomp-v1.2.0-macos-arm64.zip": "740330c8e717ff60858a096f2a4c951c8db8e08cef1f1d1d0833fc71debf625e",
+        "SymphonyRecomp-v1.2.0-windows-x64.zip": "e13c7950544a9ec0b0e96029e90b8b5ec1548eb8ab9529de5dc53ed0171b66d7"
+      },
+      "notes": "Castlevania: Symphony of the Night native recompilation (SOTN Ultimate) in .NET 10 / RecompOne by Gustavo Clemente (fork/evolution of BlackLabelHQ/SymphonyRecomp, Konami original). Features 5 playable characters including Maria Renard (Saturn & PSP styles), Richter Belmont and Alucard, native widescreen, audio streaming synchronization fix, direct .chd/.cue disc detection, full controller support. Supports Windows x64 and macOS Apple Silicon ARM64."
     },
     {
       "id": "Sonic1Forever",

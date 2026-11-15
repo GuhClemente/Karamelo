@@ -174,7 +174,7 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Jak & Daxter (OpenGOAL) | 🪟 | [open-goal/jak-project](https://github.com/open-goal/jak-project) |
 | LoD: Severed Chains | 🪟 | [Legend-of-Dragoon-Modding/Severed-Chains](https://github.com/Legend-of-Dragoon-Modding/Severed-Chains) |
 | REDRIVER 2 | 🪟🐧 | [OpenDriver2/REDRIVER2](https://github.com/OpenDriver2/REDRIVER2) |
-| Castlevania: Symphony of the Night | 🪟 | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
+| Castlevania: Symphony of the Night | 🪟🍎 | [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) |
 | Sonic 1 Forever | 🪟 | [ElspethThePict/S1Forever](https://github.com/ElspethThePict/S1Forever) |
 | Sonic 3 A.I.R. | 🪟🐧🍎 | [Eukaryot/sonic3air](https://github.com/Eukaryot/sonic3air) |
 | Sonic Unleashed Recompiled | 🪟 | [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) |
@@ -250,8 +250,8 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Road Rash Trilogy | 🪟 | [BTr-RJ/RoadRashTrilogy_Recomp](https://github.com/BTr-RJ/RoadRashTrilogy_Recomp) |
 | Syndicate Plus | 🪟🍎 | [Buyukcaglar/synd](https://github.com/Buyukcaglar/synd) |
 
-**65 de 103 têm build Linux** e **45 de 103 têm build macOS** (Apple Silicon /
-Universal), verificado em 14/11/2026 contra a release mais recente de cada
+**65 de 103 têm build Linux** e **46 de 103 têm build macOS** (Apple Silicon /
+Universal), verificado em 15/11/2026 contra a release mais recente de cada
 repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy e Syndicate Plus; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
@@ -302,6 +302,8 @@ imagem `.iso` do Xbox original (versões USA ou Europe com patch interno) dentro
 montando o disco FATX virtualmente sem necessidade de ferramentas externas de extração. O
 Karamelo localiza automaticamente o ISO em `roms/Xbox/` (ou `roms/`) e cria um hardlink/cópia
 transparente para `ports/BlackRecomp/assets/` antes da execução.
+
+Um detalhe da linha do Castlevania: Symphony of the Night: é o port nativo de **Castlevania: Symphony of the Night** (*Akumajō Dracula X: Gekka no Yasōkyoku*, jogo original da **Konami Digital Entertainment** para PlayStation, Sega Saturn e PSP). A recompilação estática upstream em C# foi concebida e desenvolvida pelo time **BlackLabelHQ** ([BlackLabelHQ/SymphonyRecomp](https://github.com/BlackLabelHQ/SymphonyRecomp)). Esta edição (SOTN Ultimate) foi portada para .NET 10 / RecompOne e empacotada por **Gustavo Clemente** ([GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp)), trazendo binários nativos para **Windows x64** (`sotn.exe`) e **macOS Apple Silicon ARM64** (`sotn` Mach-O nativo). Incorpora as melhorias da comunidade SOTN Ultimate: suporte a 5 personagens jogáveis (Alucard, Richter Belmont, Maria Renard no estilo Sega Saturn com familiares/magias de coruja e Maria Renard no estilo PSP/Rondo com artes marciais e projéteis animais), correção e sincronização completa de streaming de áudio CD-XA/ADPCM, suporte a resolução widescreen nativa e compatibilidade direta com imagens de disco em formato CHD, CUE/BIN e ISO. O jogador coloca sua imagem em `roms/PSX/` (ou `roms/PlayStation/`); o Karamelo passa o caminho diretamente via linha de comando e realiza hardlink/cópia transparente para a pasta `ports/SymphonyRecomp/disc/`.
 
 Um detalhe só da linha do Valkyrie Profile: diferente de todo o resto da
 tabela, o zip baixado não traz o jogo pronto - ele traz um assistente que
