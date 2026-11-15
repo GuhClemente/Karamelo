@@ -384,7 +384,7 @@ Lugares encontrados:
 Detalhe do 8: além do número, a frase "nenhuma entrada do menu aponta para um
 emulador ausente" continua verdadeira e pode ficar.
 
-**Atualizado em 13/11/2026:** são **97** jogos de "Ports & Recomp" (97 🪟, 62 🐧, 42 🍎) — 42 até
+**Atualizado em 15/11/2026:** são **97** jogos de "Ports & Recomp" (97 🪟, 62 🐧, 43 🍎) — 42 até
 11/09, +1 em 30/10 (Project Tandem — ver seção 51), +1 em 05/11 (The Legend of Zelda: Ocarina of Time 3D / TriAevum — ver seção 59), +1 em 09/11 (Top Gear — ver seção 61), +1 em 13/11 (Super Street Fighter II Turbo HD Remix — ver seção 63), +5 em 20/09 (ver seção 15), +8 em 21/09 (ver seção 16), +1 em 27/09 (Melee Unlocked — ver seção 18), +1 em 27/09 (Yakumo — ver seção 20), +1 em 29/09 (Foxhollow — ver seção 23), +1 em 12/10 (CBFD-Recompiled — ver seção 25), +1 em 12/10 (ProjectCane — ver seção 26), +1 em 12/10 (cvlod_recomp — ver seção 27), +1 em 17/10 (BLACK — ver seção 30), +8 em 18/10 (ver seção 33), +8 em 25/10 (Onda 1 — ver seção 38), +8 em 25/10 (Onda 2 — ver seção 39) e +7 em 25/10 (The Legend of Zelda: A Link to the Past, Splinter Cell: Double Agent, Mercenaries, Fable II, GoldenEye 007 XBLA, Crash Team Racing High Octane e The Minish Cap — ver seção 40). Skate 3, Burnout 3: Takedown e Mario Kart Wii entraram nas Ondas 1 e 2 e saíram no mesmo dia (seção 41): não contam e não aparecem. The Darkness (Xbox 360) chegou a ser anunciado
 em 27/09 e foi **retirado no mesmo dia** — não conta e não aparece (seção 19).
 O número foi conferido contra o `CREDITS.md`, que é sempre a fonte, e não copie
@@ -1604,7 +1604,7 @@ arquivo `data/ports.json` do repositório, publicado em
 > **Aviso para a IA do site:** os números e a lista de ports podem ser lidos direto desse
 > arquivo (`ports[]`, ignorando entradas com `"hidden": true`; `has_linux_build` e
 > `has_macos_build` dão os selos 🐧 e 🍎; todo port listado tem build Windows 🪟).
-> Hoje: **97 jogos — 97 Windows 🪟, 62 Linux 🐧, 42 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem; seção 59 para o TriAevum; seção 61 para o Top Gear; seção 63 para o SSF2T HD Remix).
+> Hoje: **97 jogos — 97 Windows 🪟, 62 Linux 🐧, 43 macOS 🍎** (Ondas 1, 2 e 3 adicionadas; seção 41 para os 3 que saíram; seção 51 para o Project Tandem; seção 59 para o TriAevum; seção 61 para o Top Gear; seção 63 para o SSF2T HD Remix; seção 64 para SymphonyRecomp com macOS).
 
 Para o jogador: um port novo pode aparecer no menu sem atualizar o Karamelo. O app baixa
 o catálogo novo em segundo plano e mostra o port a partir do próximo início.
@@ -2400,3 +2400,36 @@ Novo jogo adicionado ao catálogo de Ports & Recompilados. **Novos totais: 97 jo
 - **O que o jogador precisa**: O pacote original do jogo para Xbox 360 (XBLA), extraído do console (arquivo único com nome hexadecimal sem extensão em `Content\0000000000000000\584108A4\000D0000\`). Opcionalmente, o pacote do Title Update #1 (`...000B0000\`). Nenhum arquivo de jogo protegido por direitos autorais acompanha o download.
 - **Como funciona no Karamelo**: O Karamelo baixa e descompacta a release diretamente em `ports/SSF2THDRemix/`. Ao iniciar, o jogo abre o launcher integrado onde o jogador pode clicar em "Install Game" e selecionar seu pacote XBLA para extração automática na pasta `game/`. Após isso, o jogo fica pronto para jogar diretamente.
 - **Aviso legal para a página**: Projeto de fã não oficial, sem afiliação ou endosso da Capcom ou Microsoft. Super Street Fighter II Turbo HD Remix é marca registrada de seus respectivos proprietários.
+
+---
+
+## 64. Atualização de 15/11/2026 — Castlevania: Symphony of the Night (SOTN Ultimate / SymphonyRecomp)
+
+Atualização e expansão de suporte do port nativo de *Castlevania: Symphony of the Night* (`SymphonyRecomp`). **Novos totais: 97 jogos — 97 Windows 🪟, 62 Linux 🐧, 43 macOS 🍎.**
+
+- **Projeto**: [GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp) (fork e evolução oficial no ecossistema Karamelo).
+- **Projetos e Autores Originais**:
+  - **Jogo Original**: *Castlevania: Symphony of the Night* (*Akumajō Dracula X: Gekka no Yasōkyoku*), copyright **Konami Digital Entertainment** (PlayStation 1, Sega Saturn e PSP).
+  - **Recompilação Estática Upstream**: Projeto concebido e desenvolvido pela equipe **BlackLabelHQ** ([BlackLabelHQ/SymphonyRecomp](https://github.com/BlackLabelHQ/SymphonyRecomp)), pioneiros na engenharia reversa e recompilação em C# do clássico.
+  - **Comunidade SOTN Ultimate**: Inovações trazidas por modders e entusiastas — widescreen estendido, correções de áudio e balanceamento.
+  - **Port Karamelo & RecompOne**: Desenvolvido e empacotado por **Gustavo Clemente** ([GuhClemente/SymphonyRecomp](https://github.com/GuhClemente/SymphonyRecomp)) com migração para **.NET 10 AOT / RecompOne**, suporte multiplataforma nativo (Windows x64 e macOS Apple Silicon ARM64), carregamento de discos CHD/CUE/ISO e integração com SDL3.
+- **Licença**: Código do port sob licença aberta (MIT / GPL). Assets e código original do jogo continuam sob copyright da Konami.
+- **Sistemas Suportados**: **Windows 🪟 e macOS Apple Silicon (M1/M2/M3/M4) 🍎**.
+  - **Windows (x64)**: executável nativo `sotn.exe` (`SymphonyRecomp-v1.2.0-windows-x64.zip`).
+  - **macOS (Apple Silicon ARM64)**: binário nativo Mach-O 64-bit arm64 `sotn` (`SymphonyRecomp-v1.2.0-macos-arm64.zip`), rodando liso sem Rosetta 2.
+- **Destaques e Recursos Técnicos**:
+  - **5 Personagens Jogáveis**:
+    1. **Alucard**: Campanha clássica com sistema completo de RPG, familiares, magias e inventário.
+    2. **Richter Belmont**: Jogabilidade clássica Belmont com chicote Vampire Killer e Item Crash.
+    3. **Maria Renard (Modo Sega Saturn)**: Habilidades clássicas da versão japonesa do Saturn, com magias e ataques do pássaro/coruja familiar.
+    4. **Maria Renard (Modo PSP / Rondo of Blood)**: Jogabilidade moderna com artes marciais, duplo pulo ágil e disparos mágicos de animais celestiais.
+    5. **Richter Alternativo / Modos Secretos**: Selecionáveis diretamente na criação de novo jogo ou seleção de personagem.
+  - **Widescreen Nativo (16:9 / ultrawide)**: Renderização expandida dos cenários sem esticar sprites 2D.
+  - **Correção de Áudio e Streaming CD-XA/ADPCM**: Sincronização impecável da trilha sonora e diálogos gravados em CD-DA/XA sem engasgos ou dessincronia.
+  - **Compatibilidade Nativa com CHD e CUE**: Suporte direto a imagens compactadas `.chd` e `.cue/.bin` do jogo original de PlayStation 1.
+  - **Zero Emulação**: Código 100% nativo AOT em C#/C++ com alta performance e input lag virtualmente nulo.
+- **O que o jogador precisa**:
+  - O jogador precisa possuir sua cópia original de *Castlevania: Symphony of the Night* (PlayStation 1, versões NTSC-U ou NTSC-J) em formato `.chd`, `.cue/.bin` ou `.iso`.
+  - Basta colocar a imagem em `roms/PSX/`, `roms/PlayStation/` ou na pasta do port `ports/SymphonyRecomp/disc/`.
+  - O Karamelo detecta a imagem automaticamente pelo nome e extensão, cria hardlink/cópia transparente para `ports/SymphonyRecomp/disc/` e repassa o caminho absoluto na linha de comando na inicialização.
+- **Aviso Legal**: Castlevania, Symphony of the Night e Akumajō Dracula são marcas registradas da Konami Digital Entertainment. Este projeto não distribui nenhum arquivo de jogo ou ROM comercial protegida por direitos autorais.

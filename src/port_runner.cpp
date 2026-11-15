@@ -187,6 +187,7 @@ static const PortDefinition* FindPortDef(const std::string& id) {
 }
 
 static std::string FindBestExecutable(const std::string& dir);
+static std::string FindUserIso(const PortDefinition& def, const std::string& port_dir, bool* out_wrong_disc = nullptr);
 
 // The executable a port folder resolves to: the exact exe_relpath when the
 // definition pins one (empty if that file is not there yet, so the port reads
@@ -1098,12 +1099,43 @@ bool PortIsInstalled(const std::string& port_id) {
 
 bool PortAutoSetupRom(const std::string& port_id) {
     const PortDefinition* def = FindPortDef(port_id);
-    if (!def || !def->needs_rom || def->rom_keywords.empty()) return false;
+    if (!def || !def->needs_rom || (def->rom_keywords.empty() && def->iso_keywords.empty())) return false;
 
     std::string target_dir = ResolvePortDir(port_id);
     if (target_dir.empty()) target_dir = "ports/" + port_id;
     std::error_code ec;
     fs::create_directories(target_dir, ec);
+
+    // Special case: Castlevania: Symphony of the Night (SymphonyRecomp)
+    // Links or copies the user's PSX disc image (.chd, .cue, .iso, .bin) from
+    // roms/PSX, roms/PlayStation, etc. into ports/SymphonyRecomp/disc/
+    if (port_id == "SymphonyRecomp") {
+        fs::path disc_dir = fs::path(target_dir) / "disc";
+        fs::create_directories(disc_dir, ec);
+        if (fs::is_directory(disc_dir, ec)) {
+            for (const auto& f : fs::directory_iterator(disc_dir, ec)) {
+                if (ec || !f.is_regular_file(ec)) continue;
+                std::string ext = ToLowerStr(f.path().extension().string());
+                if (ext == ".chd" || ext == ".cue" || ext == ".iso" || ext == ".bin") return true;
+            }
+        }
+        std::string iso = FindUserIso(*def, target_dir);
+        if (!iso.empty()) {
+            fs::path target_disc = disc_dir / fs::path(iso).filename();
+            std::error_code link_ec;
+            fs::create_hard_link(iso, target_disc, link_ec);
+            if (link_ec) {
+                link_ec.clear();
+                fs::create_symlink(iso, target_disc, link_ec);
+                if (link_ec) {
+                    link_ec.clear();
+                    fs::copy_file(iso, target_disc, fs::copy_options::overwrite_existing, link_ec);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
 
     // 0. Special case: CPS-2 Recomp (Capcom Arcade Collection)
     // Copies available CPS-1/CPS-2 rom sets (sfa2u, dino, avspu, spf2t, vsavj, vsav2, vhunt2, etc.)
@@ -1351,11 +1383,15 @@ static bool IsoHeaderMatches(const PortDefinition& def, const fs::path& iso) {
 // reports that a name matched but no header did, so the toast can say
 // "wrong disc" instead of "no disc".
 static std::string FindUserIso(const PortDefinition& def, const std::string& port_dir,
-                               bool* out_wrong_disc = nullptr) {
+                               bool* out_wrong_disc) {
     if (out_wrong_disc) *out_wrong_disc = false;
     if (def.iso_keywords.empty()) return "";
     std::vector<std::string> search;
-    if (!port_dir.empty()) search.push_back(port_dir);
+    if (!port_dir.empty()) {
+        search.push_back(port_dir);
+        search.push_back(port_dir + "/disc");
+        search.push_back(port_dir + "/assets");
+    }
     for (const auto& d : def.iso_dirs) { search.push_back("roms/" + d); search.push_back("app/roms/" + d); }
     search.push_back("roms");
     search.push_back("app/roms");

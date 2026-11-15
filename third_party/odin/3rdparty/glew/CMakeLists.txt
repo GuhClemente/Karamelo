@@ -117,9 +117,8 @@ else()
 endif()
 
 # OS Specific dependencies
-if(APPLE AND CMAKE_SYSTEM_VERSION VERSION_LESS "25.0.0")
-	find_library(AGL_LIBRARY AGL REQUIRED)
-	list(APPEND LIBRARIES ${AGL_LIBRARY})
+if(APPLE)
+	# macOS uses OpenGL framework directly, no AGL or X11 required
 elseif(NOT WIN32)
 	if(GLEW_OSMESA)
 		find_library(OSMESA_LIBRARY OSMesa REQUIRED)

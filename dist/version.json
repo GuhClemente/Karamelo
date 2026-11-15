@@ -12,11 +12,11 @@
     "exe_size": 5076992,
     "exe_sha256": "1936AC385100A4E7F478D731A1F4E7FADC8283C6816D50F977C71AFE2C4EB74A",
     "zip_url": "https://karamelo-emu.com/downloads/Karamelo_v0.981_Win64.zip",
-    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.981_macOS_arm64.tar.gz",
+    "macos_tar_url": "https://karamelo-emu.com/downloads/Karamelo_v0.982_macOS_arm64.tar.gz",
     "exe_version": "0.981",
     "linux_bin_version": "0.981",
-    "macos_bin_version": "0.981",
+    "macos_bin_version": "0.982",
     "macos_bin_url": "https://karamelo-emu.com/downloads/Karamelo_mac",
-    "macos_bin_size": 5093176,
-    "macos_bin_sha256": "4D751127B7CF1A2A991B4BF36F15BC5352DA3A1E8F2F36DC93E4A4190ECA24DC"
+    "macos_bin_size": 5128776,
+    "macos_bin_sha256": "3508E888C0C70D33FC0515AB3C5D3713270DDFA933E5FEC5CE16F5D4358B3ED3"
 }

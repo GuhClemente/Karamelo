@@ -110,9 +110,11 @@ KARAMELO_SRCS=(
     src/main_linux.cpp
 )
 
+NEWEST_HEADER=$(find include -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -n 1)
+
 for src in "${KARAMELO_SRCS[@]}"; do
     obj="build/macos_obj/$(basename "$src" .cpp).o"
-    if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+    if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ] || [ -n "$NEWEST_HEADER" -a "$NEWEST_HEADER" -nt "$obj" ]; then
         echo "  Compilando $src..."
         # -Werror so no nosso codigo (ver compile_linux.sh).
         clang++ -std=c++20 -O2 -Werror $COMMON_DEFS $COMMON_INCLUDES -c "$src" -o "$obj"

@@ -1874,7 +1874,7 @@ input:checked + .slider:before {
             </div>
             <div class="eco-card">
               <h4><span>🍎 macOS (Apple Silicon)</span><span class="badge badge-ok">Pronto</span></h4>
-              <p>Nativo M1/M2/M3/M4 ARM64, Cocoa, Metal/OpenGL, SDL3 estático sem Homebrew, e 42 PC Ports compilados em Mach-O nativo.</p>
+              <p>Nativo M1/M2/M3/M4 ARM64, Cocoa, Metal/OpenGL, SDL3 estático sem Homebrew, e 43 PC Ports compilados em Mach-O nativo.</p>
 )raw";
 	h << R"raw(            </div>
             <div class="eco-card">
