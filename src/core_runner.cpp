@@ -4120,7 +4120,11 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 				// NASCAR Arcade: default to imitation drive board so steering calibration passes without serial hardware
 				if ((stem == "sgnascar" || stem == "sgnascaro") && !getenv("ODIN_DRIVE"))
 				{
+#ifdef _WIN32
 					_putenv("ODIN_DRIVE=imitation");
+#else
+					setenv("ODIN_DRIVE", "imitation", 1);
+#endif
 				}
 			}
 			// Sega Model 1 & Model 2 titles: SM2-EMU (cores/sm2.dll) goes to the front when available
