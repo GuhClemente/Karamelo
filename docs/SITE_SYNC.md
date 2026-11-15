@@ -2549,3 +2549,71 @@ Foram integrados 6 novos títulos ao catálogo de Ports & Recompilados (`data/po
 - **O que o jogador precisa**: Os arquivos de dados da instalação original do jogo em disquetes ou CD-ROM DOS.
 - **Como funciona no Karamelo**: O executável nativo é baixado e configurado na pasta de ports, permitindo inicialização instantânea e suporte a mouse e mapeamento no controle.
 - **Aviso legal para a página**: Projeto open-source de preservação técnica, sem vínculo com a Electronic Arts ou criadores originais da Bullfrog.
+
+---
+
+## 66. Atualização de 14/11/2026 — Galeria Multimídia Unificada (92 Jogos, 182 Vídeos, 364 Screenshots CRT)
+
+Uma grande atualização da vitrine multimídia e galeria de jogos do site `karamelo-emu.com` foi implementada para apresentar todos os sistemas de emulação suportados pelo Karamelo em ação real, com capturas automatizadas em alta fidelidade e sem telas travadas.
+
+### 1. Resumo e Contagens Canônicas para a IA do Site
+- **Jogos em Destaque na Galeria**: **92 jogos** cadastrados na fonte de verdade do site (`app/gallery-data.js`).
+- **Sistemas Cobertos**: **37 de 37 sistemas** suportados pelo Karamelo (`APP_SYSTEM_COUNT = 37`).
+- **Regra de Cobertura Multi-Jogos**: Todos os consoles e sistemas com acervo expressivo (SNES, Genesis, NES, N64, PS1, Saturn, Dreamcast, GBA, Arcade, 32X, 3DO, FM Towns Marty, Atari 2600, ColecoVision, MSX, C64, DOS, PC-98, etc.) possuem **no mínimo 3 jogos distintos gravados e catalogados**.
+- **Acervo de Vídeos (`public/gallery/videos/`)**:
+  - **182 arquivos de vídeo gravados na sessão** (totalizando 103 `.webm` e 103 `.mp4` no repositório do site).
+  - Padrão técnico: 720p 60 FPS cravados, áudio estéreo digital 48 kHz capturado do barramento PCM do Libretro.
+  - Formatos duplos para cada jogo: `.webm` (VP9 + Opus para navegadores modernos e carregamento ultra-rápido) e `.mp4` (H.264 + AAC 48 kHz para máxima compatibilidade mobile/Safari).
+- **Acervo de Screenshots (`public/gallery/shots/`)**:
+  - **364 capturas WebP geradas na sessão** (totalizando 412 capturas `.webp` no repositório do site).
+  - Exatamente **4 screenshots por jogo**:
+    - `_01.webp`: Tela de título, abertura ou logo da desenvolvedora.
+    - `_02.webp`: Prólogo, introdução ou tela de seleção de personagem/veículo.
+    - `_03.webp`: Gameplay ativo nítido em pixel-perfect (sem HUD poluído ou telas de pausa).
+    - `_04_crt.webp`: Demonstração visual do shader CRT Trinitron (Scanlines 15kHz e máscara de abertura clássica do Karamelo).
+
+### 2. Estrutura de Dados (`app/gallery-data.js`)
+O array exportado é `ALL_GALLERY_CORES`. Cada entrada possui o seguinte esquema obrigatório:
+```javascript
+{
+  id: "snes_mmx",                           // Identificador único (sistema_jogo)
+  name: "Super Nintendo (SNES)",            // Nome canônico do sistema
+  core: "bsnes",                            // Nome canônico do motor Libretro
+  category: "16-Bit",                       // Categoria para os filtros da UI
+  game: "Mega Man X",                       // Nome comercial do jogo
+  cover: "/gallery/shots/snes_mmx_02.webp", // Imagem de capa do card
+  video: "/gallery/videos/snes_mmx.webm",   // URL do vídeo WebM
+  videoMp4: "/gallery/videos/snes_mmx.mp4", // URL do vídeo MP4
+  shots: [                                  // 4 capturas com legenda explicativa
+    { src: "/gallery/shots/snes_mmx_01.webp", caption: "Tela de Abertura Capcom 1993" },
+    { src: "/gallery/shots/snes_mmx_02.webp", caption: "Prólogo Narrativo em Português" },
+    { src: "/gallery/shots/snes_mmx_03.webp", caption: "Highway Stage: X em Ação Pixel-Perfect" },
+    { src: "/gallery/shots/snes_mmx_04_crt.webp", caption: "Filtro CRT Trinitron Scanlines 15kHz" }
+  ],
+  resolution: "256x224 (60.00 Hz)",         // Resolução nativa e taxa de quadros
+  cpu: "Ricoh 5A22 @ 3.58 MHz + SPC700 Audio", // Processador e chip de som
+  desc: {
+    pt: "O clássico de ação da Capcom em português com trilha sonora sintetizada no DSP Sony SPC700 e gráficos 240p cravados a 60 FPS.",
+    en: "Capcom's classic action platformer in Portuguese with Sony SPC700 DSP stereo audio and locked 240p 60 FPS visuals."
+  }
+}
+```
+
+### 3. Categorias e Filtros da Interface (`home-client.js`)
+As categorias canônicas para agrupamento de abas/filtros são:
+- `all`: Exibe todos os 92 jogos.
+- `video`: Filtra apenas itens com vídeo disponível.
+- `c16`: Sistemas 16-Bit (SNES, Mega Drive, Neo Geo, PC Engine, etc.).
+- `c32`: Sistemas 32-Bit (PlayStation, Saturn, 3DO, 32X, PC-FX, etc.).
+- `c64`: Sistemas 3D & 64-Bit / 128-Bit (Nintendo 64, Dreamcast, etc.).
+- `c8`: Sistemas 8-Bit (NES, Master System, Atari 7800, etc.).
+- `portables`: Portáteis (GBA, Game Boy, Game Boy Color, Game Gear, Neo Geo Pocket, WonderSwan, Lynx, etc.).
+- `arcade`: Placas Arcade (MAME / FBNeo, Capcom CPS-1/CPS-2, etc.).
+- `computers`: Microcomputadores Vintage (Commodore 64, Amiga, MSX, DOS, PC-98, FM Towns Marty, etc.).
+
+### 4. Diretrizes de Apresentação e Reprodução para a IA do Site
+- **Prevenção de Ruído para o Usuário**: Os vídeos na grade da galeria iniciam silenciosos com `muted playsInline loop` no hover ou foco do card.
+- **Reprodução com Áudio no Modal**: Quando o usuário clica para abrir a visualização detalhada ou o modal Lightbox, o vídeo pode ser reproduzido com som estéreo digital completo de alta fidelidade.
+- **Alternância de CRT**: A quarta screenshot de cada jogo (`_04_crt.webp`) deve ser apresentada com destaque nos controles de visualização (ex.: badge "CRT 15kHz" ou botão de alternância "Ver com Shader CRT") para evidenciar o renderizador retrô do Karamelo.
+- **Separação de Repositórios**: Os arquivos de mídia pesada residem exclusivamente em `c:\github\Karamelo Site\public\gallery/`. Nunca devem ser commitados no repositório de desenvolvimento do emulador (`c:\github\Karamelo`).
+
