@@ -10,9 +10,11 @@ echo.
 cd /d "%~dp0"
 
 if "%~1" neq "" (
-    echo [0/4] Configurando versao de release para %~1...
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\bump_version.ps1 %~1
-    echo.
+    if "%~1" neq "--fast" (
+        echo [0/4] Configurando versao de release para %~1...
+        powershell -NoProfile -ExecutionPolicy Bypass -File .\bump_version.ps1 %~1
+        echo.
+    )
 )
 
 for /f "tokens=3" %%v in ('findstr /c:"#define APP_VERSION " include\app_info.h') do set APP_VER=%%~v
@@ -28,7 +30,10 @@ echo.
 
 rem 1. Compile clean release binary
 echo [1/4] Compilando executavel de producao com /MT (Static CRT)...
-call "%~dp0compile.bat"
+set COMPILE_ARGS=
+if "%~1"=="--fast" set COMPILE_ARGS=--fast
+if "%~2"=="--fast" set COMPILE_ARGS=--fast
+call "%~dp0compile.bat" %COMPILE_ARGS%
 if errorlevel 1 (
     echo [ERRO] Falha na compilacao. O pacote nao pode ser criado.
     exit /b 1

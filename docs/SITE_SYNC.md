@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.982 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.983 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -2669,3 +2669,18 @@ Foi integrado ao catálogo de PC Ports & Recompilados (`data/ports.json` versão
 - **O que é**: Recompilação estática em C++ da conceituada versão de PS2 para Windows x64. Diferente do port antigo de PC feito pela EA Seattle, a versão Black Box do PS2 possui física veicular autêntica, iluminação dinâmica, folhagens e perseguições policiais cinematográficas.
 - **Destaques**: Renderizador nativo Vulkan, suporte a taxas de quadros modernas, controles analógicos com aceleração/freio nos gatilhos (RT/LT) e assistente embutido que extrai os assets (~3.6 GB) diretamente do disco/ISO original de PS2 do jogador no primeiro uso.
 - **O que o jogador precisa**: Imagem de disco de PS2 (EUA SLUS-20362, Europa SLES-50731, Ásia SLPM-65181 ou Coreia SLPM-67527). O download do Karamelo traz apenas o executável do motor e não contém assets protegidos da Electronic Arts.
+
+---
+
+## 69. Versão 0.983
+
+**Estado**: pacote de **Windows** pronto em 16/11/2026 (`Karamelo_v0.983_Win64.zip` e `Karamelo.exe`). Só anuncie como publicada depois que o deploy estiver no ar (o `version.json` do site passa a dizer 0.983).
+Contagens: **37 sistemas, 42 motores; 104 ports — 104 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎**.
+
+Novidades para o jogador:
+
+- **Dreamcast e motores 3D em 4K nativo**: Framebuffers internos e buffers de apresentação expandidos para 3840×2880 (4K), permitindo que títulos 3D em alta resolução e widescreen hack rodem sem cortes de imagem na tela.
+- **Touchpad do DualShock 4 e DualSense como Mouse & Stylus**:
+  - Em jogos de computadores clássicos (DOSBox, ScummVM, Amiga, PC-98, FM Towns): deslize o polegar no touchpad do controle PlayStation para mover o cursor suavemente (modo trackpad de notebook), e dê um toque rápido (*tap-to-click*) para o botão esquerdo.
+  - Nintendo DS e 3DS: o touchpad vira uma mesa digitalizadora 1:1 mapeada diretamente na tela sensível ao toque, permitindo interação com a ponta dos dedos sem precisar do mouse do Windows.
+- **Need for Speed: Hot Pursuit 2 (PS2 Recomp)**: Novo título no catálogo oficial de Ports & Recompilados (104 jogos totais no menu). Recompilação do clássico de PS2 em C++ para Windows via Vulkan, com extração automatizada de assets da ISO original do jogador.
