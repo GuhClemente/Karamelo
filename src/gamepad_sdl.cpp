@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <math.h>
 
 #include "gamepad_sdl.h"
 
@@ -499,5 +500,94 @@ void GamepadShutdown()
 		}
 	}
 	ReleaseSRWLockExclusive(&s_pads_lock);
+}
+
+struct TouchpadTracker {
+	bool down;
+	float prev_x;
+	float prev_y;
+	uint64_t start_tick;
+	float total_dist;
+};
+
+static TouchpadTracker s_touch[4] = {};
+static SRWLOCK s_touch_lock = SRWLOCK_INIT;
+
+bool GamepadGetTouchpadFinger(int slot, int finger, bool* out_down, float* out_x, float* out_y, float* out_pressure)
+{
+	if (slot < 0 || slot >= 4) return false;
+	AcquireSRWLockShared(&s_pads_lock);
+	SDL_Gamepad* gp = s_pads[slot];
+	bool ok = false;
+	if (gp && SDL_GetNumGamepadTouchpads(gp) > 0)
+	{
+		bool down = false;
+		float x = 0.0f, y = 0.0f, pressure = 0.0f;
+		if (SDL_GetGamepadTouchpadFinger(gp, 0, finger, &down, &x, &y, &pressure))
+		{
+			if (out_down) *out_down = down;
+			if (out_x) *out_x = x;
+			if (out_y) *out_y = y;
+			if (out_pressure) *out_pressure = pressure;
+			ok = true;
+		}
+	}
+	ReleaseSRWLockShared(&s_pads_lock);
+	return ok;
+}
+
+bool GamepadGetTouchpadMotion(int slot, float* out_dx, float* out_dy, bool* out_down, bool* out_tap)
+{
+	if (out_dx) *out_dx = 0.0f;
+	if (out_dy) *out_dy = 0.0f;
+	if (out_down) *out_down = false;
+	if (out_tap) *out_tap = false;
+	if (slot < 0 || slot >= 4) return false;
+
+	bool down = false;
+	float x = 0.0f, y = 0.0f, pressure = 0.0f;
+	if (!GamepadGetTouchpadFinger(slot, 0, &down, &x, &y, &pressure))
+		return false;
+
+	AcquireSRWLockExclusive(&s_touch_lock);
+	TouchpadTracker& t = s_touch[slot];
+	uint64_t now = (uint64_t)SDL_GetTicks();
+
+	if (down)
+	{
+		if (out_down) *out_down = true;
+		if (!t.down)
+		{
+			t.down = true;
+			t.prev_x = x;
+			t.prev_y = y;
+			t.start_tick = now;
+			t.total_dist = 0.0f;
+		}
+		else
+		{
+			float dx = x - t.prev_x;
+			float dy = y - t.prev_y;
+			t.total_dist += fabsf(dx) + fabsf(dy);
+			t.prev_x = x;
+			t.prev_y = y;
+			if (out_dx) *out_dx = dx;
+			if (out_dy) *out_dy = dy;
+		}
+	}
+	else
+	{
+		if (t.down)
+		{
+			uint64_t dur = now - t.start_tick;
+			if (dur < 280 && t.total_dist < 0.04f)
+			{
+				if (out_tap) *out_tap = true;
+			}
+			t.down = false;
+		}
+	}
+	ReleaseSRWLockExclusive(&s_touch_lock);
+	return true;
 }
 

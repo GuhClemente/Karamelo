@@ -1055,6 +1055,15 @@ static void PollMouseStylus()
 	if (!CoreIsRunning() || OsdIsEnabled()) { CoreSetPointer(0.0, 0.0, false); return; }
 	if (GetForegroundWindow() != g_hwnd) { CoreSetPointer(0.0, 0.0, false); return; }
 
+	// DualShock 4 / DualSense touchpad direct stylus
+	bool tp_down = false;
+	float tp_x = 0.0f, tp_y = 0.0f, tp_p = 0.0f;
+	if (GamepadGetTouchpadFinger(0, 0, &tp_down, &tp_x, &tp_y, &tp_p) && tp_down)
+	{
+		CoreSetPointerDirect((double)tp_x, (double)tp_y, true);
+		return;
+	}
+
 	POINT pt;
 	if (!GetCursorPos(&pt) || !ScreenToClient(g_hwnd, &pt)) return;
 

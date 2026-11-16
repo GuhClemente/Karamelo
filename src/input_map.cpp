@@ -799,12 +799,12 @@ bool InputBindDeleteSystemProfile(const char* system_name)
 	return fs::remove(path, ec);
 }
 
-int InputEmulatedMouseButtons(bool pad_as_mouse, unsigned pad_buttons, bool key_space, bool key_enter)
+int InputEmulatedMouseButtons(bool pad_as_mouse, unsigned pad_buttons, bool key_space, bool key_enter, bool touchpad_tap)
 {
 	if (!pad_as_mouse) return 0;
 	int btns = 0;
 	if (pad_buttons & (PAD_BTN_A | PAD_BTN_RT)) btns |= 1;
 	if (pad_buttons & (PAD_BTN_B | PAD_BTN_LT)) btns |= 2;
-	if (key_space || key_enter) btns |= 1;
+	if (key_space || key_enter || touchpad_tap) btns |= 1;
 	return btns;
 }

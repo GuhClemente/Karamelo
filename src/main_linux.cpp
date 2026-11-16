@@ -567,6 +567,15 @@ static void PollMouseStylus()
 
 	SDL_HideCursor();
 
+	// DualShock 4 / DualSense touchpad direct stylus
+	bool tp_down = false;
+	float tp_x = 0.0f, tp_y = 0.0f, tp_p = 0.0f;
+	if (GamepadGetTouchpadFinger(0, 0, &tp_down, &tp_x, &tp_y, &tp_p) && tp_down)
+	{
+		CoreSetPointerDirect((double)tp_x, (double)tp_y, true);
+		return;
+	}
+
 	float mx = 0.0f, my = 0.0f;
 	SDL_MouseButtonFlags btn = SDL_GetMouseState(&mx, &my);
 

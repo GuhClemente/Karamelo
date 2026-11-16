@@ -28,6 +28,13 @@ TEST_CASE(PadAsMouseMapsClicks)
 	ASSERT_EQ(InputEmulatedMouseButtons(true, PAD_BTN_X | PAD_BTN_Y | PAD_BTN_START | PAD_BTN_DPAD_UP, false, false), 0);
 }
 
+TEST_CASE(PadAsMouseTouchpadTap)
+{
+	ASSERT_EQ(InputEmulatedMouseButtons(false, 0, false, false, true), 0);
+	ASSERT_EQ(InputEmulatedMouseButtons(true, 0, false, false, true), 1);
+	ASSERT_EQ(InputEmulatedMouseButtons(true, PAD_BTN_B, false, false, true), 3); // Right click + left click
+}
+
 // 6-button pads (8BitDo M30 and similar: bottom row A B C = Xbox A B RB, top
 // row X Y Z = Xbox X Y LB). Each table follows that core's own RetroPad
 // mapping, so the console's buttons land where they sit on the pad.

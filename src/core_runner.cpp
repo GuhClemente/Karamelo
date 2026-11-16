@@ -3152,8 +3152,17 @@ static void PollLocalInput(void)
 			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP)    mouse_dy -= 3;
 			if (pad0.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN)  mouse_dy += 3;
 
-			// A / right trigger = left click, B / left trigger = right click.
-			mouse_btns |= InputEmulatedMouseButtons(pad_as_mouse, w0, false, false);
+			// DualShock 4 / DualSense touchpad: laptop-style trackpad navigation
+			float t_dx = 0.0f, t_dy = 0.0f;
+			bool t_down = false, t_tap = false;
+			if (GamepadGetTouchpadMotion(0, &t_dx, &t_dy, &t_down, &t_tap))
+			{
+				mouse_dx += (int)(t_dx * 960.0f);
+				mouse_dy += (int)(t_dy * 960.0f);
+			}
+
+			// A / right trigger = left click, B / left trigger = right click, touchpad tap = left click.
+			mouse_btns |= InputEmulatedMouseButtons(pad_as_mouse, w0, false, false, t_tap);
 		}
 	}
 
@@ -3255,6 +3264,23 @@ void CoreSetPointer(double client_fx, double client_fy, bool pressed)
 
 	InterlockedExchange(&g_pointer_xy, (LONG)(((uint32_t)(px & 0xFFFF) << 16) | (uint32_t)(py & 0xFFFF)));
 	InterlockedExchange(&g_pointer_down, pressed ? 1 : 0);
+}
+
+void CoreSetPointerDirect(double u, double v, bool pressed)
+{
+	if (!pressed || u < 0.0 || u > 1.0 || v < 0.0 || v > 1.0)
+	{
+		InterlockedExchange(&g_pointer_down, 0);
+		return;
+	}
+
+	int px = (int)(u * 65534.0) - 32767;
+	int py = (int)(v * 65534.0) - 32767;
+	if (px < -32767) px = -32767; else if (px > 32767) px = 32767;
+	if (py < -32767) py = -32767; else if (py > 32767) py = 32767;
+
+	InterlockedExchange(&g_pointer_xy, (LONG)(((uint32_t)(px & 0xFFFF) << 16) | (uint32_t)(py & 0xFFFF)));
+	InterlockedExchange(&g_pointer_down, 1);
 }
 
 static int RetroKeyToVK(unsigned id)

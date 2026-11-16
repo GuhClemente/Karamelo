@@ -126,6 +126,11 @@ void CoreSetN64Upscale(int mode);
 // or window size. A position outside the picture is reported as not touching.
 void CoreSetPointer(double client_fx, double client_fy, bool pressed);
 
+// Absolute stylus pointer in normalized retro viewport space (0..1).
+// Used for touchpad surfaces (e.g. DualShock 4 / DualSense) directly mapping
+// across the retro display without window letterbox margins.
+void CoreSetPointerDirect(double u, double v, bool pressed);
+
 // True when the loaded game came from a disc image rather than a cartridge.
 bool CoreIsDiscGame();
 

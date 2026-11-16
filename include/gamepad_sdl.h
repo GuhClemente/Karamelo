@@ -47,6 +47,17 @@ int GamepadGetDeviceType(int slot);
 // Returns a user-friendly model name (e.g. "DualSense (PS5)", "Xbox One/Series", "Switch Pro").
 const char* GamepadGetDeviceTypeName(int slot);
 
+// Queries finger on a controller's touchpad (e.g. DualShock 4 or DualSense).
+// Returns true if the controller has a touchpad and finger info was retrieved.
+// x and y are normalized (0.0 to 1.0, top-left origin).
+bool GamepadGetTouchpadFinger(int slot, int finger, bool* out_down, float* out_x, float* out_y, float* out_pressure);
+
+// Calculates touchpad motion deltas and tap detection since last frame.
+// Returns true if the controller in this slot has a touchpad.
+// out_dx and out_dy are delta movement (-1.0 to +1.0).
+// out_tap is set to true on a quick release (tap-to-click).
+bool GamepadGetTouchpadMotion(int slot, float* out_dx, float* out_dy, bool* out_down, bool* out_tap);
+
 // Feed every SDL event from the main loop here - it acts on joystick/gamepad
 // added and removed and on START, ignoring the rest, so slot assignment stays
 // in sync with what is actually plugged in. Hot swap: a pad that comes back

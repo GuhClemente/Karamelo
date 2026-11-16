@@ -152,9 +152,9 @@ int InputBindGetGlobalPad(int bind);
 
 // Mouse buttons (bit 0 = left, bit 1 = right) the pad and the keyboard stand in
 // for: A or right trigger = left click, B or left trigger = right click, Space
-// or Enter = left click. Always 0 with "Controle como Mouse" off - the same
-// press would otherwise reach the game twice, as the button and as a click
+// or Enter = left click, touchpad tap = left click. Always 0 with "Controle como Mouse" off -
+// the same press would otherwise reach the game twice, as the button and as a click
 // (on FM Towns the mouse sits on player 2's port). tests/test_input_mouse.cpp.
-int InputEmulatedMouseButtons(bool pad_as_mouse, unsigned pad_buttons, bool key_space, bool key_enter);
+int InputEmulatedMouseButtons(bool pad_as_mouse, unsigned pad_buttons, bool key_space, bool key_enter, bool touchpad_tap = false);
 
 #endif
