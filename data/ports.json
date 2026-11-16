@@ -1,5 +1,5 @@
 {
-  "catalog_version": 12,
+  "catalog_version": 13,
   "ports": [
     {
       "id": "DrMario64",
@@ -2044,6 +2044,17 @@
         "Syndicate64-1.0-macOS.zip": "26ad07c9cfa5f7e5ee12de61815943eaddef2507bd056b467a663e0ac6b0a22d"
       },
       "notes": "Bullfrog's Syndicate Plus (1993 DOS) recompiled into a native 64-bit program by Buyukcaglar. Original gameplay and audio. Checked 14/11/2026 against v1.0: Windows x64 and macOS."
+    },
+    {
+      "id": "NfsHp2",
+      "display_name": "Need for Speed: Hot Pursuit 2",
+      "repo": "ZloiKILLER/nfshp2-port-win",
+      "exe_hint": "speed.exe",
+      "release_tag": "0.13",
+      "asset_sha256": {
+        "speed.exe": "3e985020f6f67e1086080d7320b73176cd9a1bd34fcae2d093e73ceeddb9d15e"
+      },
+      "notes": "Need for Speed: Hot Pursuit 2 (Black Box PS2 version recompiled to Windows via Vulkan by ZloiKILLER). Built-in installer extracts game assets from user PS2 ISO on first launch."
     }
   ]
 }

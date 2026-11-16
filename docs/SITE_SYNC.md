@@ -2445,7 +2445,7 @@ Esta seção instrui a IA mantenedora do site sobre as implementações técnica
 > **REGRA DE OURO PARA O SITE**: As implementações abaixo residem na branch `feat/batocera-app-upgrades` para homologação e compilação multiplataforma dos novos binários `.dll` / `.so` / `.dylib`. **NÃO ALTERE AS CONTAGENS PÚBLICAS NO SITE OFICIAL AINDA.** A contagem oficial de produção permanece rigorosamente em:
 > - **37 Sistemas Nativos**
 > - **42 Motores de Emulação** (`APP_CORE_ENGINES = 42`)
-> - **103 Ports e Recompilados** (103 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎)
+> - **104 Ports e Recompilados** (104 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎)
 > 
 > A contagem só será atualizada para 38 sistemas / 44 motores no momento em que a branch for mesclada à `main` e a versão 0.983 for compilada e distribuída oficialmente.
 
@@ -2649,3 +2649,23 @@ As categorias canônicas para agrupamento de abas/filtros são:
 - **Reprodução com Áudio no Modal**: Quando o usuário clica para abrir a visualização detalhada ou o modal Lightbox, o vídeo pode ser reproduzido com som estéreo digital completo de alta fidelidade.
 - **Alternância de CRT**: A quarta screenshot de cada jogo (`_04_crt.webp`) deve ser apresentada com destaque nos controles de visualização (ex.: badge "CRT 15kHz" ou botão de alternância "Ver com Shader CRT") para evidenciar o renderizador retrô do Karamelo.
 - **Separação de Repositórios**: Os arquivos de mídia pesada residem exclusivamente em `c:\github\Karamelo Site\public\gallery/`. Nunca devem ser commitados no repositório de desenvolvimento do emulador (`c:\github\Karamelo`).
+
+---
+
+## 68. Adição de 16/11/2026 — Need for Speed: Hot Pursuit 2 (PS2 Recomp) (+1 Port)
+
+Foi integrado ao catálogo de PC Ports & Recompilados (`data/ports.json` versão 13) o port nativo de **Need for Speed: Hot Pursuit 2**.
+
+**Novos totais oficiais**: **104 jogos — 104 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎.**
+
+### Detalhamento do Título:
+- **ID do Port**: `NfsHp2`
+- **Nome de Exibição**: `Need for Speed: Hot Pursuit 2`
+- **Projeto & Repositório**: [ZloiKILLER/nfshp2-port-win](https://github.com/ZloiKILLER/nfshp2-port-win).
+- **Autores & Créditos**: ZloiKILLER, baseado na versão PlayStation 2 desenvolvida originalmente pela EA Black Box.
+- **Licença**: Código aberto / pesquisa de engenharia reversa.
+- **Sistemas**: **Windows 🪟** (Vulkan, WASAPI).
+- **Versão no catálogo**: `0.13` (fixada com SHA-256 do `speed.exe`).
+- **O que é**: Recompilação estática em C++ da conceituada versão de PS2 para Windows x64. Diferente do port antigo de PC feito pela EA Seattle, a versão Black Box do PS2 possui física veicular autêntica, iluminação dinâmica, folhagens e perseguições policiais cinematográficas.
+- **Destaques**: Renderizador nativo Vulkan, suporte a taxas de quadros modernas, controles analógicos com aceleração/freio nos gatilhos (RT/LT) e assistente embutido que extrai os assets (~3.6 GB) diretamente do disco/ISO original de PS2 do jogador no primeiro uso.
+- **O que o jogador precisa**: Imagem de disco de PS2 (EUA SLUS-20362, Europa SLES-50731, Ásia SLPM-65181 ou Coreia SLPM-67527). O download do Karamelo traz apenas o executável do motor e não contém assets protegidos da Electronic Arts.

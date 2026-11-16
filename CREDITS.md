@@ -249,10 +249,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Animal Crossing: City Folk | 🪟🐧🍎 | [rob646464/city-folk-recompiled](https://github.com/rob646464/city-folk-recompiled) |
 | Road Rash Trilogy | 🪟 | [BTr-RJ/RoadRashTrilogy_Recomp](https://github.com/BTr-RJ/RoadRashTrilogy_Recomp) |
 | Syndicate Plus | 🪟🍎 | [Buyukcaglar/synd](https://github.com/Buyukcaglar/synd) |
+| Need for Speed: Hot Pursuit 2 | 🪟 | [ZloiKILLER/nfshp2-port-win](https://github.com/ZloiKILLER/nfshp2-port-win) |
 
-**65 de 103 têm build Linux** e **46 de 103 têm build macOS** (Apple Silicon /
-Universal), verificado em 15/11/2026 contra a release mais recente de cada
-repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy e Syndicate Plus; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
+**65 de 104 têm build Linux** e **46 de 104 têm build macOS** (Apple Silicon /
+Universal), verificado em 16/11/2026 contra a release mais recente de cada
+repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy, Syndicate Plus e Need for Speed Hot Pursuit 2; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
