@@ -86,8 +86,8 @@ SDL_Window* MainGetSdlWindow()
 	return g_window;
 }
 
-#define PRESENT_MAX_W 1920
-#define PRESENT_MAX_H 1200
+#define PRESENT_MAX_W 3840
+#define PRESENT_MAX_H 2160
 
 static uint32_t* present_buffer = nullptr;
 static SDL_Texture* g_present_texture = nullptr;

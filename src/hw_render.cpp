@@ -542,7 +542,10 @@ bool HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 {
 	if (!g_gl_ready || !g_fbo || !dest) return false;
 	if (width == 0 || height == 0) return false;
-	if (width > g_surface_w || height > g_surface_h) return false;
+	if (width > g_surface_w || height > g_surface_h)
+	{
+		if (!HwEnsureSurface(width, height)) return false;
+	}
 	if (!HwMakeCurrent()) return false;
 
 	p_glBindFramebuffer(GL_FRAMEBUFFER, g_fbo);

@@ -151,8 +151,8 @@ static void InitBackbuffer(HDC hdc)
 // While a game is running with no OSD on screen we scale the core's framebuffer
 // straight to the window size instead, so there is only one resample.
 // -------------------------------------------------------------
-#define PRESENT_MAX_W 1920
-#define PRESENT_MAX_H 1200
+#define PRESENT_MAX_W 3840
+#define PRESENT_MAX_H 2160
 
 static uint32_t* present_buffer = nullptr;
 static HBITMAP   h_present_bitmap = nullptr;

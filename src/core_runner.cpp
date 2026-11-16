@@ -126,8 +126,9 @@ static bool  s_core_faulted = false;   // retro_run raised an exception this ses
 static enum retro_pixel_format core_pixel_format = RETRO_PIXEL_FORMAT_RGB565;
 
 // Triple-Buffered Lock-Free Framebuffer System
-#define MAX_FB_WIDTH  1280
-#define MAX_FB_HEIGHT 1024
+// Supports up to 4K / 3840x2880 internal resolution for 3D cores (Flycast, Mupen, Dolphin, PCSX2).
+#define MAX_FB_WIDTH  3840
+#define MAX_FB_HEIGHT 2880
 // Lock-free triple buffer.
 //
 // The previous version rotated indices in a way that only ever used two of the
@@ -151,7 +152,9 @@ static int g_fb_front = 2;             // consumer thread only
 // 480i / 448i Motion-Adaptive Deinterlace for PS2 (Play! core)
 // PS2 GS alternates odd/even fields. Blending alternating scanlines with previous
 // field data forms a solid 448p progressive frame with zero screen shake and solid crisp text.
-static uint32_t g_deinterlace_prev[MAX_FB_WIDTH * MAX_FB_HEIGHT];
+#define MAX_DEINTERLACE_WIDTH  1280
+#define MAX_DEINTERLACE_HEIGHT 1024
+static uint32_t g_deinterlace_prev[MAX_DEINTERLACE_WIDTH * MAX_DEINTERLACE_HEIGHT];
 static bool     g_deinterlace_have_prev = false;
 static unsigned g_deinterlace_field = 0; // 0=even, 1=odd
 
@@ -2627,7 +2630,8 @@ static void CB_VideoRefresh(const void* data, unsigned width, unsigned height, s
 
 		// 480i / 448i Motion-Adaptive Deinterlacing for PS2 (Play! core only).
 		// PCSX2 handles hardware deinterlacing natively in its OpenGL GS pipeline.
-		if (!s_loaded_core_is_pcsx2 && height == 448 && width >= 512)
+		if (!s_loaded_core_is_pcsx2 && height == 448 && width >= 512 &&
+		    width <= MAX_DEINTERLACE_WIDTH && height <= MAX_DEINTERLACE_HEIGHT)
 		{
 			if (g_deinterlace_have_prev)
 			{
