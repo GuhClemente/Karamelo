@@ -1052,7 +1052,7 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 {
 	if (!g_vk_ready || !dest) return false;
 	if (width == 0 || height == 0) return false;
-	if (!g_pending_image_valid) return false;
+	if (!g_pending_image_valid || g_pending_image.create_info.image == VK_NULL_HANDLE) return false;
 	if (!VkHwEnsureSurface(width, height)) return false;
 
 	g_queue_lock.lock();
