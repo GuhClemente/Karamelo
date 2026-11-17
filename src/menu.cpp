@@ -72,7 +72,8 @@ enum MenuState {
   STATE_WEB_ADMIN,
   STATE_LIVE_CHAT,
   STATE_MANAGE_SYSTEMS,
-  STATE_WIZARD
+  STATE_WIZARD,
+  STATE_ACCESSIBILITY
 };
 
 struct MenuItem {
@@ -365,6 +366,13 @@ static int setting_nds_layout = 0;
 static int setting_nds_gap = 0;
 static int setting_nds_hybrid = 0;
 static int setting_citra_layout = 0;
+static int setting_upscaler = 0; // 0=Desligado, 1=FSR 1.0 (EASU+RCAS), 2=FidelityFX CAS
+static int setting_upscaler_sharpness = 75; // 0..100%
+static int setting_lut = 0; // 0=Desligado, 1=Sony PVM, 2=Game Boy DMG, 3=Game Boy Color, 4=Noir
+static int setting_cvd = 0; // 0=Desativado, 1=Protanopia, 2=Deuteranopia, 3=Tritanopia
+static int setting_cvd_strength = 100; // 0..100%
+static int setting_cvd_simulate = 0; // 0=Desativado, 1=Protanopia, 2=Deuteranopia, 3=Tritanopia
+static int setting_dsu_enabled = 0; // 0=Desligado, 1=Ativado
 
 // Filled in by PopulateMainMenu from the list it actually builds, so the
 // About page can never disagree with the menu the way it used to.
@@ -723,6 +731,20 @@ int MenuGetN64Core() { return setting_n64_core; }
 void MenuSetN64Core(int core) { setting_n64_core = ClampInt(core, 0, 2); }
 int MenuGetN64Upscale() { return setting_n64_upscale; }
 void MenuSetN64Upscale(int mode) { setting_n64_upscale = ClampInt(mode, 0, 2); }
+int   MenuGetUpscalerMode() { return setting_upscaler; }
+void  MenuSetUpscalerMode(int mode) { setting_upscaler = ClampInt(mode, 0, 2); }
+float MenuGetUpscalerSharpness() { return (float)setting_upscaler_sharpness / 100.0f; }
+void  MenuSetUpscalerSharpness(float s) { setting_upscaler_sharpness = ClampInt((int)(s * 100.0f + 0.5f), 0, 100); }
+int   MenuGetLutMode() { return setting_lut; }
+void  MenuSetLutMode(int mode) { setting_lut = ClampInt(mode, 0, 4); }
+int   MenuGetCvdMode() { return setting_cvd; }
+void  MenuSetCvdMode(int mode) { setting_cvd = ClampInt(mode, 0, 3); }
+float MenuGetCvdStrength() { return (float)setting_cvd_strength / 100.0f; }
+void  MenuSetCvdStrength(float s) { setting_cvd_strength = ClampInt((int)(s * 100.0f + 0.5f), 0, 100); }
+int   MenuGetCvdSimulateMode() { return setting_cvd_simulate; }
+void  MenuSetCvdSimulateMode(int mode) { setting_cvd_simulate = ClampInt(mode, 0, 3); }
+bool  MenuGetDsuEnabled() { return setting_dsu_enabled != 0; }
+void  MenuSetDsuEnabled(bool e) { setting_dsu_enabled = e ? 1 : 0; }
 // Arcade routing is automatic and deliberately has no setting. There used to
 // be one, offering "FinalBurn Neo", "MAME 2003", "MAME 2010" and "Flycast".
 // Picking wrong was not a harmless mistake: handing a romset to a MAME build
@@ -1132,6 +1154,7 @@ void PopulateShaderList();
 void PopulateDiagnostics();
 void PopulateManageSystems();
 void PopulateWizard();
+void PopulateAccessibility();
 static MenuState shader_list_previous_state = STATE_VIDEO;
 static MenuState controller_previous_state = STATE_SETTINGS;
 
@@ -2096,6 +2119,7 @@ void PopulateSettings() {
   items.push_back({Tr("Video", "Video"), ">", false, true, 201});
   items.push_back({Tr("Audio & Voz", "Audio & Voice"), ">", false, true, 202});
   items.push_back({Tr("Controles", "Controller"), ">", false, true, 203});
+  items.push_back({Tr("Acessibilidade", "Accessibility"), ">", false, true, 227});
   items.push_back({Tr("Netplay (Online)", "Netplay (Online)"), ">", false, true, 204});
   items.push_back({"Karamelo Cloud", ">", false, true, 217});
   items.push_back({"Karamelo Live (Chat)", ">", false, true, 218});
@@ -2327,6 +2351,48 @@ void PopulateVideoSettings() {
     snprintf(scroll_lbl, sizeof(scroll_lbl), "%ds", kScrollDelays[setting_name_scroll]);
   items.push_back({Tr("Rolagem Nome", "Name Scroll"), scroll_lbl, false, false, 313});
 
+  const char *upscaler_names_pt[] = {"Desligado", "FSR 1.0 (EASU+RCAS)", "FidelityFX CAS"};
+  const char *upscaler_names_en[] = {"Disabled", "FSR 1.0 (EASU+RCAS)", "FidelityFX CAS"};
+  items.push_back({Tr("Upscale FSR/CAS", "Upscale FSR/CAS"), (setting_language == 1) ? upscaler_names_en[setting_upscaler] : upscaler_names_pt[setting_upscaler], false, false, 314});
+
+  char sharp_buf[16];
+  snprintf(sharp_buf, sizeof(sharp_buf), "%d%%", setting_upscaler_sharpness);
+  items.push_back({Tr("Nitidez Upscale", "Upscale Sharp"), sharp_buf, false, false, 315});
+
+  const char *lut_names_pt[] = {"Desligado", "Sony PVM Trinitron", "Game Boy DMG (Verde)", "GBC / GBA Correcao", "Monocromatico Noir"};
+  const char *lut_names_en[] = {"Disabled", "Sony PVM Trinitron", "Game Boy DMG (Green)", "GBC / GBA Correct", "Noir Monochrome"};
+  items.push_back({Tr("Paleta / 3D LUT", "3D LUT Palette"), (setting_language == 1) ? lut_names_en[setting_lut] : lut_names_pt[setting_lut], false, false, 316});
+
+  if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+    selected_idx = 0;
+    scroll_top = 0;
+  }
+}
+
+void PopulateAccessibility() {
+  items.clear();
+  current_title = Tr("Acessibilidade", "Accessibility");
+  OsdSetSize(10);
+
+  const char *cvd_names_pt[] = {"Desativado", "Protanopia (Verm.)", "Deuteranopia (Verde)", "Tritanopia (Azul)"};
+  const char *cvd_names_en[] = {"Disabled", "Protanopia (Red)", "Deuteranopia (Green)", "Tritanopia (Blue)"};
+  items.push_back({Tr("Daltonismo", "Colour Vision"), (setting_language == 1) ? cvd_names_en[setting_cvd] : cvd_names_pt[setting_cvd], false, false, 350});
+
+  char cvd_str[16];
+  snprintf(cvd_str, sizeof(cvd_str), "%d%%", setting_cvd_strength);
+  items.push_back({Tr("Intensidade CVD", "CVD Strength"), cvd_str, false, false, 351});
+
+  const char *sim_names_pt[] = {"Desativado", "Protanopia", "Deuteranopia", "Tritanopia"};
+  const char *sim_names_en[] = {"Disabled", "Protanopia", "Deuteranopia", "Tritanopia"};
+  items.push_back({Tr("Simular Dalton.", "Simulate CVD"), (setting_language == 1) ? sim_names_en[setting_cvd_simulate] : sim_names_pt[setting_cvd_simulate], false, false, 352});
+
+  const char *dsu_names_pt[] = {"Desligado", "Ligado (UDP:26760)"};
+  const char *dsu_names_en[] = {"Disabled", "Enabled (UDP:26760)"};
+  items.push_back({Tr("Giroscopio DSU", "DSU Gyro UDP"), (setting_language == 1) ? dsu_names_en[setting_dsu_enabled] : dsu_names_pt[setting_dsu_enabled], false, false, 353});
+
+  items.push_back({" ", "", false, false, 0});
+  items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
+
   if (selected_idx < 0 || selected_idx >= (int)items.size()) {
     selected_idx = 0;
     scroll_top = 0;
@@ -2458,27 +2524,127 @@ void PopulateAudioSettings() {
 // instead of going through the shared 999 handler, which always lands on
 // STATE_SETTINGS - wrong for a page nothing routes through Settings to reach.
 //
-// Rows use action_id 800 + option_index, capped at 98 options (800-897) so
-// the range can never collide with 898 (Back) - two full orders of magnitude
-// past what any real core declares, this is headroom, not a real limit.
-static const int kCoreOptionsMaxRows = 98;
+#include "core_options_categories.h"
+
+static int s_core_options_category = CORE_CAT_ROOT;
+
 void PopulateCoreOptionsSettings() {
   items.clear();
-  current_title = Tr("Opcoes Core", "Core Options");
 
-  int n = CoreOptionCount();
-  if (n > kCoreOptionsMaxRows) n = kCoreOptionsMaxRows;
-  for (int i = 0; i < n; i++) {
-    std::string label = CoreOptionLabel(i);
-    int cur = CoreOptionCurrentChoiceIndex(i);
-    std::string val = CoreOptionChoiceAt(i, cur);
-    items.push_back({label, val, false, false, 800 + i});
-  }
-  if (n == 0)
+  int total = CoreOptionCount();
+  if (total > kCoreOptionsMaxRows) total = kCoreOptionsMaxRows;
+
+  if (total == 0) {
+    current_title = Tr("Opcoes Core", "Core Options");
     items.push_back({Tr("Sem opcoes para este core", "No options for this core"), "", false, false, 0});
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({Tr("Voltar", "Back"), "", false, true, 898});
+    OsdSetSize((int)items.size());
+    selected_idx = 0;
+    scroll_top = 0;
+    return;
+  }
 
-  items.push_back({" ", "", false, false, 0});
-  items.push_back({Tr("Voltar", "Back"), "", false, true, 898});
+  // If 7 or fewer options, present them flat without subcategories
+  if (total <= 7) {
+    s_core_options_category = CORE_CAT_ROOT;
+    current_title = Tr("Opcoes Core", "Core Options");
+    for (int i = 0; i < total; i++) {
+      std::string label = CoreOptionLabel(i);
+      int cur = CoreOptionCurrentChoiceIndex(i);
+      std::string val = CoreOptionChoiceAt(i, cur);
+      items.push_back({label, val, false, false, 800 + i});
+    }
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({Tr("Voltar", "Back"), "", false, true, 898});
+    OsdSetSize((int)items.size());
+    if (selected_idx < 0 || selected_idx >= (int)items.size()) {
+      selected_idx = 0;
+      scroll_top = 0;
+    }
+    return;
+  }
+
+  // More than 7 options: categorized view
+  if (s_core_options_category == CORE_CAT_ROOT) {
+    current_title = Tr("Opcoes Core", "Core Options");
+
+    // 1. Primary options (up to 4)
+    int primary_count = 0;
+    for (int i = 0; i < total && primary_count < 4; i++) {
+      std::string key = CoreOptionKey(i);
+      std::string label = CoreOptionLabel(i);
+      if (IsCoreOptionPrimary(key, label)) {
+        int cur = CoreOptionCurrentChoiceIndex(i);
+        std::string val = CoreOptionChoiceAt(i, cur);
+        items.push_back({label, val, false, false, 800 + i});
+        primary_count++;
+      }
+    }
+
+    if (primary_count > 0) {
+      items.push_back({" ", "", false, false, 0});
+    }
+
+    // 2. Count options per category
+    int cat_counts[CORE_CAT_COUNT] = {0};
+    for (int i = 0; i < total; i++) {
+      std::string key = CoreOptionKey(i);
+      std::string label = CoreOptionLabel(i);
+      CoreOptionCategory cat = ClassifyCoreOption(key, label);
+      if (cat >= 0 && cat < CORE_CAT_COUNT) {
+        cat_counts[cat]++;
+      }
+    }
+
+    // Category folder definitions
+    struct CatDef {
+      CoreOptionCategory cat;
+      const char* label_pt;
+      const char* label_en;
+    };
+    static const CatDef kCats[] = {
+      {CORE_CAT_VIDEO,  "> Video & Graficos",     "> Video & Graphics"},
+      {CORE_CAT_AUDIO,  "> Audio & Som",          "> Audio & Sound"},
+      {CORE_CAT_SYSTEM, "> Sistema & Regiao",     "> System & Region"},
+      {CORE_CAT_PERF,   "> Avancado",             "> Advanced"},
+      {CORE_CAT_INPUT,  "> Controles",            "> Controls"},
+      {CORE_CAT_MISC,   "> Outras Opcoes",        "> Other Options"}
+    };
+
+    for (const auto& c : kCats) {
+      if (cat_counts[c.cat] > 0) {
+        items.push_back({Tr(c.label_pt, c.label_en), ">", true, true, kActionCoreCategoryBase + c.cat});
+      }
+    }
+
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({Tr("Voltar", "Back"), "", false, true, 898});
+  } else {
+    // Inside a specific category
+    switch (s_core_options_category) {
+      case CORE_CAT_VIDEO:  current_title = Tr("Core - Video", "Core - Video"); break;
+      case CORE_CAT_AUDIO:  current_title = Tr("Core - Audio", "Core - Audio"); break;
+      case CORE_CAT_SYSTEM: current_title = Tr("Core - Sistema", "Core - System"); break;
+      case CORE_CAT_PERF:   current_title = Tr("Core - Avancado", "Core - Advanced"); break;
+      case CORE_CAT_INPUT:  current_title = Tr("Core - Controles", "Core - Controls"); break;
+      default:              current_title = Tr("Core - Outros", "Core - Other"); break;
+    }
+
+    for (int i = 0; i < total; i++) {
+      std::string key = CoreOptionKey(i);
+      std::string label = CoreOptionLabel(i);
+      CoreOptionCategory cat = ClassifyCoreOption(key, label);
+      if (cat == s_core_options_category) {
+        int cur = CoreOptionCurrentChoiceIndex(i);
+        std::string val = CoreOptionChoiceAt(i, cur);
+        items.push_back({label, val, false, false, 800 + i});
+      }
+    }
+
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({Tr("Voltar", "Back"), "", false, true, 898});
+  }
 
   OsdSetSize((int)items.size());
   if (selected_idx < 0 || selected_idx >= (int)items.size()) {
@@ -3214,6 +3380,13 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "vsync", setting_vsync);
   AppendSetting(out, "n64_core", setting_n64_core);
   AppendSetting(out, "n64_upscale", setting_n64_upscale);
+  AppendSetting(out, "upscaler", setting_upscaler);
+  AppendSetting(out, "upscaler_sharpness", setting_upscaler_sharpness);
+  AppendSetting(out, "lut", setting_lut);
+  AppendSetting(out, "cvd", setting_cvd);
+  AppendSetting(out, "cvd_strength", setting_cvd_strength);
+  AppendSetting(out, "cvd_simulate", setting_cvd_simulate);
+  AppendSetting(out, "dsu_enabled", setting_dsu_enabled);
   AppendSetting(out, "osd_timeout", setting_osd_timeout);
   AppendSetting(out, "name_scroll", setting_name_scroll);
   AppendSetting(out, "hw_render", (setting_driver != VIDEO_DRIVER_SOFTWARE) ? 1 : 0);
@@ -3359,6 +3532,21 @@ static void MenuLoadSettings() {
       setting_n64_core = ClampInt(iv, 0, 2);
     else if (!strcmp(key, "n64_upscale"))
       setting_n64_upscale = ClampInt(iv, 0, 2);
+    else if (!strcmp(key, "upscaler"))
+      setting_upscaler = ClampInt(iv, 0, 2);
+    else if (!strcmp(key, "upscaler_sharpness"))
+      setting_upscaler_sharpness = ClampInt(iv, 0, 100);
+    else if (!strcmp(key, "lut"))
+      setting_lut = ClampInt(iv, 0, 4);
+    else if (!strcmp(key, "cvd"))
+      setting_cvd = ClampInt(iv, 0, 3);
+    else if (!strcmp(key, "cvd_strength"))
+      setting_cvd_strength = ClampInt(iv, 0, 100);
+    else if (!strcmp(key, "cvd_simulate"))
+      setting_cvd_simulate = ClampInt(iv, 0, 3);
+    else if (!strcmp(key, "dsu_enabled")) {
+      setting_dsu_enabled = ClampInt(iv, 0, 1);
+    }
     else if (!strcmp(key, "osd_timeout"))
       setting_osd_timeout = ClampInt(iv, 0, kOsdTimeoutCount - 1);
     else if (!strcmp(key, "name_scroll"))
@@ -4019,9 +4207,16 @@ static void MenuGoBack() {
     PopulateMainMenu();
     SelectByAction(4, 10);
   } else if (current_state == STATE_CORE_OPTIONS) {
-    current_state = STATE_MAIN;
-    PopulateMainMenu();
-    SelectByAction(221, 5);
+    if (s_core_options_category >= 0) {
+      int prev_cat = s_core_options_category;
+      s_core_options_category = CORE_CAT_ROOT;
+      PopulateCoreOptionsSettings();
+      SelectByAction(kActionCoreCategoryBase + prev_cat, 0);
+    } else {
+      current_state = STATE_MAIN;
+      PopulateMainMenu();
+      SelectByAction(221, 5);
+    }
   } else if (current_state == STATE_CONTROLLER) {
     current_state = controller_previous_state;
     if (current_state == STATE_MAIN) {
@@ -4031,6 +4226,10 @@ static void MenuGoBack() {
       PopulateSettings();
       SelectByAction(203, 3);
     }
+  } else if (current_state == STATE_ACCESSIBILITY) {
+    current_state = STATE_SETTINGS;
+    PopulateSettings();
+    SelectByAction(227, 4);
   } else if (current_state == STATE_VIDEO) {
     current_state = STATE_SETTINGS;
     PopulateSettings();
@@ -4419,6 +4618,64 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CoreSetToast(msg, 150);
       PopulateVideoSettings();
       SelectByAction(item.action_id, 11);
+    } else if (item.action_id == 314) // Upscale FSR/CAS
+    {
+      setting_upscaler = (setting_upscaler + delta + 3) % 3;
+      const char* names[] = {Tr("DESLIGADO", "OFF"), "FSR 1.0 (EASU+RCAS)", "FIDELITYFX CAS"};
+      char msg[64];
+      snprintf(msg, sizeof(msg), "UPSCALE: %s", names[setting_upscaler]);
+      CoreSetToast(msg, 120);
+      PopulateVideoSettings();
+      SelectByAction(item.action_id, selected_idx);
+    } else if (item.action_id == 315) // Upscale Sharpness
+    {
+      setting_upscaler_sharpness = ClampInt(setting_upscaler_sharpness + delta * 25, 0, 100);
+      char msg[64];
+      snprintf(msg, sizeof(msg), "NITIDEZ: %d%%", setting_upscaler_sharpness);
+      CoreSetToast(msg, 120);
+      PopulateVideoSettings();
+      SelectByAction(item.action_id, selected_idx);
+    } else if (item.action_id == 316) // Paleta / 3D LUT
+    {
+      setting_lut = (setting_lut + delta + 5) % 5;
+      const char* names[] = {Tr("DESLIGADO", "OFF"), "SONY PVM", "GAME BOY DMG", "GBC CORRECAO", "NOIR PB"};
+      char msg[64];
+      snprintf(msg, sizeof(msg), "LUT: %s", names[setting_lut]);
+      CoreSetToast(msg, 120);
+      PopulateVideoSettings();
+      SelectByAction(item.action_id, selected_idx);
+    } else if (item.action_id == 350) // Daltonismo CVD
+    {
+      setting_cvd = (setting_cvd + delta + 4) % 4;
+      const char* names[] = {Tr("DESATIVADO", "OFF"), "PROTANOPIA", "DEUTERANOPIA", "TRITANOPIA"};
+      char msg[64];
+      snprintf(msg, sizeof(msg), "DALTONISMO: %s", names[setting_cvd]);
+      CoreSetToast(msg, 120);
+      PopulateAccessibility();
+      SelectByAction(item.action_id, selected_idx);
+    } else if (item.action_id == 351) // Intensidade CVD
+    {
+      setting_cvd_strength = ClampInt(setting_cvd_strength + delta * 25, 25, 100);
+      char msg[64];
+      snprintf(msg, sizeof(msg), "INTENSIDADE: %d%%", setting_cvd_strength);
+      CoreSetToast(msg, 120);
+      PopulateAccessibility();
+      SelectByAction(item.action_id, selected_idx);
+    } else if (item.action_id == 352) // Simular Daltonismo
+    {
+      setting_cvd_simulate = (setting_cvd_simulate + delta + 4) % 4;
+      const char* names[] = {Tr("DESATIVADO", "OFF"), "PROTANOPIA", "DEUTERANOPIA", "TRITANOPIA"};
+      char msg[64];
+      snprintf(msg, sizeof(msg), "SIMULAR: %s", names[setting_cvd_simulate]);
+      CoreSetToast(msg, 120);
+      PopulateAccessibility();
+      SelectByAction(item.action_id, selected_idx);
+    } else if (item.action_id == 353) // DSU Gyro
+    {
+      setting_dsu_enabled = (setting_dsu_enabled + delta + 2) % 2;
+      CoreSetToast(setting_dsu_enabled ? "DSU GYRO: ATIVADO" : "DSU GYRO: DESLIGADO", 120);
+      PopulateAccessibility();
+      SelectByAction(item.action_id, selected_idx);
     } else if (item.action_id == 308) // V-Sync
     {
       setting_vsync = (setting_vsync + delta + 2) % 2;
@@ -4658,6 +4915,17 @@ static void MenuProcessKeyImpl(MenuKey key) {
       int cur_row = selected_idx;
       PopulateCoreOptionsSettings();
       selected_idx = cur_row;
+    } else if (delta > 0 && item.action_id >= kActionCoreCategoryBase &&
+               item.action_id < kActionCoreCategoryBase + CORE_CAT_COUNT) {
+      s_core_options_category = item.action_id - kActionCoreCategoryBase;
+      selected_idx = 0;
+      scroll_top = 0;
+      PopulateCoreOptionsSettings();
+    } else if (delta < 0 && item.action_id == 898 && s_core_options_category >= 0) {
+      int prev_cat = s_core_options_category;
+      s_core_options_category = CORE_CAT_ROOT;
+      PopulateCoreOptionsSettings();
+      SelectByAction(kActionCoreCategoryBase + prev_cat, 0);
     }
     break;
   }
@@ -4698,6 +4966,25 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (item.action_id == 898) // Back (Core Options -> in-game menu, not Settings)
     {
       MenuGoBack();
+    } else if (item.action_id >= kActionCoreCategoryBase &&
+               item.action_id < kActionCoreCategoryBase + CORE_CAT_COUNT) {
+      s_core_options_category = item.action_id - kActionCoreCategoryBase;
+      selected_idx = 0;
+      scroll_top = 0;
+      PopulateCoreOptionsSettings();
+    } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
+    {
+      int opt_index = item.action_id - 800;
+      int choice_count = CoreOptionChoiceCount(opt_index);
+      if (choice_count > 0) {
+        int cur = CoreOptionCurrentChoiceIndex(opt_index);
+        int next = (cur + 1) % choice_count;
+        CoreOptionSetChoiceIndex(opt_index, next);
+        MenuSetPersistedCoreOption(CoreOptionKey(opt_index), CoreOptionChoiceAt(opt_index, next));
+      }
+      int cur_row = selected_idx;
+      PopulateCoreOptionsSettings();
+      selected_idx = cur_row;
     } else if (current_state == STATE_MAIN || current_state == STATE_SYSTEMS) {
       if (item.action_id == 195) // Browse Systems
       {
@@ -4936,6 +5223,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       }
       else if (item.action_id == 221) {
         current_state = STATE_CORE_OPTIONS;
+        s_core_options_category = CORE_CAT_ROOT;
         selected_idx = 0;
         scroll_top = 0;
         PopulateCoreOptionsSettings();
@@ -5011,6 +5299,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
       } else if (item.action_id == 210) {
         current_state = STATE_RESET_CONFIRM;
         PopulateResetConfirm();
+      } else if (item.action_id == 227) {
+        current_state = STATE_ACCESSIBILITY;
+        selected_idx = 0;
+        scroll_top = 0;
+        PopulateAccessibility();
       }
     } else if (current_state == STATE_CLOUD) {
       if (item.action_id == 901) {
@@ -5277,6 +5570,30 @@ static void MenuProcessKeyImpl(MenuKey key) {
         current_state = STATE_LIVE_CHAT;
         PopulateLiveChatSettings();
       }
+    } else if (current_state == STATE_ACCESSIBILITY) {
+      if (item.action_id == 999) {
+        current_state = STATE_SETTINGS;
+        selected_idx = 4;
+        scroll_top = 0;
+        PopulateSettings();
+      } else if (item.action_id == 350) {
+        setting_cvd = (setting_cvd + 1) % 4;
+        PopulateAccessibility();
+        SelectByAction(350, 0);
+      } else if (item.action_id == 351) {
+        setting_cvd_strength = (setting_cvd_strength + 25);
+        if (setting_cvd_strength > 100) setting_cvd_strength = 25;
+        PopulateAccessibility();
+        SelectByAction(351, 1);
+      } else if (item.action_id == 352) {
+        setting_cvd_simulate = (setting_cvd_simulate + 1) % 4;
+        PopulateAccessibility();
+        SelectByAction(352, 2);
+      } else if (item.action_id == 353) {
+        setting_dsu_enabled = setting_dsu_enabled ? 0 : 1;
+        PopulateAccessibility();
+        SelectByAction(353, 3);
+      }
     } else if (current_state == STATE_VIDEO) {
       if (item.action_id == 302) {
         shader_list_previous_state = STATE_VIDEO;
@@ -5290,6 +5607,19 @@ static void MenuProcessKeyImpl(MenuKey key) {
         setting_theme = (setting_theme + 1) % 6;
         PopulateVideoSettings();
         SelectByAction(item.action_id, 4);
+      } else if (item.action_id == 314) {
+        setting_upscaler = (setting_upscaler + 1) % 3;
+        PopulateVideoSettings();
+        SelectByAction(item.action_id, selected_idx);
+      } else if (item.action_id == 315) {
+        setting_upscaler_sharpness = (setting_upscaler_sharpness + 25);
+        if (setting_upscaler_sharpness > 100) setting_upscaler_sharpness = 0;
+        PopulateVideoSettings();
+        SelectByAction(item.action_id, selected_idx);
+      } else if (item.action_id == 316) {
+        setting_lut = (setting_lut + 1) % 5;
+        PopulateVideoSettings();
+        SelectByAction(item.action_id, selected_idx);
       }
     } else if (current_state == STATE_AUDIO) {
       if (item.action_id == 404) {

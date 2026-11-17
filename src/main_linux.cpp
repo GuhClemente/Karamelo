@@ -45,6 +45,7 @@ namespace fs = std::filesystem;
 #include "voice_chat.h"
 #include "tray_manager.h"
 #include "desktop_chat.h"
+#include "dsu_client.h"
 
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
@@ -606,6 +607,7 @@ static DWORD s_pad_seen_tick[4] = {}; // when each slot appeared, 0 while it is 
 
 static void PollGamepad()
 {
+	if (MenuGetDsuEnabled()) DsuClientPoll();
 	// Any connected pad drives the menu. Which one gets slot 0 depends on what the system
 	// found first, so the pad in the player's hands could be slot 1 and do nothing here.
 	XINPUT_STATE state;

@@ -107,6 +107,9 @@ KARAMELO_SRCS=(
     src/voice_chat.cpp
     src/tray_manager.cpp
     src/desktop_chat.cpp
+    src/color_correction.cpp
+    src/fsr1.cpp
+    src/dsu_client.cpp
     src/main_linux.cpp
 )
 

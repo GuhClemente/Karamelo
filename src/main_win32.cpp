@@ -43,6 +43,7 @@ namespace fs = std::filesystem;
 #include "voice_chat.h"
 #include "tray_manager.h"
 #include "desktop_chat.h"
+#include "dsu_client.h"
 
 // dev-sdl3: first slice of the SDL3 migration. This only proves the vendored,
 // statically-linked SDL3 build actually links and runs inside this exe - it
@@ -1085,6 +1086,7 @@ static DWORD s_pad_seen_tick[4] = {}; // when each slot appeared, 0 while it is 
 
 static void PollGamepad()
 {
+	if (MenuGetDsuEnabled()) DsuClientPoll();
 	// Any connected pad drives the menu. Which one gets slot 0 depends on what Windows
 	// found first, so after a restart the pad in the player's hands could be slot 1
 	// and the menu did not react to it. Who plays as whom in a game is decided elsewhere.

@@ -37,7 +37,6 @@ typedef unsigned int uint;
 
 static int  s_visibleRows = OSD_FIXED_ROWS;
 static bool s_enabled     = true;
-static int  s_arrowFlags  = 0;
 
 static uint8_t s_raster[OSD_ROW_SLOTS * OSD_ROW_STRIDE];
 static uint8_t s_rowInverted[OSD_ROW_SLOTS]; // which row is currently drawn highlighted
@@ -208,7 +207,7 @@ static int EmitTextGlyphCell(RowEncoder& row, const unsigned char* glyphRows, in
 
 void OsdSetTitle(const char *raw, int a)
 {
-	s_arrowFlags = a;
+	(void)a;
 	const std::string display = OsdDisplayText(raw ? raw : "");
 	const char* s = display.c_str();
 
@@ -258,7 +257,7 @@ void OsdSetTitle(const char *raw, int a)
 
 void OsdSetArrow(int a)
 {
-	s_arrowFlags = a;
+	(void)a;
 }
 
 // ---- main line writer ----------------------------------------------------
@@ -272,8 +271,6 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 		s_rowInverted[n] = invert;
 
 	int lineLimit = OSDLINELEN;
-	if (n == (s_visibleRows - 1) && (s_arrowFlags & OSD_ARROW_RIGHT))
-		lineLimit -= 22;
 
 	if (n && n < s_visibleRows - 1)
 		leftchar = 0;
@@ -283,7 +280,6 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 
 	RowEncoder row(RowStart(n));
 
-	int arrowState = s_arrowFlags;
 	unsigned xorInvert = 0;
 	unsigned xorChar   = 0;
 	int col = 0;
@@ -311,14 +307,6 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 			}
 
 			col += EmitTitleCell(row, titleColumn);
-		}
-		else if (n == (s_visibleRows - 1) && (arrowState & OSD_ARROW_LEFT))
-		{
-			col += EmitArrowCell(row, charfont[0x10], charfont[0x14], offset, xorInvert, 3, 5);
-			arrowState &= ~OSD_ARROW_LEFT;
-			if (*s++ == 0) break;
-			if (*s++ == 0) break;
-			if (*s++ == 0) break;
 		}
 		else
 		{
@@ -348,11 +336,6 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 
 	for (; col < lineLimit; ++col)
 		row.Push(xorInvert);
-
-	if (n == (s_visibleRows - 1) && (arrowState & OSD_ARROW_RIGHT))
-	{
-		col += EmitArrowCell(row, charfont[0x15], charfont[0x11], offset, xorInvert, 3, 3);
-	}
 }
 
 void OsdWrite(unsigned char n, const char *s, unsigned char inver, unsigned char stipple, char usebg, int maxinv, int mininv)

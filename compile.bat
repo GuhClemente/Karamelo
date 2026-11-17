@@ -129,6 +129,9 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /WX /std:c++20 /EHsc /GR- /guard
     src\voice_chat.cpp ^
     src\tray_manager.cpp ^
     src\desktop_chat.cpp ^
+    src\color_correction.cpp ^
+    src\fsr1.cpp ^
+    src\dsu_client.cpp ^
     src\main_win32.cpp ^
     third_party\rcheevos\src\*.c ^
     third_party\rcheevos\src\rapi\*.c ^

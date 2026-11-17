@@ -53,6 +53,9 @@
 #include "tray_manager.h"
 #include "voice_chat.h"
 #include "system_registry.h"
+#include "fsr1.h"
+#include "color_correction.h"
+#include "dsu_client.h"
 
 namespace fs = std::filesystem;
 
@@ -6421,6 +6424,33 @@ void CoreRender(uint32_t* dest_buffer, int dest_w, int dest_h, int aspect_mode, 
 	}
 
 	// ---------------------------------------------------------
+	// AMD FSR 1.0 (EASU + RCAS): Edge-Adaptive Spatial Upscaling
+	// ---------------------------------------------------------
+	int upscaler_mode = MenuGetUpscalerMode();
+	if (upscaler_mode == 1 && filter_mode != 3)
+	{
+		Fsr1UpscaleWithPitch(src_fb, fbw, fbh, fbw,
+		                     dest_buffer + (size_t)offset_y * dest_w + offset_x,
+		                     target_w, target_h, dest_w,
+		                     MenuGetUpscalerSharpness());
+
+		int cvd_mode = MenuGetCvdMode();
+		int cvd_sim = MenuGetCvdSimulateMode();
+		int lut_mode = MenuGetLutMode();
+		if (cvd_mode != 0 || cvd_sim != 0 || lut_mode != 0 || ColorCorrectionHasCustomCube())
+		{
+			float cvd_m[9];
+			bool has_cvd = ColorCorrectionGetMatrix(cvd_mode, MenuGetCvdStrength(), cvd_sim, cvd_m);
+			for (int y = 0; y < target_h; y++)
+			{
+				uint32_t* row = dest_buffer + (size_t)(offset_y + y) * dest_w + offset_x;
+				ColorCorrectionProcessRow(row, row, target_w, has_cvd ? cvd_m : nullptr, lut_mode);
+			}
+		}
+		return;
+	}
+
+	// ---------------------------------------------------------
 	// Curved-tube filter: needs true per-pixel warping, so it keeps the
 	// floating point path. Every other mode maps linearly and goes through the
 	// integer path below.
@@ -6930,6 +6960,29 @@ void CoreRender(uint32_t* dest_buffer, int dest_w, int dest_h, int aspect_mode, 
 		// This thread takes the first band instead of idling.
 		render_band(0, (step < target_h) ? step : target_h);
 		for (auto& t : pool) t.join();
+	}
+
+	// FidelityFX CAS puro em viewport
+	if (upscaler_mode == 2 && MenuGetUpscalerSharpness() > 0.0f)
+	{
+		FidelityFxCasWithPitch(dest_buffer + (size_t)offset_y * dest_w + offset_x, dest_w,
+		                       dest_buffer + (size_t)offset_y * dest_w + offset_x, dest_w,
+		                       target_w, target_h, MenuGetUpscalerSharpness());
+	}
+
+	// Pos-processamento de Acessibilidade (Daltonismo) e 3D LUT
+	int cvd_mode = MenuGetCvdMode();
+	int cvd_sim = MenuGetCvdSimulateMode();
+	int lut_mode = MenuGetLutMode();
+	if (cvd_mode != 0 || cvd_sim != 0 || lut_mode != 0 || ColorCorrectionHasCustomCube())
+	{
+		float cvd_m[9];
+		bool has_cvd = ColorCorrectionGetMatrix(cvd_mode, MenuGetCvdStrength(), cvd_sim, cvd_m);
+		for (int y = 0; y < target_h; y++)
+		{
+			uint32_t* row = dest_buffer + (size_t)(offset_y + y) * dest_w + offset_x;
+			ColorCorrectionProcessRow(row, row, target_w, has_cvd ? cvd_m : nullptr, lut_mode);
+		}
 	}
 }
 

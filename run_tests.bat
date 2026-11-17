@@ -35,6 +35,7 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /WX /std:c++20 /EHsc ^
     tests\test_port_catalog.cpp ^
     tests\test_input_mouse.cpp ^
     tests\test_cloud_live.cpp ^
+    tests\test_upscaling_accessibility.cpp ^
     src\karamelo_math.cpp ^
     src\netplay_protocol.cpp ^
     src\archive_helper.cpp ^
@@ -51,6 +52,9 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /WX /std:c++20 /EHsc ^
     src\voice_chat.cpp ^
     src\tray_manager.cpp ^
     src\desktop_chat.cpp ^
+    src\color_correction.cpp ^
+    src\fsr1.cpp ^
+    src\dsu_client.cpp ^
     build\tests\lzxd.obj ^
     build\sdl3\SDL3-static.lib ^
     /link /OUT:build\karamelo_tests.exe /SUBSYSTEM:CONSOLE winhttp.lib ws2_32.lib crypt32.lib shell32.lib user32.lib gdi32.lib dwmapi.lib winmm.lib bcrypt.lib ole32.lib oleaut32.lib imm32.lib setupapi.lib version.lib advapi32.lib
