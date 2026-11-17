@@ -3855,15 +3855,12 @@ void MenuRun() {
       int cycle = (int)current_title.size() - kVisibleCharsVert + gap;
       int step = (int)((elapsed - delay_ms) / 180) % cycle;
       std::string padded = current_title + std::string(gap, ' ');
-      OsdSetTitle(padded.substr(step, kVisibleCharsVert).c_str(),
-                  (current_state != STATE_MAIN) ? OSD_ARROW_LEFT : 0);
+      OsdSetTitle(padded.substr(step, kVisibleCharsVert).c_str(), 0);
     } else {
-      OsdSetTitle(current_title.c_str(),
-                  (current_state != STATE_MAIN) ? OSD_ARROW_LEFT : 0);
+      OsdSetTitle(current_title.c_str(), 0);
     }
   } else {
-    OsdSetTitle(current_title.c_str(),
-                (current_state != STATE_MAIN) ? OSD_ARROW_LEFT : 0);
+    OsdSetTitle(current_title.c_str(), 0);
   }
 
   int max_visible = OsdGetSize();

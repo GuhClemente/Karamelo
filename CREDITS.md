@@ -250,10 +250,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Road Rash Trilogy | 🪟 | [BTr-RJ/RoadRashTrilogy_Recomp](https://github.com/BTr-RJ/RoadRashTrilogy_Recomp) |
 | Syndicate Plus | 🪟🍎 | [Buyukcaglar/synd](https://github.com/Buyukcaglar/synd) |
 | Need for Speed: Hot Pursuit 2 | 🪟 | [ZloiKILLER/nfshp2-port-win](https://github.com/ZloiKILLER/nfshp2-port-win) |
+| The Simpsons Arcade | 🪟 | [cheviman/simpsons-decomp](https://github.com/cheviman/simpsons-decomp) |
 
-**65 de 104 têm build Linux** e **46 de 104 têm build macOS** (Apple Silicon /
-Universal), verificado em 16/11/2026 contra a release mais recente de cada
-repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy, Syndicate Plus e Need for Speed Hot Pursuit 2; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
+**65 de 105 têm build Linux** e **46 de 105 têm build macOS** (Apple Silicon /
+Universal), verificado em 17/11/2026 contra a release mais recente de cada
+repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy, Syndicate Plus, Need for Speed Hot Pursuit 2 e The Simpsons Arcade; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -405,6 +406,15 @@ originalmente de DOS, por Buyukcaglar. Publica builds nativos para Windows (zip 
 (zip nativo para Apple Silicon e Intel). Roda direto na CPU host sem depender de emulador de
 DOS (DOSBox), preservando a taxa de quadros original e o áudio sintetizado autêntico.
 O jogador fornece os arquivos de dados da instalação original do jogo.
+
+Um detalhe da linha do The Simpsons Arcade: é a reconstrução clean-room completa em C
+do clássico jogo de arcade de 1991 da Konami (*The Simpsons*, com CPU Konami 053248 e placa
+de som Z80 com chips YM2151 e K053260) por Sebastian Toyos (cheviman), sob licença BSD-3-Clause.
+Não é um emulador: roda nativamente em SDL2 com taxa de quadros e áudio perfeitos, comparado
+quadro a quadro contra o MAME em 25 cenários (343.270 quadros sem divergência). Suporta
+ação cooperativa para até 4 jogadores simultâneos (Marge, Homer, Bart e Lisa). O jogador
+fornece o conjunto de ROMs do MAME `simpsons.zip` (4 Players World, set 1) em `roms/Arcade/`;
+o jogo carrega seus dados a partir dos assets extraídos.
 
 Um detalhe da linha do Conker's Bad Fur Day: é o port nativo de **Conker's Bad Fur
 Day** (Nintendo 64) via recompilação estática com RT64 (código por sciaschi,

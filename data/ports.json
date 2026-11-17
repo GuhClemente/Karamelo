@@ -1,5 +1,5 @@
 {
-  "catalog_version": 13,
+  "catalog_version": 14,
   "ports": [
     {
       "id": "DrMario64",
@@ -2055,6 +2055,27 @@
         "speed.exe": "3e985020f6f67e1086080d7320b73176cd9a1bd34fcae2d093e73ceeddb9d15e"
       },
       "notes": "Need for Speed: Hot Pursuit 2 (Black Box PS2 version recompiled to Windows via Vulkan by ZloiKILLER). Built-in installer extracts game assets from user PS2 ISO on first launch."
+    },
+    {
+      "id": "SimpsonsArcade",
+      "display_name": "The Simpsons Arcade",
+      "repo": "cheviman/simpsons-decomp",
+      "exe_hint": "simpsons.exe",
+      "needs_rom": true,
+      "rom_keywords": [
+        "simpsons"
+      ],
+      "rom_exclude_keywords": [
+        "bowling",
+        "hit",
+        "run",
+        "road",
+        "rage",
+        "skate",
+        "wrestling",
+        "game"
+      ],
+      "notes": "The Simpsons (1991 Konami Arcade) clean-room C decompilation by Sebastian Toyos (cheviman). Frame-by-frame match against MAME in state, picture and sound (Konami 053248 CPU, Z80 sound board, YM2151 and K053260). 4 players simultaneous arcade action (Marge, Homer, Bart, Lisa). Checked 17/11/2026: SDL2 frontend (simpsons.exe) runs on Windows. Requires MAME's simpsons.zip ROM set (4 Players World, set 1); game assets are extracted via tools/extract_assets.py and placed in assets/ next to the executable. Repository licensed under BSD-3-Clause."
     }
   ]
 }

@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.983 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.984 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -2445,7 +2445,7 @@ Esta seção instrui a IA mantenedora do site sobre as implementações técnica
 > **REGRA DE OURO PARA O SITE**: As implementações abaixo residem na branch `feat/batocera-app-upgrades` para homologação e compilação multiplataforma dos novos binários `.dll` / `.so` / `.dylib`. **NÃO ALTERE AS CONTAGENS PÚBLICAS NO SITE OFICIAL AINDA.** A contagem oficial de produção permanece rigorosamente em:
 > - **37 Sistemas Nativos**
 > - **42 Motores de Emulação** (`APP_CORE_ENGINES = 42`)
-> - **104 Ports e Recompilados** (104 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎)
+> - **105 Ports e Recompilados** (105 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎)
 > 
 > A contagem só será atualizada para 38 sistemas / 44 motores no momento em que a branch for mesclada à `main` e a versão 0.983 for compilada e distribuída oficialmente.
 
@@ -2684,3 +2684,37 @@ Novidades para o jogador:
   - Em jogos de computadores clássicos (DOSBox, ScummVM, Amiga, PC-98, FM Towns): deslize o polegar no touchpad do controle PlayStation para mover o cursor suavemente (modo trackpad de notebook), e dê um toque rápido (*tap-to-click*) para o botão esquerdo.
   - Nintendo DS e 3DS: o touchpad vira uma mesa digitalizadora 1:1 mapeada diretamente na tela sensível ao toque, permitindo interação com a ponta dos dedos sem precisar do mouse do Windows.
 - **Need for Speed: Hot Pursuit 2 (PS2 Recomp)**: Novo título no catálogo oficial de Ports & Recompilados (104 jogos totais no menu). Recompilação do clássico de PS2 em C++ para Windows via Vulkan, com extração automatizada de assets da ISO original do jogador.
+
+---
+
+## 70. Adição de 17/11/2026 — The Simpsons Arcade (Clean-room Decompilation) (+1 Port)
+
+Foi integrado ao catálogo de PC Ports & Recompilados (`data/ports.json` versão 14) o port nativo de **The Simpsons Arcade** (1991, Konami Arcade).
+
+**Novos totais oficiais**: **105 jogos — 105 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎.**
+
+### Detalhamento do Título:
+- **ID do Port**: `SimpsonsArcade`
+- **Nome de Exibição**: `The Simpsons Arcade`
+- **Projeto & Repositório**: [cheviman/simpsons-decomp](https://github.com/cheviman/simpsons-decomp).
+- **Autores & Créditos**: Sebastian Toyos (cheviman), baseado no arcade original lançado pela Konami em 1991.
+- **Licença**: BSD 3-Clause.
+- **Sistemas**: **Windows 🪟** (SDL2, C11/C++20 nativo).
+- **Versão no catálogo**: v14 (catálogo embutido e sincronizado).
+- **O que é**: Reconstrução clean-room completa em C portável do clássico de arcade *The Simpsons* da Konami (CPU principal Konami 053248 + placa de som Z80 com chips YM2151 e K053260). Não é um emulador: o jogo roda nativamente a partir dos assets extraídos, comparado quadro a quadro em estado, vídeo e áudio contra a máquina original do MAME (25 cenários e 343.270 quadros sem divergência).
+- **Destaques**: Ação cooperativa arcade simultânea para até 4 jogadores (Marge, Homer, Bart e Lisa), suporte nativo a gamepads modernos e controles digitais, taxa de quadros e áudio perfeitos em hardware moderno com SDL2.
+- **O que o jogador precisa**: O conjunto de ROMs do MAME `simpsons.zip` (4 Players World, set 1). O Karamelo já inclui o romset em `roms/Arcade/simpsons.zip` e realiza a correspondência de ROMs/assets.
+
+---
+
+## 71. Versão 0.984
+
+**Estado**: pacote de **Windows** preparado localmente em 17/11/2026 (`Karamelo_v0.984_Win64.zip` e `Karamelo.exe`). Deploy de produção pendente ("não sobe").
+Contagens: **37 sistemas, 42 motores; 105 ports — 105 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎**.
+
+Novidades para o jogador:
+
+- **The Simpsons Arcade (Clean-room Decompilation)**: Novo título integrado no catálogo de Ports & Recompilados (105 jogos no total). Ação cooperativa clássica de 1991 da Konami para até 4 jogadores simultâneos, rodando nativo via SDL2 a partir dos assets extraídos da ROM de MAME.
+- **Correção Visual no Menu OSD**: Corrigido bug de renderização no rasterizador OSD que sobrepunha a seta de navegação (`◄^`) sobre o 15º item da lista em menus paginados, garantindo legibilidade perfeita de todos os nomes de jogos.
+- **Top Gear Fullscreen Edition (SA-1 v1.2)**: Validação e suporte estendido a ROMs customizadas com chip acelerador SA-1 em tela cheia 16:9.
+- **Subsistema de ROMs Arcade**: Aprimoramentos em `PortAutoSetupRom` para descoberta e espelhamento automático de romsets MAME/FBNeo para a pasta do port.

@@ -1210,6 +1210,36 @@ bool PortAutoSetupRom(const std::string& port_id) {
         return false;
     }
 
+    // 1.5 Special case: The Simpsons Arcade (simpsons-decomp)
+    // The Simpsons Arcade looks for extracted assets/ or MAME's simpsons.zip
+    if (port_id == "SimpsonsArcade") {
+        fs::path assets_dir = fs::path(target_dir) / "assets";
+        if (fs::exists(assets_dir / "eeprom.txt", ec)) return true;
+        fs::path rom_zip1 = fs::path(target_dir) / "simpsons.zip";
+        fs::path rom_zip2 = fs::path(target_dir) / "rom" / "simpsons.zip";
+        if (fs::exists(rom_zip1, ec) || fs::exists(rom_zip2, ec)) return true;
+
+        static const std::vector<std::string> arcade_dirs = {
+            "roms/Arcade", "app/roms/Arcade", "roms", "app/roms", "roms/MAME", "app/roms/MAME", "roms/FBNeo", "app/roms/FBNeo"
+        };
+        for (const auto& sdir : arcade_dirs) {
+            if (!fs::exists(sdir, ec)) continue;
+            for (const auto& entry : fs::directory_iterator(sdir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                std::string fname = ToLowerStr(entry.path().filename().string());
+                if (fname == "simpsons.zip" || (fname.find("simpsons") != std::string::npos && fname.size() >= 4 && fname.substr(fname.size() - 4) == ".zip")) {
+                    fs::create_directories(target_dir, ec);
+                    fs::path rom_sub = fs::path(target_dir) / "rom";
+                    fs::create_directories(rom_sub, ec);
+                    fs::copy_file(entry.path(), rom_zip1, fs::copy_options::overwrite_existing, ec);
+                    fs::copy_file(entry.path(), rom_zip2, fs::copy_options::overwrite_existing, ec);
+                    return !ec;
+                }
+            }
+        }
+        return false;
+    }
+
     // 2. SNES Recomps (SuperMetroidRecomp, SuperMarioWorldRecomp, StarFoxEnhanced, JungleStrikeSNES,
     //    TopGearPC). The player's ROM is taken from roms/SNES, where the SNES
     //    core already reads it.
