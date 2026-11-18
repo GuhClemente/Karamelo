@@ -258,10 +258,11 @@ static bool SystemNeedsKeyboardBridge(const std::string& system_dir)
 // is bound to, i.e. one push producing two unrelated actions. Systems whose
 // only real control IS the D-Pad (NES, SNES, Genesis, Saturn, arcade, ...)
 // still get the full mirroring - there is nothing for it to collide with there.
-// NOTE: Saturn is intentionally EXCLUDED from independent analog: standard
-// Saturn controllers are pure digital Control Pads. Modern gamepads (and 6-button
-// pads like the 8BitDo M30 in X-Input mode) route directional inputs via Left
-// Stick axes, so mirroring to D-Pad is required for games to register movement.
+// NOTE: Saturn and Dreamcast are intentionally EXCLUDED from independent analog:
+// standard Saturn controllers are pure digital Control Pads, and Sega 6-button pads
+// (like the 8BitDo M30 in X-Input mode) route directional inputs via either Left Stick
+// axes or D-Pad buttons. Mirroring between stick and D-Pad ensures that games, VMU prompts,
+// and 3D navigation respond seamlessly regardless of controller mode.
 static bool SystemHasIndependentAnalogStick(const std::string& core_dll_path)
 {
 	std::string s = core_dll_path;
@@ -269,7 +270,6 @@ static bool SystemHasIndependentAnalogStick(const std::string& core_dll_path)
 	return s.find("n64") != std::string::npos ||
 	       s.find("psx") != std::string::npos ||
 	       s.find("ps2") != std::string::npos ||
-	       s.find("dreamcast") != std::string::npos ||
 	       s.find("gamecube") != std::string::npos ||
 	       s.find("psp") != std::string::npos ||
 	       s.find("3ds") != std::string::npos;
@@ -2981,6 +2981,23 @@ static void PollLocalInput(void)
 			{
 				if (state.Gamepad.sThumbLY > deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_UP] = 1;
 				else if (state.Gamepad.sThumbLY < -deadzone_thresh) jb[RETRO_DEVICE_ID_JOYPAD_DOWN] = 1;
+			}
+		}
+		if (!indep_analog)
+		{
+			// Bidirectional mirroring for systems without independent analog (e.g. Saturn, Dreamcast):
+			// if a digital pad (like the 8BitDo M30 in D-Pad mode, an arcade stick, or retro controller)
+			// presses D-Pad while the analog stick is centered, mirror D-Pad onto the analog stick
+			// so 3D games expecting analog axes still respond to directional presses.
+			if (analog_sticks[pad][0][0] == 0)
+			{
+				if (jb[RETRO_DEVICE_ID_JOYPAD_RIGHT]) analog_sticks[pad][0][0] = 32767;
+				else if (jb[RETRO_DEVICE_ID_JOYPAD_LEFT]) analog_sticks[pad][0][0] = -32767;
+			}
+			if (analog_sticks[pad][0][1] == 0)
+			{
+				if (jb[RETRO_DEVICE_ID_JOYPAD_DOWN]) analog_sticks[pad][0][1] = 32767;
+				else if (jb[RETRO_DEVICE_ID_JOYPAD_UP]) analog_sticks[pad][0][1] = -32767;
 			}
 		}
 		if (abs(state.Gamepad.sThumbRX) > deadzone_thresh) analog_sticks[pad][1][0] = state.Gamepad.sThumbRX;
