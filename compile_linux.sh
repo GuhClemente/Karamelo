@@ -132,6 +132,7 @@ g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     tests/test_port_catalog.cpp \
     tests/test_input_mouse.cpp \
     tests/test_cloud_live.cpp \
+    tests/test_upscaling_accessibility.cpp \
     build/linux_obj/karamelo_math.o \
     build/linux_obj/netplay_protocol.o \
     build/linux_obj/archive_helper.o \
@@ -147,6 +148,9 @@ g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/linux_obj/voice_chat.o \
     build/linux_obj/tray_manager.o \
     build/linux_obj/desktop_chat.o \
+    build/linux_obj/color_correction.o \
+    build/linux_obj/fsr1.o \
+    build/linux_obj/dsu_client.o \
     build/sdl3_linux/libSDL3.a \
     -lpthread -ldl -lm \
     -o build/karamelo_tests

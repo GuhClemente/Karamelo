@@ -153,6 +153,7 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     tests/test_port_catalog.cpp \
     tests/test_input_mouse.cpp \
     tests/test_cloud_live.cpp \
+    tests/test_upscaling_accessibility.cpp \
     build/macos_obj/karamelo_math.o \
     build/macos_obj/netplay_protocol.o \
     build/macos_obj/archive_helper.o \
@@ -168,6 +169,9 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/macos_obj/voice_chat.o \
     build/macos_obj/tray_manager.o \
     build/macos_obj/desktop_chat.o \
+    build/macos_obj/color_correction.o \
+    build/macos_obj/fsr1.o \
+    build/macos_obj/dsu_client.o \
     $SDL3_LIBS \
     -lpthread -ldl \
     -o build/karamelo_tests
