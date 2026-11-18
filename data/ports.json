@@ -1,5 +1,5 @@
 {
-  "catalog_version": 14,
+  "catalog_version": 15,
   "ports": [
     {
       "id": "DrMario64",
@@ -2076,6 +2076,22 @@
         "game"
       ],
       "notes": "The Simpsons (1991 Konami Arcade) clean-room C decompilation by Sebastian Toyos (cheviman). Frame-by-frame match against MAME in state, picture and sound (Konami 053248 CPU, Z80 sound board, YM2151 and K053260). 4 players simultaneous arcade action (Marge, Homer, Bart, Lisa). Checked 17/11/2026: SDL2 frontend (simpsons.exe) runs on Windows. Requires MAME's simpsons.zip ROM set (4 Players World, set 1); game assets are extracted via tools/extract_assets.py and placed in assets/ next to the executable. Repository licensed under BSD-3-Clause."
+    },
+    {
+      "id": "SuperHangOnUltimate",
+      "display_name": "Super Hang-On Ultimate",
+      "repo": "chaotix359/Super-Hang-On-Ultimate",
+      "exe_hint": "SuperHangOn.exe",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "hidden": true,
+      "release_tag": "v0.9.34",
+      "asset_sha256": {
+        "SuperHangOnUltimate-Linux-Installer-0.9.34.zip": "f88d5a77b94ab55d6b6e28a0d6f5a93393b843101a6a57c0c46aa0088f8a36ac",
+        "SuperHangOnUltimate-Mac-Installer-0.9.34.zip": "9efce1dc8dbffd366b77eb6abcdc2f9310acfd464caed55588b186ee1999c233",
+        "SuperHangOnUltimate-Windows-Installer-0.9.34.exe": "d41bf8d5d68074f88a83265db2df39d4f88ae6e7bad40407b7d2d7f3fe3db88c"
+      },
+      "notes": "Arcade Super Hang-On static recomp + Mega Drive Original Mode mod (chaotix359, MIT). OCULTO (18/11/2026): no Windows a v0.9.34 so traz instalador Inno Setup (SuperHangOnUltimate-Windows-Installer-0.9.34.exe) e no Linux/macOS traz scripts de build; o autor nao publica binarios pre-compilados por questoes de copyright da ROM da Sega. Volta ao menu quando houver release portatil sem assistente interativo."
     }
   ]
 }

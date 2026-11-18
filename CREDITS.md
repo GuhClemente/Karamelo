@@ -496,16 +496,16 @@ fork [dobsondev/N64RecompLauncher](https://github.com/dobsondev/N64RecompLaunche
 depois que a abordagem original deste projeto (pegar o maior `.exe`) errou o
 executável em mais de um port real.
 
-### Fora do menu: Skate 3, Burnout 3: Takedown e Mario Kart Wii
+### Fora do menu: Skate 3, Burnout 3: Takedown, Mario Kart Wii e Super Hang-On Ultimate
 
 | Jogo | SO | Repositório |
 |---|---|---|
 | Skate 3 | 🪟🐧🍎 | [mchughalex/skate3recomp](https://github.com/mchughalex/skate3recomp) |
 | Burnout 3: Takedown | 🪟🐧🍎 | [xenophobentx/takedawn](https://github.com/xenophobentx/takedawn) |
 | Mario Kart Wii | 🪟🐧 | [patchzyy/wiicompiled](https://github.com/patchzyy/wiicompiled) |
+| Super Hang-On Ultimate | 🪟🐧🍎 | [chaotix359/Super-Hang-On-Ultimate](https://github.com/chaotix359/Super-Hang-On-Ultimate) |
 
-Entraram na Onda 1/2 de 25/10/2026 e saíram no mesmo dia, na revisão que
-instalou cada port novo de verdade (`tools/validate_ports.ps1`). **Não entram
+Entraram na Onda 1/2 de 25/10/2026 e em 18/11/2026. **Não entram
 na tabela acima nem em nenhuma contagem**; ficam no catálogo com
 `"hidden": true` e o motivo no campo `notes`:
 
@@ -519,6 +519,12 @@ na tabela acima nem em nenhuma contagem**; ficam no catálogo com
   recusa ("release só oferece instalador").
 - **Mario Kart Wii (WiiCompiled)**: mesma coisa - a v0.9.2 só publica
   instaladores (`WiiCompiled-Setup.exe`, `-Setup-x86_64.AppImage`, `.pkg`).
+- **Super Hang-On Ultimate**: no Windows a v0.9.34 só traz instalador Inno Setup
+  (`SuperHangOnUltimate-Windows-Installer-0.9.34.exe`) com assistente gráfico que
+  compila a partir de `shangon.zip`, e no Linux/macOS distribui scripts de build
+  em vez de binários pré-compilados (o autor não distribui executáveis por
+  direitos da ROM da Sega). O jogo roda perfeitamente se o binário for gerado e
+  colocado na pasta `ports/SuperHangOnUltimate/`.
 
 Voltam ao menu quando o projeto publicar build portátil (ou, no caso do
 Skate 3, quando o arquivo for confirmado limpo): tirar o `hidden`, subir o
