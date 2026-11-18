@@ -89,7 +89,7 @@ $map = [ordered]@{
     "GameBoy"       = @{ Dll = "cores/gb.dll";           Dir = "GameBoy" }
     "GBA"           = @{ Dll = "cores/gba.dll";          Dir = "GBA" }
     "NDS"           = @{ Dll = "cores/nds.dll";          Dir = "NDS" }
-    "Nintendo64"    = @{ Dll = "cores/n64_gopher.dll";   Dir = "Nintendo64" }
+    "Nintendo64"    = @{ Dll = "cores/n64_parallel.dll"; Dir = "Nintendo64" }
     "N64-Parallel"  = @{ Dll = "cores/n64_parallel.dll"; Dir = "Nintendo64" }
     "N64-Mupen"     = @{ Dll = "cores/n64_mupen.dll";    Dir = "Nintendo64" }
     "N64-Generic"   = @{ Dll = "cores/n64.dll";          Dir = "Nintendo64" }
@@ -136,7 +136,9 @@ foreach ($sys in $map.Keys) {
     if (-not (Test-Path $dll)) { $pulados += "$sys (core ausente: $($cfg.Dll))"; continue }
 
     $romPath = $null
-    if (Test-Path $romDir) {
+    if ($cfg.Rom -and (Test-Path (Join-Path $app $cfg.Rom))) {
+        $romPath = $cfg.Rom
+    } elseif (Test-Path $romDir) {
         $rom = Get-ChildItem $romDir -File -ErrorAction SilentlyContinue |
                Where-Object { $naoRom -notcontains $_.Extension.ToLower() -and $_.Extension -ne "" } |
                Sort-Object Name | Select-Object -First 1
