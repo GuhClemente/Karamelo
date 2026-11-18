@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
-#include <set>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +22,6 @@
 #endif
 
 #include "app_info.h"
-#include "archive_helper.h"
 #include "core_runner.h"
 #include "gamepad_sdl.h" // pulls in <xinput.h> for the XINPUT_STATE shape
 #include "hw_render.h"
@@ -3102,6 +3100,8 @@ void PopulateBrowse(const std::string &dirpath) {
     if (plist.empty()) {
       items.push_back({Tr("[Nenhum Port Encontrado]", "[No Ports Found]"), "", false, false, 0});
     }
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({std::string("< ") + Tr("Voltar", "Back"), "", false, true, 999});
     OsdSetSize((int)items.size());
     SelectByAction(kActionPortItem, 1);
     scroll_top = 0;
@@ -3275,12 +3275,21 @@ void PopulateBrowse(const std::string &dirpath) {
       items.push_back(d);
     for (const auto &f : files)
       items.push_back(f);
+
+    if (!dirs.empty() || !files.empty()) {
+      items.push_back({" ", "", false, false, 0});
+      items.push_back({std::string("< ") + Tr("Voltar", "Back"), "", false, true, 999});
+    }
   } catch (...) {
     items.push_back({Tr("[Diretorio Vazio]", "[Empty Directory]"), "", false, false, 0});
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({std::string("< ") + Tr("Voltar", "Back"), "", false, true, 999});
   }
 
   if (items.empty()) {
     items.push_back({Tr("[Diretorio Vazio]", "[Empty Directory]"), "", false, false, 0});
+    items.push_back({" ", "", false, false, 0});
+    items.push_back({std::string("< ") + Tr("Voltar", "Back"), "", false, true, 999});
   }
 
   selected_idx = 0;
@@ -4383,10 +4392,14 @@ static void MenuProcessKeyImpl(MenuKey key) {
 
   case KEY_PAGEUP:
     selected_idx = (selected_idx > 5) ? selected_idx - 5 : 0;
+    while (selected_idx > 0 && items[selected_idx].label == " ")
+      selected_idx--;
     break;
 
   case KEY_PAGEDOWN:
     selected_idx = (selected_idx + 5 < total) ? selected_idx + 5 : total - 1;
+    while (selected_idx < total - 1 && items[selected_idx].label == " ")
+      selected_idx++;
     break;
 
   case KEY_HOME:
@@ -5752,7 +5765,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         }
       }
     } else if (current_state == STATE_BROWSE) {
-      if (item.label == "<..>") {
+      if (item.label == "<..>" || item.action_id == 999) {
         BrowseGoUp();
       } else if (current_dir == "ports") {
         auto plist = PortGetAvailableList();
@@ -5799,7 +5812,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
     if (current_state == STATE_BROWSE) {
       if (selected_idx >= 0 && selected_idx < (int)items.size()) {
         const auto &it = items[selected_idx];
-        if (it.label != "<..>" && !it.is_folder) {
+        if (it.label != "<..>" && it.action_id != 999 && it.label != " " && !it.is_folder) {
           if (current_dir == "ports") {
             std::string raw_lbl = it.label;
             if (raw_lbl.rfind("* ", 0) == 0) raw_lbl = raw_lbl.substr(2);

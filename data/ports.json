@@ -1891,6 +1891,11 @@
         "gear"
       ],
       "has_linux_build": true,
+      "launch_args": [
+        "--wide",
+        "--full-view",
+        "--smooth"
+      ],
       "rom_exclude_keywords": [
         "gear 2",
         "3000",

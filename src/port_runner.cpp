@@ -1934,6 +1934,37 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
         }
     }
 
+    // 1f. Special helper for TopGearPC: ensure fullscreen is enabled in its settings
+    if (def && def->id == "TopGearPC") {
+#ifdef _WIN32
+        const char* appdata = getenv("APPDATA");
+        if (appdata) {
+            std::error_code ec;
+            fs::path cfg_dir = fs::path(appdata) / "topgear-pc" / "Top Gear";
+            fs::create_directories(cfg_dir, ec);
+            fs::path cfg_file = cfg_dir / "settings.txt";
+            if (!fs::exists(cfg_file, ec)) {
+                std::ofstream out(cfg_file);
+                if (out) {
+                    out << "aspect 0\nfilter 1\nfullscreen 1\ninteger_scale 0\nrumble 0\nsmooth 1\nfull_view 1\ntall_road 0\nmap_top 0\nspeed_bottom 0\nwide 1\nside_by_side 0\nghost 0\nauto_save 0\nhigh_fps 1\ntv_colour 0\nvsync 1\n";
+                }
+            } else {
+                std::ifstream in(cfg_file);
+                if (in) {
+                    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                    in.close();
+                    size_t pos = content.find("fullscreen 0");
+                    if (pos != std::string::npos) {
+                        content.replace(pos, 12, "fullscreen 1");
+                        std::ofstream out(cfg_file, std::ios::trunc);
+                        if (out) out << content;
+                    }
+                }
+            }
+        }
+#endif
+    }
+
     // 2. Stop any active Libretro core. CoreIsRunning() alone is false while
     // a ROM/core is still on its way up (CORE_STATE_LOADING) - checking only
     // that let a native port launch alongside a core load still running on
