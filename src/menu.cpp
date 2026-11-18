@@ -3071,6 +3071,8 @@ void PopulateRecentMenu() {
   scroll_top = 0;
 }
 
+static const int kActionPortItem = 1400;
+
 void PopulateBrowse(const std::string &dirpath) {
   items.clear();
 
@@ -3095,13 +3097,13 @@ void PopulateBrowse(const std::string &dirpath) {
       if (MenuIsFavorite("port:" + p.id)) {
         disp = "* " + p.name;
       }
-      items.push_back({disp, "", false, true, 800});
+      items.push_back({disp, "", false, true, kActionPortItem});
     }
     if (plist.empty()) {
       items.push_back({Tr("[Nenhum Port Encontrado]", "[No Ports Found]"), "", false, false, 0});
     }
     OsdSetSize((int)items.size());
-    SelectByAction(800, 1);
+    SelectByAction(kActionPortItem, 1);
     scroll_top = 0;
     return;
   }
@@ -4909,7 +4911,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       TelemetrySetEnabled(!TelemetryIsEnabled());
       PopulateDiagnostics();
       selected_idx = cur;
-    } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
+    } else if (current_state == STATE_CORE_OPTIONS && item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
     {
       int opt_index = item.action_id - 800;
       int choice_count = CoreOptionChoiceCount(opt_index);
@@ -4926,13 +4928,13 @@ static void MenuProcessKeyImpl(MenuKey key) {
       int cur_row = selected_idx;
       PopulateCoreOptionsSettings();
       selected_idx = cur_row;
-    } else if (delta > 0 && item.action_id >= kActionCoreCategoryBase &&
+    } else if (current_state == STATE_CORE_OPTIONS && delta > 0 && item.action_id >= kActionCoreCategoryBase &&
                item.action_id < kActionCoreCategoryBase + CORE_CAT_COUNT) {
       s_core_options_category = item.action_id - kActionCoreCategoryBase;
       selected_idx = 0;
       scroll_top = 0;
       PopulateCoreOptionsSettings();
-    } else if (delta < 0 && item.action_id == 898 && s_core_options_category >= 0) {
+    } else if (current_state == STATE_CORE_OPTIONS && delta < 0 && item.action_id == 898 && s_core_options_category >= 0) {
       int prev_cat = s_core_options_category;
       s_core_options_category = CORE_CAT_ROOT;
       PopulateCoreOptionsSettings();
@@ -4974,16 +4976,16 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (item.action_id == 999) // Back
     {
       MenuGoBack();
-    } else if (item.action_id == 898) // Back (Core Options -> in-game menu, not Settings)
+    } else if (current_state == STATE_CORE_OPTIONS && item.action_id == 898) // Back (Core Options -> in-game menu, not Settings)
     {
       MenuGoBack();
-    } else if (item.action_id >= kActionCoreCategoryBase &&
+    } else if (current_state == STATE_CORE_OPTIONS && item.action_id >= kActionCoreCategoryBase &&
                item.action_id < kActionCoreCategoryBase + CORE_CAT_COUNT) {
       s_core_options_category = item.action_id - kActionCoreCategoryBase;
       selected_idx = 0;
       scroll_top = 0;
       PopulateCoreOptionsSettings();
-    } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
+    } else if (current_state == STATE_CORE_OPTIONS && item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
     {
       int opt_index = item.action_id - 800;
       int choice_count = CoreOptionChoiceCount(opt_index);
