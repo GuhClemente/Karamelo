@@ -41,6 +41,7 @@
 #include "updater.h"
 #include "port_runner.h"
 #include "crash_reporter.h"
+#include "telemetry.h"
 #include "cloud_sync.h"
 #include "web_admin.h"
 #include "voice_chat.h"
@@ -2232,10 +2233,14 @@ void PopulateDiagnostics() {
   current_title = Tr("Diagnostico", "Diagnostics");
   OsdSetSize(6);
 
-  bool enabled = CrashReporterIsEnabled();
-  items.push_back({Tr("Relatorio de Falhas", "Crash Report"), enabled ? Tr("Ativado", "Enabled") : Tr("Desativado", "Disabled"), false, false, 520});
-  items.push_back({Tr("[INFO] Envia falhas p/ correcao", "[INFO] Sends crash reports"), "", false, false, 0});
-  items.push_back({Tr("[INFO] Se desligar nao envia", "[INFO] If disabled none sent"), "", false, false, 0});
+  bool crash_enabled = CrashReporterIsEnabled();
+  items.push_back({Tr("Relatorio de Falhas", "Crash Report"), crash_enabled ? Tr("Ativado (Automatico)", "Enabled (Automatic)") : Tr("Desativado", "Disabled"), false, false, 520});
+  items.push_back({Tr("[INFO] Falhas vao p/ correcao", "[INFO] Auto sends crashes to fix"), "", false, false, 0});
+
+  bool tele_enabled = TelemetryIsEnabled();
+  items.push_back({Tr("Telemetria de Versao", "Version Telemetry"), tele_enabled ? Tr("Ativado", "Enabled") : Tr("Desativado", "Disabled"), false, false, 522});
+  items.push_back({Tr("[INFO] Conta versoes/SO anonimo", "[INFO] Anonymous OS/ver metric"), "", false, false, 0});
+
   items.push_back({Tr("Testar Envio (Diagnostico)", "Test Send (Diagnostics)"), ">", false, true, 521});
   items.push_back({" ", "", false, false, 0});
   items.push_back({Tr("Voltar", "Back"), "<", false, true, 999});
@@ -4898,6 +4903,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
       CrashReporterSetEnabled(!CrashReporterIsEnabled());
       PopulateDiagnostics();
       selected_idx = cur;
+    } else if (item.action_id == 522) // Toggle telemetry
+    {
+      int cur = selected_idx;
+      TelemetrySetEnabled(!TelemetryIsEnabled());
+      PopulateDiagnostics();
+      selected_idx = cur;
     } else if (item.action_id >= 800 && item.action_id < 800 + kCoreOptionsMaxRows) // Core Options
     {
       int opt_index = item.action_id - 800;
@@ -5392,6 +5403,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
       if (item.action_id == 520) {
         int cur = selected_idx;
         CrashReporterSetEnabled(!CrashReporterIsEnabled());
+        PopulateDiagnostics();
+        selected_idx = cur;
+      } else if (item.action_id == 522) {
+        int cur = selected_idx;
+        TelemetrySetEnabled(!TelemetryIsEnabled());
         PopulateDiagnostics();
         selected_idx = cur;
       } else if (item.action_id == 521) {

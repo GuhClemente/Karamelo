@@ -41,6 +41,7 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /WX /std:c++20 /EHsc ^
     src\archive_helper.cpp ^
     src\updater.cpp ^
     src\crash_reporter.cpp ^
+    src\telemetry.cpp ^
     src\x360_dump.cpp ^
     src\port_catalog.cpp ^
     src\json_mini.cpp ^

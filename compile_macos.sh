@@ -102,6 +102,7 @@ KARAMELO_SRCS=(
     src/json_mini.cpp
     src/x360_dump.cpp
     src/crash_reporter.cpp
+    src/telemetry.cpp
     src/cloud_sync.cpp
     src/web_admin.cpp
     src/voice_chat.cpp
@@ -159,6 +160,7 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/macos_obj/archive_helper.o \
     build/macos_obj/updater.o \
     build/macos_obj/crash_reporter.o \
+    build/macos_obj/telemetry.o \
     build/macos_obj/input_map.o \
     build/macos_obj/gamepad_sdl.o \
     build/macos_obj/port_catalog.o \

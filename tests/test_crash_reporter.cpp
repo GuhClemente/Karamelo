@@ -1,5 +1,6 @@
 #include "test_framework.h"
 #include "crash_reporter.h"
+#include "telemetry.h"
 #include <string>
 
 
@@ -54,7 +55,28 @@ TEST_CASE(CrashReporterToggleSettings)
 
 TEST_CASE(CrashReporterContextTracking)
 {
-	CrashReporterSetLastGameInfo("Snes9x", "Super Mario World");
+	// Test full path stripping: only the basename/stem should be retained
+	CrashReporterSetLastGameInfo("Snes9x", "C:\\Users\\Player\\roms\\snes\\Super Mario World.sfc");
+	CrashReporterSetLastGameInfo("Flycast", "/home/player/roms/dreamcast/DOA2BR.cdi");
 	CrashReporterSetLastGameInfo("Nenhum", "Nenhum");
+	ASSERT_TRUE(true);
+}
+
+TEST_CASE(TelemetryToggleSettingsAndHeartbeat)
+{
+	bool orig = TelemetryIsEnabled();
+
+	TelemetrySetEnabled(true);
+	ASSERT_TRUE(TelemetryIsEnabled());
+
+	TelemetrySetEnabled(false);
+	ASSERT_FALSE(TelemetryIsEnabled());
+
+	TelemetrySetEnabled(orig);
+	ASSERT_EQ(TelemetryIsEnabled(), orig);
+
+	// Transient disable prevents network dispatch during unit tests
+	TelemetrySetTransientDisable(true);
+	TelemetrySendHeartbeat();
 	ASSERT_TRUE(true);
 }

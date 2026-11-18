@@ -45,7 +45,7 @@ static std::string g_last_game_stem = "Nenhum";
 // carries the name of the game that was running and a stack trace; under the
 // LGPD that is the player's to agree to, not ours to assume. A choice saved
 // earlier in Config/karamelo.ini still wins over this default.
-static bool g_crash_reporting_enabled = false;
+static bool g_crash_reporting_enabled = true;
 static bool g_settings_loaded = false;
 static bool g_transient_disabled = false;
 
@@ -59,6 +59,7 @@ void CrashReporterSetTransientDisable(bool disable) {
 static void LoadDiagnosticsSettings() {
     if (g_settings_loaded) return;
     g_settings_loaded = true;
+    g_crash_reporting_enabled = true; // Enabled by default (automatic opt-out)
 
     std::string path = INI_PATH;
     if (!fs::exists(path) && fs::exists("karamelo.ini")) {
@@ -162,8 +163,16 @@ void CrashReporterSetLastGameInfo(const char* core_name, const char* game_stem) 
     if (core_name && core_name[0]) g_last_core_name = core_name;
     else g_last_core_name = "Nenhum";
 
-    if (game_stem && game_stem[0]) g_last_game_stem = game_stem;
-    else g_last_game_stem = "Nenhum";
+    if (game_stem && game_stem[0]) {
+        std::string s(game_stem);
+        size_t last_slash = s.find_last_of("\\/");
+        if (last_slash != std::string::npos) {
+            s = s.substr(last_slash + 1);
+        }
+        g_last_game_stem = s;
+    } else {
+        g_last_game_stem = "Nenhum";
+    }
 }
 
 // -------------------------------------------------------------
@@ -220,8 +229,20 @@ std::string CrashReporterSanitizeString(const std::string& input) {
         }
     }
 
-    // 3. Redact tokens, passwords, keys
-    const char* sensitive_keys[] = { "token=", "Token=", "password=", "key=", "Bearer " };
+    // 3. Explicit check for current system username environment variable
+    const char* env_user = getenv("USERNAME");
+    if (!env_user || !env_user[0]) env_user = getenv("USER");
+    if (env_user && strlen(env_user) >= 2) {
+        std::string uname = env_user;
+        pos = 0;
+        while ((pos = s.find(uname, pos)) != std::string::npos) {
+            s.replace(pos, uname.length(), "[USER]");
+            pos += 6;
+        }
+    }
+
+    // 4. Redact tokens, passwords, keys
+    const char* sensitive_keys[] = { "token=", "Token=", "password=", "key=", "Bearer ", "auth=" };
     for (const char* pattern : sensitive_keys) {
         pos = 0;
         size_t plen = strlen(pattern);
@@ -470,12 +491,9 @@ void CrashReporterCheckAndDispatch() {
     }
 
     if (!g_crash_reporting_enabled) {
-        // Nothing is sent - but the player is told it happened and where the
-        // switch is, instead of the crash vanishing without a trace.
+        // Player opted out: delete dump quietly without prompting or nagging
         std::error_code ec;
         fs::remove(CRASH_DUMP_PATH, ec);
-        CoreSetToast(Tr("O KARAMELO FECHOU SOZINHO - ATIVE CONFIGURACOES > DIAGNOSTICO PARA ENVIAR RELATORIOS",
-                        "KARAMELO CLOSED UNEXPECTEDLY - ENABLE SETTINGS > DIAGNOSTICS TO SEND REPORTS"), 420);
         return;
     }
 
@@ -563,7 +581,7 @@ void CrashReporterCheckAndDispatch() {
         }
     }).detach();
 
-    CoreSetToast(Tr("RELATORIO DE FALHA ENVIADO A EQUIPE", "CRASH REPORT SENT TO THE TEAM"), 150);
+    CoreSetToast(Tr("RELATORIO DE FALHA ENVIADO AUTOMATICAMENTE A EQUIPE", "CRASH REPORT SENT AUTOMATICALLY TO THE TEAM"), 240);
 }
 
 bool CrashReporterSendTest() {

@@ -124,6 +124,7 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /WX /std:c++20 /EHsc /GR- /guard
     src\x360_dump.cpp ^
     build\lzxd.obj ^
     src\crash_reporter.cpp ^
+    src\telemetry.cpp ^
     src\cloud_sync.cpp ^
     src\web_admin.cpp ^
     src\voice_chat.cpp ^

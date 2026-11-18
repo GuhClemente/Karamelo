@@ -35,6 +35,7 @@ namespace fs = std::filesystem;
 #include "updater.h"
 #include "port_runner.h"
 #include "crash_reporter.h"
+#include "telemetry.h"
 #include "hw_render.h"
 #include "hw_render_vulkan.h"
 #include "hw_render_d3d11.h"
@@ -894,6 +895,7 @@ int main(int argc, char* argv[])
 	if (is_cli_mode)
 	{
 		CrashReporterSetTransientDisable(true);
+		TelemetrySetTransientDisable(true);
 	}
 
 	// bios/, cores/, saves/, Wallpapers/, Config/, roms/ and the log are all opened
@@ -1317,6 +1319,7 @@ int main(int argc, char* argv[])
 	// 3. SDL3 Initialization & Window Creation
 	// -------------------------------------------------------------
 	CrashReporterInit();
+	TelemetryInit();
 
 	// The identifier is the Wayland app_id / X11 WM_CLASS, matched against the
 	// karamelo-emu.desktop entry below so the desktop shows the right icon.
@@ -1417,6 +1420,7 @@ int main(int argc, char* argv[])
 	if (!is_cli_mode)
 	{
 		CrashReporterCheckAndDispatch();
+		TelemetrySendHeartbeat();
 	}
 
 	std::string record_out_path = "";

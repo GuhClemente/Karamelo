@@ -87,6 +87,7 @@ KARAMELO_SRCS=(
     src/json_mini.cpp
     src/x360_dump.cpp
     src/crash_reporter.cpp
+    src/telemetry.cpp
     src/cloud_sync.cpp
     src/web_admin.cpp
     src/voice_chat.cpp
@@ -138,6 +139,7 @@ g++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     build/linux_obj/archive_helper.o \
     build/linux_obj/updater.o \
     build/linux_obj/crash_reporter.o \
+    build/linux_obj/telemetry.o \
     build/linux_obj/input_map.o \
     build/linux_obj/gamepad_sdl.o \
     build/linux_obj/port_catalog.o \

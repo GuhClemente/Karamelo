@@ -38,6 +38,7 @@ namespace fs = std::filesystem;
 #include "karamelo_math.h"
 #include "gamepad_sdl.h"
 #include "crash_reporter.h"
+#include "telemetry.h"
 #include "cloud_sync.h"
 #include "web_admin.h"
 #include "voice_chat.h"
@@ -1577,13 +1578,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (is_cli_mode)
 	{
 		CrashReporterSetTransientDisable(true);
+		TelemetrySetTransientDisable(true);
 	}
 
 	CrashReporterInit();
+	TelemetryInit();
 	CheckWindowsCrashReportsOnStartup();
 	if (!is_cli_mode)
 	{
 		CrashReporterCheckAndDispatch();
+		TelemetrySendHeartbeat();
 	}
 
 	// Root cause of a real crash: SDL_Init(SDL_INIT_VIDEO) registers a Win32
