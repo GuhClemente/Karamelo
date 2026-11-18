@@ -16,6 +16,18 @@ int  MenuGetAudioLatencyMs() { return 128; }
 int  MenuGetHwRender() { return 1; }
 int  MenuGetPadAsMouse() { return 0; }
 
+static int s_headless_upscaler_mode = 0;
+static float s_headless_upscaler_sharpness = 0.75f;
+int  MenuGetUpscalerMode() { return s_headless_upscaler_mode; }
+void MenuSetUpscalerMode(int mode) { s_headless_upscaler_mode = mode; }
+float MenuGetUpscalerSharpness() { return s_headless_upscaler_sharpness; }
+void MenuSetUpscalerSharpness(float s) { s_headless_upscaler_sharpness = s; }
+
+int  MenuGetLutMode() { return 0; }
+int  MenuGetCvdMode() { return 0; }
+float MenuGetCvdStrength() { return 1.0f; }
+int  MenuGetCvdSimulateMode() { return 0; }
+
 static int s_headless_n64_upscale = 0;
 int  MenuGetN64Upscale() { return s_headless_n64_upscale; }
 void MenuSetN64Upscale(int mode) { s_headless_n64_upscale = mode; }

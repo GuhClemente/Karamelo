@@ -57,6 +57,8 @@ cl.exe /nologo /MT /O2 /Oi /Ot /fp:fast /FS /W3 /std:c++20 /EHsc /GR- ^
     src\chd_reader.cpp ^
     src\core_runner.cpp ^
     src\archive_helper.cpp ^
+    src\fsr1.cpp ^
+    src\color_correction.cpp ^
     tools\record_gameplay\headless_stubs.cpp ^
     tools\record_gameplay\record_gameplay.cpp ^
     third_party\rcheevos\src\*.c ^

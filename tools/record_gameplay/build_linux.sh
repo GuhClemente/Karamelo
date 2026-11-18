@@ -41,6 +41,8 @@ SRCS=(
     src/chd_reader.cpp
     src/core_runner.cpp
     src/archive_helper.cpp
+    src/fsr1.cpp
+    src/color_correction.cpp
     tools/record_gameplay/headless_stubs.cpp
     tools/record_gameplay/record_gameplay.cpp
 )

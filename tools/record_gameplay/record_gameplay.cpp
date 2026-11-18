@@ -292,10 +292,25 @@ int main(int argc, char **argv) {
     printf("[INFO] Timed input macros: loaded %zu action(s)\n",
            timed_macros.size());
   }
+  int fsr_mode = 0;
+  float fsr_sharpness = 0.75f;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--fsr") == 0 || strcmp(argv[i], "--fsr1") == 0) {
+      fsr_mode = 1;
+    } else if (strcmp(argv[i], "--cas") == 0) {
+      fsr_mode = 2;
+    } else if (strcmp(argv[i], "--upscaler") == 0 && i + 1 < argc) {
+      fsr_mode = atoi(argv[++i]);
+    } else if (strcmp(argv[i], "--sharpness") == 0 && i + 1 < argc) {
+      fsr_sharpness = (float)atof(argv[++i]);
+    }
+  }
+  MenuSetUpscalerMode(fsr_mode);
+  MenuSetUpscalerSharpness(fsr_sharpness);
+
   MenuSetN64Upscale(upscale_mode);
-  printf("[INFO] N64 Upscale Mode: %d, Filter Mode: %d, No-Input: %d, "
-         "Skip-Extras: %d\n",
-         upscale_mode, filter_mode, (int)no_input, (int)skip_extras);
+  printf("[INFO] N64 Upscale: %d, Upscaler: %d (sharpness=%.2f), Filter: %d, No-Input: %d, Skip-Extras: %d\n",
+         upscale_mode, fsr_mode, fsr_sharpness, filter_mode, (int)no_input, (int)skip_extras);
 
   std::string lower_rom = rom_path;
   std::transform(lower_rom.begin(), lower_rom.end(), lower_rom.begin(),
@@ -311,6 +326,11 @@ int main(int argc, char **argv) {
                    lower_base.find("zelda") != std::string::npos);
   bool is_waverace = (lower_rom.find("wave race") != std::string::npos ||
                       lower_base.find("waverace") != std::string::npos);
+  bool is_topgear = (lower_rom.find("top gear") != std::string::npos ||
+                     lower_base.find("topgear") != std::string::npos);
+  bool is_doa2 = (lower_rom.find("doa2") != std::string::npos ||
+                  lower_rom.find("dead or alive") != std::string::npos ||
+                  lower_base.find("doa2") != std::string::npos);
   bool is_sor = (lower_rom.find("streets") != std::string::npos ||
                  lower_rom.find("rage") != std::string::npos ||
                  lower_rom.find("sor") != std::string::npos ||
@@ -476,6 +496,84 @@ int main(int argc, char **argv) {
           CoreSetButtonState(0, 8, true);
           int16_t steer = (int16_t)(sin(frames_written * 0.05) * 12000);
           CoreSetAnalogState(0, 0, 0, steer);
+        }
+      } else if (is_topgear) {
+        // Top Gear 2 (SNES):
+        // 1) 0-4s: Logos
+        // 2) 4-10s: Title Screen -> Press START to enter Championship Menu
+        if (elapsed >= 4 && elapsed < 10) {
+          CoreSetButtonState(0, 3, pulse); // START
+          CoreSetButtonState(0, 8, pulse); // A
+        }
+        // 3) 10-18s: Menu options / Select Country / Start Race
+        else if (elapsed >= 10 && elapsed < 18) {
+          CoreSetButtonState(0, 3, pulse); // START
+          CoreSetButtonState(0, 8, pulse); // A
+          CoreSetButtonState(0, 0, pulse); // B
+        }
+        // 4) 18s+: ACTIVE RACING GAMEPLAY!
+        else if (elapsed >= 18) {
+          CoreSetButtonState(0, 0, true);  // B = Gas / Accelerate!
+          // Nitro boosts at 30s, 50s, 70s
+          if ((elapsed >= 28 && elapsed <= 30) ||
+              (elapsed >= 48 && elapsed <= 50) ||
+              (elapsed >= 68 && elapsed <= 70)) {
+            CoreSetButtonState(0, 9, true); // Y = Nitro Turbo!
+          }
+          // Dynamic steering along track curves
+          int sw = (frames_written / 40) % 8;
+          if (sw == 1 || sw == 2) CoreSetButtonState(0, 7, true); // Steer Right
+          else if (sw == 5 || sw == 6) CoreSetButtonState(0, 6, true); // Steer Left
+        }
+      } else if (is_doa2) {
+        // Dead or Alive 2 (Dreamcast):
+        // 1) 0-10s: Intro logos / FMV
+        // 2) 10-22s: Title Screen -> Press START to enter Mode Select
+        if (elapsed >= 10 && elapsed < 22) {
+          CoreSetButtonState(0, 3, pulse); // START
+          CoreSetButtonState(0, 0, pulse); // DC Button A (Libretro B=0)
+          CoreSetButtonState(0, 8, pulse); // Libretro A
+        }
+        // 3) 22-34s: Mode Select & Character Select -> Select Fighter (Kasumi / Hayabusa)
+        else if (elapsed >= 22 && elapsed < 34) {
+          CoreSetButtonState(0, 3, pulse); // START
+          CoreSetButtonState(0, 0, pulse); // A (Confirm)
+          CoreSetButtonState(0, 8, pulse); // A
+        }
+        // 4) 34-40s: VS Screen / Loading fight arena
+        else if (elapsed >= 34 && elapsed < 40) {
+          // Wait for fight announcement
+        }
+        // 5) 40s+: ACTIVE 3D FIGHTING COMBAT!
+        else if (elapsed >= 40) {
+          int combo = (frames_written / 15) % 10;
+          bool fast_atk = ((frames_written / 4) % 2 == 0);
+          if (combo == 0) {
+            CoreSetButtonState(0, 7, true);  // Walk forward
+            CoreSetButtonState(0, 0, fast_atk); // Punch
+          } else if (combo == 1) {
+            CoreSetButtonState(0, 8, fast_atk); // Kick
+          } else if (combo == 2) {
+            CoreSetButtonState(0, 7, true);
+            CoreSetButtonState(0, 8, true); // High kick
+          } else if (combo == 3) {
+            CoreSetButtonState(0, 1, true); // Guard / Hold / Throw
+            CoreSetButtonState(0, 0, true);
+          } else if (combo == 4) {
+            CoreSetButtonState(0, 5, true); // Crouch
+            CoreSetButtonState(0, 8, fast_atk); // Low kick
+          } else if (combo == 5) {
+            CoreSetButtonState(0, 6, true); // Backstep / Retreat
+          } else if (combo == 6) {
+            CoreSetButtonState(0, 7, true); // Dash forward
+            CoreSetButtonState(0, 0, true); // Heavy punch combo
+          } else if (combo == 7) {
+            CoreSetButtonState(0, 4, true); // Jump
+            CoreSetButtonState(0, 8, true); // Air kick
+          } else {
+            CoreSetButtonState(0, 0, fast_atk);
+            CoreSetButtonState(0, 8, fast_atk);
+          }
         }
       } else if (is_zelda) {
         // Zelda A Link to the Past:
