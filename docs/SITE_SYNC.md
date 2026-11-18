@@ -2718,3 +2718,92 @@ Novidades para o jogador:
 - **Correção Visual no Menu OSD**: Corrigido bug de renderização no rasterizador OSD que sobrepunha a seta de navegação (`◄^`) sobre o 15º item da lista em menus paginados, garantindo legibilidade perfeita de todos os nomes de jogos.
 - **Top Gear Fullscreen Edition (SA-1 v1.2)**: Validação e suporte estendido a ROMs customizadas com chip acelerador SA-1 em tela cheia 16:9.
 - **Subsistema de ROMs Arcade**: Aprimoramentos em `PortAutoSetupRom` para descoberta e espelhamento automático de romsets MAME/FBNeo para a pasta do port.
+
+---
+
+## 72. Arquitetura de Telemetria e Relatórios de Falha (Crashes) — Separação Estrita e Diretrizes de Privacidade (LGPD / GDPR)
+
+A partir da v0.984, o ecossistema do Karamelo adota a **separação estrita** entre dois canais independentes de comunicação: **Telemetria Anônima (Métrica de Saúde)** e **Relatórios de Falhas Críticas (Crashes)**.
+
+Esta especificação serve como diretriz canônica para a IA mantenedora do site `karamelo-emu.com` atualizar as seções de Política de Privacidade, FAQ e documentação institucional.
+
+### 1. Separação Arquitetural de Canais
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   Karamelo Emulador                    │
+└──────────────┬──────────────────────────┬──────────────┘
+               │                          │
+        (Início de Sessão)         (Falha Crítica / Crash)
+               │                          │
+               ▼                          ▼
+     [Telemetria Anônima]       [Manipulador SEH / Signal]
+       Métrica de Saúde          Grava crash_dump.txt atômico
+               │                          │
+               ▼                     (Próximo Boot)
+     POST /api/ping                       │
+  (Versão, SO, GPU, Backend)              ▼
+                                  POST /api/crash-report
+                               (Envia automático sem travar)
+```
+
+### 2. Canal A: Relatórios de Falhas Críticas (Crashes — "Sem Pedir")
+
+* **Finalidade e Base Legal**: Artigo 7º, IX da LGPD e Artigo 6(1)(f) do GDPR (**Legítimo Interesse**). Identificar e corrigir falhas técnicas de forma proativa para estabilizar o software.
+* **Envio Automático por Padrão ("Sem Pedir")**:
+  - Quando ocorre uma falha fatal (Access Violation, SIGSEGV, heap error), o app grava um dump leve em disco (`crash_dump.txt`) em menos de 1 ms e fecha graciosamente, sem congelar o computador do jogador.
+  - Na inicialização seguinte, o Karamelo detecta o dump pendente, higieniza todas as strings e despacha de forma assíncrona para `https://karamelo-emu.com/api/crash-report`.
+  - O arquivo local é imediatamente removido para evitar reenvios em loop.
+  - O jogador recebe um aviso visual discreto via toast no OSD: `RELATORIO DE FALHA ENVIADO AUTOMATICAMENTE A EQUIPE`.
+* **O que é Enviado no Crash Report**:
+  - Versão do Karamelo (ex.: `0.984`).
+  - Sistema Operacional (ex.: `Windows 11 Build 22631 x64`, `macOS arm64`, `Linux x64`).
+  - Timestamp em UTC.
+  - Nome do motor/core ativo (ex.: `Flycast`, `Snes9x`, `Genesis Plus GX`).
+  - Nome puro do jogo (estritamente o nome do arquivo/stem, ex.: `DOA2BR` ou `Super Mario World` — nunca o caminho completo).
+  - Tipo e código da falha (ex.: `EXCEPTION_ACCESS_VIOLATION`, `0xC0000005`, `SIGSEGV`).
+  - Módulo da falha (ex.: `Karamelo.exe`, `flycast.dll`) e endereço de memória.
+  - Pilha de execução técnica (stack trace).
+* **O que NUNCA é Enviado (Garantias de Privacidade e Anonimização)**:
+  - **Zero nomes de usuário de computadores**: Todos os caminhos de pastas são higienizados por regex e case-insensitive find:
+    - `C:\Users\NomeDoJogador\...` $\rightarrow$ `C:\Users\[USER]\...`
+    - `/home/nomedojogador/...` $\rightarrow$ `/home/[USER]/...`
+    - `/Users/nomedojogador/...` $\rightarrow$ `/Users/[USER]/...`
+    - Varredura ativa do valor das variáveis de ambiente `%USERNAME%` e `$USER` para mascarar qualquer menção literal do nome do usuário.
+  - **Zero senhas ou tokens**: Padrões como `token=`, `password=`, `key=`, `Bearer `, `auth=` são automaticamente redigidos para `[REDACTED]`.
+  - **Zero endereço IP gravado em disco**: O servidor VPS do `karamelo-emu.com` converte o IP em um pseudônimo criptográfico HMAC-SHA256 truncado com salt secreto (`_reporter: a3f81c9e`), usado apenas para distinguir se múltiplos relatos vêm da mesma origem, sendo matematicamente impossível recuperar o IP original.
+* **Como Desativar (Opt-Out Transparente)**:
+  - No Menu OSD: `Configurações` › `Diagnóstico` › `Relatório de Falhas: Desativado`.
+  - No arquivo `Config/karamelo.ini`: `[Diagnostics]` › `crash_reporting=0`.
+  - Quando desativado pelo jogador, se uma falha ocorrer, o arquivo `crash_dump.txt` é **apagado silenciosamente do disco no boot seguinte**, sem enviar nada e sem exibir mensagens de aviso.
+
+### 3. Canal B: Telemetria de Versão e Saúde (Heartbeat Anônimo)
+
+* **Finalidade**: Responder às dúvidas agregadas de produto e engenharia:
+  - Quantos usuários ativos existem?
+  - Quais versões do Karamelo estão instaladas em campo (adoção de updates)?
+  - Qual a distribuição de Sistemas Operacionais (Windows vs Linux vs macOS)?
+  - Quais adaptadores de vídeo e drivers gráficos predominam (Direct3D 11 vs Metal vs OpenGL)?
+* **Disparo**: Ocorre exatamente **1 vez por sessão** no momento da inicialização do app (em segundo plano, com timeout rígido de 5 segundos via WinHttp ou curl, sem atrasar o carregamento da interface).
+* **Endpoint do Servidor**: `POST https://karamelo-emu.com/api/ping`.
+* **Payload Ultraleve (~200 bytes)**:
+  ```json
+  {
+    "event": "heartbeat",
+    "app": "Karamelo",
+    "version": "0.984",
+    "os": "Windows 11 Build 22631 x64",
+    "video_driver": "Direct3D 11",
+    "gpu": "NVIDIA GeForce RTX 3080 Laptop GPU",
+    "lang": "pt-BR"
+  }
+  ```
+* **Privacidade Absoluta**:
+  - **Zero jogos jogados ou biblioteca de ROMs**: O heartbeat não sabe e não transmite quais jogos o usuário possui ou joga.
+  - **Zero medição de tempo de jogo**: Não há contadores de minutos ou horas jogadas.
+  - **Zero identificadores de usuário**: Não há contas, nomes, e-mails ou números de série.
+* **Como Desativar (Opt-Out)**:
+  - No Menu OSD: `Configurações` › `Diagnóstico` › `Telemetria de Versão: Desativado`.
+  - No arquivo `Config/karamelo.ini`: `[Diagnostics]` › `telemetry=0`.
+
+---
