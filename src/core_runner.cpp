@@ -2962,6 +2962,17 @@ static void PollLocalInput(void)
 			}
 		}
 
+		if (s_loaded_core_path.find("dreamcast") != std::string::npos ||
+		    s_loaded_core_path.find("flycast") != std::string::npos ||
+		    loaded_core_name == "Dreamcast")
+		{
+			// Dreamcast has analog triggers L and R.
+			// Mirror L2 -> L and R2 -> R so pulling physical triggers (LT/RT)
+			// works seamlessly alongside any face-button (C/Z) arcade assignments.
+			if (jb[RETRO_DEVICE_ID_JOYPAD_L2]) jb[RETRO_DEVICE_ID_JOYPAD_L] = 1;
+			if (jb[RETRO_DEVICE_ID_JOYPAD_R2]) jb[RETRO_DEVICE_ID_JOYPAD_R] = 1;
+		}
+
 		if (abs(state.Gamepad.sThumbLX) > deadzone_thresh)
 		{
 			analog_sticks[pad][0][0] = state.Gamepad.sThumbLX;
@@ -3046,6 +3057,14 @@ static void PollLocalInput(void)
 			int rid = InputBindRetroId(bind);
 			if (rid >= 0 && rid < 16) joypad_buttons[0][rid] = 1;
 		}
+	}
+
+	if (s_loaded_core_path.find("dreamcast") != std::string::npos ||
+	    s_loaded_core_path.find("flycast") != std::string::npos ||
+	    loaded_core_name == "Dreamcast")
+	{
+		if (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_L2]) joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_L] = 1;
+		if (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_R2]) joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_R] = 1;
 	}
 
 	// For MSX computer cores: also route Space to Joypad A/B so games reading
@@ -4888,6 +4907,27 @@ const char* CoreGetAxisLabel(int stick, int axis)
 	return g_desc_axis[stick][axis][0] ? g_desc_axis[stick][axis] : NULL;
 }
 
+static int s_saturn_3d_pad = 0;
+static void SetPortDevicesGuarded();
+
+void CoreSetSaturn3DPad(int enabled)
+{
+	s_saturn_3d_pad = enabled ? 1 : 0;
+	if (!p_retro_set_controller_port_device) return;
+	EnterCriticalSection(&name_lock);
+	bool is_saturn = (s_loaded_core_path.find("saturn") != std::string::npos || loaded_core_name == "Saturn");
+	LeaveCriticalSection(&name_lock);
+	if (is_saturn)
+	{
+		SetPortDevicesGuarded();
+	}
+}
+
+int CoreGetSaturn3DPad()
+{
+	return s_saturn_3d_pad;
+}
+
 static void SetPortDevicesGuarded()
 {
 	if (!p_retro_set_controller_port_device) return;
@@ -4909,6 +4949,12 @@ static void SetPortDevicesGuarded()
 			// Port 1 (Hardware Port 2) = FM Towns Mouse (Indiana Jones, Monkey Island, Zak McKracken, etc.)
 			port0_device = RETRO_DEVICE_JOYPAD;
 			port1_device = RETRO_DEVICE_MOUSE;
+		}
+		else if (s_loaded_core_path.find("saturn") != std::string::npos || loaded_core_name == "Saturn")
+		{
+			// Sega Saturn: RETRO_DEVICE_JOYPAD = Standard Digital Pad
+			//              RETRO_DEVICE_ANALOG = 3D Control Pad (Multi Controller HSS-0137)
+			port0_device = s_saturn_3d_pad ? RETRO_DEVICE_ANALOG : RETRO_DEVICE_JOYPAD;
 		}
 		p_retro_set_controller_port_device(0, port0_device);
 		p_retro_set_controller_port_device(1, port1_device);
@@ -5180,7 +5226,7 @@ static bool CoreLoad(const char* core_dll_path)
 	else if (strstr(core_dll_path, "atari7800")) loaded_core_name = "Atari 7800";
 	else if (strstr(core_dll_path, "atari5200") || strstr(core_dll_path, "a5200")) loaded_core_name = "Atari 5200";
 	else if (strstr(core_dll_path, "atari2600") || strstr(core_dll_path, "atari")) loaded_core_name = "Atari 2600";
-	else if (strstr(core_dll_path, "dreamcast")) loaded_core_name = "Dreamcast";
+	else if (strstr(core_dll_path, "dreamcast") || strstr(core_dll_path, "flycast")) loaded_core_name = "Dreamcast";
 	else if (strstr(core_dll_path, "gamecube")) loaded_core_name = "GameCube";
 	else if (strstr(core_dll_path, "3ds")) loaded_core_name = "Nintendo 3DS";
 	else if (strstr(core_dll_path, "nds")) loaded_core_name = "Nintendo DS";

@@ -119,6 +119,8 @@ const char* CoreGetGameName();
 const char* CoreGetCoreName();
 void CoreSetOption(const char* key, const char* value);
 void CoreSetN64Upscale(int mode);
+void CoreSetSaturn3DPad(int enabled);
+int  CoreGetSaturn3DPad();
 
 // Mouse as a stylus. Takes the cursor position as a fraction of the client
 // area (0..1) and maps it through the current viewport onto the core's

@@ -63,6 +63,16 @@ TEST_CASE(SixButtonLayoutPerSystem)
 	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_LB);
 	InputBindRestoreGlobal();
 
+	// Flycast (Dreamcast): B=A, A=B, L=C, Y=X, X=Y, R=Z
+	ASSERT_TRUE(InputBindApplySixButtonLayout("Dreamcast", none));
+	ASSERT_EQ(InputBindGetPad(BIND_B), PAD_BTN_A);
+	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_B);
+	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_RB);
+	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X);
+	ASSERT_EQ(InputBindGetPad(BIND_X), PAD_BTN_Y);
+	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_LB);
+	InputBindRestoreGlobal();
+
 	// Opera (3DO): Y=A, B=B, A=C, L=L on X, R=R on Z
 	ASSERT_TRUE(InputBindApplySixButtonLayout("3DO", none));
 	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_A);

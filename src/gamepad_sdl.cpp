@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <math.h>
+#include <string>
+#include <cctype>
 
 #include "gamepad_sdl.h"
 
@@ -486,6 +488,30 @@ const char* GamepadGetDeviceTypeName(int slot)
 		return name ? name : "Gamepad";
 	}
 	}
+}
+
+bool GamepadIsSixButton(int slot)
+{
+	if (slot >= 0 && slot < 4)
+	{
+		const char* name = GamepadGetDeviceName(slot);
+		if (!name || !*name) return false;
+		std::string s = name;
+		for (char& c : s) c = (char)::tolower((unsigned char)c);
+		return s.find("m30") != std::string::npos ||
+		       s.find("saturn") != std::string::npos ||
+		       s.find("fighting commander") != std::string::npos ||
+		       s.find("md6") != std::string::npos ||
+		       s.find("fightstick") != std::string::npos ||
+		       s.find("arcade stick") != std::string::npos ||
+		       (s.find("genesis") != std::string::npos && s.find("6") != std::string::npos) ||
+		       (s.find("sega") != std::string::npos && (s.find("control pad") != std::string::npos || s.find("gamepad") != std::string::npos));
+	}
+	for (int i = 0; i < 4; i++)
+	{
+		if (GamepadIsSixButton(i)) return true;
+	}
+	return false;
 }
 
 void GamepadShutdown()

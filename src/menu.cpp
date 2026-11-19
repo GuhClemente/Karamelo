@@ -277,9 +277,8 @@ static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
 static int setting_pad_mouse = 0;
 static int setting_pad_menu_toggle = 0;
 // 6-button pad (Mega Drive / Saturn style, e.g. 8BitDo M30): built-in layout
-// per system (input_map.cpp). Cannot be detected - over USB an M30 reads as an
-// "Xbox 360 Controller" - so the player says so here.
-static int setting_six_button = 0;
+// per system (input_map.cpp). 0 = Desligado, 1 = Ligado, 2 = Auto (Detectar via SDL).
+static int setting_six_button = 2;
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
 // Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
 // the mixer on a loaded machine; above 512ms the delay is audible against input.
@@ -1738,7 +1737,13 @@ static void ApplySystemPadLayout() {
     InputBindLoadSystemProfile(sys_name.c_str());
     return;
   }
-  if (!setting_six_button) return;
+  bool apply_six = false;
+  if (setting_six_button == 1) {
+    apply_six = true;
+  } else if (setting_six_button == 2) {
+    apply_six = GamepadIsSixButton(0);
+  }
+  if (!apply_six) return;
   const char* labels[16] = {};
   for (int id = 0; id < 16; id++) labels[id] = CoreGetButtonLabel(id);
   InputBindApplySixButtonLayout(sys_name.c_str(), labels);
@@ -1938,7 +1943,14 @@ void PopulateControllerSettings() {
     Tr("Arcade 6-Botoes", "Arcade 6-Button")
   };
   items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
-  items.push_back({Tr("Controle 6 Botoes", "6-Button Pad"), setting_six_button ? Tr("Ligado", "On") : Tr("Desligado", "Off"), false, false, 533});
+  const char *six_btn_labels[] = {
+    Tr("Desligado", "Off"),
+    Tr("Ligado", "On"),
+    Tr("Auto (Detectar)", "Auto (Detect)")
+  };
+  int six_idx = (setting_six_button >= 0 && setting_six_button <= 2) ? setting_six_button : 2;
+  items.push_back({Tr("Controle 6 Botoes", "6-Button Pad"), six_btn_labels[six_idx], false, false, 533});
+  items.push_back({Tr("Controle Saturn", "Saturn Controller"), CoreGetSaturn3DPad() ? Tr("3D Pad (Analogico)", "3D Pad (Analog)") : Tr("Padrao (Digital)", "Standard (Digital)"), false, false, 534});
   if (KarameloIsAppliance()) {
     items.push_back({Tr("Parear Controle BT", "Pair BT Controller"), BtStatusLabel(0, Tr("Buscando...", "Scanning...")), false, true, 535});
     items.push_back({Tr("Parear Teclado BT", "Pair BT Keyboard"), BtStatusLabel(1, Tr("Buscando...", "Scanning...")), false, true, 536});
@@ -2062,7 +2074,8 @@ static void ResetAllSettingsToDefault() {
   setting_deadzone = 1;
   setting_pad_mouse = 0;
   setting_pad_menu_toggle = 0;
-  setting_six_button = 0;
+  setting_six_button = 2;
+  CoreSetSaturn3DPad(0);
   setting_latency = 1;
   setting_driver = 0;
   setting_sync = 1;
@@ -3390,6 +3403,7 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "pad_mouse", setting_pad_mouse);
   AppendSetting(out, "pad_menu_toggle", setting_pad_menu_toggle);
   AppendSetting(out, "pad_six_button", setting_six_button);
+  AppendSetting(out, "saturn_3d_pad", CoreGetSaturn3DPad());
   AppendSetting(out, "latency", setting_latency);
   AppendSetting(out, "driver", setting_driver);
   AppendSetting(out, "sync", setting_sync);
@@ -3529,7 +3543,9 @@ static void MenuLoadSettings() {
     else if (!strcmp(key, "pad_menu_toggle"))
       setting_pad_menu_toggle = ClampInt(iv, 0, 4);
     else if (!strcmp(key, "pad_six_button"))
-      setting_six_button = ClampInt(iv, 0, 1);
+      setting_six_button = ClampInt(iv, 0, 2);
+    else if (!strcmp(key, "saturn_3d_pad"))
+      CoreSetSaturn3DPad(ClampInt(iv, 0, 1));
     else if (!strcmp(key, "pad_device"))
       setting_pad_device = ClampInt(iv, 0, 1);
     else if (InputBindFromConfigKey(key) >= 0)
@@ -4899,9 +4915,16 @@ static void MenuProcessKeyImpl(MenuKey key) {
       SelectByAction(item.action_id, 0);
     } else if (item.action_id == 533) // Controle 6 Botoes
     {
-      setting_six_button = !setting_six_button;
+      setting_six_button = (setting_six_button + delta + 3) % 3;
       MenuSaveSettings();
       ApplySystemPadLayout();
+      PopulateControllerSettings();
+      SelectByAction(item.action_id, 3);
+    } else if (item.action_id == 534) // Controle Saturn
+    {
+      int cur = CoreGetSaturn3DPad();
+      CoreSetSaturn3DPad(!cur);
+      MenuSaveSettings();
       PopulateControllerSettings();
       SelectByAction(item.action_id, 3);
     } else if (item.action_id == 530) // Preset Botoes
@@ -5450,9 +5473,15 @@ static void MenuProcessKeyImpl(MenuKey key) {
       }
     } else if (current_state == STATE_CONTROLLER) {
       if (item.action_id == 533) {
-        setting_six_button = !setting_six_button;
+        setting_six_button = (setting_six_button + 1) % 3;
         MenuSaveSettings();
         ApplySystemPadLayout();
+        PopulateControllerSettings();
+        SelectByAction(item.action_id, 3);
+      } else if (item.action_id == 534) {
+        int cur = CoreGetSaturn3DPad();
+        CoreSetSaturn3DPad(!cur);
+        MenuSaveSettings();
         PopulateControllerSettings();
         SelectByAction(item.action_id, 3);
       } else if (item.action_id == 530) {

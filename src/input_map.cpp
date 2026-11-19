@@ -661,6 +661,7 @@ bool InputBindLoadSystemProfile(const char* system_name)
 // docs), so the console's A B C / X Y Z land where they sit on the real pad:
 //   Genesis Plus GX / PicoDrive: Y=A  B=B  A=C  L=X  X=Y  R=Z
 //   Beetle Saturn:               B=A  A=B  R=C  Y=X  X=Y  L=Z  (L2/R2 = L/R)
+//   Flycast (Dreamcast):         B=A  A=B  L=C  Y=X  X=Y  R=Z  (L/R Triggers = C/Z + LT/RT)
 //   Opera (3DO):                 Y=A  B=B  A=C  L=L  R=R  (Select=X, Start=P)
 // Arcade goes by the button names the core gives for the loaded game.
 // ---------------------------------------------------------------------------
@@ -729,6 +730,19 @@ bool InputBindApplySixButtonLayout(const char* system_name, const char* const la
 		clear_face();
 		layout[BIND_B] = kSixA; layout[BIND_A] = kSixB; layout[BIND_R] = kSixC;
 		layout[BIND_Y] = kSixX; layout[BIND_X] = kSixY; layout[BIND_L] = kSixZ;
+	}
+	else if (sys == "Dreamcast")
+	{
+		clear_face();
+		// Dreamcast on 6-button Sega pad / Arcade sticks:
+		// Bottom row: A (Light Kick) = kSixA, B (Medium Kick) = kSixB, L-Trigger (Heavy Kick) = kSixC
+		// Top row:    X (Light Punch) = kSixX, Y (Medium Punch) = kSixY, R-Trigger (Heavy Punch) = kSixZ
+		layout[BIND_B] = kSixA; // Retro B (DC A)
+		layout[BIND_A] = kSixB; // Retro A (DC B)
+		layout[BIND_L] = kSixC; // Retro L (DC L Trigger -> Heavy Kick)
+		layout[BIND_Y] = kSixX; // Retro Y (DC X)
+		layout[BIND_X] = kSixY; // Retro X (DC Y)
+		layout[BIND_R] = kSixZ; // Retro R (DC R Trigger -> Heavy Punch)
 	}
 	else if (sys == "3DO")
 	{

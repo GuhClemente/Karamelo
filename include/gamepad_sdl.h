@@ -47,6 +47,11 @@ int GamepadGetDeviceType(int slot);
 // Returns a user-friendly model name (e.g. "DualSense (PS5)", "Xbox One/Series", "Switch Pro").
 const char* GamepadGetDeviceTypeName(int slot);
 
+// Returns true if the controller connected in slot (or any slot if slot < 0)
+// is recognized as a 6-button arcade / Sega-style gamepad (e.g. 8BitDo M30,
+// Retro-Bit Saturn/Genesis, Arcade fightsticks).
+bool GamepadIsSixButton(int slot = 0);
+
 // Queries finger on a controller's touchpad (e.g. DualShock 4 or DualSense).
 // Returns true if the controller has a touchpad and finger info was retrieved.
 // x and y are normalized (0.0 to 1.0, top-left origin).
