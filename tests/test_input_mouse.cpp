@@ -96,9 +96,9 @@ TEST_CASE(SixButtonLayoutM30Mode)
 	InputBindResetDefaults();
 	const char* none[16] = {};
 
-	// With six_mode = 1 (8BitDo M30 XInput):
-	// Face C = RT, Face Z = RB, Shoulder L = LB, Shoulder R = LT
-	ASSERT_TRUE(InputBindApplySixButtonLayout("Dreamcast", none, 1));
+	// 8BitDo M30 XInput table: Face C = RT, Face Z = RB, Shoulder L = LB, Shoulder R = LT
+	const SixPadMap m30 = InputSixPadBuiltin(SIXPAD_M30_XINPUT);
+	ASSERT_TRUE(InputBindApplySixButtonLayout("Dreamcast", none, &m30));
 	ASSERT_EQ(InputBindGetPad(BIND_B), PAD_BTN_A);   // DC A
 	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_B);   // DC B
 	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X);   // DC X
@@ -110,7 +110,7 @@ TEST_CASE(SixButtonLayoutM30Mode)
 	InputBindRestoreGlobal();
 
 	// Saturn in M30 mode:
-	ASSERT_TRUE(InputBindApplySixButtonLayout("Saturn", none, 1));
+	ASSERT_TRUE(InputBindApplySixButtonLayout("Saturn", none, &m30));
 	ASSERT_EQ(InputBindGetPad(BIND_B), PAD_BTN_A);   // Saturn A
 	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_B);   // Saturn B
 	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_RT);  // Saturn C on Face C
@@ -119,6 +119,72 @@ TEST_CASE(SixButtonLayoutM30Mode)
 	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_RB);  // Saturn Z on Face Z
 	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_LB); // Saturn L on Shoulder L
 	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_LT); // Saturn R on Shoulder R
+	InputBindRestoreGlobal();
+	InputBindResetDefaults();
+}
+
+// Auto mode goes by the controller's name, never by a whole vendor: an 8BitDo
+// SN30 Pro or a plain Xbox pad must not get the 6-button layout.
+TEST_CASE(SixButtonDetectionByNameOnly)
+{
+	ASSERT_TRUE(InputNameLooksSixButton("8BitDo M30 gamepad"));
+	ASSERT_TRUE(InputNameLooksSixButton("Retro-Bit Sega Saturn Control Pad"));
+	ASSERT_TRUE(InputNameLooksSixButton("HORI Fighting Commander"));
+	ASSERT_TRUE(InputNameLooksSixButton("Qanba Arcade Stick"));
+	ASSERT_TRUE(!InputNameLooksSixButton("8BitDo SN30 Pro"));
+	ASSERT_TRUE(!InputNameLooksSixButton("8BitDo Ultimate Wireless"));
+	ASSERT_TRUE(!InputNameLooksSixButton("Xbox 360 Controller"));
+	ASSERT_TRUE(!InputNameLooksSixButton("DualSense Wireless Controller"));
+	ASSERT_TRUE(!InputNameLooksSixButton(""));
+	ASSERT_TRUE(!InputNameLooksSixButton(nullptr));
+}
+
+// A calibration is kept per controller and drives the layout exactly as
+// pressed - whatever the firmware sends for C, Z and the shoulders.
+TEST_CASE(SixButtonCalibrationRoundTrip)
+{
+	InputBindResetDefaults();
+	const char* key = "045e_028e_Xbox 360 Controller (test)";
+	InputSixPadDelete(key);
+	ASSERT_TRUE(!InputSixPadHas(key));
+
+	SixPadMap cal;
+	cal.a = PAD_BTN_A; cal.b = PAD_BTN_B; cal.c = PAD_BTN_LT;
+	cal.x = PAD_BTN_X; cal.y = PAD_BTN_Y; cal.z = PAD_BTN_LB;
+	cal.l = PAD_BTN_NONE; cal.r = PAD_BTN_RT;   // L skipped with START
+	ASSERT_TRUE(InputSixPadSave(key, cal));
+	ASSERT_TRUE(InputSixPadHas(key));
+
+	SixPadMap back;
+	ASSERT_TRUE(InputSixPadLoad(key, &back));
+	ASSERT_EQ(back.c, PAD_BTN_LT);
+	ASSERT_EQ(back.z, PAD_BTN_LB);
+	ASSERT_EQ(back.l, PAD_BTN_NONE);
+	ASSERT_EQ(back.r, PAD_BTN_RT);
+
+	const char* none[16] = {};
+	ASSERT_TRUE(InputBindApplySixButtonLayout("Genesis", none, &back));
+	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_LT);  // Genesis C where this pad sends C
+	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_LB);  // Genesis Z where this pad sends Z
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_NONE);
+	InputBindRestoreGlobal();
+
+	ASSERT_TRUE(InputSixPadDelete(key));
+	ASSERT_TRUE(!InputSixPadHas(key));
+	InputBindResetDefaults();
+}
+
+// A fighting game that names its heavy kick on L2 keeps it there: the
+// shoulders only fill L2/R2 where no punch or kick went.
+TEST_CASE(SixButtonArcadeKeepsKickOnL2)
+{
+	InputBindResetDefaults();
+	const char* labels[16] = {};
+	labels[1] = "Weak Punch"; labels[9] = "Medium Punch"; labels[10] = "Heavy Punch";
+	labels[0] = "Weak Kick";  labels[8] = "Medium Kick";  labels[12] = "Heavy Kick";   // L2
+	ASSERT_TRUE(InputBindApplySixButtonLayout("Arcade", labels));
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_RB);  // heavy kick: bottom right (Sega C)
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_RT);  // right shoulder
 	InputBindRestoreGlobal();
 	InputBindResetDefaults();
 }

@@ -47,9 +47,15 @@ int GamepadGetDeviceType(int slot);
 // Returns a user-friendly model name (e.g. "DualSense (PS5)", "Xbox One/Series", "Switch Pro").
 const char* GamepadGetDeviceTypeName(int slot);
 
-// Returns true if the controller connected in slot (or any slot if slot < 0)
-// is recognized as a 6-button arcade / Sega-style gamepad (e.g. 8BitDo M30,
-// Retro-Bit Saturn/Genesis, Arcade fightsticks).
+// Identifies the controller model in a slot, for per-controller settings:
+// "<vendor>_<product>_<name>" as SDL reports them (e.g. "045e_028e_Xbox 360 Controller").
+// False, with an empty string, when the slot is empty.
+bool GamepadGetDeviceKey(int slot, char* out, size_t out_size);
+
+// True if the controller in slot (any slot if slot < 0) is a 6-button / Sega /
+// fighting pad: one the player calibrated, or one whose name says so
+// (InputNameLooksSixButton). An M30 over XInput reads as "Xbox 360
+// Controller" and is found only after calibration.
 bool GamepadIsSixButton(int slot = 0);
 
 // Queries finger on a controller's touchpad (e.g. DualShock 4 or DualSense).

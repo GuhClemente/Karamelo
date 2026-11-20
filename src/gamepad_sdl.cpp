@@ -12,8 +12,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <math.h>
-#include <string>
-#include <cctype>
 
 #include "gamepad_sdl.h"
 #include "input_map.h"
@@ -491,47 +489,35 @@ const char* GamepadGetDeviceTypeName(int slot)
 	}
 }
 
+bool GamepadGetDeviceKey(int slot, char* out, size_t out_size)
+{
+	if (!out || out_size == 0) return false;
+	out[0] = '\0';
+	if (slot < 0 || slot >= 4) return false;
+	AcquireSRWLockShared(&s_pads_lock);
+	SDL_Gamepad* gp = s_pads[slot];
+	if (gp)
+	{
+		const char* name = SDL_GetGamepadName(gp);
+		snprintf(out, out_size, "%04x_%04x_%s", (unsigned)SDL_GetGamepadVendor(gp),
+			(unsigned)SDL_GetGamepadProduct(gp), name ? name : "pad");
+	}
+	ReleaseSRWLockShared(&s_pads_lock);
+	return out[0] != '\0';
+}
+
 bool GamepadIsSixButton(int slot)
 {
-	if (InputBindGetPreset() == PRESET_8BITDO_M30 || InputBindGetPreset() == PRESET_ARCADE_6BTN)
-		return true;
-
-	if (slot >= 0 && slot < 4)
+	if (slot < 0)
 	{
-		AcquireSRWLockShared(&s_pads_lock);
-		SDL_Gamepad* gp = s_pads[slot];
-		if (gp)
-		{
-			Uint16 vid = SDL_GetGamepadVendor(gp);
-			Uint16 pid = SDL_GetGamepadProduct(gp);
-			// 8BitDo (0x2DC8) or Mayflash (0x0EB7) or Retro-Bit (0x0CA3)
-			if (vid == 0x2dc8 || vid == 0x0ca3 || vid == 0x0eb7)
-			{
-				ReleaseSRWLockShared(&s_pads_lock);
-				return true;
-			}
-		}
-		ReleaseSRWLockShared(&s_pads_lock);
-
-		const char* name = GamepadGetDeviceName(slot);
-		if (!name || !*name) return false;
-		std::string s = name;
-		for (char& c : s) c = (char)::tolower((unsigned char)c);
-		return s.find("m30") != std::string::npos ||
-		       s.find("8bitdo") != std::string::npos ||
-		       s.find("saturn") != std::string::npos ||
-		       s.find("fighting commander") != std::string::npos ||
-		       s.find("md6") != std::string::npos ||
-		       s.find("fightstick") != std::string::npos ||
-		       s.find("arcade stick") != std::string::npos ||
-		       (s.find("genesis") != std::string::npos && s.find("6") != std::string::npos) ||
-		       (s.find("sega") != std::string::npos && (s.find("control pad") != std::string::npos || s.find("gamepad") != std::string::npos));
+		for (int i = 0; i < 4; i++)
+			if (GamepadIsSixButton(i)) return true;
+		return false;
 	}
-	for (int i = 0; i < 4; i++)
-	{
-		if (GamepadIsSixButton(i)) return true;
-	}
-	return false;
+	char key[160];
+	if (!GamepadGetDeviceKey(slot, key, sizeof(key))) return false;
+	if (InputSixPadHas(key)) return true;   // calibrated by the player
+	return InputNameLooksSixButton(GamepadGetDeviceName(slot));
 }
 
 void GamepadShutdown()

@@ -482,6 +482,11 @@ int InputBindGetPreset()
 	return s_current_preset;
 }
 
+void InputBindSetPresetTag(int preset)
+{
+	if (preset >= 0 && preset < PRESET_COUNT) s_current_preset = preset;
+}
+
 void InputBindApplyPreset(int preset)
 {
 	s_current_preset = preset;
@@ -532,16 +537,18 @@ void InputBindApplyPreset(int preset)
 		//  - B -> Retro A (Confirm/Action)
 		//  - X -> Retro Y (Attack/Shoot)
 		//  - Y -> Retro X
-		//  - Ombro L (LB) -> Retro L / L2 (Gatilho Esquerdo)
-		//  - Ombro R (LT) -> Retro R / R2 (Gatilho Direito / Mirar / Acelerar)
+		//  - Ombro L (LB) -> Retro L, Ombro R (LT) -> Retro R
+		//  - Z (RB) -> Retro L2, C (RT) -> Retro R2
 		s_pads[BIND_B] = PAD_BTN_A;
 		s_pads[BIND_A] = PAD_BTN_B;
 		s_pads[BIND_Y] = PAD_BTN_X;
 		s_pads[BIND_X] = PAD_BTN_Y;
 		s_pads[BIND_L] = PAD_BTN_LB;
 		s_pads[BIND_R] = PAD_BTN_LT;
-		s_pads[BIND_L2] = PAD_BTN_LB;
-		s_pads[BIND_R2] = PAD_BTN_LT;
+		// L2/R2 on Z and C. They used to sit on the same LB/LT as L/R, so on
+		// PlayStation or N64 every L1 press was also an L2 press.
+		s_pads[BIND_L2] = PAD_BTN_RB;
+		s_pads[BIND_R2] = PAD_BTN_RT;
 	}
 	else if (preset == PRESET_ARCADE_6BTN)
 	{
@@ -678,12 +685,12 @@ bool InputBindLoadSystemProfile(const char* system_name)
 }
 
 // ---------------------------------------------------------------------------
-// 6-button pads.
-// There are two major hardware mappings on PC:
-// 1. 8BitDo M30 (XInput / Cabo USB):
-//    Hardware: A=A, B=B, C=RT, X=X, Y=Y, Z=RB, L=LB, R=LT.
-// 2. Sega / Retro-Bit Standard (DInput / Saturn USB):
-//    Hardware: A=A, B=B, C=RB, X=X, Y=Y, Z=LB, L=LT, R=RT.
+// 6-button pads. Where a pad's A B C / X Y Z / L R arrive is a SixPadMap:
+// the player's calibration for that controller (Config/pads/), or one of two
+// built-in tables. Firmwares disagree on C, Z and the shoulders, which is why
+// calibration wins over any table:
+//   Sega standard (Retro-Bit, Saturn USB, DInput): C=RB Z=LB L=LT R=RT
+//   8BitDo M30 over XInput:                        C=RT Z=RB L=LB R=LT
 // Each system's table comes from that core's own RetroPad mapping (libretro
 // docs), so the console's A B C / X Y Z land where they sit on the real pad.
 // ---------------------------------------------------------------------------
@@ -727,7 +734,119 @@ int StrengthOf(const char* label, bool game_has_medium)
 }
 } // namespace
 
-bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16], int six_mode)
+SixPadMap InputSixPadBuiltin(int kind)
+{
+	SixPadMap m;
+	m.a = PAD_BTN_A; m.b = PAD_BTN_B; m.x = PAD_BTN_X; m.y = PAD_BTN_Y;
+	if (kind == SIXPAD_M30_XINPUT)
+	{
+		m.c = PAD_BTN_RT; m.z = PAD_BTN_RB; m.l = PAD_BTN_LB; m.r = PAD_BTN_LT;
+	}
+	else
+	{
+		m.c = PAD_BTN_RB; m.z = PAD_BTN_LB; m.l = PAD_BTN_LT; m.r = PAD_BTN_RT;
+	}
+	return m;
+}
+
+bool InputNameLooksSixButton(const char* name)
+{
+	if (!name || !*name) return false;
+	// Names, never a whole vendor: 8BitDo also makes the SN30 Pro and the
+	// Ultimate, which have four face buttons. Over XInput an M30 calls itself
+	// "Xbox 360 Controller" and cannot be told apart at all - that is what the
+	// calibration (InputSixPadSave) is for.
+	static const char* const kWords[] = {
+		"m30", "saturn", "mega drive", "megadrive", "genesis", "md6", "6b ",
+		"fighting commander", "fightstick", "fight stick", "arcade stick",
+		"fighting stick", "arcade pad", "neo geo", "neogeo",
+	};
+	for (const char* w : kWords)
+		if (LabelHas(name, w)) return true;
+	return false;
+}
+
+// Calibrations live one per controller model, keyed by what SDL reports
+// (vendor/product and name - see GamepadGetDeviceKey), like RetroArch's
+// autoconfig profiles: the pad is recognised the next time it is plugged in.
+static std::string SixPadPath(const char* device_key)
+{
+	std::string clean = SanitizeSystemName(device_key);
+	if (clean.empty()) return "";
+	for (char& c : clean)
+		if (!isalnum((unsigned char)c) && c != '_' && c != '-') c = '_';
+	if (clean.size() > 80) clean.resize(80);
+	return "Config/pads/" + clean + ".cfg";
+}
+
+static const char* const kSixPadKeys[8] = { "six_a", "six_b", "six_c", "six_x", "six_y", "six_z", "six_l", "six_r" };
+
+static int* SixPadField(SixPadMap& m, int i)
+{
+	int* f[8] = { &m.a, &m.b, &m.c, &m.x, &m.y, &m.z, &m.l, &m.r };
+	return f[i];
+}
+
+bool InputSixPadSave(const char* device_key, const SixPadMap& map)
+{
+	std::string path = SixPadPath(device_key);
+	if (path.empty()) return false;
+	std::error_code ec;
+	fs::create_directories("Config/pads", ec);
+	FILE* f = fopen(path.c_str(), "wb");
+	if (!f) return false;
+	SixPadMap m = map;
+	fprintf(f, "# Karamelo - 6-button calibration for %s\n", device_key);
+	for (int i = 0; i < 8; i++) fprintf(f, "%s=%d\n", kSixPadKeys[i], *SixPadField(m, i));
+	fclose(f);
+	return true;
+}
+
+bool InputSixPadLoad(const char* device_key, SixPadMap* out)
+{
+	std::string path = SixPadPath(device_key);
+	if (path.empty()) return false;
+	FILE* f = fopen(path.c_str(), "rb");
+	if (!f) return false;
+	SixPadMap m;
+	int seen = 0;
+	char line[128];
+	while (fgets(line, sizeof(line), f))
+	{
+		char* eq = strchr(line, '=');
+		if (line[0] == '#' || !eq) continue;
+		*eq = '\0';
+		const int iv = atoi(eq + 1);
+		for (int i = 0; i < 8; i++)
+		{
+			if (strcmp(line, kSixPadKeys[i]) == 0 && iv >= 0 && iv <= 0xFFFF)
+			{
+				*SixPadField(m, i) = iv;
+				seen |= 1 << i;
+			}
+		}
+	}
+	fclose(f);
+	// The six face buttons are required; the shoulders may have been skipped.
+	if ((seen & 0x3F) != 0x3F) return false;
+	if (out) *out = m;
+	return true;
+}
+
+bool InputSixPadHas(const char* device_key)
+{
+	return InputSixPadLoad(device_key, nullptr);
+}
+
+bool InputSixPadDelete(const char* device_key)
+{
+	std::string path = SixPadPath(device_key);
+	if (path.empty()) return false;
+	std::error_code ec;
+	return fs::remove(path, ec);
+}
+
+bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16], const SixPadMap* pad)
 {
 	if (!system_name) return false;
 	const std::string sys = system_name;
@@ -738,18 +857,12 @@ bool InputBindApplySixButtonLayout(const char* system_name, const char* const la
 		for (int b : {BIND_B, BIND_A, BIND_Y, BIND_X, BIND_L, BIND_R, BIND_L2, BIND_R2}) layout[b] = PAD_BTN_NONE;
 	};
 
-	// Determine button set:
-	// six_mode: 0 = auto (follow preset), 1 = 8BitDo M30, 2 = Sega Standard DInput
-	const bool is_m30 = (six_mode == 1) || (six_mode == 0 && s_current_preset == PRESET_8BITDO_M30);
-
-	const int sixA = PAD_BTN_A;
-	const int sixB = PAD_BTN_B;
-	const int sixC = is_m30 ? PAD_BTN_RT : PAD_BTN_RB;
-	const int sixX = PAD_BTN_X;
-	const int sixY = PAD_BTN_Y;
-	const int sixZ = is_m30 ? PAD_BTN_RB : PAD_BTN_LB;
-	const int sixL = is_m30 ? PAD_BTN_LB : PAD_BTN_LT;
-	const int sixR = is_m30 ? PAD_BTN_LT : PAD_BTN_RT;
+	// Where the pad's own A B C / X Y Z / L R are: a calibration, or one of the
+	// built-in tables (Sega standard when nothing is given).
+	const SixPadMap m = pad ? *pad : InputSixPadBuiltin(SIXPAD_SEGA_STANDARD);
+	const int sixA = m.a, sixB = m.b, sixC = m.c;
+	const int sixX = m.x, sixY = m.y, sixZ = m.z;
+	const int sixL = m.l, sixR = m.r;
 
 	if (sys == "Genesis" || sys == "Mega CD" || sys == "Sega 32X")
 	{
@@ -819,8 +932,10 @@ bool InputBindApplySixButtonLayout(const char* system_name, const char* const la
 			if (punch[s] >= 0) layout[punch[s]] = top[s];
 			if (kick[s] >= 0) layout[kick[s]] = bottom[s];
 		}
-		layout[BIND_L2] = sixL;
-		layout[BIND_R2] = sixR;
+		// The shoulders take L2/R2 only where no punch or kick went: a game
+		// can name its heavy kick on L2, and that must not be overwritten.
+		if (layout[BIND_L2] == PAD_BTN_NONE) layout[BIND_L2] = sixL;
+		if (layout[BIND_R2] == PAD_BTN_NONE) layout[BIND_R2] = sixR;
 	}
 	else
 	{

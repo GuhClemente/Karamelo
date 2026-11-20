@@ -301,6 +301,19 @@ static char g_desc_axis[2][2][24] = { { { 0 } } };
 static bool g_desc_present = false;
 static void ClearInputDescriptors();
 
+// Controller types the core offers on ports 0 and 1 (SET_CONTROLLER_INFO):
+// name and device id, so a device such as the Saturn 3D pad is requested under
+// the id that core actually uses. Core thread only (set during load, read when
+// the port devices are declared).
+struct retro_controller_description { const char* desc; unsigned id; };
+struct retro_controller_info { const struct retro_controller_description* types; unsigned num_types; };
+static std::vector<std::pair<std::string, unsigned>> g_port_types[2];
+static void SetPortDevicesGuarded();
+// Saturn controller choice (menu thread writes, core thread applies before the
+// next retro_run - see CoreSetSaturn3DPad).
+static std::atomic<int>  s_saturn_3d_pad{ 0 };
+static std::atomic<bool> s_port_devices_dirty{ false };
+
 // Toast Notification State. Written by the core thread, read by the UI thread
 // every frame, so it is a fixed buffer under a lock rather than a std::string:
 // reading a string while another thread reassigns it can fault.
@@ -2423,6 +2436,26 @@ static bool CB_Environment(unsigned cmd, void* data)
 		return true;
 	}
 
+	case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
+	{
+		// Array of ports, ended by an entry with no types. Only the names and
+		// ids are kept: the strings belong to the core.
+		const struct retro_controller_info* info = (const struct retro_controller_info*)data;
+		g_port_types[0].clear();
+		g_port_types[1].clear();
+		if (!info) return true;
+		for (unsigned port = 0; info[port].types && port < 8; port++)
+		{
+			if (port >= 2) continue;
+			for (unsigned t = 0; t < info[port].num_types; t++)
+			{
+				const struct retro_controller_description& d = info[port].types[t];
+				if (d.desc) g_port_types[port].emplace_back(d.desc, d.id);
+			}
+		}
+		return true;
+	}
+
 	case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
 	{
 		// The core is telling us what each control is called on this system.
@@ -2962,18 +2995,6 @@ static void PollLocalInput(void)
 			}
 		}
 
-		if (s_loaded_core_path.find("dreamcast") != std::string::npos ||
-		    s_loaded_core_path.find("flycast") != std::string::npos ||
-		    loaded_core_name == "Dreamcast")
-		{
-			// Bidirectional trigger mirroring for Dreamcast:
-			// In Capcom fighting games, heavy kicks/punches land on C and Z (Retro L and R).
-			// Mirroring L -> L2 and R -> R2 ensures face buttons C and Z also fire L/R triggers,
-			// while physical shoulder buttons (already mapped to L2/R2) work seamlessly.
-			if (jb[RETRO_DEVICE_ID_JOYPAD_L])  jb[RETRO_DEVICE_ID_JOYPAD_L2] = 1;
-			if (jb[RETRO_DEVICE_ID_JOYPAD_R])  jb[RETRO_DEVICE_ID_JOYPAD_R2] = 1;
-		}
-
 		if (abs(state.Gamepad.sThumbLX) > deadzone_thresh)
 		{
 			analog_sticks[pad][0][0] = state.Gamepad.sThumbLX;
@@ -3058,14 +3079,6 @@ static void PollLocalInput(void)
 			int rid = InputBindRetroId(bind);
 			if (rid >= 0 && rid < 16) joypad_buttons[0][rid] = 1;
 		}
-	}
-
-	if (s_loaded_core_path.find("dreamcast") != std::string::npos ||
-	    s_loaded_core_path.find("flycast") != std::string::npos ||
-	    loaded_core_name == "Dreamcast")
-	{
-		if (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_L2]) joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_L] = 1;
-		if (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_R2]) joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_R] = 1;
 	}
 
 	// For MSX computer cores: also route Space to Joypad A/B so games reading
@@ -3857,6 +3870,10 @@ struct FrameRunResult { bool ok; DWORD exc_code; void* exc_addr; };
 static FrameRunResult RunOneFrameGuarded()
 {
 	FrameRunResult r = { true, 0, NULL };
+	// A port device change the menu asked for lands here, on the core thread
+	// and between frames, never in the middle of retro_run().
+	if (s_port_devices_dirty.exchange(false))
+		SetPortDevicesGuarded();
 #if defined(_WIN32) && defined(_MSC_VER)
 	__try
 	{
@@ -4915,30 +4932,54 @@ const char* CoreGetAxisLabel(int stick, int axis)
 	return g_desc_axis[stick][axis][0] ? g_desc_axis[stick][axis] : NULL;
 }
 
-static int s_saturn_3d_pad = 0;
-static void SetPortDevicesGuarded();
-
+// The menu only records the choice. retro_set_controller_port_device has to be
+// called on the core thread, between two retro_run() calls: from the menu
+// thread it ran while the core was inside retro_run() reading that same port.
+// RunOneFrameGuarded() picks the flag up before the next frame.
 void CoreSetSaturn3DPad(int enabled)
 {
-	s_saturn_3d_pad = enabled ? 1 : 0;
-	if (!p_retro_set_controller_port_device) return;
-	EnterCriticalSection(&name_lock);
-	bool is_saturn = (s_loaded_core_path.find("saturn") != std::string::npos || loaded_core_name == "Saturn");
-	LeaveCriticalSection(&name_lock);
-	if (is_saturn)
-	{
-		SetPortDevicesGuarded();
-	}
+	s_saturn_3d_pad.store(enabled ? 1 : 0);
+	s_port_devices_dirty.store(true);
 }
 
 int CoreGetSaturn3DPad()
 {
-	return s_saturn_3d_pad;
+	return s_saturn_3d_pad.load();
+}
+
+// The device id the core gave a controller type, by a word of its name
+// ("3D Control Pad"), from SET_CONTROLLER_INFO. Beetle Saturn calls the 3D
+// pad RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0), not a plain ANALOG - and
+// another Saturn core can number it differently, which is why the core's own
+// list is asked first. `fallback` when the core listed nothing that matches.
+static unsigned PortDeviceByName(unsigned port, const char* word, unsigned fallback)
+{
+	if (port >= 2) return fallback;
+	std::string w = word;
+	for (char& c : w) c = (char)tolower((unsigned char)c);
+	for (const auto& t : g_port_types[port])
+	{
+		std::string d = t.first;
+		for (char& c : d) c = (char)tolower((unsigned char)c);
+		if (d.find(w) != std::string::npos) return t.second;
+	}
+	return fallback;
+}
+
+static unsigned SaturnPort0Device()
+{
+	if (s_saturn_3d_pad.load())
+		return PortDeviceByName(0, "3d", RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0));
+	return RETRO_DEVICE_JOYPAD;
 }
 
 static void SetPortDevicesGuarded()
 {
 	if (!p_retro_set_controller_port_device) return;
+	// Worked out before the __try: it builds std::strings, which SEH does not
+	// allow in the same function.
+	const bool is_saturn = s_loaded_core_path.find("saturn") != std::string::npos || loaded_core_name == "Saturn";
+	const unsigned saturn_device = is_saturn ? SaturnPort0Device() : RETRO_DEVICE_JOYPAD;
 	__try
 	{
 		unsigned port0_device = RETRO_DEVICE_JOYPAD;
@@ -4958,11 +4999,11 @@ static void SetPortDevicesGuarded()
 			port0_device = RETRO_DEVICE_JOYPAD;
 			port1_device = RETRO_DEVICE_MOUSE;
 		}
-		else if (s_loaded_core_path.find("saturn") != std::string::npos || loaded_core_name == "Saturn")
+		else if (is_saturn)
 		{
-			// Sega Saturn: RETRO_DEVICE_JOYPAD = Standard Digital Pad
-			//              RETRO_DEVICE_ANALOG = 3D Control Pad (Multi Controller HSS-0137)
-			port0_device = s_saturn_3d_pad ? RETRO_DEVICE_ANALOG : RETRO_DEVICE_JOYPAD;
+			// Sega Saturn: RETRO_DEVICE_JOYPAD = Standard Digital Pad, or the
+			// 3D Control Pad (HSS-0137) under the id the core listed for it.
+			port0_device = saturn_device;
 		}
 		p_retro_set_controller_port_device(0, port0_device);
 		p_retro_set_controller_port_device(1, port1_device);
@@ -5080,6 +5121,9 @@ static bool CoreLoad(const char* core_dll_path)
 	// A core that sends no descriptors must not inherit the previous one's
 	// names, so this is cleared on the way in rather than only on the way out.
 	ClearInputDescriptors();
+	g_port_types[0].clear();
+	g_port_types[1].clear();
+	s_port_devices_dirty.store(false);   // the post-load declaration covers it
 	g_core_wants_vk_negotiation = false;
 	// A interface de negociacao e um ponteiro para dentro da DLL do core. Ao
 	// trocar de core ele tem que ser esquecido aqui, antes do LoadLibrary do

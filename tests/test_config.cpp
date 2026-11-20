@@ -184,8 +184,15 @@ TEST_CASE(InputPresetLayoutsAndSwitching)
 	ASSERT_EQ(InputBindGetPad(BIND_X), PAD_BTN_Y);
 	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_LB);
 	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_LT);
-	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_LB);
-	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_LT);
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_RB);  // Z, not the L shoulder again
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_RT);  // C, not the R shoulder again
+
+	// The preset read back from karamelo.cfg only sets the label.
+	InputBindSetPresetTag(PRESET_PLAYSTATION);
+	ASSERT_EQ(InputBindGetPreset(), PRESET_PLAYSTATION);
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_RT);
+	InputBindSetPresetTag(99);   // out of range: ignored
+	ASSERT_EQ(InputBindGetPreset(), PRESET_PLAYSTATION);
 
 	// 6. Arcade 6-Button Preset
 	InputBindApplyPreset(PRESET_ARCADE_6BTN);

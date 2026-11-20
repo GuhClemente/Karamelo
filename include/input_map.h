@@ -140,12 +140,44 @@ void InputBindRestoreGlobal();
 // Name of the profile currently swapped in, or NULL for the global bindings.
 const char* InputBindActiveProfile();
 
-// Built-in layout for 6-button pads (bottom row A B C, top row X Y Z, like a
-// Mega Drive or Saturn pad).
-// six_mode: 0 = auto, 1 = 8BitDo M30 (XInput / cable), 2 = Sega / Arcade standard (DInput).
-// Swapped in like a system profile, for Genesis, Mega CD, Sega 32X, Saturn, Dreamcast,
-// 3DO and arcade fighting games. `labels` are the core's own names for the RetroPad buttons.
-bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16], int six_mode = 0);
+// Only the "preset" label, for a preset read back from karamelo.cfg: the
+// bindings it set are already saved on their own and must not be reapplied.
+void InputBindSetPresetTag(int preset);
+
+// --- 6-button pads (bottom row A B C, top row X Y Z, shoulders L R) ---------
+// Where each of the pad's own buttons arrives, as PadButtonCode. PAD_BTN_NONE
+// on a shoulder the pad does not have (or that calibration skipped).
+struct SixPadMap
+{
+	int a = PAD_BTN_NONE, b = PAD_BTN_NONE, c = PAD_BTN_NONE;
+	int x = PAD_BTN_NONE, y = PAD_BTN_NONE, z = PAD_BTN_NONE;
+	int l = PAD_BTN_NONE, r = PAD_BTN_NONE;
+};
+enum SixPadKind
+{
+	SIXPAD_SEGA_STANDARD = 0, // Retro-Bit, Saturn USB, DInput: C=RB Z=LB L=LT R=RT
+	SIXPAD_M30_XINPUT,        // 8BitDo M30 over XInput:        C=RT Z=RB L=LB R=LT
+};
+SixPadMap InputSixPadBuiltin(int kind);
+
+// True for a controller name that is a 6-button / fighting pad ("8BitDo M30",
+// "Retro-Bit Saturn", "Fighting Commander", "... Arcade Stick"). Names only:
+// a whole vendor is not a pad shape.
+bool InputNameLooksSixButton(const char* name);
+
+// Per-controller calibration, Config/pads/<device_key>.cfg, device_key from
+// GamepadGetDeviceKey(). Load fails unless all six face buttons are in it.
+bool InputSixPadSave(const char* device_key, const SixPadMap& map);
+bool InputSixPadLoad(const char* device_key, SixPadMap* out);
+bool InputSixPadHas(const char* device_key);
+bool InputSixPadDelete(const char* device_key);
+
+// Built-in layout per system, swapped in like a system profile, for Genesis,
+// Mega CD, Sega 32X, Saturn, Dreamcast, 3DO and arcade fighting games.
+// `labels` are the core's own names for the RetroPad buttons (arcade punches
+// and kicks are placed by name); `pad` where the pad's buttons are, NULL for
+// the Sega standard table. Returns false, changing nothing, for any other system.
+bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16], const SixPadMap* pad = nullptr);
 int InputBindGetGlobalKey(int bind);
 int InputBindGetGlobalPad(int bind);
 

@@ -2815,13 +2815,75 @@ Contagens: **37 sistemas, 42 motores; 105 ports — 105 Windows 🪟, 65 Linux �
 
 Novidades para o jogador:
 
-- **Revisão Completa e Auditoria de Mapeamento de Controles**:
-  - **Preset Nativo 8BitDo M30 (Cabo USB / XInput)**: Soluciona a inversão histórica de botões do firmware do M30 em PCs (onde C é enviado como RT e ombro R é enviado como LT). Agora ombros L e R operam como gatilhos reais e a fileira frontal de 6 botões respeita 100% da serigrafia física.
-  - **Ergonomia Corrigida em Jogos de Tiro e Survival Horror (Dreamcast)**: Em títulos como *Resident Evil 3: Nemesis* e *The Ring: Terror's Realm*, a mira é acionada confortavelmente pelo ombro R e a lanterna pelo ombro L, eliminando a necessidade de combinações de botões frontais como C + X.
-  - **Opção Expandida de Controle de 6 Botões**: Menu OSD agora conta com 4 modos (`Desligado`, `8BitDo M30`, `Sega Padrao`, `Auto (Detectar)`), com reconhecimento inteligente por VID USB `0x2DC8`.
-  - **Espelhamento Bidirecional de Triggers**: Jogos de luta 2D no Dreamcast aceitam golpes fortes tanto nos botões frontais (C e Z) quanto nos gatilhos físicos de ombro.
+- **Controles de 6 Botões Reconhecidos Automaticamente**:
+  - **Calibrar 6 Botões** (Configurações › Controles): o jogador aperta A, B, C, X, Y, Z, L e R do próprio controle, uma vez só, e o Karamelo guarda isso para aquele modelo de controle. Vale para qualquer firmware (8BitDo, Retro-Bit, Hori, arcade sticks), porque cada um manda C, Z e os ombros para um lugar diferente.
+  - **Modo Auto (novo padrão)**: liga o layout de 6 botões sozinho quando o controle em uso foi calibrado ou tem nome de controle de 6 botões ("M30", "Saturn", "Fighting Commander", "Arcade Stick"…). Um controle comum (Xbox, PlayStation, Switch) não é afetado. A tela mostra o que encontrou: Auto/Calib, Auto/Detect ou Auto/Inativo.
+  - **Troca de controle no meio do jogo**: o layout acompanha o controle que está na mão do jogador 1.
+  - **Preset 8BitDo M30 (Cabo USB / XInput)**: conferido em um M30 real. No cabo, ele se identifica como "Xbox 360 Controller" e manda C como RT, Z como RB, L como LB e R como LT. O preset e a opção "8BitDo M30 XInput" seguem isso. Como o nome não denuncia o M30, no modo Auto ele precisa ser calibrado uma vez.
+  - **Dreamcast**: com o layout de 6 botões, os ombros L e R são os gatilhos (mira e lanterna em *Resident Evil 3* e *The Ring*) e C e Z ficam separados nos botões frontais. Nenhum botão aciona outro junto.
+  - **Saturn 3D Pad**: a opção "Controle Saturn" usa o identificador que o próprio core informa para o 3D Control Pad e passa a valer já no quadro seguinte, sem reiniciar o jogo.
+  - **Preset de botões lembrado**: o preset escolhido continua selecionado depois de fechar o Karamelo.
 - **Filtro Aprofundado no Navegador de Arquivos (Limpeza Geral)**:
   - O navegador do menu OSD agora filtra automaticamente arquivos residuais e auxiliares que não são jogos executáveis: scripts (`.sh`, `.bat`, `.cmd`, `.ps1`), vídeos (`.mov`, `.mp4`, `.avi`, `.mkv`), arquivos de áudio, documentos de texto (`.nfo`, `.txt`, `.pdf`), checksums (`.sfv`, `.md5`, `.sha256`) e downloads parciais (`.torrent`, `.part`, `.crdownload`).
 
 ---
 
+
+## 74. Página de ajuda: Controles de 6 Botões e 8BitDo M30
+
+Material para uma página de orientação no site ("Como usar controle de 6 botões / 8BitDo M30 no Karamelo"). Vale a partir da **0.985**. Os dados marcados como **medido** foram conferidos em 20/11/2026 com um 8BitDo M30 real ligado por cabo USB num PC com Windows 11; não troque esses valores por outros que encontrar na internet.
+
+### O que dizer em uma frase
+O Karamelo deixa controles no estilo Mega Drive / Saturn (A B C embaixo, X Y Z em cima, L e R nos ombros) com os botões no mesmo lugar do controle original em cada console, e você só precisa calibrar o controle uma vez.
+
+### Passo a passo (texto para a página)
+1. Ligue o controle no PC (no M30: **cabo USB**).
+2. Abra o menu do Karamelo: **Home** no controle, ou **Start + Select**, ou **F12** no teclado.
+3. Vá em **Configurações › Controles › Calibrar 6 Botões**.
+4. Aperte, quando a tela pedir, **A, B, C, X, Y, Z, L e R** do seu controle, um de cada vez. Se o controle não tiver L ou R, aperte **START** para pular. **ESC** no teclado cancela.
+5. Pronto: a linha **Controle 6 Botões** passa a mostrar **Auto/Calib**. A calibração fica guardada e vale toda vez que o controle for ligado, em qualquer jogo, sem precisar repetir.
+
+### A opção "Controle 6 Botões"
+| Valor no menu | O que faz |
+|---|---|
+| **Auto/Calib** | O controle foi calibrado: o layout de 6 botões está ligado. |
+| **Auto/Detect** | O nome do controle já indica 6 botões (ex.: "Saturn", "Fighting Commander", "Arcade Stick"): ligado mesmo sem calibrar. |
+| **Auto/M30** | O preset de botões escolhido é "8BitDo M30": ligado com a tabela do M30. |
+| **Auto/Inativo** | Controle comum (Xbox, PlayStation, Switch): nada muda. É o padrão. |
+| **Sega Padrao** / **M30 XInput** | Força uma tabela fixa e ignora a calibração. Só para casos especiais. |
+| **Desligado** | Nunca usa o layout de 6 botões. |
+
+O layout segue o controle que está com o Jogador 1: trocar de controle no meio do jogo troca o layout. Um remapeamento salvo pelo jogador para um sistema ("Salvar p/ Sistema") continua tendo prioridade.
+
+### Onde cada botão vai, por console
+| Console | A B C (embaixo) | X Y Z (em cima) | Ombros L e R |
+|---|---|---|---|
+| Mega Drive / Mega CD / 32X | A, B, C do Mega Drive | X, Y, Z do Mega Drive | livres |
+| Saturn | A, B, C do Saturn | X, Y, Z do Saturn | L e R do Saturn |
+| Dreamcast | A, B do Dreamcast; C = botão C do arcade | X, Y do Dreamcast; Z = botão Z do arcade | **gatilhos L e R** do Dreamcast |
+| 3DO | A, B, C | X = L, Z = R do 3DO | livres |
+| Jogos de luta de arcade | chutes fraco, médio e forte | socos fraco, médio e forte | livres, salvo se o jogo usar |
+
+Nos jogos de luta de arcade, o Karamelo coloca socos em cima e chutes embaixo **pelo nome que cada jogo dá aos botões**, então funciona mesmo quando cada jogo numera os botões de um jeito diferente.
+
+### Exemplo testado: The Ring: Terror's Realm (Dreamcast)
+Testado com o M30 calibrado: **L** acende a lanterna, **R** prepara a arma, **R + A** atira. É exatamente como no controle original do Dreamcast (gatilho R para mirar, A para atirar). Bom exemplo para a página porque mostra que os ombros do M30 viram os gatilhos do Dreamcast.
+
+### 8BitDo M30 no PC: o que é verdade (medido)
+- No **cabo USB**, o M30 se identifica como **"Xbox 360 Controller"** (Microsoft, 045e:028e), inclusive para o próprio Windows. Nenhum programa consegue ver o nome "M30" nesse modo. **Por isso ele precisa ser calibrado uma vez**; depois o Karamelo o reconhece sozinho.
+- Ligar o M30 com **START + Y** e plugar no cabo **não muda nada**: continua "Xbox 360 Controller".
+- No cabo, os botões chegam assim: **A=A, B=B, C=RT, X=X, Y=Y, Z=RB, L=LB, R=LT**. A calibração cuida disso; o jogador não precisa saber.
+- O **receptor 2.4G que vem com o M30 de Mega Drive** encaixa na porta de controle do console, não no PC. Para jogar no PC, use o **cabo USB**. (Não afirme que um adaptador USB da 8BitDo funciona com esse modelo; não foi testado.)
+
+### Perguntas frequentes (para a página)
+- **Calibrei e nada mudou.** Veja se a linha "Controle 6 Botões" está em **Auto/Calib**. Se estiver em "Sega Padrao" ou "M30 XInput", mude para Auto (seta para a esquerda/direita). Na 0.985, terminar a calibração já coloca em Auto sozinho.
+- **Tenho também um controle de Xbox 360 de verdade.** Como o M30 no cabo se apresenta como Xbox 360, a calibração vale para os dois. Se for jogar com o Xbox 360 em jogos da Sega, use **Apagar Calibração** antes (ou "Desligado"), e calibre de novo quando voltar ao M30.
+- **No Dreamcast, o golpe forte saía junto com o gatilho.** Corrigido na 0.985: ombros = gatilhos, C e Z = botões próprios; nenhum botão aciona outro.
+- **No Saturn, o NiGHTS anda só em 8 direções.** Em **Controles › Controle Saturn**, escolha **3D Pad (Analogico)**. Vale na hora, sem reiniciar o jogo.
+
+### Não escreva no site
+- Que o Karamelo "detecta o M30 automaticamente" no cabo: ele detecta **depois de calibrado**.
+- Que qualquer controle 8BitDo vira 6 botões: só os de 6 botões (o SN30 Pro e o Ultimate continuam normais).
+- Atalhos de firmware do M30 (SELECT + direcional etc.) como se fossem do Karamelo: são do controle, vêm do manual da 8BitDo e não foram conferidos aqui.
+
+---

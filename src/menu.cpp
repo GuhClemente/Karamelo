@@ -277,8 +277,17 @@ static int setting_deadzone = 1; // 0=5%, 1=10%, 2=15%, 3=20%
 static int setting_pad_mouse = 0;
 static int setting_pad_menu_toggle = 0;
 // 6-button pad (Mega Drive / Saturn style, e.g. 8BitDo M30): built-in layout
-// per system (input_map.cpp). 0 = Desligado, 1 = Ligado, 2 = Auto (Detectar via SDL).
-static int setting_six_button = 1;
+// per system (input_map.cpp). 0 = Desligado, 1 = Auto (only a pad that was
+// calibrated or whose name says 6-button - an ordinary pad is left alone),
+// 2 = Sega standard table, 3 = 8BitDo M30 over XInput table.
+// Saved as "pad_six_mode"; the old "pad_six_button" (0/1) is migrated on load.
+enum { SIX_OFF = 0, SIX_AUTO, SIX_SEGA, SIX_M30, SIX_COUNT };
+static int setting_six_button = SIX_AUTO;
+// 6-button calibration: step 0..7 (A B C X Y Z L R) while it runs, -1 when not.
+static int six_cal_step = -1;
+static bool six_cal_armed = false;
+static SixPadMap six_cal_map;
+static char six_cal_key[160] = "";
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
 // Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
 // the mixer on a loaded machine; above 512ms the delay is audible against input.
@@ -1725,6 +1734,28 @@ void MenuHideEmptySystems() {
   s_systems_dirty = true;
 }
 
+// Where player 1's 6-button pad has its buttons, by the "Controle 6 Botoes"
+// setting. Auto, like RetroArch's autoconfig, goes by the controller itself:
+// its calibration if the player made one, else the Sega table for a pad whose
+// name says 6-button, else the M30 table if the M30 preset was chosen - and
+// nothing at all for an ordinary pad. SIXSRC_NONE = no 6-button layout.
+enum SixSource { SIXSRC_NONE = 0, SIXSRC_CALIBRATED, SIXSRC_DETECTED, SIXSRC_PRESET, SIXSRC_FORCED };
+static int SixPadForPlayer1(SixPadMap* out) {
+  if (setting_six_button == SIX_SEGA) { *out = InputSixPadBuiltin(SIXPAD_SEGA_STANDARD); return SIXSRC_FORCED; }
+  if (setting_six_button == SIX_M30)  { *out = InputSixPadBuiltin(SIXPAD_M30_XINPUT); return SIXSRC_FORCED; }
+  if (setting_six_button != SIX_AUTO) return SIXSRC_NONE;
+  char key[160];
+  if (GamepadGetDeviceKey(0, key, sizeof(key))) {
+    if (InputSixPadLoad(key, out)) return SIXSRC_CALIBRATED;
+    if (InputNameLooksSixButton(GamepadGetDeviceName(0))) {
+      *out = InputSixPadBuiltin(SIXPAD_SEGA_STANDARD);
+      return SIXSRC_DETECTED;
+    }
+  }
+  if (InputBindGetPreset() == PRESET_8BITDO_M30) { *out = InputSixPadBuiltin(SIXPAD_M30_XINPUT); return SIXSRC_PRESET; }
+  return SIXSRC_NONE;
+}
+
 // Bindings for the system that is running: the player's own saved profile for
 // it wins; otherwise, with "Controle 6 Botoes" on, the built-in 6-button layout
 // for that system; otherwise the global bindings.
@@ -1737,23 +1768,11 @@ static void ApplySystemPadLayout() {
     InputBindLoadSystemProfile(sys_name.c_str());
     return;
   }
-  int six_mode = 0;
-  if (setting_six_button == 1) {
-    six_mode = 1; // 8BitDo M30 (Cabo / XInput)
-  } else if (setting_six_button == 2) {
-    six_mode = 2; // Sega Padrao (DInput)
-  } else if (setting_six_button == 3) {
-    if (GamepadIsSixButton(0)) {
-      six_mode = 0; // Auto: segue o preset ativo ou deteccao
-    } else {
-      return;
-    }
-  } else {
-    return; // 0 = Desligado
-  }
+  SixPadMap pad;
+  if (!SixPadForPlayer1(&pad)) return;
   const char* labels[16] = {};
   for (int id = 0; id < 16; id++) labels[id] = CoreGetButtonLabel(id);
-  InputBindApplySixButtonLayout(sys_name.c_str(), labels, six_mode);
+  InputBindApplySixButtonLayout(sys_name.c_str(), labels, &pad);
 }
 
 // Karamelo OS power entry waiting for its confirming second press (96 restart,
@@ -1951,14 +1970,34 @@ void PopulateControllerSettings() {
     Tr("Arcade 6-Botoes", "Arcade 6-Button")
   };
   items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
-  const char *six_btn_labels[] = {
-    Tr("Desligado", "Off"),
-    Tr("8BitDo M30", "8BitDo M30"),
-    Tr("Sega Padrao", "Sega Standard"),
-    Tr("Auto (Detectar)", "Auto (Detect)")
-  };
-  int six_idx = (setting_six_button >= 0 && setting_six_button <= 3) ? setting_six_button : 3;
-  items.push_back({Tr("Controle 6 Botoes", "6-Button Pad"), six_btn_labels[six_idx], false, false, 533});
+  // Auto says what it found for the pad in hand, so the player can tell
+  // whether the layout is on without starting a Mega Drive game. Kept short:
+  // a row is 22 columns for label and value, and the label is what gets cut
+  // ("Auto: Calibrado" left only "Control" of the name).
+  static char six_label[40];
+  {
+    SixPadMap probe;
+    const int src = SixPadForPlayer1(&probe);
+    const char *val = Tr("Desligado", "Off");
+    if (setting_six_button == SIX_SEGA) val = Tr("Sega Padrao", "Sega Standard");
+    else if (setting_six_button == SIX_M30) val = Tr("M30 XInput", "M30 XInput");
+    else if (setting_six_button == SIX_AUTO)
+      val = src == SIXSRC_CALIBRATED ? Tr("Auto/Calib", "Auto/Calib")
+          : src == SIXSRC_DETECTED   ? Tr("Auto/Detect", "Auto/Detect")
+          : src == SIXSRC_PRESET     ? Tr("Auto/M30", "Auto/M30")
+                                     : Tr("Auto/Inativo", "Auto/Off");
+    snprintf(six_label, sizeof(six_label), "%s", val);
+  }
+  items.push_back({Tr("Controle 6 Botoes", "6-Button Pad"), six_label, false, false, 533});
+  {
+    char key[160];
+    const bool has_pad = GamepadGetDeviceKey(0, key, sizeof(key));
+    items.push_back({Tr("Calibrar 6 Botoes", "Calibrate 6-Button"),
+                     six_cal_step >= 0 ? Tr("<pressione>", "<press>") : (has_pad ? ">" : Tr("Sem controle", "No pad")),
+                     false, true, 538});
+    if (has_pad && InputSixPadHas(key))
+      items.push_back({Tr("Apagar Calibracao", "Delete Calibration"), "", false, true, 539});
+  }
   items.push_back({Tr("Controle Saturn", "Saturn Controller"), CoreGetSaturn3DPad() ? Tr("3D Pad (Analogico)", "3D Pad (Analog)") : Tr("Padrao (Digital)", "Standard (Digital)"), false, false, 534});
   if (KarameloIsAppliance()) {
     items.push_back({Tr("Parear Controle BT", "Pair BT Controller"), BtStatusLabel(0, Tr("Buscando...", "Scanning...")), false, true, 535});
@@ -2066,6 +2105,115 @@ void PopulateControllerSettings() {
   scroll_top = 0;
 }
 
+// "Calibrar 6 Botoes": the player presses the pad's own A B C X Y Z L R, and
+// the result is kept for that controller model (Config/pads/). This is what
+// makes the layout right on any firmware - 8BitDo's XInput and DInput modes,
+// Retro-Bit, Hori and arcade sticks all put C, Z and the shoulders somewhere
+// else - instead of trusting a table. START skips L/R on a pad without them.
+static const char *SixCalButtonName(int step) {
+  static const char *const names[8] = {"A", "B", "C", "X", "Y", "Z", "L", "R"};
+  return (step >= 0 && step < 8) ? names[step] : "?";
+}
+
+static int *SixCalField(int step) {
+  int *f[8] = {&six_cal_map.a, &six_cal_map.b, &six_cal_map.c, &six_cal_map.x,
+               &six_cal_map.y, &six_cal_map.z, &six_cal_map.l, &six_cal_map.r};
+  return f[step];
+}
+
+static void SixCalPrompt() {
+  char buf[80];
+  if (six_cal_step >= 6)
+    snprintf(buf, sizeof(buf), "[%d/8] %s %s (%s)", six_cal_step + 1, Tr("APERTE O OMBRO", "PRESS SHOULDER"),
+             SixCalButtonName(six_cal_step), Tr("START = NAO TEM", "START = NONE"));
+  else
+    snprintf(buf, sizeof(buf), "[%d/8] %s %s", six_cal_step + 1, Tr("APERTE O BOTAO", "PRESS BUTTON"),
+             SixCalButtonName(six_cal_step));
+  CoreSetToast(buf, 600);
+}
+
+static void SixCalStart() {
+  if (!GamepadGetDeviceKey(0, six_cal_key, sizeof(six_cal_key))) {
+    CoreSetToast(Tr("CONECTE UM CONTROLE", "CONNECT A CONTROLLER"), 120);
+    return;
+  }
+  six_cal_map = SixPadMap();
+  six_cal_step = 0;
+  six_cal_armed = false;
+  SixCalPrompt();
+  PopulateControllerSettings();
+  SelectByAction(538, 3);
+}
+
+static void SixCalCancel() {
+  if (six_cal_step < 0) return;
+  six_cal_step = -1;
+  PopulateControllerSettings();
+  SelectByAction(538, 3);
+  CoreSetToast(Tr("CALIBRACAO CANCELADA", "CALIBRATION CANCELLED"), 90);
+}
+
+static void SixCalTick() {
+  if (six_cal_step < 0) return;
+  // Same arming as the binding capture: wait for everything to be let go, or
+  // the press that opened the calibration would be taken as A.
+  if (!six_cal_armed) {
+    if (InputCaptureIsAllReleased()) {
+      InputCaptureFlush();
+      six_cal_armed = true;
+    }
+    return;
+  }
+  if (InputCaptureScanKey() == VK_ESCAPE) {
+    SixCalCancel();
+    return;
+  }
+  const int pad = InputCaptureScanPad();
+  if (pad == 0) return;
+  six_cal_armed = false;   // one press per step
+
+  if (pad == PAD_BTN_START || pad == PAD_BTN_BACK) {
+    if (six_cal_step < 6) {   // the face buttons cannot be skipped
+      SixCalPrompt();
+      return;
+    }
+    *SixCalField(six_cal_step) = PAD_BTN_NONE;
+  } else if (pad & (PAD_BTN_DPAD_UP | PAD_BTN_DPAD_DOWN | PAD_BTN_DPAD_LEFT | PAD_BTN_DPAD_RIGHT)) {
+    CoreSetToast(Tr("O D-PAD NAO SERVE AQUI", "NOT THE D-PAD"), 90);
+    return;
+  } else {
+    for (int i = 0; i < six_cal_step; i++) {
+      if (*SixCalField(i) == pad) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%s %s", Tr("ESSE JA E O", "THAT IS ALREADY"), SixCalButtonName(i));
+        CoreSetToast(buf, 120);
+        return;
+      }
+    }
+    *SixCalField(six_cal_step) = pad;
+  }
+
+  if (++six_cal_step < 8) {
+    SixCalPrompt();
+    return;
+  }
+  six_cal_step = -1;
+  if (InputSixPadSave(six_cal_key, six_cal_map)) {
+    // Calibrating is choosing to use it. Only Auto reads a calibration: left
+    // on Off, or on a forced table (Sega / M30), the buttons just pressed
+    // would be ignored - seen with an M30 left on "Sega Padrao", whose table
+    // put the Dreamcast triggers on R and C.
+    setting_six_button = SIX_AUTO;
+    ApplySystemPadLayout();
+    MenuSaveSettings();
+    CoreSetToast(Tr("CONTROLE 6 BOTOES CALIBRADO!", "6-BUTTON PAD CALIBRATED!"), 150);
+  } else {
+    CoreSetToast(Tr("FALHA AO SALVAR CALIBRACAO", "COULD NOT SAVE CALIBRATION"), 150);
+  }
+  PopulateControllerSettings();
+  SelectByAction(538, 3);
+}
+
 // Puts every persisted setting (video/audio/controller/per-system options)
 // back to the same value it has at first launch, then saves. Netplay's saved
 // IP and RetroAchievements login are deliberately left alone - those are
@@ -2083,7 +2231,7 @@ static void ResetAllSettingsToDefault() {
   setting_deadzone = 1;
   setting_pad_mouse = 0;
   setting_pad_menu_toggle = 0;
-  setting_six_button = 3;
+  setting_six_button = SIX_AUTO;
   CoreSetSaturn3DPad(0);
   setting_latency = 1;
   setting_driver = 0;
@@ -3438,7 +3586,8 @@ static std::string SettingsSnapshot() {
   AppendSetting(out, "deadzone", setting_deadzone);
   AppendSetting(out, "pad_mouse", setting_pad_mouse);
   AppendSetting(out, "pad_menu_toggle", setting_pad_menu_toggle);
-  AppendSetting(out, "pad_six_button", setting_six_button);
+  AppendSetting(out, "pad_six_mode", setting_six_button);
+  AppendSetting(out, "pad_preset", InputBindGetPreset());
   AppendSetting(out, "saturn_3d_pad", CoreGetSaturn3DPad());
   AppendSetting(out, "latency", setting_latency);
   AppendSetting(out, "driver", setting_driver);
@@ -3533,6 +3682,7 @@ static void MenuLoadSettings() {
   }
 
   char line[512];
+  bool six_mode_loaded = false;   // pad_six_mode wins over the old pad_six_button
   while (fgets(line, sizeof(line), f)) {
     if (line[0] == '#')
       continue;
@@ -3578,8 +3728,15 @@ static void MenuLoadSettings() {
       setting_pad_mouse = ClampInt(iv, 0, 1);
     else if (!strcmp(key, "pad_menu_toggle"))
       setting_pad_menu_toggle = ClampInt(iv, 0, 4);
-    else if (!strcmp(key, "pad_six_button"))
-      setting_six_button = ClampInt(iv, 0, 3);
+    else if (!strcmp(key, "pad_six_mode")) {
+      setting_six_button = ClampInt(iv, 0, SIX_COUNT - 1);
+      six_mode_loaded = true;
+    } else if (!strcmp(key, "pad_six_button")) {
+      // Up to 0.984 this was On/Off, and On was the Sega table (C=RB, Z=LB).
+      // Off becomes Auto, which leaves an ordinary pad alone just the same.
+      if (!six_mode_loaded) setting_six_button = iv == 1 ? SIX_SEGA : SIX_AUTO;
+    } else if (!strcmp(key, "pad_preset"))
+      InputBindSetPresetTag(ClampInt(iv, 0, PRESET_COUNT - 1));
     else if (!strcmp(key, "saturn_3d_pad"))
       CoreSetSaturn3DPad(ClampInt(iv, 0, 1));
     else if (!strcmp(key, "pad_device"))
@@ -3964,7 +4121,7 @@ void MenuRun() {
   // Close the OSD after a spell of no input, so it does not sit over the game
   // forever if the player wandered off. Only while a game is actually running:
   // hiding it on the main menu would leave nothing on screen at all.
-  if (OsdIsEnabled() && CoreIsRunning() && capture_bind < 0) {
+  if (OsdIsEnabled() && CoreIsRunning() && capture_bind < 0 && six_cal_step < 0) {
     int secs = kOsdTimeouts[setting_osd_timeout];
     if (secs > 0) {
       if (g_last_input_tick == 0)
@@ -4058,6 +4215,26 @@ void MenuRun() {
         } else {
           CoreSetToast(Tr("ESSA TECLA E RESERVADA PARA O MENU", "THIS KEY IS RESERVED FOR THE MENU"), 120);
         }
+      }
+    }
+  }
+
+  SixCalTick();
+
+  // Hot plug: the 6-button layout belongs to the pad in player 1's hands. It
+  // was only chosen when the game started, so plugging the M30 in afterwards
+  // (or swapping it for an Xbox pad) kept the layout of the pad before.
+  {
+    static char s_last_p1_key[160] = "";
+    char key[160];
+    if (!GamepadGetDeviceKey(0, key, sizeof(key))) key[0] = '\0';
+    if (strcmp(key, s_last_p1_key) != 0) {
+      snprintf(s_last_p1_key, sizeof(s_last_p1_key), "%s", key);
+      if (CoreIsRunning() && six_cal_step < 0) ApplySystemPadLayout();
+      if (current_state == STATE_CONTROLLER && capture_bind < 0 && six_cal_step < 0) {
+        const int keep = selected_idx;
+        PopulateControllerSettings();
+        selected_idx = keep < (int)items.size() ? keep : 0;
       }
     }
   }
@@ -4225,6 +4402,10 @@ void MenuRun() {
 }
 
 static void MenuGoBack() {
+  if (six_cal_step >= 0) {
+    SixCalCancel();
+    return;
+  }
   if (capture_bind >= 0 || wizard_active) {
     wizard_active = false;
     capture_bind = -1;
@@ -4357,6 +4538,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
 
   // While waiting for a key to bind, the menu must not also act on it,
   // except for KEY_CANCEL (ESC) which aborts the capture / wizard.
+  // The pad's own presses also arrive here as menu keys - B as Back - and
+  // pressing B is a calibration step, so nothing here may cancel it. ESC on
+  // the keyboard does (SixCalTick).
+  if (six_cal_step >= 0) return;
   if (capture_bind >= 0) {
     if (key == KEY_CANCEL || key == KEY_BACKSPACE) {
       wizard_active = false;
@@ -4951,7 +5136,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       SelectByAction(item.action_id, 0);
     } else if (item.action_id == 533) // Controle 6 Botoes
     {
-      setting_six_button = (setting_six_button + delta + 4) % 4;
+      setting_six_button = (setting_six_button + delta + SIX_COUNT) % SIX_COUNT;
       MenuSaveSettings();
       ApplySystemPadLayout();
       PopulateControllerSettings();
@@ -4967,7 +5152,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
     {
       int cur_preset = InputBindGetPreset();
       int next_preset = (cur_preset + delta + PRESET_COUNT) % PRESET_COUNT;
+      // Onto the global bindings: applied over a swapped-in system layout it
+      // was lost, since karamelo.cfg stores the global set.
+      InputBindRestoreGlobal();
       InputBindApplyPreset(next_preset);
+      ApplySystemPadLayout();
       MenuSaveSettings();
       PopulateControllerSettings();
       SelectByAction(item.action_id, 2);
@@ -5509,7 +5698,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       }
     } else if (current_state == STATE_CONTROLLER) {
       if (item.action_id == 533) {
-        setting_six_button = (setting_six_button + 1) % 4;
+        setting_six_button = (setting_six_button + 1) % SIX_COUNT;
         MenuSaveSettings();
         ApplySystemPadLayout();
         PopulateControllerSettings();
@@ -5520,10 +5709,22 @@ static void MenuProcessKeyImpl(MenuKey key) {
         MenuSaveSettings();
         PopulateControllerSettings();
         SelectByAction(item.action_id, 3);
+      } else if (item.action_id == 538) {
+        SixCalStart();
+      } else if (item.action_id == 539) {
+        char key[160];
+        if (GamepadGetDeviceKey(0, key, sizeof(key)) && InputSixPadDelete(key)) {
+          ApplySystemPadLayout();
+          CoreSetToast(Tr("CALIBRACAO APAGADA", "CALIBRATION DELETED"), 90);
+        }
+        PopulateControllerSettings();
+        SelectByAction(538, 3);
       } else if (item.action_id == 530) {
         int cur_preset = InputBindGetPreset();
         int next_preset = (cur_preset + 1) % PRESET_COUNT;
+        InputBindRestoreGlobal();
         InputBindApplyPreset(next_preset);
+        ApplySystemPadLayout();
         MenuSaveSettings();
         PopulateControllerSettings();
         SelectByAction(item.action_id, 2);
