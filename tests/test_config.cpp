@@ -148,6 +148,7 @@ TEST_CASE(InputPresetLayoutsAndSwitching)
 	ASSERT_STR_EQ(InputPresetName(PRESET_MISTER_NINTENDO), "MiSTer / Nintendo");
 	ASSERT_STR_EQ(InputPresetName(PRESET_XBOX_NATIVE), "Xbox Nativo");
 	ASSERT_STR_EQ(InputPresetName(PRESET_PLAYSTATION), "PlayStation");
+	ASSERT_STR_EQ(InputPresetName(PRESET_8BITDO_M30), "8BitDo M30 (Cabo/XInput)");
 	ASSERT_STR_EQ(InputPresetName(PRESET_ARCADE_6BTN), "Arcade 6-Botoes");
 
 	// 2. MiSTer / Nintendo Preset (Nintendo layout on Xbox physical controller)
@@ -174,7 +175,19 @@ TEST_CASE(InputPresetLayoutsAndSwitching)
 	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X); // Square (West) -> Retro Y
 	ASSERT_EQ(InputBindGetPad(BIND_X), PAD_BTN_Y); // Triangle (North) -> Retro X
 
-	// 5. Arcade 6-Button Preset
+	// 5. 8BitDo M30 Preset
+	InputBindApplyPreset(PRESET_8BITDO_M30);
+	ASSERT_EQ(InputBindGetPreset(), PRESET_8BITDO_M30);
+	ASSERT_EQ(InputBindGetPad(BIND_B), PAD_BTN_A);
+	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_B);
+	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X);
+	ASSERT_EQ(InputBindGetPad(BIND_X), PAD_BTN_Y);
+	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_LB);
+	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_LT);
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_LB);
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_LT);
+
+	// 6. Arcade 6-Button Preset
 	InputBindApplyPreset(PRESET_ARCADE_6BTN);
 	ASSERT_EQ(InputBindGetPreset(), PRESET_ARCADE_6BTN);
 	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X);  // LP

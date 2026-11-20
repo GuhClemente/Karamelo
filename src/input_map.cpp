@@ -469,6 +469,7 @@ const char* InputPresetName(int preset)
 	case PRESET_MISTER_NINTENDO: return "MiSTer / Nintendo";
 	case PRESET_XBOX_NATIVE:     return "Xbox Nativo";
 	case PRESET_PLAYSTATION:     return "PlayStation";
+	case PRESET_8BITDO_M30:      return "8BitDo M30 (Cabo/XInput)";
 	case PRESET_ARCADE_6BTN:     return "Arcade 6-Botoes";
 	default: return "Custom";
 	}
@@ -519,6 +520,28 @@ void InputBindApplyPreset(int preset)
 		s_pads[BIND_R] = PAD_BTN_RB;
 		s_pads[BIND_L2] = PAD_BTN_LT;
 		s_pads[BIND_R2] = PAD_BTN_RT;
+	}
+	else if (preset == PRESET_8BITDO_M30)
+	{
+		// 8BitDo M30 (XInput / Cabo USB):
+		// No firmware XInput da 8BitDo:
+		//  - Botoes frontais: A=A, B=B, C=RT, X=X, Y=Y, Z=RB
+		//  - Ombros fisicos:  L=LB, R=LT
+		// Mapeamento correto para que os botoes fisicos correspondam a serigrafia:
+		//  - A -> Retro B (Jump/Cancel)
+		//  - B -> Retro A (Confirm/Action)
+		//  - X -> Retro Y (Attack/Shoot)
+		//  - Y -> Retro X
+		//  - Ombro L (LB) -> Retro L / L2 (Gatilho Esquerdo)
+		//  - Ombro R (LT) -> Retro R / R2 (Gatilho Direito / Mirar / Acelerar)
+		s_pads[BIND_B] = PAD_BTN_A;
+		s_pads[BIND_A] = PAD_BTN_B;
+		s_pads[BIND_Y] = PAD_BTN_X;
+		s_pads[BIND_X] = PAD_BTN_Y;
+		s_pads[BIND_L] = PAD_BTN_LB;
+		s_pads[BIND_R] = PAD_BTN_LT;
+		s_pads[BIND_L2] = PAD_BTN_LB;
+		s_pads[BIND_R2] = PAD_BTN_LT;
 	}
 	else if (preset == PRESET_ARCADE_6BTN)
 	{
@@ -655,20 +678,16 @@ bool InputBindLoadSystemProfile(const char* system_name)
 }
 
 // ---------------------------------------------------------------------------
-// 6-button pads. Physical buttons of the pad, as SDL/XInput reads an 8BitDo M30:
-// bottom row A B C = Xbox A, B, RB; top row X Y Z = Xbox X, Y, LB.
+// 6-button pads.
+// There are two major hardware mappings on PC:
+// 1. 8BitDo M30 (XInput / Cabo USB):
+//    Hardware: A=A, B=B, C=RT, X=X, Y=Y, Z=RB, L=LB, R=LT.
+// 2. Sega / Retro-Bit Standard (DInput / Saturn USB):
+//    Hardware: A=A, B=B, C=RB, X=X, Y=Y, Z=LB, L=LT, R=RT.
 // Each system's table comes from that core's own RetroPad mapping (libretro
-// docs), so the console's A B C / X Y Z land where they sit on the real pad:
-//   Genesis Plus GX / PicoDrive: Y=A  B=B  A=C  L=X  X=Y  R=Z
-//   Beetle Saturn:               B=A  A=B  R=C  Y=X  X=Y  L=Z  (L2/R2 = L/R)
-//   Flycast (Dreamcast):         B=A  A=B  L=C  Y=X  X=Y  R=Z  (L/R Triggers = C/Z + LT/RT)
-//   Opera (3DO):                 Y=A  B=B  A=C  L=L  R=R  (Select=X, Start=P)
-// Arcade goes by the button names the core gives for the loaded game.
+// docs), so the console's A B C / X Y Z land where they sit on the real pad.
 // ---------------------------------------------------------------------------
 namespace {
-const int kSixA = PAD_BTN_A, kSixB = PAD_BTN_B, kSixC = PAD_BTN_RB;
-const int kSixX = PAD_BTN_X, kSixY = PAD_BTN_Y, kSixZ = PAD_BTN_LB;
-
 int BindForRetroId(int id)
 {
 	switch (id)
@@ -708,7 +727,7 @@ int StrengthOf(const char* label, bool game_has_medium)
 }
 } // namespace
 
-bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16])
+bool InputBindApplySixButtonLayout(const char* system_name, const char* const labels[16], int six_mode)
 {
 	if (!system_name) return false;
 	const std::string sys = system_name;
@@ -716,39 +735,62 @@ bool InputBindApplySixButtonLayout(const char* system_name, const char* const la
 	for (int i = 0; i < BIND_COUNT; i++) layout[i] = -1;   // -1 = keep the global binding
 
 	auto clear_face = [&]() {
-		for (int b : {BIND_B, BIND_A, BIND_Y, BIND_X, BIND_L, BIND_R}) layout[b] = PAD_BTN_NONE;
+		for (int b : {BIND_B, BIND_A, BIND_Y, BIND_X, BIND_L, BIND_R, BIND_L2, BIND_R2}) layout[b] = PAD_BTN_NONE;
 	};
+
+	// Determine button set:
+	// six_mode: 0 = auto (follow preset), 1 = 8BitDo M30, 2 = Sega Standard DInput
+	const bool is_m30 = (six_mode == 1) || (six_mode == 0 && s_current_preset == PRESET_8BITDO_M30);
+
+	const int sixA = PAD_BTN_A;
+	const int sixB = PAD_BTN_B;
+	const int sixC = is_m30 ? PAD_BTN_RT : PAD_BTN_RB;
+	const int sixX = PAD_BTN_X;
+	const int sixY = PAD_BTN_Y;
+	const int sixZ = is_m30 ? PAD_BTN_RB : PAD_BTN_LB;
+	const int sixL = is_m30 ? PAD_BTN_LB : PAD_BTN_LT;
+	const int sixR = is_m30 ? PAD_BTN_LT : PAD_BTN_RT;
 
 	if (sys == "Genesis" || sys == "Mega CD" || sys == "Sega 32X")
 	{
 		clear_face();
-		layout[BIND_Y] = kSixA; layout[BIND_B] = kSixB; layout[BIND_A] = kSixC;
-		layout[BIND_L] = kSixX; layout[BIND_X] = kSixY; layout[BIND_R] = kSixZ;
+		// Genesis Plus GX / PicoDrive: Y=A, B=B, A=C, L=X, X=Y, R=Z
+		layout[BIND_Y] = sixA; layout[BIND_B] = sixB; layout[BIND_A] = sixC;
+		layout[BIND_L] = sixX; layout[BIND_X] = sixY; layout[BIND_R] = sixZ;
+		layout[BIND_L2] = sixL; layout[BIND_R2] = sixR;
 	}
 	else if (sys == "Saturn")
 	{
 		clear_face();
-		layout[BIND_B] = kSixA; layout[BIND_A] = kSixB; layout[BIND_R] = kSixC;
-		layout[BIND_Y] = kSixX; layout[BIND_X] = kSixY; layout[BIND_L] = kSixZ;
+		// Beetle Saturn: B=A, A=B, R=C, Y=X, X=Y, L=Z, L2=L, R2=R
+		layout[BIND_B] = sixA; layout[BIND_A] = sixB; layout[BIND_R] = sixC;
+		layout[BIND_Y] = sixX; layout[BIND_X] = sixY; layout[BIND_L] = sixZ;
+		layout[BIND_L2] = sixL; layout[BIND_R2] = sixR;
 	}
 	else if (sys == "Dreamcast")
 	{
 		clear_face();
-		// Dreamcast on 6-button Sega pad / Arcade sticks:
-		// Bottom row: A (Light Kick) = kSixA, B (Medium Kick) = kSixB, L-Trigger (Heavy Kick) = kSixC
-		// Top row:    X (Light Punch) = kSixX, Y (Medium Punch) = kSixY, R-Trigger (Heavy Punch) = kSixZ
-		layout[BIND_B] = kSixA; // Retro B (DC A)
-		layout[BIND_A] = kSixB; // Retro A (DC B)
-		layout[BIND_L] = kSixC; // Retro L (DC L Trigger -> Heavy Kick)
-		layout[BIND_Y] = kSixX; // Retro Y (DC X)
-		layout[BIND_X] = kSixY; // Retro X (DC Y)
-		layout[BIND_R] = kSixZ; // Retro R (DC R Trigger -> Heavy Punch)
+		// Flycast: B=A, A=B, Y=X, X=Y
+		// L2 = Left Trigger (Physical Shoulder L)
+		// R2 = Right Trigger (Physical Shoulder R)
+		// L  = Arcade C (Face button C)
+		// R  = Arcade Z (Face button Z)
+		layout[BIND_B] = sixA;  // Face A -> DC A
+		layout[BIND_A] = sixB;  // Face B -> DC B
+		layout[BIND_Y] = sixX;  // Face X -> DC X
+		layout[BIND_X] = sixY;  // Face Y -> DC Y
+		layout[BIND_L2] = sixL; // Shoulder L -> DC Left Trigger (Flashlight / Brake)
+		layout[BIND_R2] = sixR; // Shoulder R -> DC Right Trigger (Aim / Gas)
+		layout[BIND_L] = sixC;  // Face C -> DC Arcade C (Heavy Kick)
+		layout[BIND_R] = sixZ;  // Face Z -> DC Arcade Z (Heavy Punch)
 	}
 	else if (sys == "3DO")
 	{
 		clear_face();
-		layout[BIND_Y] = kSixA; layout[BIND_B] = kSixB; layout[BIND_A] = kSixC;
-		layout[BIND_L] = kSixX; layout[BIND_R] = kSixZ;
+		// Opera (3DO): Y=A, B=B, A=C, L=X, R=Z, L2/R2=shoulders
+		layout[BIND_Y] = sixA; layout[BIND_B] = sixB; layout[BIND_A] = sixC;
+		layout[BIND_L] = sixX; layout[BIND_R] = sixZ;
+		layout[BIND_L2] = sixL; layout[BIND_R2] = sixR;
 	}
 	else if (sys == "Arcade")
 	{
@@ -771,12 +813,14 @@ bool InputBindApplySixButtonLayout(const char* system_name, const char* const la
 		}
 		if (found < 4) return false;   // not a punch/kick fighting game
 		clear_face();
-		const int top[3] = {kSixX, kSixY, kSixZ}, bottom[3] = {kSixA, kSixB, kSixC};
+		const int top[3] = {sixX, sixY, sixZ}, bottom[3] = {sixA, sixB, sixC};
 		for (int s = 0; s < 3; s++)
 		{
 			if (punch[s] >= 0) layout[punch[s]] = top[s];
 			if (kick[s] >= 0) layout[kick[s]] = bottom[s];
 		}
+		layout[BIND_L2] = sixL;
+		layout[BIND_R2] = sixR;
 	}
 	else
 	{

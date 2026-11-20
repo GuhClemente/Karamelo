@@ -278,7 +278,7 @@ static int setting_pad_mouse = 0;
 static int setting_pad_menu_toggle = 0;
 // 6-button pad (Mega Drive / Saturn style, e.g. 8BitDo M30): built-in layout
 // per system (input_map.cpp). 0 = Desligado, 1 = Ligado, 2 = Auto (Detectar via SDL).
-static int setting_six_button = 2;
+static int setting_six_button = 1;
 static int setting_latency = 1;  // index into kAudioLatencyMs below; default 128ms
 // Audio buffer depth. Below 64ms the audio stream queue cannot stay ahead of
 // the mixer on a loaded machine; above 512ms the delay is audible against input.
@@ -1737,16 +1737,23 @@ static void ApplySystemPadLayout() {
     InputBindLoadSystemProfile(sys_name.c_str());
     return;
   }
-  bool apply_six = false;
+  int six_mode = 0;
   if (setting_six_button == 1) {
-    apply_six = true;
+    six_mode = 1; // 8BitDo M30 (Cabo / XInput)
   } else if (setting_six_button == 2) {
-    apply_six = GamepadIsSixButton(0);
+    six_mode = 2; // Sega Padrao (DInput)
+  } else if (setting_six_button == 3) {
+    if (GamepadIsSixButton(0)) {
+      six_mode = 0; // Auto: segue o preset ativo ou deteccao
+    } else {
+      return;
+    }
+  } else {
+    return; // 0 = Desligado
   }
-  if (!apply_six) return;
   const char* labels[16] = {};
   for (int id = 0; id < 16; id++) labels[id] = CoreGetButtonLabel(id);
-  InputBindApplySixButtonLayout(sys_name.c_str(), labels);
+  InputBindApplySixButtonLayout(sys_name.c_str(), labels, six_mode);
 }
 
 // Karamelo OS power entry waiting for its confirming second press (96 restart,
@@ -1935,20 +1942,22 @@ void PopulateControllerSettings() {
 
   // Presets de botoes
   int current_preset_idx = InputBindGetPreset();
-  if (current_preset_idx < 0 || current_preset_idx >= 4) current_preset_idx = 0;
+  if (current_preset_idx < 0 || current_preset_idx >= PRESET_COUNT) current_preset_idx = 0;
   const char *preset_names[] = {
     Tr("MiSTer/Nintendo", "MiSTer/Nintendo"),
     Tr("Xbox Nativo", "Xbox Native"),
     Tr("PlayStation", "PlayStation"),
+    Tr("8BitDo M30", "8BitDo M30"),
     Tr("Arcade 6-Botoes", "Arcade 6-Button")
   };
   items.push_back({Tr("Preset Botoes", "Button Preset"), preset_names[current_preset_idx], false, false, 530});
   const char *six_btn_labels[] = {
     Tr("Desligado", "Off"),
-    Tr("Ligado", "On"),
+    Tr("8BitDo M30", "8BitDo M30"),
+    Tr("Sega Padrao", "Sega Standard"),
     Tr("Auto (Detectar)", "Auto (Detect)")
   };
-  int six_idx = (setting_six_button >= 0 && setting_six_button <= 2) ? setting_six_button : 2;
+  int six_idx = (setting_six_button >= 0 && setting_six_button <= 3) ? setting_six_button : 3;
   items.push_back({Tr("Controle 6 Botoes", "6-Button Pad"), six_btn_labels[six_idx], false, false, 533});
   items.push_back({Tr("Controle Saturn", "Saturn Controller"), CoreGetSaturn3DPad() ? Tr("3D Pad (Analogico)", "3D Pad (Analog)") : Tr("Padrao (Digital)", "Standard (Digital)"), false, false, 534});
   if (KarameloIsAppliance()) {
@@ -2074,7 +2083,7 @@ static void ResetAllSettingsToDefault() {
   setting_deadzone = 1;
   setting_pad_mouse = 0;
   setting_pad_menu_toggle = 0;
-  setting_six_button = 2;
+  setting_six_button = 3;
   CoreSetSaturn3DPad(0);
   setting_latency = 1;
   setting_driver = 0;
@@ -3109,7 +3118,9 @@ static bool IsNonGameFile(const std::string& fn, const fs::path& p) {
     // Scripts
     ".sh", ".bat", ".cmd", ".ps1", ".vbs", ".py",
     // Configuration and auxiliary metadata
-    ".ini", ".cfg", ".conf", ".bak", ".tmp", ".old", ".sub", ".srt"
+    ".ini", ".cfg", ".conf", ".bak", ".tmp", ".old", ".sub", ".srt",
+    // Checksums, torrents, and partial downloads
+    ".sfv", ".md5", ".sha1", ".sha256", ".sha512", ".torrent", ".part", ".crdownload"
   };
 
   for (const char* ext : kIgnoredExts) {
@@ -3568,7 +3579,7 @@ static void MenuLoadSettings() {
     else if (!strcmp(key, "pad_menu_toggle"))
       setting_pad_menu_toggle = ClampInt(iv, 0, 4);
     else if (!strcmp(key, "pad_six_button"))
-      setting_six_button = ClampInt(iv, 0, 2);
+      setting_six_button = ClampInt(iv, 0, 3);
     else if (!strcmp(key, "saturn_3d_pad"))
       CoreSetSaturn3DPad(ClampInt(iv, 0, 1));
     else if (!strcmp(key, "pad_device"))
@@ -4940,7 +4951,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       SelectByAction(item.action_id, 0);
     } else if (item.action_id == 533) // Controle 6 Botoes
     {
-      setting_six_button = (setting_six_button + delta + 3) % 3;
+      setting_six_button = (setting_six_button + delta + 4) % 4;
       MenuSaveSettings();
       ApplySystemPadLayout();
       PopulateControllerSettings();
@@ -4955,7 +4966,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
     } else if (item.action_id == 530) // Preset Botoes
     {
       int cur_preset = InputBindGetPreset();
-      int next_preset = (cur_preset + delta + 4) % 4;
+      int next_preset = (cur_preset + delta + PRESET_COUNT) % PRESET_COUNT;
       InputBindApplyPreset(next_preset);
       MenuSaveSettings();
       PopulateControllerSettings();
@@ -5498,7 +5509,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
       }
     } else if (current_state == STATE_CONTROLLER) {
       if (item.action_id == 533) {
-        setting_six_button = (setting_six_button + 1) % 3;
+        setting_six_button = (setting_six_button + 1) % 4;
         MenuSaveSettings();
         ApplySystemPadLayout();
         PopulateControllerSettings();
@@ -5511,7 +5522,7 @@ static void MenuProcessKeyImpl(MenuKey key) {
         SelectByAction(item.action_id, 3);
       } else if (item.action_id == 530) {
         int cur_preset = InputBindGetPreset();
-        int next_preset = (cur_preset + 1) % 4;
+        int next_preset = (cur_preset + 1) % PRESET_COUNT;
         InputBindApplyPreset(next_preset);
         MenuSaveSettings();
         PopulateControllerSettings();

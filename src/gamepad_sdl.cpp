@@ -16,6 +16,7 @@
 #include <cctype>
 
 #include "gamepad_sdl.h"
+#include "input_map.h"
 
 static void GamepadLog(const char* fmt, ...)
 {
@@ -492,13 +493,32 @@ const char* GamepadGetDeviceTypeName(int slot)
 
 bool GamepadIsSixButton(int slot)
 {
+	if (InputBindGetPreset() == PRESET_8BITDO_M30 || InputBindGetPreset() == PRESET_ARCADE_6BTN)
+		return true;
+
 	if (slot >= 0 && slot < 4)
 	{
+		AcquireSRWLockShared(&s_pads_lock);
+		SDL_Gamepad* gp = s_pads[slot];
+		if (gp)
+		{
+			Uint16 vid = SDL_GetGamepadVendor(gp);
+			Uint16 pid = SDL_GetGamepadProduct(gp);
+			// 8BitDo (0x2DC8) or Mayflash (0x0EB7) or Retro-Bit (0x0CA3)
+			if (vid == 0x2dc8 || vid == 0x0ca3 || vid == 0x0eb7)
+			{
+				ReleaseSRWLockShared(&s_pads_lock);
+				return true;
+			}
+		}
+		ReleaseSRWLockShared(&s_pads_lock);
+
 		const char* name = GamepadGetDeviceName(slot);
 		if (!name || !*name) return false;
 		std::string s = name;
 		for (char& c : s) c = (char)::tolower((unsigned char)c);
 		return s.find("m30") != std::string::npos ||
+		       s.find("8bitdo") != std::string::npos ||
 		       s.find("saturn") != std::string::npos ||
 		       s.find("fighting commander") != std::string::npos ||
 		       s.find("md6") != std::string::npos ||

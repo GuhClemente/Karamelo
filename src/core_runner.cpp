@@ -2966,11 +2966,12 @@ static void PollLocalInput(void)
 		    s_loaded_core_path.find("flycast") != std::string::npos ||
 		    loaded_core_name == "Dreamcast")
 		{
-			// Dreamcast has analog triggers L and R.
-			// Mirror L2 -> L and R2 -> R so pulling physical triggers (LT/RT)
-			// works seamlessly alongside any face-button (C/Z) arcade assignments.
-			if (jb[RETRO_DEVICE_ID_JOYPAD_L2]) jb[RETRO_DEVICE_ID_JOYPAD_L] = 1;
-			if (jb[RETRO_DEVICE_ID_JOYPAD_R2]) jb[RETRO_DEVICE_ID_JOYPAD_R] = 1;
+			// Bidirectional trigger mirroring for Dreamcast:
+			// In Capcom fighting games, heavy kicks/punches land on C and Z (Retro L and R).
+			// Mirroring L -> L2 and R -> R2 ensures face buttons C and Z also fire L/R triggers,
+			// while physical shoulder buttons (already mapped to L2/R2) work seamlessly.
+			if (jb[RETRO_DEVICE_ID_JOYPAD_L])  jb[RETRO_DEVICE_ID_JOYPAD_L2] = 1;
+			if (jb[RETRO_DEVICE_ID_JOYPAD_R])  jb[RETRO_DEVICE_ID_JOYPAD_R2] = 1;
 		}
 
 		if (abs(state.Gamepad.sThumbLX) > deadzone_thresh)
@@ -3534,6 +3535,13 @@ static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, 
 		{
 			if (!s_np_frame_ready && s_injected_analog[port][index][id] != 0) return s_injected_analog[port][index][id];
 			return analog_sticks[port][index][id];
+		}
+		else if (index == 2) /* RETRO_DEVICE_INDEX_ANALOG_BUTTON */
+		{
+			if (id == RETRO_DEVICE_ID_JOYPAD_L2)
+				return (joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_L2] || (!s_np_frame_ready && s_injected_buttons[port][RETRO_DEVICE_ID_JOYPAD_L2])) ? 32767 : 0;
+			if (id == RETRO_DEVICE_ID_JOYPAD_R2)
+				return (joypad_buttons[port][RETRO_DEVICE_ID_JOYPAD_R2] || (!s_np_frame_ready && s_injected_buttons[port][RETRO_DEVICE_ID_JOYPAD_R2])) ? 32767 : 0;
 		}
 	}
 	else if (device == RETRO_DEVICE_POINTER && port == 0 && index == 0)

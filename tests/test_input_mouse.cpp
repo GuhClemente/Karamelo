@@ -63,7 +63,7 @@ TEST_CASE(SixButtonLayoutPerSystem)
 	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_LB);
 	InputBindRestoreGlobal();
 
-	// Flycast (Dreamcast): B=A, A=B, L=C, Y=X, X=Y, R=Z
+	// Flycast (Dreamcast): B=A, A=B, L=C, Y=X, X=Y, R=Z, L2=L-Trig, R2=R-Trig
 	ASSERT_TRUE(InputBindApplySixButtonLayout("Dreamcast", none));
 	ASSERT_EQ(InputBindGetPad(BIND_B), PAD_BTN_A);
 	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_B);
@@ -71,6 +71,8 @@ TEST_CASE(SixButtonLayoutPerSystem)
 	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X);
 	ASSERT_EQ(InputBindGetPad(BIND_X), PAD_BTN_Y);
 	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_LB);
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_LT);
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_RT);
 	InputBindRestoreGlobal();
 
 	// Opera (3DO): Y=A, B=B, A=C, L=L on X, R=R on Z
@@ -86,6 +88,38 @@ TEST_CASE(SixButtonLayoutPerSystem)
 	const int snes_b = InputBindGetPad(BIND_B);
 	ASSERT_TRUE(!InputBindApplySixButtonLayout("SNES", none));
 	ASSERT_EQ(InputBindGetPad(BIND_B), snes_b);
+	InputBindResetDefaults();
+}
+
+TEST_CASE(SixButtonLayoutM30Mode)
+{
+	InputBindResetDefaults();
+	const char* none[16] = {};
+
+	// With six_mode = 1 (8BitDo M30 XInput):
+	// Face C = RT, Face Z = RB, Shoulder L = LB, Shoulder R = LT
+	ASSERT_TRUE(InputBindApplySixButtonLayout("Dreamcast", none, 1));
+	ASSERT_EQ(InputBindGetPad(BIND_B), PAD_BTN_A);   // DC A
+	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_B);   // DC B
+	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X);   // DC X
+	ASSERT_EQ(InputBindGetPad(BIND_X), PAD_BTN_Y);   // DC Y
+	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_RT);  // DC Arcade C on Face C
+	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_RB);  // DC Arcade Z on Face Z
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_LB); // DC Left Trigger on Shoulder L (Flashlight)
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_LT); // DC Right Trigger on Shoulder R (Aim)
+	InputBindRestoreGlobal();
+
+	// Saturn in M30 mode:
+	ASSERT_TRUE(InputBindApplySixButtonLayout("Saturn", none, 1));
+	ASSERT_EQ(InputBindGetPad(BIND_B), PAD_BTN_A);   // Saturn A
+	ASSERT_EQ(InputBindGetPad(BIND_A), PAD_BTN_B);   // Saturn B
+	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_RT);  // Saturn C on Face C
+	ASSERT_EQ(InputBindGetPad(BIND_Y), PAD_BTN_X);   // Saturn X
+	ASSERT_EQ(InputBindGetPad(BIND_X), PAD_BTN_Y);   // Saturn Y
+	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_RB);  // Saturn Z on Face Z
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_LB); // Saturn L on Shoulder L
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_LT); // Saturn R on Shoulder R
+	InputBindRestoreGlobal();
 	InputBindResetDefaults();
 }
 

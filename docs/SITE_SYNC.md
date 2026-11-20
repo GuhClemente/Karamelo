@@ -74,7 +74,7 @@ Leia de lá. Valores em 09/09/2026:
 | `APP_SYSTEM_COUNT` | 37 | "37 sistemas" |
 | `APP_CORE_ENGINES` | 42 | "42 motores de emulação" — detalhamento em [MOTORES.md](MOTORES.md) |
 | `APP_CORE_FILES` | 43 | **não publique** — é contagem de arquivos, não de emuladores |
-| `APP_VERSION` | 0.984 | prefira ler do `version.json` (seção 3) |
+| `APP_VERSION` | 0.985 | prefira ler do `version.json` (seção 3) |
 
 **Publique sempre `APP_CORE_ENGINES`, nunca `APP_CORE_FILES`.** Os dois diferem
 porque `n64_parallel.dll` e `n64.dll` são o mesmo arquivo sob dois nomes.
@@ -2807,3 +2807,21 @@ Esta especificação serve como diretriz canônica para a IA mantenedora do site
   - No arquivo `Config/karamelo.ini`: `[Diagnostics]` › `telemetry=0`.
 
 ---
+
+## 73. Versão 0.985
+
+**Estado**: pacote de **Windows** preparado localmente em 20/11/2026 (`Karamelo_v0.985_Win64.zip` e `Karamelo.exe`). Deploy de produção pendente ("não sobe").
+Contagens: **37 sistemas, 42 motores; 105 ports — 105 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎**.
+
+Novidades para o jogador:
+
+- **Revisão Completa e Auditoria de Mapeamento de Controles**:
+  - **Preset Nativo 8BitDo M30 (Cabo USB / XInput)**: Soluciona a inversão histórica de botões do firmware do M30 em PCs (onde C é enviado como RT e ombro R é enviado como LT). Agora ombros L e R operam como gatilhos reais e a fileira frontal de 6 botões respeita 100% da serigrafia física.
+  - **Ergonomia Corrigida em Jogos de Tiro e Survival Horror (Dreamcast)**: Em títulos como *Resident Evil 3: Nemesis* e *The Ring: Terror's Realm*, a mira é acionada confortavelmente pelo ombro R e a lanterna pelo ombro L, eliminando a necessidade de combinações de botões frontais como C + X.
+  - **Opção Expandida de Controle de 6 Botões**: Menu OSD agora conta com 4 modos (`Desligado`, `8BitDo M30`, `Sega Padrao`, `Auto (Detectar)`), com reconhecimento inteligente por VID USB `0x2DC8`.
+  - **Espelhamento Bidirecional de Triggers**: Jogos de luta 2D no Dreamcast aceitam golpes fortes tanto nos botões frontais (C e Z) quanto nos gatilhos físicos de ombro.
+- **Filtro Aprofundado no Navegador de Arquivos (Limpeza Geral)**:
+  - O navegador do menu OSD agora filtra automaticamente arquivos residuais e auxiliares que não são jogos executáveis: scripts (`.sh`, `.bat`, `.cmd`, `.ps1`), vídeos (`.mov`, `.mp4`, `.avi`, `.mkv`), arquivos de áudio, documentos de texto (`.nfo`, `.txt`, `.pdf`), checksums (`.sfv`, `.md5`, `.sha256`) e downloads parciais (`.torrent`, `.part`, `.crdownload`).
+
+---
+
