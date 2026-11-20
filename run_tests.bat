@@ -34,6 +34,7 @@ cl.exe /nologo /O2 /Oi /Ot /fp:fast /W3 /WX /std:c++20 /EHsc ^
     tests\test_x360_dump.cpp ^
     tests\test_port_catalog.cpp ^
     tests\test_input_mouse.cpp ^
+    tests\test_menu_nav.cpp ^
     tests\test_cloud_live.cpp ^
     tests\test_upscaling_accessibility.cpp ^
     src\karamelo_math.cpp ^

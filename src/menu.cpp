@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,7 @@
 #include "hw_render_d3d11.h"
 #include "input_map.h"
 #include "menu.h"
+#include "menu_nav.h"
 #include "karamelo_os.h"
 #include "system_registry.h"
 #include <functional>
@@ -569,6 +571,7 @@ void PopulateRecentMenu();
 static std::string join_ip_input = "127.0.0.1";
 
 static void MenuProcessKeyImpl(MenuKey key);
+static void RestoreBrowseRow(const std::string &dirpath);
 static void MenuSaveSettings();
 
 // A player's choice on the generic Core Options page (PopulateCoreOptionsSettings/
@@ -3491,6 +3494,7 @@ void PopulateBrowse(const std::string &dirpath) {
 
   selected_idx = 0;
   scroll_top = 0;
+  RestoreBrowseRow(dirpath);
 }
 
 // Going up one level in the browser. Both the "<..>" row and Escape land here.
@@ -3865,12 +3869,197 @@ static std::string CurrentBindingsSnapshot() {
   return out;
 }
 
+// --- Faster list navigation ------------------------------------------------
+// Lists of games and systems: there Left/Right have nothing to change, so they
+// page like L/R do, and L2/R2 jump by letter. Pages of settings keep Left/Right
+// for changing values, and L2/R2 go to the first / last row.
+static bool IsPagedList() {
+  switch (current_state) {
+  case STATE_BROWSE:
+  case STATE_FAVORITES:
+  case STATE_RECENT:
+  case STATE_SYSTEMS:
+    return true;
+  case STATE_MAIN:
+    // With a game running the main menu holds values (aspect, save slot).
+    return !CoreIsRunning() && !CoreIsLoading();
+  default:
+    return false;
+  }
+}
+
+// One line per page / letter jump in karamelo.log: what the pad sent, on
+// which page, from which row to which, so a report of "L/R does nothing" can
+// be told apart from "it moved, but not where I expected".
+static void NavLog(const char *fmt, ...) {
+  FILE *lf = fopen("karamelo.log", "a");
+  if (!lf)
+    return;
+  va_list ap;
+  va_start(ap, fmt);
+  fputs("[INFO] [NAV] ", lf);
+  vfprintf(lf, fmt, ap);
+  fputc('\n', lf);
+  va_end(ap);
+  fclose(lf);
+}
+
+// A page is what the screen shows, not a fixed 5 rows.
+static int PageRows() {
+  const int rows = OsdGetSize();
+  return rows > 1 ? rows - 1 : 8;
+}
+
+static void MovePage(int dir) {
+  const int total = (int)items.size();
+  if (total <= 0)
+    return;
+  const int before = selected_idx;
+  selected_idx = menu_nav::Page(total, selected_idx, PageRows(), dir);
+  // Off the blank spacer rows, the way single steps skip them.
+  while (selected_idx > 0 && selected_idx < total && items[selected_idx].label == " ")
+    selected_idx += dir > 0 ? 1 : -1;
+  selected_idx = ClampInt(selected_idx, 0, total - 1);
+  // The view turns with the cursor, a whole page at a time; the renderer then
+  // clamps it to the list.
+  scroll_top += selected_idx - before;
+  if (scroll_top < 0)
+    scroll_top = 0;
+  NavLog("pagina %+d: estado=%d linha %d -> %d de %d (pagina=%d linhas)", dir, (int)current_state, before,
+         selected_idx, total, PageRows());
+}
+
+static void MoveLetter(int dir) {
+  const int total = (int)items.size();
+  if (total <= 0)
+    return;
+  std::vector<std::string> labels;
+  labels.reserve(items.size());
+  for (const auto &it : items)
+    labels.push_back(it.is_action && it.action_id == 999 ? std::string("<..>") : it.label);
+  const int to = menu_nav::NextLetter(labels, selected_idx, dir);
+  NavLog("letra %+d: estado=%d linha %d -> %d de %d", dir, (int)current_state, selected_idx, to, total);
+  if (to == selected_idx)
+    return;
+  selected_idx = to;
+  scroll_top = selected_idx;   // the group starts at the top of the screen
+  const char k = menu_nav::LetterKey(labels[to]);
+  if (k) {
+    // The letter, big and short-lived, so a fast run of jumps is readable.
+    char buf[16];
+    snprintf(buf, sizeof(buf), "[ %c ]", k);
+    CoreSetToast(buf, 40);
+  }
+}
+
+// Last row the cursor was on in each folder, so going back into Saturn lands
+// on the game played last instead of the top. Kept for the session; the first
+// visit falls back to the most recent game in that folder.
+static std::map<std::string, std::string> s_browse_last;
+
+static std::string StripFavoriteMark(const std::string &label) {
+  return label.rfind("* ", 0) == 0 ? label.substr(2) : label;
+}
+
+static void RememberBrowseRow() {
+  if (current_state != STATE_BROWSE || selected_idx < 0 || selected_idx >= (int)items.size())
+    return;
+  const auto &it = items[selected_idx];
+  if (it.label == " " || it.action_id == 999)
+    return;
+  s_browse_last[current_dir] = StripFavoriteMark(it.label);
+}
+
+static void RestoreBrowseRow(const std::string &dirpath) {
+  std::string want;
+  auto found = s_browse_last.find(dirpath);
+  if (found != s_browse_last.end()) {
+    want = found->second;
+  } else {
+    LoadFavoritesAndRecent();
+    std::error_code ec;
+    const fs::path dir = fs::path(dirpath);
+    for (const auto &r : g_recent) {
+      const fs::path rp(r);
+      if (fs::equivalent(rp.parent_path(), dir, ec)) {
+        want = rp.filename().string();
+        break;
+      }
+    }
+  }
+  if (want.empty())
+    return;
+  for (size_t k = 0; k < items.size(); k++) {
+    if (StripFavoriteMark(items[k].label) == want) {
+      selected_idx = (int)k;
+      const int rows = OsdGetSize() > 0 ? OsdGetSize() : 8;
+      scroll_top = selected_idx > rows / 2 ? selected_idx - rows / 2 : 0;   // centered
+      return;
+    }
+  }
+}
+
+// L / R page, L2 / R2 by letter (see menu.h). The codes come from the player's
+// global bindings, so whatever the pad sends for its shoulders is what pages.
+void MenuPadShoulders(unsigned pad_bits, unsigned now_ms) {
+  static unsigned s_last_call = 0;
+  static unsigned s_held = 0;        // the bit being held, 0 for none
+  static unsigned s_first = 0, s_last = 0;
+  // A gap since the last poll means the menu was closed: whatever is held now
+  // was pressed for the game, and must be let go before it counts here.
+  const bool fresh = now_ms - s_last_call > 250;
+  s_last_call = now_ms;
+
+  // Never a button the menu already uses for something else.
+  const unsigned reserved = PAD_BTN_A | PAD_BTN_B | PAD_BTN_X | PAD_BTN_Y | PAD_BTN_START | PAD_BTN_BACK |
+                            PAD_BTN_DPAD_UP | PAD_BTN_DPAD_DOWN | PAD_BTN_DPAD_LEFT | PAD_BTN_DPAD_RIGHT;
+  struct Act { int bind; MenuKey key; };
+  static const Act acts[] = {{BIND_L, KEY_PAGEUP}, {BIND_R, KEY_PAGEDOWN},
+                             {BIND_L2, KEY_LETTER_PREV}, {BIND_R2, KEY_LETTER_NEXT}};
+
+  unsigned bit = 0;
+  MenuKey key = KEY_NONE;
+  for (const auto &a : acts) {
+    const unsigned code = (unsigned)InputBindGetGlobalPad(a.bind);
+    if (code && !(code & reserved) && (pad_bits & code) == code) {
+      bit = code;
+      key = a.key;
+      break;
+    }
+  }
+
+  if (fresh) {
+    s_held = bit;   // already down: ignored until released
+    s_first = s_last = now_ms;
+    return;
+  }
+  if (!bit) {
+    s_held = 0;
+    return;
+  }
+  if (bit != s_held) {
+    s_held = bit;
+    s_first = s_last = now_ms;
+    NavLog("ombro: botao=0x%04x tecla=%d (bits do controle=0x%04x)", bit, (int)key, pad_bits);
+    MenuProcessKey(key);
+    return;
+  }
+  const unsigned every = menu_nav::RepeatInterval(now_ms - s_first);
+  if (every && now_ms - s_last >= every) {
+    s_last = now_ms;
+    MenuProcessKey(key);
+  }
+}
+
+unsigned MenuRepeatInterval(unsigned held_ms) { return menu_nav::RepeatInterval(held_ms); }
+
 void MenuProcessKey(MenuKey key) {
   std::string before = SettingsSnapshot();
   std::string binds_before = CurrentBindingsSnapshot();
   const char *profile_before = InputBindActiveProfile();
   std::string profile_name = profile_before ? profile_before : "";
   MenuProcessKeyImpl(key);
+  RememberBrowseRow();
   if (SettingsSnapshot() != before)
     MenuSaveSettings();
   // karamelo.cfg only holds the global set, so a rebind made while a system
@@ -4628,15 +4817,21 @@ static void MenuProcessKeyImpl(MenuKey key) {
     break;
 
   case KEY_PAGEUP:
-    selected_idx = (selected_idx > 5) ? selected_idx - 5 : 0;
-    while (selected_idx > 0 && items[selected_idx].label == " ")
-      selected_idx--;
+    MovePage(-1);
     break;
 
   case KEY_PAGEDOWN:
-    selected_idx = (selected_idx + 5 < total) ? selected_idx + 5 : total - 1;
-    while (selected_idx < total - 1 && items[selected_idx].label == " ")
-      selected_idx++;
+    MovePage(+1);
+    break;
+
+  case KEY_LETTER_PREV:
+  case KEY_LETTER_NEXT:
+    if (IsPagedList()) {
+      MoveLetter(key == KEY_LETTER_NEXT ? +1 : -1);
+    } else if (total > 0) {
+      // Pages of settings: first / last row, like Home / End.
+      MenuProcessKeyImpl(key == KEY_LETTER_NEXT ? KEY_END : KEY_HOME);
+    }
     break;
 
   case KEY_HOME:
@@ -4660,6 +4855,11 @@ static void MenuProcessKeyImpl(MenuKey key) {
   case KEY_LEFT:
   case KEY_RIGHT: {
     int delta = (key == KEY_RIGHT) ? 1 : -1;
+    // In a list of games or systems nothing changes sideways: page instead.
+    if (IsPagedList()) {
+      MovePage(delta);
+      break;
+    }
     // A copy, not a reference: several branches below call PopulateXxx(),
     // which clear()s/rebuilds `items` and can reallocate its backing storage -
     // a reference held across that call would dangle for any code reading it

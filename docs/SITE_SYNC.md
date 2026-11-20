@@ -2823,6 +2823,15 @@ Novidades para o jogador:
   - **Dreamcast**: com o layout de 6 botões, os ombros L e R são os gatilhos (mira e lanterna em *Resident Evil 3* e *The Ring*) e C e Z ficam separados nos botões frontais. Nenhum botão aciona outro junto.
   - **Saturn 3D Pad**: a opção "Controle Saturn" usa o identificador que o próprio core informa para o 3D Control Pad e passa a valer já no quadro seguinte, sem reiniciar o jogo.
   - **Preset de botões lembrado**: o preset escolhido continua selecionado depois de fechar o Karamelo.
+- **Navegação Mais Rápida nos Menus pelo Controle**:
+  - **L e R** mudam de página (uma tela inteira por vez); segurando, repete.
+  - **Setas esquerda e direita** também mudam de página nas listas de sistemas, jogos, Ports, Favoritos e Recentes. Nas Configurações elas continuam mudando valores.
+  - **L2 e R2** pulam para a letra anterior / próxima nas listas, com a letra aparecendo na tela; nas Configurações vão para o início / fim.
+  - **Segurar o direcional acelera**: começa devagar e fica cada vez mais rápido, para atravessar listas grandes de jogos.
+  - **Volta para onde você estava**: ao entrar de novo em um sistema, o cursor fica no último jogo em que você estava (ou no jogo mais recente daquela pasta).
+  - Os atalhos seguem os botões L, R, L2 e R2 configurados para o jogador, então funcionam em qualquer controle, inclusive no 8BitDo M30 (onde o ombro R chega como gatilho).
+  - No menu, **só o A confirma**. O X também confirmava e, num controle de 6 botões, fazia entrar em jogos sem querer.
+  - No teclado, **PgUp/PgDn** agora andam uma tela inteira.
 - **Filtro Aprofundado no Navegador de Arquivos (Limpeza Geral)**:
   - O navegador do menu OSD agora filtra automaticamente arquivos residuais e auxiliares que não são jogos executáveis: scripts (`.sh`, `.bat`, `.cmd`, `.ps1`), vídeos (`.mov`, `.mp4`, `.avi`, `.mkv`), arquivos de áudio, documentos de texto (`.nfo`, `.txt`, `.pdf`), checksums (`.sfv`, `.md5`, `.sha256`) e downloads parciais (`.torrent`, `.part`, `.crdownload`).
 

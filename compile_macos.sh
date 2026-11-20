@@ -153,6 +153,7 @@ clang++ -std=c++20 -O2 $COMMON_DEFS $COMMON_INCLUDES \
     tests/test_crash_reporter.cpp \
     tests/test_port_catalog.cpp \
     tests/test_input_mouse.cpp \
+    tests/test_menu_nav.cpp \
     tests/test_cloud_live.cpp \
     tests/test_upscaling_accessibility.cpp \
     build/macos_obj/karamelo_math.o \

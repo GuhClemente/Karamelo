@@ -21,13 +21,28 @@ enum MenuKey
 	KEY_CANCEL,
 	KEY_BACKSPACE,
 	KEY_MENU_TOGGLE,
-	KEY_INFO
+	KEY_INFO,
+	// Previous / next letter group in a list of games or systems (Home / End
+	// on any other page). The pad's L2 / R2.
+	KEY_LETTER_PREV,
+	KEY_LETTER_NEXT
 };
 
 void MenuInit();
 void MenuRun();
 void MenuEnqueueTask(std::function<void()> task);
 void MenuProcessKey(MenuKey key);
+
+// Shoulders and triggers while the menu is open, called every pad poll with
+// the pad's buttons as PadButtonCode bits (LT/RT set from the triggers). The
+// player's own L / R bindings page up / down and L2 / R2 jump by letter, so it
+// follows any controller's layout - on an 8BitDo M30 the R shoulder arrives as
+// LT. Holding repeats, faster the longer it is held.
+void MenuPadShoulders(unsigned pad_bits, unsigned now_ms);
+
+// Milliseconds between repeats of a held menu direction (menu_nav.h), for the
+// D-pad loops in main_win32.cpp / main_linux.cpp. 0 = not yet.
+unsigned MenuRepeatInterval(unsigned held_ms);
 void MenuJumpToLetter(char c);
 void MenuSetStatus(const char* status);
 const char* MenuGetStatus();

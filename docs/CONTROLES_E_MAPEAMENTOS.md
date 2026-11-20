@@ -119,7 +119,28 @@ Ligue o controle segurando os botões indicados até os LEDs começarem a correr
 
 ---
 
-## 6. Solução Rápida de Problemas (Troubleshooting)
+## 6. Navegando nos Menus com o Controle
+
+| Botão | Nas listas (sistemas, jogos, Ports, Favoritos, Recentes) | Nas Configurações |
+| :--- | :--- | :--- |
+| **Direcional cima/baixo** | Uma linha; segurando, acelera | Uma linha; segurando, acelera |
+| **Direcional esquerda/direita** | Página anterior / próxima | Muda o valor da linha |
+| **L / R** | Página anterior / próxima | Página anterior / próxima |
+| **L2 / R2** | Letra anterior / próxima (a letra aparece na tela) | Início / fim da lista |
+| **A** | Confirma / entra | Confirma |
+| **B** | Volta | Volta |
+| **Y** | Marca/desmarca favorito | — |
+| **Start** ou **Home** | Fecha/abre o menu | Fecha/abre o menu |
+
+* L, R, L2 e R2 são os botões **configurados para o jogador** (preset ou remapeamento), não posições fixas do Xbox. No 8BitDo M30 no cabo: **L** = página anterior, **R** = próxima, **Z** = letra anterior, **C** = próxima.
+* A lista é circular: passar do fim volta ao começo, por linha ou por página.
+* Ao entrar de novo em uma pasta, o cursor volta ao último jogo em que você estava; na primeira vez depois de abrir o Karamelo, vai para o jogo mais recente daquela pasta.
+* **X não confirma** no menu (até a 0.985 confirmava, e num controle de 6 botões entrava em jogos sem querer).
+* Teclado: PgUp/PgDn = uma tela, Home/End = início/fim, letras = pula para a letra.
+
+---
+
+## 7. Solução Rápida de Problemas (Troubleshooting)
 
 * **Pergunta: Meu controle de 6 botões não ativa o layout (menu mostra "Auto/Inativo").**
   * *Solução*: o controle não se identifica pelo nome (o M30 no cabo diz ser um Xbox 360). Use **Calibrar 6 Botões** uma vez: daí em diante aparece "Auto/Calib". Observação: a calibração vale para o modelo que o controle diz ser, então um Xbox 360 de verdade ligado no mesmo PC também pegaria o layout de 6 botões nos sistemas Sega; nesse caso, use **Apagar Calibração** antes de jogar com o Xbox 360. No cabo USB o M30 não tem modo que mostre o próprio nome (conferido com START+Y).

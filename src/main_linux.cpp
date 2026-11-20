@@ -633,6 +633,10 @@ static void PollGamepad()
 		if (tick - s_pad_seen_tick[slot] < 500) settling_buttons |= one.Gamepad.wButtons;
 		if (abs((int)one.Gamepad.sThumbLX) > abs((int)state.Gamepad.sThumbLX)) state.Gamepad.sThumbLX = one.Gamepad.sThumbLX;
 		if (abs((int)one.Gamepad.sThumbLY) > abs((int)state.Gamepad.sThumbLY)) state.Gamepad.sThumbLY = one.Gamepad.sThumbLY;
+		// The triggers too: the menu pages and jumps by letter on them (an 8BitDo M30
+		// sends its R shoulder and C as LT / RT), and they were left at zero here.
+		if (one.Gamepad.bLeftTrigger > state.Gamepad.bLeftTrigger) state.Gamepad.bLeftTrigger = one.Gamepad.bLeftTrigger;
+		if (one.Gamepad.bRightTrigger > state.Gamepad.bRightTrigger) state.Gamepad.bRightTrigger = one.Gamepad.bRightTrigger;
 	}
 
 	if (any_pad)
@@ -690,11 +694,18 @@ static void PollGamepad()
 
 		if (osd_now)
 		{
+			// Shoulders and triggers: page and letter jumps (MenuPadShoulders).
+			MenuPadShoulders((unsigned)wButtons |
+				(state.Gamepad.bLeftTrigger > 50 ? 0x0400u : 0u) |   // PAD_BTN_LT
+				(state.Gamepad.bRightTrigger > 50 ? 0x0800u : 0u),   // PAD_BTN_RT
+				(unsigned)now);
 			if (trigger_toggle || (wPressed & XINPUT_GAMEPAD_START))
 			{
 				MenuProcessKey(KEY_MENU_TOGGLE);
 			}
-			else if (wPressed & (XINPUT_GAMEPAD_A | XINPUT_GAMEPAD_X))
+			// A only: X sits right above A on a 6-button pad, and confirming with it
+			// started games by accident.
+			else if (wPressed & XINPUT_GAMEPAD_A)
 			{
 				MenuProcessKey(KEY_SELECT);
 			}
@@ -722,7 +733,8 @@ static void PollGamepad()
 					s_dpad_first_press_tick = now;
 					s_dpad_last_repeat_tick = now;
 				}
-				else if (now - s_dpad_first_press_tick >= 300 && now - s_dpad_last_repeat_tick >= 110)
+				else if (unsigned every = MenuRepeatInterval((unsigned)(now - s_dpad_first_press_tick));
+				         every && now - s_dpad_last_repeat_tick >= every)
 				{
 					fire = true;
 					s_dpad_last_repeat_tick = now;
