@@ -3084,6 +3084,44 @@ void PopulateRecentMenu() {
 
 static const int kActionPortItem = 1400;
 
+static bool IsNonGameFile(const std::string& fn, const fs::path& p) {
+  if (fn == "cache" || fn == "config" || fn == "scripts" ||
+      fn == "wallpapers" || fn == "bios" || fn == "cores" ||
+      fn == "saves" || fn == "cheats" || fn == "screenshots" ||
+      fn == "thumbs.db" || fn == ".ds_store" || fn == "desktop.ini")
+    return true;
+
+  static const char* kIgnoredExts[] = {
+    // Executables, binaries, and libraries
+    ".exe", ".pdb", ".dll", ".so", ".dylib", ".o", ".obj",
+    // Logs and diagnostic dumps
+    ".log", ".dmp", ".crash", ".trace",
+    // Documentation and text
+    ".txt", ".nfo", ".diz", ".pdf", ".doc", ".docx", ".rtf", ".odt",
+    // Images
+    ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".svg", ".ico", ".tga", ".tif", ".tiff",
+    // Audio (standalone media)
+    ".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma", ".mid", ".midi",
+    // Video
+    ".mov", ".mp4", ".mkv", ".avi", ".wmv", ".webm", ".flv", ".m4v", ".mpg", ".mpeg",
+    // Web and structured data
+    ".url", ".json", ".xml", ".htm", ".html", ".css", ".js", ".csv", ".tsv", ".yaml", ".yml",
+    // Scripts
+    ".sh", ".bat", ".cmd", ".ps1", ".vbs", ".py",
+    // Configuration and auxiliary metadata
+    ".ini", ".cfg", ".conf", ".bak", ".tmp", ".old", ".sub", ".srt"
+  };
+
+  for (const char* ext : kIgnoredExts) {
+    if (fn.ends_with(ext)) return true;
+  }
+
+  if (fn.ends_with(".md") && !IsMegaDriveRom(p))
+    return true;
+
+  return false;
+}
+
 void PopulateBrowse(const std::string &dirpath) {
   items.clear();
 
@@ -3229,20 +3267,7 @@ void PopulateBrowse(const std::string &dirpath) {
             continue;
           }
 
-          if (lower_fn == "cache" || lower_fn == "config" || lower_fn == "scripts" ||
-              lower_fn == "wallpapers" || lower_fn == "bios" || lower_fn == "cores" ||
-              lower_fn == "saves" || lower_fn == "cheats" ||
-              lower_fn.ends_with(".exe") || lower_fn.ends_with(".pdb") ||
-              lower_fn.ends_with(".dll") || lower_fn.ends_with(".log") ||
-              lower_fn.ends_with(".txt") || lower_fn.ends_with(".nfo") ||
-              (lower_fn.ends_with(".md") && !IsMegaDriveRom(entry.path())) ||
-              lower_fn.ends_with(".ini") ||
-              lower_fn.ends_with(".cfg") || lower_fn.ends_with(".pdf") ||
-              lower_fn.ends_with(".doc") || lower_fn.ends_with(".docx") ||
-              lower_fn.ends_with(".png") || lower_fn.ends_with(".jpg") ||
-              lower_fn.ends_with(".jpeg") || lower_fn.ends_with(".url") ||
-              lower_fn.ends_with(".bat") || lower_fn.ends_with(".json") ||
-              lower_fn.ends_with(".xml")) {
+          if (IsNonGameFile(lower_fn, entry.path())) {
             continue;
           }
 
