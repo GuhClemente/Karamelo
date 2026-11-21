@@ -897,6 +897,18 @@ bool InputBindApplySixButtonLayout(const char* system_name, const char* const la
 		layout[BIND_L] = sixC;  // Face C -> DC Arcade C (Heavy Kick)
 		layout[BIND_R] = sixZ;  // Face Z -> DC Arcade Z (Heavy Punch)
 	}
+	else if (sys == "GameCube")
+	{
+		// Dolphin: the GameCube's L / R triggers are RetroPad L2 / R2, its Z is
+		// RetroPad R, and RetroPad L is the Triforce test button. With the
+		// global set an M30 had the triggers (zoom, aim) on its Z and C face
+		// buttons and its shoulders on Z and nothing. A B X Y keep the global
+		// bindings: only the shoulders move.
+		layout[BIND_L2] = sixL;  // shoulder L -> GameCube L
+		layout[BIND_R2] = sixR;  // shoulder R -> GameCube R
+		layout[BIND_R]  = sixZ;  // Z -> GameCube Z
+		layout[BIND_L]  = PAD_BTN_NONE;   // Triforce test: off the pad
+	}
 	else if (sys == "3DO")
 	{
 		clear_face();

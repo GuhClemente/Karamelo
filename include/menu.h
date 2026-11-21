@@ -43,6 +43,14 @@ void MenuPadShoulders(unsigned pad_bits, unsigned now_ms);
 // Milliseconds between repeats of a held menu direction (menu_nav.h), for the
 // D-pad loops in main_win32.cpp / main_linux.cpp. 0 = not yet.
 unsigned MenuRepeatInterval(unsigned held_ms);
+
+// A controller's own turbo (8BitDo and others: hold a button + press the turbo
+// key) is invisible to the PC: the combo sends nothing, the pad just starts or
+// stops pulsing that button. Called every pad poll, menu open or not, with the
+// pad's buttons as PadButtonCode bits; shows "TURBO A: LIGADO" once a button
+// pulses on its own, "DESLIGADO" once a turbo button is held steady
+// (menu_nav::TurboWatch).
+void MenuPadTurboWatch(unsigned pad_bits, unsigned now_ms);
 void MenuJumpToLetter(char c);
 void MenuSetStatus(const char* status);
 const char* MenuGetStatus();

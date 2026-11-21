@@ -4053,6 +4053,51 @@ void MenuPadShoulders(unsigned pad_bits, unsigned now_ms) {
 
 unsigned MenuRepeatInterval(unsigned held_ms) { return menu_nav::RepeatInterval(held_ms); }
 
+// The name the player knows a button by: the 6-button pad's own letter when
+// the pad is calibrated or detected (the M30's C arrives as RT), otherwise the
+// Xbox name.
+static const char *TurboButtonName(unsigned bit) {
+  SixPadMap six;
+  if (SixPadForPlayer1(&six)) {
+    const struct { int code; const char *name; } own[] = {
+        {six.a, "A"}, {six.b, "B"}, {six.c, "C"}, {six.x, "X"},
+        {six.y, "Y"}, {six.z, "Z"}, {six.l, "L"}, {six.r, "R"}};
+    for (const auto &o : own)
+      if (o.code && (unsigned)o.code == bit)
+        return o.name;
+  }
+  switch (bit) {
+  case PAD_BTN_A: return "A";
+  case PAD_BTN_B: return "B";
+  case PAD_BTN_X: return "X";
+  case PAD_BTN_Y: return "Y";
+  case PAD_BTN_LB: return "LB";
+  case PAD_BTN_RB: return "RB";
+  case PAD_BTN_LT: return "LT";
+  case PAD_BTN_RT: return "RT";
+  default: return "?";
+  }
+}
+
+void MenuPadTurboWatch(unsigned pad_bits, unsigned now_ms) {
+  // Buttons a turbo can be set on: face buttons, shoulders, triggers.
+  const unsigned kTurboable = PAD_BTN_A | PAD_BTN_B | PAD_BTN_X | PAD_BTN_Y |
+                              PAD_BTN_LB | PAD_BTN_RB | PAD_BTN_LT | PAD_BTN_RT;
+  static menu_nav::TurboWatch s_watch;
+  unsigned on = 0, off = 0;
+  s_watch.Update(pad_bits & kTurboable, now_ms, &on, &off);
+  for (unsigned bit = 1; bit && (on | off); bit <<= 1) {
+    if (!((on | off) & bit))
+      continue;
+    char buf[48];
+    snprintf(buf, sizeof(buf), "TURBO %s: %s", TurboButtonName(bit),
+             (on & bit) ? Tr("LIGADO", "ON") : Tr("DESLIGADO", "OFF"));
+    CoreSetToast(buf, 120);
+    on &= ~bit;
+    off &= ~bit;
+  }
+}
+
 void MenuProcessKey(MenuKey key) {
   std::string before = SettingsSnapshot();
   std::string binds_before = CurrentBindingsSnapshot();

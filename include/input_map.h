@@ -173,7 +173,8 @@ bool InputSixPadHas(const char* device_key);
 bool InputSixPadDelete(const char* device_key);
 
 // Built-in layout per system, swapped in like a system profile, for Genesis,
-// Mega CD, Sega 32X, Saturn, Dreamcast, 3DO and arcade fighting games.
+// Mega CD, Sega 32X, Saturn, Dreamcast, GameCube (shoulders only), 3DO and
+// arcade fighting games.
 // `labels` are the core's own names for the RetroPad buttons (arcade punches
 // and kicks are placed by name); `pad` where the pad's buttons are, NULL for
 // the Sega standard table. Returns false, changing nothing, for any other system.

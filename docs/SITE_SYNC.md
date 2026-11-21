@@ -2832,6 +2832,10 @@ Novidades para o jogador:
   - Os atalhos seguem os botões L, R, L2 e R2 configurados para o jogador, então funcionam em qualquer controle, inclusive no 8BitDo M30 (onde o ombro R chega como gatilho).
   - No menu, **só o A confirma**. O X também confirmava e, num controle de 6 botões, fazia entrar em jogos sem querer.
   - No teclado, **PgUp/PgDn** agora andam uma tela inteira.
+- **Turbo do Controle e Atalho do Menu**:
+  - Controles com turbo próprio (como o 8BitDo M30: segure o botão e aperte a estrela) funcionam normalmente. O botão Home só abre o menu quando é apertado **sozinho**; apertado junto com outro botão, o Karamelo ignora.
+  - Ao usar um botão com turbo, aparece na tela **"TURBO A: LIGADO"**, e ao segurá-lo firme depois de desligar o turbo, **"TURBO A: DESLIGADO"**. Com o controle de 6 botões calibrado, o nome é o do próprio controle (A, B, C, X, Y, Z). O turbo é do controle; o Karamelo só percebe e avisa.
+- **GameCube com controle de 6 botões**: os ombros L e R viram os gatilhos L e R do GameCube, e o botão Z do controle vira o Z do GameCube (antes o zoom de *Resident Evil 0* ficava nos botões C e Z).
 - **Filtro Aprofundado no Navegador de Arquivos (Limpeza Geral)**:
   - O navegador do menu OSD agora filtra automaticamente arquivos residuais e auxiliares que não são jogos executáveis: scripts (`.sh`, `.bat`, `.cmd`, `.ps1`), vídeos (`.mov`, `.mp4`, `.avi`, `.mkv`), arquivos de áudio, documentos de texto (`.nfo`, `.txt`, `.pdf`), checksums (`.sfv`, `.md5`, `.sha256`) e downloads parciais (`.torrent`, `.part`, `.crdownload`).
 

@@ -45,6 +45,7 @@ O mapeamento de cada sistema vem da própria tabela RetroPad do core (Genesis Pl
 | **Sega Genesis / Mega Drive / CD / 32X** | **X**, **Y**, **Z** | **A**, **B**, **C** | RetroPad L2 / R2 |
 | **Sega Saturn (Digital)** | **X**, **Y**, **Z** | **A**, **B**, **C** | **L** e **R** (Gatilhos de ombro) |
 | **Sega Dreamcast** | **X**, **Y**, **Z** (RetroPad R) | **A**, **B**, **C** (RetroPad L) | **Gatilhos L e R** do Dreamcast |
+| **GameCube** (só os ombros) | A, B, X, Y como no preset; **Z** = Z do GameCube | A, B, C como no preset | **L** e **R** = gatilhos L e R do GameCube |
 | **3DO Interactive Multiplayer** | **X** (P / Stop), **Y**, **Z** (Select) | **A**, **B**, **C** | **L** e **R** |
 | **Arcade / MAME / FBNeo** | Soco Fraco, Soco Médio, Soco Forte | Chute Fraco, Chute Médio, Chute Forte | Ações auxiliares / Coins |
 
@@ -135,6 +136,7 @@ Ligue o controle segurando os botões indicados até os LEDs começarem a correr
 * L, R, L2 e R2 são os botões **configurados para o jogador** (preset ou remapeamento), não posições fixas do Xbox. No 8BitDo M30 no cabo: **L** = página anterior, **R** = próxima, **Z** = letra anterior, **C** = próxima.
 * A lista é circular: passar do fim volta ao começo, por linha ou por página.
 * Ao entrar de novo em uma pasta, o cursor volta ao último jogo em que você estava; na primeira vez depois de abrir o Karamelo, vai para o jogo mais recente daquela pasta.
+* **Turbo do próprio controle** (8BitDo M30: segure o botão e aperte a estrela): funciona normal. O **Home só abre o menu apertado sozinho**; junto com outro botão é ignorado. Ao usar o botão, o Karamelo avisa **"TURBO A: LIGADO"**; segurando firme depois de desligar, **"TURBO A: DESLIGADO"**. A combinação não chega ao PC, então o aviso vem do ritmo do botão (5 apertos em meio segundo ou mais).
 * **X não confirma** no menu (até a 0.985 confirmava, e num controle de 6 botões entrava em jogos sem querer).
 * Teclado: PgUp/PgDn = uma tela, Home/End = início/fim, letras = pula para a letra.
 

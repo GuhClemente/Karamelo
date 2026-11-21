@@ -110,6 +110,65 @@ inline int Page(int total, int sel, int page, int dir)
 	return sel - page > 0 ? sel - page : 0;
 }
 
+// A controller's own turbo (8BitDo: hold a button + press the turbo key) sends
+// nothing to the PC when it is switched - the pad just starts or stops
+// pulsing that button by itself. So it is recognised by the pulses: 10
+// changes (5 presses) inside half a second is a turbo, no finger keeps that
+// up; a turbo button then held steady for 0.7 s has been switched off.
+struct TurboWatch
+{
+	static const int kEdges = 10;
+	static const unsigned kWindowMs = 500;
+	static const unsigned kSteadyMs = 700;
+
+	unsigned turbo_bits = 0;   // buttons currently pulsing on their own
+	unsigned last_bits = 0;
+	bool started = false;
+	unsigned edges[16][kEdges] = {};
+	int count[16] = {};
+	unsigned down_since[16] = {};
+
+	// `bits`: the buttons down now (one bit per button, the ones that can
+	// carry a turbo). Sets `on` / `off` to the buttons whose turbo was just
+	// seen to start / stop.
+	void Update(unsigned bits, unsigned now_ms, unsigned* on, unsigned* off)
+	{
+		*on = *off = 0;
+		if (!started)
+		{
+			started = true;
+			last_bits = bits;
+			for (int b = 0; b < 16; b++) down_since[b] = now_ms;
+			return;
+		}
+		const unsigned changed = bits ^ last_bits;
+		last_bits = bits;
+		for (int b = 0; b < 16; b++)
+		{
+			const unsigned m = 1u << b;
+			if (changed & m)
+			{
+				edges[b][count[b] % kEdges] = now_ms;
+				count[b]++;
+				if (bits & m) down_since[b] = now_ms;
+				// The edge kEdges-1 changes ago is the oldest one kept.
+				if (!(turbo_bits & m) && count[b] >= kEdges &&
+				    now_ms - edges[b][count[b] % kEdges] <= kWindowMs)
+				{
+					turbo_bits |= m;
+					*on |= m;
+				}
+			}
+			else if ((turbo_bits & m) && (bits & m) && now_ms - down_since[b] >= kSteadyMs)
+			{
+				turbo_bits &= ~m;
+				*off |= m;
+				count[b] = 0;
+			}
+		}
+	}
+};
+
 } // namespace menu_nav
 
 #endif

@@ -63,3 +63,40 @@ TEST_CASE(MenuNavPage)
 	ASSERT_EQ(Page(0, 0, 14, +1), 0);
 	ASSERT_EQ(Page(10, 3, 0, +1), 4);      // a page of at least one row
 }
+
+// A pad's own turbo: recognised by the pulses, switched off by a steady hold.
+TEST_CASE(MenuNavTurboWatch)
+{
+	menu_nav::TurboWatch w;
+	unsigned on = 0, off = 0, t = 1000;
+	const unsigned A = 0x1000;
+	w.Update(0, t, &on, &off);
+
+	// A finger: 3 presses in a second - not a turbo.
+	for (int i = 0; i < 3; i++)
+	{
+		w.Update(A, t += 170, &on, &off); ASSERT_EQ(on, 0u);
+		w.Update(0, t += 170, &on, &off); ASSERT_EQ(on, 0u);
+	}
+	t += 1000;
+	w.Update(0, t, &on, &off);
+
+	// The M30 turbo: ~13 presses a second (about 38 ms per change).
+	unsigned seen_on = 0;
+	for (int i = 0; i < 10; i++)
+	{
+		w.Update(A, t += 38, &on, &off); seen_on |= on;
+		w.Update(0, t += 38, &on, &off); seen_on |= on;
+	}
+	ASSERT_EQ(seen_on, A);
+	ASSERT_EQ(w.turbo_bits, A);
+
+	// Turbo switched off: the button is now held steady.
+	w.Update(A, t += 40, &on, &off);
+	ASSERT_EQ(off, 0u);
+	w.Update(A, t += 400, &on, &off);
+	ASSERT_EQ(off, 0u);
+	w.Update(A, t += 400, &on, &off);
+	ASSERT_EQ(off, A);
+	ASSERT_EQ(w.turbo_bits, 0u);
+}

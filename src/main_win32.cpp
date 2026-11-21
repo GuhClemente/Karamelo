@@ -1145,8 +1145,23 @@ static void PollGamepad()
 		{
 			if (GamepadGetGuideButton(slot)) guide_now = true;
 		}
+		// Guide/Home opens the menu only when tapped on its own, on release. Pads
+		// with a turbo in their firmware set it with "hold a button + press the
+		// turbo key", and an 8BitDo M30 sends that key as Guide - so the turbo
+		// combo opened the menu over the game. Any other button (or trigger) down
+		// while Guide is held makes it a combo, not a menu request.
 		static bool s_prev_guide = false;
-		bool guide_pressed = guide_now && !s_prev_guide;
+		static bool s_guide_combo = false;
+		const bool others_down = state.Gamepad.wButtons != 0 ||
+			state.Gamepad.bLeftTrigger > 50 || state.Gamepad.bRightTrigger > 50;
+		if (guide_now && !s_prev_guide) s_guide_combo = others_down;
+		else if (guide_now && others_down) s_guide_combo = true;
+		// A pad's own turbo switching on/off, shown as a toast.
+		MenuPadTurboWatch((unsigned)state.Gamepad.wButtons |
+			(state.Gamepad.bLeftTrigger > 50 ? 0x0400u : 0u) |   // PAD_BTN_LT
+			(state.Gamepad.bRightTrigger > 50 ? 0x0800u : 0u),   // PAD_BTN_RT
+			(unsigned)GetTickCount());
+		bool guide_pressed = !guide_now && s_prev_guide && !s_guide_combo;
 		s_prev_guide = guide_now;
 		if (settling_buttons != 0) guide_pressed = false;
 

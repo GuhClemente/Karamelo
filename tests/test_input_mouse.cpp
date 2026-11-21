@@ -189,6 +189,25 @@ TEST_CASE(SixButtonArcadeKeepsKickOnL2)
 	InputBindResetDefaults();
 }
 
+// GameCube (Dolphin): the pad's shoulders go to the GameCube's L / R triggers
+// (RetroPad L2 / R2) and its Z to the GameCube's Z (RetroPad R) - with the
+// global set an M30 zoomed with C and Z. A B X Y stay on the global bindings.
+TEST_CASE(SixButtonGameCubeShoulders)
+{
+	InputBindResetDefaults();
+	const char* none[16] = {};
+	const int global_a = InputBindGetPad(BIND_A);
+	const SixPadMap m30 = InputSixPadBuiltin(SIXPAD_M30_XINPUT);
+	ASSERT_TRUE(InputBindApplySixButtonLayout("GameCube", none, &m30));
+	ASSERT_EQ(InputBindGetPad(BIND_L2), PAD_BTN_LB);  // shoulder L -> GC L
+	ASSERT_EQ(InputBindGetPad(BIND_R2), PAD_BTN_LT);  // shoulder R -> GC R
+	ASSERT_EQ(InputBindGetPad(BIND_R), PAD_BTN_RB);   // Z -> GC Z
+	ASSERT_EQ(InputBindGetPad(BIND_L), PAD_BTN_NONE); // Triforce test: off
+	ASSERT_EQ(InputBindGetPad(BIND_A), global_a);     // face buttons untouched
+	InputBindRestoreGlobal();
+	InputBindResetDefaults();
+}
+
 TEST_CASE(SixButtonArcadeFollowsButtonNames)
 {
 	InputBindResetDefaults();
