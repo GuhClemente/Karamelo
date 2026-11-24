@@ -1,5 +1,5 @@
 {
-  "catalog_version": 15,
+  "catalog_version": 16,
   "ports": [
     {
       "id": "DrMario64",
@@ -2097,6 +2097,38 @@
         "SuperHangOnUltimate-Windows-Installer-0.9.34.exe": "d41bf8d5d68074f88a83265db2df39d4f88ae6e7bad40407b7d2d7f3fe3db88c"
       },
       "notes": "Arcade Super Hang-On static recomp + Mega Drive Original Mode mod (chaotix359, MIT). OCULTO (18/11/2026): no Windows a v0.9.34 so traz instalador Inno Setup (SuperHangOnUltimate-Windows-Installer-0.9.34.exe) e no Linux/macOS traz scripts de build; o autor nao publica binarios pre-compilados por questoes de copyright da ROM da Sega. Volta ao menu quando houver release portatil sem assistente interativo."
+    },
+    {
+      "id": "Fukami",
+      "display_name": "Ridge Racer V (Fukami)",
+      "repo": "danisandoval/fukami",
+      "exe_hint": "Fukami.exe",
+      "has_linux_build": true,
+      "has_macos_build": true,
+      "launch_args": [
+        "{iso}"
+      ],
+      "iso_keywords": [
+        "ridge",
+        "racer"
+      ],
+      "iso_dirs": [
+        "PlayStation2",
+        "PS2"
+      ],
+      "iso_exts": [
+        ".chd",
+        ".cue",
+        ".bin",
+        ".iso"
+      ],
+      "release_tag": "v1.1.0",
+      "asset_sha256": {
+        "Fukami-1.1.0-linux-x86_64.tar.gz": "45d4ffe837f3706ca1927389eb1a433f61e19eceeafe2c1357e66815d8d74c1c",
+        "Fukami-1.1.0-macos-arm64.zip": "6da23f79a010fa0b027ae3dff80572a1f1e2c110ace6fbdfe0501f6ff01c4c40",
+        "Fukami-1.1.0-windows-x86_64.zip": "855031d3d240c36cbe5272a19a550fe742bb7b5f2d0bbdb7987b7e496a232d3a"
+      },
+      "notes": "Ridge Racer V (PS2 USA SLUS-20002) native static recompilation (danisandoval/fukami) using PCSX2 GS/SPU2 layer. Supports 60 FPS, real widescreen, resolution scaling up to 8x. Reads user CHD/CUE on first launch."
     }
   ]
 }

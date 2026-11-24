@@ -2445,7 +2445,7 @@ Esta seção instrui a IA mantenedora do site sobre as implementações técnica
 > **REGRA DE OURO PARA O SITE**: As implementações abaixo residem na branch `feat/batocera-app-upgrades` para homologação e compilação multiplataforma dos novos binários `.dll` / `.so` / `.dylib`. **NÃO ALTERE AS CONTAGENS PÚBLICAS NO SITE OFICIAL AINDA.** A contagem oficial de produção permanece rigorosamente em:
 > - **37 Sistemas Nativos**
 > - **42 Motores de Emulação** (`APP_CORE_ENGINES = 42`)
-> - **105 Ports e Recompilados** (105 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎)
+> - **106 Ports e Recompilados** (106 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎)
 > 
 > A contagem só será atualizada para 38 sistemas / 44 motores no momento em que a branch for mesclada à `main` e a versão 0.983 for compilada e distribuída oficialmente.
 
@@ -2811,10 +2811,16 @@ Esta especificação serve como diretriz canônica para a IA mantenedora do site
 ## 73. Versão 0.985
 
 **Estado**: pacote de **Windows** preparado localmente em 20/11/2026 (`Karamelo_v0.985_Win64.zip` e `Karamelo.exe`). Deploy de produção pendente ("não sobe").
-Contagens: **37 sistemas, 42 motores; 105 ports — 105 Windows 🪟, 65 Linux 🐧, 46 macOS 🍎**.
+Contagens: **37 sistemas, 42 motores; 106 ports — 106 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎**.
 
 Novidades para o jogador:
 
+- **Ridge Racer V (Fukami — Recompilação Estática Nativa de PS2)**:
+  - Adicionado ao catálogo de PC Ports & Recompilados (totalizando **106 ports** — 106 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎).
+  - Recompilação estática Ahead-of-Time de código MIPS de PS2 para C++ nativo (`danisandoval/fukami`, versão americana `SLUS-20002`) utilizando a camada GS e SPU2 do PCSX2.
+  - Binários oficiais nativos para Windows (Direct3D 11 / Vulkan), Linux (Vulkan) e macOS Apple Silicon (Metal).
+  - 60 FPS cravados, widescreen real (16:9, 16:10, 21:9), upscaling até 8x, anti-aliasing (FXAA, CAS) e suporte a controles com rumble.
+  - Carregamento transparente do dump do disco do usuário (`.chd`, `.cue`/`.bin`) via argumento `{iso}`.
 - **Controles de 6 Botões Reconhecidos Automaticamente**:
   - **Calibrar 6 Botões** (Configurações › Controles): o jogador aperta A, B, C, X, Y, Z, L e R do próprio controle, uma vez só, e o Karamelo guarda isso para aquele modelo de controle. Vale para qualquer firmware (8BitDo, Retro-Bit, Hori, arcade sticks), porque cada um manda C, Z e os ombros para um lugar diferente.
   - **Modo Auto (novo padrão)**: liga o layout de 6 botões sozinho quando o controle em uso foi calibrado ou tem nome de controle de 6 botões ("M30", "Saturn", "Fighting Commander", "Arcade Stick"…). Um controle comum (Xbox, PlayStation, Switch) não é afetado. A tela mostra o que encontrou: Auto/Calib, Auto/Detect ou Auto/Inativo.

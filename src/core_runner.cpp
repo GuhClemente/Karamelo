@@ -238,12 +238,7 @@ static std::map<std::string, std::string> s_arcade_core_for_rom;
 // RETRO_DEVICE_KEYBOARD (MAME does) then sees one physical button arrive twice,
 // once as the button and once as a keystroke, and performs both actions. That
 // is the punch-and-jump-at-once bug reported on Altered Beast.
-static bool SystemNeedsKeyboardBridge(const std::string& system_dir)
-{
-	std::string s = system_dir;
-	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-	return s == "msx" || s == "c64" || s == "zxspectrum" || s == "dos" || s == "amiga";
-}
+static bool SystemNeedsKeyboardBridge(const std::string& system_dir);
 
 // Same family of bug as the keyboard bridge above, different pair of
 // controls: on a real N64/PSX/PS2/Saturn/Dreamcast/GameCube/PSP/3DS pad the
@@ -574,6 +569,23 @@ static std::string   s_loaded_core_path = "";
 static std::string   s_active_rom_path = "";
 static std::string   s_active_core_path = "";
 static std::thread::id s_core_thread_id;
+
+static bool SystemNeedsKeyboardBridge(const std::string& system_dir)
+{
+	std::string s = system_dir;
+	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+	if (s == "msx" || s == "c64" || s == "zxspectrum" || s == "dos" || s == "amiga") return true;
+	if (loaded_core_name == "Commodore 64" || loaded_core_name == "MSX" ||
+	    loaded_core_name == "Amiga" || loaded_core_name == "ZX Spectrum" ||
+	    loaded_core_name == "MS-DOS") return true;
+	if (s_loaded_core_path.find("c64") != std::string::npos ||
+	    s_loaded_core_path.find("vice") != std::string::npos ||
+	    s_loaded_core_path.find("msx") != std::string::npos ||
+	    s_loaded_core_path.find("amiga") != std::string::npos ||
+	    s_loaded_core_path.find("spectrum") != std::string::npos ||
+	    s_loaded_core_path.find("dosbox") != std::string::npos) return true;
+	return false;
+}
 
 
 
@@ -3096,6 +3108,23 @@ static void PollLocalInput(void)
 		}
 	}
 
+	// For Commodore 64 cores:
+	// If only 1 gamepad is connected, mirror port 0 inputs to port 1 so the controller
+	// works automatically whether the C64 game was programmed for Joystick Port 1 or Joystick Port 2.
+	if (s_loaded_core_path.find("c64") != std::string::npos ||
+	    s_loaded_core_path.find("vice") != std::string::npos ||
+	    loaded_core_name == "Commodore 64")
+	{
+		XINPUT_STATE pad1_state;
+		if (!GamepadGetState(1, &pad1_state))
+		{
+			for (int b = 0; b < 16; b++) joypad_buttons[1][b] = joypad_buttons[0][b];
+			for (int s = 0; s < 2; s++)
+				for (int a = 0; a < 2; a++)
+					analog_sticks[1][s][a] = analog_sticks[0][s][a];
+		}
+	}
+
 	// 3. Mouse Polling (Physical mouse + Gamepad stick/buttons + Keyboard navigation)
 	int mouse_dx = 0;
 	int mouse_dy = 0;
@@ -3531,14 +3560,39 @@ static int16_t CB_InputStateRaw(unsigned port, unsigned device, unsigned index, 
 		// the joypad and the keyboard.
 		if (!keyboard_bridge_active) return 0;
 
+		// Directional cursor keys (D-pad & analog stick mirror):
 		if (id == 273 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_UP]) return 1;
 		if (id == 274 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_DOWN]) return 1;
 		if (id == 276 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_LEFT]) return 1;
 		if (id == 275 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_RIGHT]) return 1;
-		if (id == 32  && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_B] || joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_A])) return 1; // Space
-		if (id == 13  && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_START]) return 1; // Enter
+
+		// Return / Enter (Confirm, select menu option, start game):
+		if (id == 13 && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_START] ||
+		                 joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_A])) return 1;
+
+		// Space bar (Fire / Jump / Toggle options & cheats):
+		if (id == 32 && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_B] ||
+		                 joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_X])) return 1;
+
+		// Common vintage computer menu prompts:
+		// "Trainer (Y/N)?"
+		if ((id == 'y' || id == 'Y') && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_Y]) return 1;
+		if ((id == 'n' || id == 'N') && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_X] || joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_L])) return 1;
+
+		// "1 or 2 Players?"
+		if (id == '1' && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_L]) return 1;
+		if (id == '2' && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_R]) return 1;
+
+		// F1 / Game Start:
 		if (id == 282 && joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_SELECT]) return 1; // F1
-		if (id == 'm' && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_Y] || joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_X])) return 1; // M / Powerup
+
+		// Escape / Run-Stop:
+		if (id == 27 && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_L2] ||
+		                 joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_R2])) return 1;
+
+		// MSX weapons / powerups:
+		if (id == 'm' && (joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_Y] ||
+		                  joypad_buttons[0][RETRO_DEVICE_ID_JOYPAD_X])) return 1;
 
 		return 0;
 	}
@@ -4102,13 +4156,25 @@ static DWORD WINAPI CoreExecutionThreadProc(LPVOID lpParam)
 		loaded_game_name = init_p.filename().string();
 		loaded_rom_dir = init_p.parent_path().string();
 		loaded_system_dir = init_p.parent_path().filename().string();
+		if (!original_rom_dir.empty())
+		{
+			fs::path orig_p(original_rom_dir);
+			std::string orig_sys = orig_p.filename().string();
+			if (!orig_sys.empty() && orig_sys != "roms" && orig_sys != "app" && orig_sys != "cache")
+			{
+				loaded_system_dir = orig_sys;
+			}
+		}
 		if (loaded_system_dir.empty() || loaded_system_dir == "." ||
 			loaded_system_dir == "roms" || loaded_system_dir == "cache" || loaded_system_dir == "app")
 		{
 			loaded_system_dir = init_p.stem().string();
 		}
 		keyboard_bridge_active = SystemNeedsKeyboardBridge(loaded_system_dir);
-		game_uses_keyboard = SystemIsKeyboardComputer(loaded_system_dir);
+		game_uses_keyboard = SystemIsKeyboardComputer(loaded_system_dir) ||
+		                     (loaded_core_name == "Commodore 64" || loaded_core_name == "MSX" ||
+		                      loaded_core_name == "Amiga" || loaded_core_name == "ZX Spectrum" ||
+		                      loaded_core_name == "MS-DOS");
 		CrashReporterSetLastGameInfo(loaded_core_name.c_str(), loaded_game_stem.c_str());
 		LeaveCriticalSection(&name_lock);
 	}
