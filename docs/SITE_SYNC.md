@@ -2445,7 +2445,7 @@ Esta seção instrui a IA mantenedora do site sobre as implementações técnica
 > **REGRA DE OURO PARA O SITE**: As implementações abaixo residem na branch `feat/batocera-app-upgrades` para homologação e compilação multiplataforma dos novos binários `.dll` / `.so` / `.dylib`. **NÃO ALTERE AS CONTAGENS PÚBLICAS NO SITE OFICIAL AINDA.** A contagem oficial de produção permanece rigorosamente em:
 > - **37 Sistemas Nativos**
 > - **42 Motores de Emulação** (`APP_CORE_ENGINES = 42`)
-> - **106 Ports e Recompilados** (106 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎)
+> - **107 Ports e Recompilados** (107 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎)
 > 
 > A contagem só será atualizada para 38 sistemas / 44 motores no momento em que a branch for mesclada à `main` e a versão 0.983 for compilada e distribuída oficialmente.
 
@@ -2811,10 +2811,16 @@ Esta especificação serve como diretriz canônica para a IA mantenedora do site
 ## 73. Versão 0.985
 
 **Estado**: pacote de **Windows** preparado localmente em 20/11/2026 (`Karamelo_v0.985_Win64.zip` e `Karamelo.exe`). Deploy de produção pendente ("não sobe").
-Contagens: **37 sistemas, 42 motores; 106 ports — 106 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎**.
+Contagens: **37 sistemas, 42 motores; 107 ports — 107 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎**.
 
 Novidades para o jogador:
 
+- **Screamer Rally (Recompilação Nativa x86 MS-DOS / 3dfx em Rust)**:
+  - Adicionado ao catálogo de PC Ports & Recompilados (totalizando **107 ports** — 107 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎).
+  - Recompilação nativa em Rust e Direct3D 11 (`Rick-Barber/ScreamerRally-Recomp`) do clássico de corrida de 1997 da Milestone.
+  - Executa o código original de 32-bit direto na CPU moderna sem DOSBox, com camadas nativas para DOS, BIOS, timers, CD-ROM, WASAPI e Glide.
+  - *Claude Renderer* com 4K+, widescreen real (16:9, 21:9, 32:9), interpolação de alta taxa de quadros (60+ FPS), 108 shaders CRT do ShaderGlass, controles XInput com vibração e troca de clima ao vivo.
+  - Carregamento da imagem do CD original (`.cue`/`.bin`, `.iso`, `.mds`/`.mdf`) via argumento `--disc {iso}`.
 - **Ridge Racer V (Fukami — Recompilação Estática Nativa de PS2)**:
   - Adicionado ao catálogo de PC Ports & Recompilados (totalizando **106 ports** — 106 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎).
   - Recompilação estática Ahead-of-Time de código MIPS de PS2 para C++ nativo (`danisandoval/fukami`, versão americana `SLUS-20002`) utilizando a camada GS e SPU2 do PCSX2.

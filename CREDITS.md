@@ -252,10 +252,11 @@ tabela mudava três vezes. A tabela é a fonte; o rodapé conta uma vez só.
 | Need for Speed: Hot Pursuit 2 | 🪟 | [ZloiKILLER/nfshp2-port-win](https://github.com/ZloiKILLER/nfshp2-port-win) |
 | The Simpsons Arcade | 🪟 | [cheviman/simpsons-decomp](https://github.com/cheviman/simpsons-decomp) |
 | Ridge Racer V (Fukami) | 🪟🐧🍎 | [danisandoval/fukami](https://github.com/danisandoval/fukami) |
+| Screamer Rally | 🪟 | [Rick-Barber/ScreamerRally-Recomp](https://github.com/Rick-Barber/ScreamerRally-Recomp) |
 
-**66 de 106 têm build Linux** e **47 de 106 têm build macOS** (Apple Silicon /
+**66 de 107 têm build Linux** e **47 de 107 têm build macOS** (Apple Silicon /
 Universal), verificado em 24/11/2026 contra a release mais recente de cada
-repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy, Syndicate Plus, Need for Speed Hot Pursuit 2, The Simpsons Arcade e Ridge Racer V (Fukami); Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
+repositório (adicionados ports das Ondas 1, 2, 3 e 4: DK64, Paper Mario 64, Twilight Princess, Link's Awakening HD, JSRF, Two Towers, Silent Hill, P.T., Mega Man X, Ninja Gaiden Black, SMS, Luigi's Mansion, Shaolin Monks, Jet Force Gemini, Forza Horizon, Lost Odyssey, Zelda 3, Splinter Cell DA, Mercenaries, Fable II, GoldenEye XBLA, CTR High Octane, Minish Cap, TriAevum, Top Gear, SSF2T HD Remix, Castlevania 64, Rondo of Blood, Street Fighter III, Animal Crossing City Folk, Road Rash Trilogy, Syndicate Plus, Need for Speed Hot Pursuit 2, The Simpsons Arcade, Ridge Racer V (Fukami) e Screamer Rally; Burnout 3, Skate 3 e Mario Kart Wii ficaram fora do menu - ver "Fora do menu" abaixo). Os outros publicam build utilizável apenas no Windows por este
 app. Revisado em 18/10/2026: F-Zero X ganhou build Linux (🪟🐧🍎). No macOS, o Karamelo suporta pacotes `.app`, arquivos `.zip`,
 `.tar.xz`/`.tar.gz` e imagens de disco `.dmg` (montadas e extraídas
 transparentemente via `hdiutil`) com binários Mach-O nativos e prioriza
@@ -428,6 +429,17 @@ fornece a imagem de disco americana em formato `.chd` (ou `.cue`/`.bin`) em `rom
 ou `roms/PlayStation2/`; o Karamelo passa o caminho com `{iso}`, e o Fukami descompacta
 e valida os arquivos do jogo uma única vez no primeiro início para `%LOCALAPPDATA%\Fukami\disc\`
 (Windows), `~/Library/Application Support/Fukami/disc/` (macOS) ou `~/.local/share/Fukami/disc/` (Linux).
+
+Um detalhe da linha do Screamer Rally: é o port nativo e recompilação estática
+x86 de **Screamer Rally** (Milestone, 1997, MS-DOS / 3dfx Glide) escrito em Rust e
+Direct3D 11 por Rick Barber (`Rick-Barber/ScreamerRally-Recomp`), sob licença GPL-3.0.
+Não utiliza DOSBox nem emulador: executa o código de máquina original de 32 bits diretamente
+na CPU host e reimplementa as camadas de DOS, BIOS, timers, CD-ROM, áudio WASAPI e Glide.
+Traz o *Claude Renderer* com suporte a resoluções até 4K+, widescreen real (16:9, 21:9, 32:9),
+interpolação de alta taxa de quadros (60+ FPS), 108 shaders CRT do RetroArch / ShaderGlass,
+suporte a controles XInput com vibração e alternância dinâmica de clima (dia, noite e neblina).
+O jogador fornece a imagem de CD original (`.cue`/`.bin`, `.iso` ou `.mds`/`.mdf`) em `roms/DOS/`
+ou `roms/PC/`; o Karamelo passa o caminho com `--disc {iso}`.
 
 Um detalhe da linha do Conker's Bad Fur Day: é o port nativo de **Conker's Bad Fur
 Day** (Nintendo 64) via recompilação estática com RT64 (código por sciaschi,

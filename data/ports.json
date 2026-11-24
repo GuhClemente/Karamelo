@@ -1,5 +1,5 @@
 {
-  "catalog_version": 16,
+  "catalog_version": 17,
   "ports": [
     {
       "id": "DrMario64",
@@ -2129,6 +2129,34 @@
         "Fukami-1.1.0-windows-x86_64.zip": "855031d3d240c36cbe5272a19a550fe742bb7b5f2d0bbdb7987b7e496a232d3a"
       },
       "notes": "Ridge Racer V (PS2 USA SLUS-20002) native static recompilation (danisandoval/fukami) using PCSX2 GS/SPU2 layer. Supports 60 FPS, real widescreen, resolution scaling up to 8x. Reads user CHD/CUE on first launch."
+    },
+    {
+      "id": "ScreamerRally",
+      "display_name": "Screamer Rally",
+      "repo": "Rick-Barber/ScreamerRally-Recomp",
+      "exe_hint": "ScreamerRally.exe",
+      "launch_args": [
+        "--disc",
+        "{iso}"
+      ],
+      "iso_keywords": [
+        "screamer",
+        "rally"
+      ],
+      "iso_dirs": [
+        "DOS",
+        "PC"
+      ],
+      "iso_exts": [
+        ".cue",
+        ".iso",
+        ".mds"
+      ],
+      "release_tag": "v0.1.1",
+      "asset_sha256": {
+        "ScreamerRally-0.1.1.zip": "0e99456af42272b14f514df37368b11110b6aeb8265804b5f6577b71d0ba531b"
+      },
+      "notes": "Screamer Rally (Milestone 1997 MS-DOS/3dfx) native x86 recompilation in Rust/D3D11 by Rick Barber. Features Claude Renderer (4K, real widescreen), high frame rate interpolation, 108 CRT shaders and XInput with vibration. Reads user CD image via --disc."
     }
   ]
 }
