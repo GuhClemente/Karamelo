@@ -412,6 +412,7 @@ void MenuSetLanguage(int lang) {
 static std::vector<std::string> g_favorites;
 static std::vector<std::string> g_recent;
 static bool g_fav_recent_loaded = false;
+static std::mutex s_fav_recent_mutex;
 
 // Favorites and recents written before the UTF-8 code page was switched on
 // hold paths in the old ANSI code page (cp1252 on a Portuguese Windows). Such
@@ -454,7 +455,7 @@ static std::string LegacyToUtf8(const std::string &s) {
 #endif
 }
 
-static void LoadFavoritesAndRecent() {
+static void LoadFavoritesAndRecentLocked() {
   if (g_fav_recent_loaded) return;
   g_fav_recent_loaded = true;
   g_favorites.clear();
@@ -507,20 +508,21 @@ static bool WriteFileAtomic(const char *path, const std::string &content) {
   return ok;
 }
 
-static void SaveFavorites() {
+static std::string BuildFavoritesTextLocked() {
   std::string out = "# Karamelo - Favorites\n";
   for (const auto &p : g_favorites) out += p + "\n";
-  WriteFileAtomic("Config/favorites.txt", out);
+  return out;
 }
 
-static void SaveRecent() {
+static std::string BuildRecentTextLocked() {
   std::string out = "# Karamelo - Recent Games\n";
   for (const auto &p : g_recent) out += p + "\n";
-  WriteFileAtomic("Config/recent.txt", out);
+  return out;
 }
 
 bool MenuIsFavorite(const std::string &filepath) {
-  LoadFavoritesAndRecent();
+  std::lock_guard<std::mutex> lk(s_fav_recent_mutex);
+  LoadFavoritesAndRecentLocked();
   for (const auto &fav : g_favorites) {
     if (fav == filepath) return true;
   }
@@ -528,40 +530,55 @@ bool MenuIsFavorite(const std::string &filepath) {
 }
 
 void MenuToggleFavorite(const std::string &filepath) {
-  LoadFavoritesAndRecent();
-  auto it = std::find(g_favorites.begin(), g_favorites.end(), filepath);
-  if (it != g_favorites.end()) {
-    g_favorites.erase(it);
-    SaveFavorites();
-    CoreSetToast(Tr("REMOVIDO DOS FAVORITOS", "REMOVED FROM FAVORITES"), 90);
-  } else {
-    g_favorites.push_back(filepath);
-    SaveFavorites();
-    CoreSetToast(Tr("ADICIONADO AOS FAVORITOS", "ADDED TO FAVORITES"), 90);
+  bool added = false;
+  std::string snapshot;
+  {
+    std::lock_guard<std::mutex> lk(s_fav_recent_mutex);
+    LoadFavoritesAndRecentLocked();
+    auto it = std::find(g_favorites.begin(), g_favorites.end(), filepath);
+    if (it != g_favorites.end()) {
+      g_favorites.erase(it);
+      added = false;
+    } else {
+      g_favorites.push_back(filepath);
+      added = true;
+    }
+    snapshot = BuildFavoritesTextLocked();
   }
+  WriteFileAtomic("Config/favorites.txt", snapshot);
+  CoreSetToast(added ? Tr("ADICIONADO AOS FAVORITOS", "ADDED TO FAVORITES")
+                     : Tr("REMOVIDO DOS FAVORITOS", "REMOVED FROM FAVORITES"),
+               90);
 }
 
 void MenuAddRecent(const std::string &filepath) {
   if (filepath.empty()) return;
-  LoadFavoritesAndRecent();
-  auto it = std::find(g_recent.begin(), g_recent.end(), filepath);
-  if (it != g_recent.end()) {
-    g_recent.erase(it);
+  std::string snapshot;
+  {
+    std::lock_guard<std::mutex> lk(s_fav_recent_mutex);
+    LoadFavoritesAndRecentLocked();
+    auto it = std::find(g_recent.begin(), g_recent.end(), filepath);
+    if (it != g_recent.end()) {
+      g_recent.erase(it);
+    }
+    g_recent.insert(g_recent.begin(), filepath);
+    if (g_recent.size() > 15) {
+      g_recent.resize(15);
+    }
+    snapshot = BuildRecentTextLocked();
   }
-  g_recent.insert(g_recent.begin(), filepath);
-  if (g_recent.size() > 15) {
-    g_recent.resize(15);
-  }
-  SaveRecent();
+  WriteFileAtomic("Config/recent.txt", snapshot);
 }
 
 std::vector<std::string> MenuGetFavorites() {
-  LoadFavoritesAndRecent();
+  std::lock_guard<std::mutex> lk(s_fav_recent_mutex);
+  LoadFavoritesAndRecentLocked();
   return g_favorites;
 }
 
 std::vector<std::string> MenuGetRecent() {
-  LoadFavoritesAndRecent();
+  std::lock_guard<std::mutex> lk(s_fav_recent_mutex);
+  LoadFavoritesAndRecentLocked();
   return g_recent;
 }
 
@@ -3171,13 +3188,13 @@ static std::vector<std::string> s_recent_paths;
 void PopulateFavoritesMenu() {
   items.clear();
   current_title = Tr("Favoritos", "Favorites");
-  LoadFavoritesAndRecent();
+  const auto favs = MenuGetFavorites();
   s_favorites_paths.clear();
 
   items.push_back({"<..>", "", true, false, 0});
 
-  for (size_t i = 0; i < g_favorites.size(); i++) {
-    const auto &fav = g_favorites[i];
+  for (size_t i = 0; i < favs.size(); i++) {
+    const auto &fav = favs[i];
     if (fav.rfind("port:", 0) == 0) {
       std::string pid = fav.substr(5);
       auto plist = PortGetAvailableList();
@@ -3208,13 +3225,13 @@ void PopulateFavoritesMenu() {
 void PopulateRecentMenu() {
   items.clear();
   current_title = Tr("Recentes", "Recent Games");
-  LoadFavoritesAndRecent();
+  const auto recents = MenuGetRecent();
   s_recent_paths.clear();
 
   items.push_back({"<..>", "", true, false, 0});
 
-  for (size_t i = 0; i < g_recent.size(); i++) {
-    const auto &rec = g_recent[i];
+  for (size_t i = 0; i < recents.size(); i++) {
+    const auto &rec = recents[i];
     if (rec.rfind("port:", 0) == 0) {
       std::string pid = rec.substr(5);
       auto plist = PortGetAvailableList();
@@ -3251,32 +3268,8 @@ static bool IsNonGameFile(const std::string& fn, const fs::path& p) {
       fn == "thumbs.db" || fn == ".ds_store" || fn == "desktop.ini")
     return true;
 
-  static const char* kIgnoredExts[] = {
-    // Executables, binaries, and libraries
-    ".exe", ".pdb", ".dll", ".so", ".dylib", ".o", ".obj",
-    // Logs and diagnostic dumps
-    ".log", ".dmp", ".crash", ".trace",
-    // Documentation and text
-    ".txt", ".nfo", ".diz", ".pdf", ".doc", ".docx", ".rtf", ".odt",
-    // Images
-    ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".svg", ".ico", ".tga", ".tif", ".tiff",
-    // Audio (standalone media)
-    ".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma", ".mid", ".midi",
-    // Video
-    ".mov", ".mp4", ".mkv", ".avi", ".wmv", ".webm", ".flv", ".m4v", ".mpg", ".mpeg",
-    // Web and structured data
-    ".url", ".json", ".xml", ".htm", ".html", ".css", ".js", ".csv", ".tsv", ".yaml", ".yml",
-    // Scripts
-    ".sh", ".bat", ".cmd", ".ps1", ".vbs", ".py",
-    // Configuration and auxiliary metadata
-    ".ini", ".cfg", ".conf", ".bak", ".tmp", ".old", ".sub", ".srt",
-    // Checksums, torrents, and partial downloads
-    ".sfv", ".md5", ".sha1", ".sha256", ".sha512", ".torrent", ".part", ".crdownload"
-  };
-
-  for (const char* ext : kIgnoredExts) {
-    if (fn.ends_with(ext)) return true;
-  }
+  if (IsIgnoredNonGameExtension(fn, PathIsDosSystem(p)))
+    return true;
 
   if (fn.ends_with(".md") && !IsMegaDriveRom(p))
     return true;
@@ -3976,10 +3969,10 @@ static void RestoreBrowseRow(const std::string &dirpath) {
   if (found != s_browse_last.end()) {
     want = found->second;
   } else {
-    LoadFavoritesAndRecent();
+    const auto recents = MenuGetRecent();
     std::error_code ec;
     const fs::path dir = fs::path(dirpath);
-    for (const auto &r : g_recent) {
+    for (const auto &r : recents) {
       const fs::path rp(r);
       if (fs::equivalent(rp.parent_path(), dir, ec)) {
         want = rp.filename().string();
@@ -4276,7 +4269,10 @@ void MenuInit() {
   VoiceChatInit();
   DesktopChatInit();
   MenuLoadSettings();
-  LoadFavoritesAndRecent();
+  {
+    std::lock_guard<std::mutex> lk(s_fav_recent_mutex);
+    LoadFavoritesAndRecentLocked();
+  }
   NetplayInit();
   StarsInit(640, 360);
   // First boot of Karamelo OS only. /proc/asound used to be enough, and it

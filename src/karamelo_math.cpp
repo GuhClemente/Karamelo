@@ -1,4 +1,4 @@
-﻿#include "karamelo_math.h"
+#include "karamelo_math.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -90,4 +90,19 @@ int FramePeriodsForAudio(double samples, double samples_per_frame, double* carry
 	if (rest < -1.0) rest = -1.0;
 	*carry = rest;
 	return periods;
+}
+
+int RingBufferOccupancy(int wp, int rp, int capacity)
+{
+	if (capacity <= 0) return 0;
+	return (wp >= rp) ? (wp - rp) : (capacity - rp + wp);
+}
+
+int RingBufferTrimReadPos(int wp, int rp, int capacity, int keep_frames)
+{
+	if (capacity <= 0) return rp;
+	if (keep_frames < 0) keep_frames = 0;
+	int occ = RingBufferOccupancy(wp, rp, capacity);
+	if (occ <= keep_frames) return rp;
+	return (rp + (occ - keep_frames)) % capacity;
 }

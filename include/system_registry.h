@@ -134,6 +134,46 @@ inline std::filesystem::path ResolveSystemRomDir(const std::string& id_or_dir) {
   return direct1;
 }
 
+// True when a path or folder name belongs to the MS-DOS system library,
+// where executable launchers (.exe, .com, .bat) are valid games rather than
+// stray helper binaries.
+inline bool PathIsDosSystem(const std::filesystem::path& p) {
+  for (const auto& part : p) {
+    std::string seg = part.string();
+    for (char& c : seg) c = (char)tolower((unsigned char)c);
+    if (seg == "dos" || seg == "msdos" || seg == "ms-dos")
+      return true;
+  }
+  return false;
+}
+
+// Canonical check for non-game auxiliary extensions (docs, media, installers,
+// scripts, metadata). DOS folders allow .exe/.bat/.com game binaries/launchers.
+inline bool IsIgnoredNonGameExtension(const std::string& lower_fn, bool allow_dos_executables) {
+  static const char* const kIgnoredExts[] = {
+    ".pdb", ".dll", ".so", ".dylib", ".o", ".obj",
+    ".log", ".dmp", ".crash", ".trace",
+    ".txt", ".nfo", ".diz", ".pdf", ".doc", ".docx", ".rtf", ".odt",
+    ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".svg", ".ico", ".tga", ".tif", ".tiff",
+    ".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma", ".mid", ".midi",
+    ".mov", ".mp4", ".mkv", ".avi", ".wmv", ".webm", ".flv", ".m4v", ".mpg", ".mpeg",
+    ".url", ".json", ".xml", ".htm", ".html", ".css", ".js", ".csv", ".tsv", ".yaml", ".yml",
+    ".sh", ".cmd", ".ps1", ".vbs", ".py",
+    ".ini", ".cfg", ".conf", ".bak", ".tmp", ".old", ".sub", ".srt",
+    ".sfv", ".md5", ".sha1", ".sha256", ".sha512", ".torrent", ".part", ".crdownload"
+  };
+
+  for (const char* ext : kIgnoredExts) {
+    if (lower_fn.ends_with(ext)) return true;
+  }
+
+  if (!allow_dos_executables && (lower_fn.ends_with(".exe") || lower_fn.ends_with(".bat") || lower_fn.ends_with(".com"))) {
+    return true;
+  }
+
+  return false;
+}
+
 // Canonical rule for whether a directory entry qualifies as an executable game
 inline bool IsValidRomEntry(const std::filesystem::directory_entry& entry, bool is_ports = false) {
   namespace fs = std::filesystem;
@@ -149,7 +189,7 @@ inline bool IsValidRomEntry(const std::filesystem::directory_entry& entry, bool 
     for (char &c : lower_dir) c = (char)tolower((unsigned char)c);
     if (lower_dir == "cache" || lower_dir == "config" || lower_dir == "scripts" ||
         lower_dir == "wallpapers" || lower_dir == "bios" || lower_dir == "cores" ||
-        lower_dir == "saves" || lower_dir == "cheats") {
+        lower_dir == "saves" || lower_dir == "cheats" || lower_dir == "screenshots") {
       return false;
     }
     // Arcade CHD data folders (e.g. sfiii3, cvs2) companion to parent ROMs
@@ -174,6 +214,11 @@ inline bool IsValidRomEntry(const std::filesystem::directory_entry& entry, bool 
     std::string ext = fn.substr(dot);
     for (char &c : ext) c = (char)tolower((unsigned char)c);
 
+    // .exe/.com/.bat are only valid game entries inside MS-DOS libraries.
+    if (ext == ".exe" || ext == ".com" || ext == ".bat") {
+      return PathIsDosSystem(entry.path().parent_path());
+    }
+
     // Canonical extension list supported by all Karamelo cores
     static const char* const kExts[] = {
       ".sfc", ".smc", ".nes", ".fds", ".md", ".gen", ".smd", ".bin", ".32x",
@@ -182,7 +227,7 @@ inline bool IsValidRomEntry(const std::filesystem::directory_entry& entry, bool 
       ".cso", ".zip", ".7z", ".rar", ".pce", ".rom", ".img", ".col", ".lnx",
       ".j64", ".jag", ".ws", ".wsc", ".ngp", ".ngc", ".mx1", ".mx2", ".dsk",
       ".adf", ".d64", ".prg", ".tap", ".tzx", ".z80", ".sna", ".hdi", ".fdi",
-      ".d88", ".mec", ".nvm", ".wav", ".exe", ".com", ".bat", ".m3u", ".gdi",
+      ".d88", ".mec", ".nvm", ".wav", ".dosz", ".m3u", ".gdi",
       ".toc", ".a52", ".a26", ".a78"
     };
     for (const char* a : kExts) {

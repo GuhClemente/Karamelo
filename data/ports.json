@@ -1,5 +1,5 @@
 {
-  "catalog_version": 17,
+  "catalog_version": 18,
   "ports": [
     {
       "id": "DrMario64",
@@ -295,6 +295,10 @@
       "display_name": "Star Fox Enhanced",
       "repo": "kandowontu/starfox-enhanced",
       "needs_rom": true,
+      "rom_keywords": [
+        "star",
+        "fox"
+      ],
       "has_linux_build": true,
       "has_macos_build": true
     },
@@ -512,6 +516,15 @@
       "display_name": "Sonic 1 Forever",
       "repo": "ElspethThePict/S1Forever",
       "needs_rom": true,
+      "rom_keywords": [
+        "sonic"
+      ],
+      "rom_exclude_keywords": [
+        "2",
+        "3",
+        "cd",
+        "spinball"
+      ],
       "release_tag": "1.5.1",
       "asset_sha256": {
         "SonicForever_1.5.1_Android.zip": "342a300e6f424e7dadb37b0c186fe7f592b341a27e7a4d317a65345432628c9e",
@@ -524,6 +537,10 @@
       "display_name": "Sonic 3 A.I.R.",
       "repo": "Eukaryot/sonic3air",
       "needs_rom": true,
+      "rom_keywords": [
+        "sonic",
+        "3"
+      ],
       "has_linux_build": true,
       "has_macos_build": true,
       "release_tag": "v26.03.28.0-stable",
@@ -582,6 +599,11 @@
       "display_name": "Super Mario World",
       "repo": "mstan/SuperMarioWorldRecomp",
       "needs_rom": true,
+      "rom_keywords": [
+        "super",
+        "mario",
+        "world"
+      ],
       "has_linux_build": true,
       "release_tag": "v0.15.1",
       "asset_sha256": {

@@ -65,7 +65,7 @@ src/
 - **Testar Ports**: `./app/Karamelo --list-ports` (Lista todos os ports compatíveis com macOS).
 - **Empacotar**: `./package_macos.sh` (Gera `dist/Karamelo_v<versão>_macOS_arm64.tar.gz` e `dist/Karamelo_mac`).
 - **Deploy**: `./deploy_macos.sh` (Gera artefatos, atualiza `dist/version.json` e envia via SCP para `187.127.59.127:/data/downloads/`).
-- **Baixar Cores**: `./download_cores_macos.sh` (Baixa os 39 cores `.dylib` ARM64 para `app/cores/`).
+- **Baixar Cores**: `./download_cores_macos.sh` (Baixa os 43 cores `.dylib` ARM64 para `app/cores/`, correspondentes aos 42 motores mais o alias `n64_parallel`).
 
 ### Linux (x86_64)
 - **Compilar**: `./compile_linux.sh`
@@ -87,7 +87,7 @@ src/
 - **Contagem total**: 107 ports no menu (107 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎).
 - **Port que compila no primeiro uso (Project Tandem)**: `setup_relpath`, `setup_args` e `setup_done_relpath` rodam o instalador do projeto, em um console próprio, enquanto o arquivo de conclusão não existe; o launcher só inicia se ele der certo. `detached_process` mantém o Karamelo minimizado até o jogo fechar quando o launcher abre o jogo e sai. Só o processo com esse nome dentro da pasta do port conta.
 - **Fonte de download fora do GitHub (Foxhollow)**: `downloads_json_url` faz o `DownloadAndInstall` ler o feed do próprio projeto (`{"releases":[{"downloads":{"windows","linux","macos"}}]}`, mais novo primeiro) em vez da API de Releases; `iso_exts` libera `.rvz`/`.gcm` além de `.iso`.
-- **Ports ocultos** (`PortDefinition::hidden`): continuam no código e instaláveis por `--install-port`/`--prepare-port` para teste, mas `PortGetAvailableList()` os pula — não aparecem no menu nem entram em contagem. Hoje: só The Darkness.
+- **Ports ocultos** (`PortDefinition::hidden`): continuam no catálogo e instaláveis por `--install-port`/`--prepare-port` para teste, mas `PortGetAvailableList()` os pula — não aparecem no menu nem entram em contagem. Hoje: `TheDarknessRecomp`, `Takedawn`, `Skate3Recomp`, `WiiCompiled` e `SuperHangOnUltimate`.
 - **Xbox 360 (The Darkness, oculto)**: o dump do jogador (`roms/Xbox360/*.iso`) é extraído e convertido nativamente por `src/x360_dump.cpp` antes do launch, com portão de SHA-256 lido do próprio executável do port. Ver `docs/XBOX360_RECOMP.md`.
 - **ISO do jogador lido no lugar (Melee Unlocked)**: `launch_args` aceita `{iso}`, resolvido por `FindUserIso()` (palavras-chave no nome + cabeçalho GameCube `iso_disc_id`/`iso_disc_rev`, ex.: `GALE01` rev 2).
 - **Suporte macOS**: 47 ports com executáveis nativos Mach-O (`ARM64` > `Universal` > `x86_64`).

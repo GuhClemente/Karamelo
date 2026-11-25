@@ -677,13 +677,8 @@ static bool IsLinuxAssetName(const std::string& lower_name) {
 // without that function's "single untagged asset, just take it" fallback -
 // see IsLinuxAssetName's own comment for why that fallback is Windows-only.
 //
-// Restricted to ".zip" even though IsLinuxAssetName also flags .tar.gz/
-// .tar.xz/AppImage as Linux-shaped names: DownloadAndInstall's extraction
-// step below only knows how to unpack a zip (ArchiveExtractAll's Linux
-// backend is "unzip", nothing else). Picking a .tar.gz here would download
-// something the pipeline then fails to extract - worse than just not
-// offering the port. A release that ships only a .tar.gz/AppImage correctly
-// falls through to "no Linux build" until extraction grows those formats too.
+// Accepts .zip, .rar, .7z, .tar.gz, .tar.xz, .appimage, or a bare "linux"
+// binary (excluding checksums/packages like .apk/.deb/.rpm/flatpak).
 static GhAsset PickLinuxAsset(const std::vector<GhAsset>& assets) {
     auto is_archive = [](const std::string& n) {
         return (n.size() >= 4 && n.substr(n.size() - 4) == ".zip") ||

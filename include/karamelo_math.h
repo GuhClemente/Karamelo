@@ -38,4 +38,10 @@ void ComputeViewport(int aspect_mode, int dest_w, int dest_h,
 // extra period out of the drift.
 int FramePeriodsForAudio(double samples, double samples_per_frame, double* carry);
 
+// Lock-free SPSC audio ring helpers: compute current occupancy and advance a
+// consumer read index monotonically when trimming excess latency, never letting
+// the producer pull write_pos backwards behind read_pos.
+int RingBufferOccupancy(int wp, int rp, int capacity);
+int RingBufferTrimReadPos(int wp, int rp, int capacity, int keep_frames);
+
 #endif

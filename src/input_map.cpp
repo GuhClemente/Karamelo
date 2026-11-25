@@ -23,8 +23,35 @@ static SDL_Scancode VkToScancode(int vk)
 	case VK_RSHIFT: return SDL_SCANCODE_RSHIFT;
 	case VK_LCONTROL: return SDL_SCANCODE_LCTRL;
 	case VK_RCONTROL: return SDL_SCANCODE_RCTRL;
-	case VK_MENU: return SDL_SCANCODE_LALT;
+	case VK_MENU:
+	case VK_LMENU: return SDL_SCANCODE_LALT;
+	case VK_RMENU: return SDL_SCANCODE_RALT;
 	case VK_CAPITAL: return SDL_SCANCODE_CAPSLOCK;
+	case VK_PAUSE: return SDL_SCANCODE_PAUSE;
+	case VK_PRIOR: return SDL_SCANCODE_PAGEUP;
+	case VK_NEXT: return SDL_SCANCODE_PAGEDOWN;
+	case VK_END: return SDL_SCANCODE_END;
+	case VK_HOME: return SDL_SCANCODE_HOME;
+	case VK_INSERT: return SDL_SCANCODE_INSERT;
+	case VK_DELETE: return SDL_SCANCODE_DELETE;
+	case VK_NUMLOCK: return SDL_SCANCODE_NUMLOCKCLEAR;
+	case VK_SCROLL: return SDL_SCANCODE_SCROLLLOCK;
+	case VK_MULTIPLY: return SDL_SCANCODE_KP_MULTIPLY;
+	case VK_ADD: return SDL_SCANCODE_KP_PLUS;
+	case VK_SUBTRACT: return SDL_SCANCODE_KP_MINUS;
+	case VK_DECIMAL: return SDL_SCANCODE_KP_PERIOD;
+	case VK_DIVIDE: return SDL_SCANCODE_KP_DIVIDE;
+	case VK_OEM_1: return SDL_SCANCODE_SEMICOLON;
+	case VK_OEM_PLUS: return SDL_SCANCODE_EQUALS;
+	case VK_OEM_COMMA: return SDL_SCANCODE_COMMA;
+	case VK_OEM_MINUS: return SDL_SCANCODE_MINUS;
+	case VK_OEM_PERIOD: return SDL_SCANCODE_PERIOD;
+	case VK_OEM_2: return SDL_SCANCODE_SLASH;
+	case VK_OEM_3: return SDL_SCANCODE_GRAVE;
+	case VK_OEM_4: return SDL_SCANCODE_LEFTBRACKET;
+	case VK_OEM_5: return SDL_SCANCODE_BACKSLASH;
+	case VK_OEM_6: return SDL_SCANCODE_RIGHTBRACKET;
+	case VK_OEM_7: return SDL_SCANCODE_APOSTROPHE;
 	case VK_NUMPAD0: return SDL_SCANCODE_KP_0;
 	case VK_NUMPAD1: return SDL_SCANCODE_KP_1;
 	case VK_NUMPAD2: return SDL_SCANCODE_KP_2;
@@ -328,22 +355,52 @@ const char* InputBindKeyName(int bind)
 	int vk = s_keys[bind];
 	char* out = name[bind];
 
-	if (vk == 0) { strcpy(out, "-"); return out; }
+	if (vk == 0) { snprintf(out, 32, "-"); return out; }
 
 	switch (vk)
 	{
-	case VK_UP:      strcpy(out, "Cima");  return out;
-	case VK_DOWN:    strcpy(out, "Baixo"); return out;
-	case VK_LEFT:    strcpy(out, "Esq");   return out;
-	case VK_RIGHT:   strcpy(out, "Dir");   return out;
-	case VK_RETURN:  strcpy(out, "Enter");      return out;
-	case VK_SPACE:   strcpy(out, "Espaco");     return out;
-	case VK_LSHIFT:  strcpy(out, "Shift Esq");  return out;
-	case VK_RSHIFT:  strcpy(out, "Shift Dir");  return out;
-	case VK_LCONTROL:strcpy(out, "Ctrl Esq");   return out;
-	case VK_RCONTROL:strcpy(out, "Ctrl Dir");   return out;
-	case VK_TAB:     strcpy(out, "Tab");        return out;
-	case VK_BACK:    strcpy(out, "Backspace");  return out;
+	case VK_UP:         snprintf(out, 32, "Cima");       return out;
+	case VK_DOWN:       snprintf(out, 32, "Baixo");      return out;
+	case VK_LEFT:       snprintf(out, 32, "Esq");        return out;
+	case VK_RIGHT:      snprintf(out, 32, "Dir");        return out;
+	case VK_RETURN:     snprintf(out, 32, "Enter");      return out;
+	case VK_SPACE:      snprintf(out, 32, "Espaco");     return out;
+	case VK_ESCAPE:     snprintf(out, 32, "Esc");        return out;
+	case VK_LSHIFT:     snprintf(out, 32, "Shift Esq");  return out;
+	case VK_RSHIFT:     snprintf(out, 32, "Shift Dir");  return out;
+	case VK_LCONTROL:   snprintf(out, 32, "Ctrl Esq");   return out;
+	case VK_RCONTROL:   snprintf(out, 32, "Ctrl Dir");   return out;
+	case VK_MENU:
+	case VK_LMENU:      snprintf(out, 32, "Alt Esq");    return out;
+	case VK_RMENU:      snprintf(out, 32, "Alt Dir");    return out;
+	case VK_TAB:        snprintf(out, 32, "Tab");        return out;
+	case VK_BACK:       snprintf(out, 32, "Backspace");  return out;
+	case VK_CAPITAL:    snprintf(out, 32, "Caps Lock");  return out;
+	case VK_PAUSE:      snprintf(out, 32, "Pause");      return out;
+	case VK_PRIOR:      snprintf(out, 32, "Page Up");    return out;
+	case VK_NEXT:       snprintf(out, 32, "Page Down");  return out;
+	case VK_HOME:       snprintf(out, 32, "Home");       return out;
+	case VK_END:        snprintf(out, 32, "End");        return out;
+	case VK_INSERT:     snprintf(out, 32, "Insert");     return out;
+	case VK_DELETE:     snprintf(out, 32, "Delete");     return out;
+	case VK_NUMLOCK:    snprintf(out, 32, "Num Lock");   return out;
+	case VK_SCROLL:     snprintf(out, 32, "Scroll");     return out;
+	case VK_MULTIPLY:   snprintf(out, 32, "Num *");      return out;
+	case VK_ADD:        snprintf(out, 32, "Num +");      return out;
+	case VK_SUBTRACT:   snprintf(out, 32, "Num -");      return out;
+	case VK_DECIMAL:    snprintf(out, 32, "Num .");      return out;
+	case VK_DIVIDE:     snprintf(out, 32, "Num /");      return out;
+	case VK_OEM_1:      snprintf(out, 32, ";");          return out;
+	case VK_OEM_PLUS:   snprintf(out, 32, "=");          return out;
+	case VK_OEM_COMMA:  snprintf(out, 32, ",");          return out;
+	case VK_OEM_MINUS:  snprintf(out, 32, "-");          return out;
+	case VK_OEM_PERIOD: snprintf(out, 32, ".");          return out;
+	case VK_OEM_2:      snprintf(out, 32, "/");          return out;
+	case VK_OEM_3:      snprintf(out, 32, "`");          return out;
+	case VK_OEM_4:      snprintf(out, 32, "[");          return out;
+	case VK_OEM_5:      snprintf(out, 32, "\\");         return out;
+	case VK_OEM_6:      snprintf(out, 32, "]");          return out;
+	case VK_OEM_7:      snprintf(out, 32, "'");          return out;
 	default: break;
 	}
 

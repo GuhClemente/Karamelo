@@ -581,8 +581,10 @@ static void PollMouseStylus()
 	float mx = 0.0f, my = 0.0f;
 	SDL_MouseButtonFlags btn = SDL_GetMouseState(&mx, &my);
 
+	// SDL_GetMouseState returns logical window coordinates, which diverge from
+	// SDL_GetWindowSizeInPixels on Retina / HiDPI displays.
 	int win_w = 0, win_h = 0;
-	SDL_GetWindowSizeInPixels(g_window, &win_w, &win_h);
+	SDL_GetWindowSize(g_window, &win_w, &win_h);
 	if (win_w <= 0 || win_h <= 0) return;
 
 	bool down = (btn & SDL_BUTTON_LMASK) != 0;
@@ -1417,10 +1419,24 @@ int main(int argc, char* argv[])
 
 	MenuInit();
 	TrayManagerInit(nullptr);
-	if (argc > 1 && strcmp(argv[1], "--chat") == 0)
-		DesktopChatShowWindow();
-	if (argc > 1 && strcmp(argv[1], "--cloud-login") == 0)
-		CloudSyncStartOAuthFlow();
+	for (int i = 1; i < argc; i++)
+	{
+		if (argv[i] && strcmp(argv[i], "--chat") == 0)
+			DesktopChatShowWindow();
+		else if (argv[i] && strcmp(argv[i], "--cloud-login") == 0)
+			CloudSyncStartOAuthFlow();
+	}
+
+	if (start_fullscreen)
+	{
+		MenuSetFullscreen(true);
+	}
+	else if (MenuGetFullscreen())
+	{
+		start_fullscreen = true;
+		SDL_SetWindowFullscreen(g_window, true);
+	}
+	bool s_is_fullscreen = start_fullscreen;
 
 	double display_fps = 60.0;
 	SDL_DisplayID display_id = SDL_GetDisplayForWindow(g_window);
@@ -1548,8 +1564,13 @@ int main(int argc, char* argv[])
 				}
 				else if (sc == SDL_SCANCODE_F10)
 				{
-					if (!key_repeat && (!CoreGameUsesKeyboard() || DesktopChatIsOverlayVisible()))
-						DesktopChatToggleOverlay();
+					if (!key_repeat)
+					{
+						if (event.key.mod & SDL_KMOD_SHIFT)
+							DesktopChatToggleWindow();
+						else if (!CoreGameUsesKeyboard() || DesktopChatIsOverlayVisible())
+							DesktopChatToggleOverlay();
+					}
 				}
 				else if (sc == SDL_SCANCODE_F12)
 				{
@@ -1559,8 +1580,10 @@ int main(int argc, char* argv[])
 				{
 					if (!key_repeat)
 					{
-						bool is_full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN) != 0;
-						SDL_SetWindowFullscreen(g_window, !is_full);
+						bool new_full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN) == 0;
+						SDL_SetWindowFullscreen(g_window, new_full);
+						MenuSetFullscreen(new_full);
+						s_is_fullscreen = new_full;
 					}
 				}
 				else if (CoreIsRunning() && !OsdIsEnabled() && !key_repeat)
@@ -1638,6 +1661,12 @@ int main(int argc, char* argv[])
 		PollGamepad();
 		PollMouseStylus();
 		PortPumpPendingLaunch();
+
+		if (MenuGetFullscreen() != s_is_fullscreen)
+		{
+			s_is_fullscreen = MenuGetFullscreen();
+			SDL_SetWindowFullscreen(g_window, s_is_fullscreen);
+		}
 
 		if (MenuGetSyncMode() != last_sync_mode)
 		{

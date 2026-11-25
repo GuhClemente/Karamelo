@@ -765,7 +765,7 @@ void NetplayUpdate()
 		if (res > 0 && !FD_ISSET(peer_sock, &error_fds) && so_error == 0)
 		{
 			const std::string hello = "KRMB1 " + relay_ticket + "\n";
-			send(peer_sock, hello.data(), (int)hello.size(), 0);
+			send(peer_sock, hello.data(), (int)hello.size(), MSG_NOSIGNAL);
 			relay_stage = 2;
 			status_str = "Waiting for the other player...";
 		}

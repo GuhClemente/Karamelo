@@ -1,5 +1,11 @@
 #include "test_framework.h"
 #include "input_map.h"
+#include "compat_win32.h"
+#include "system_registry.h"
+
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 
 // One press, one action. With "Controle como Mouse" off (the default) nothing
 // on the pad or the keyboard may also click the emulated mouse: on FM Towns the
@@ -242,4 +248,79 @@ TEST_CASE(SixButtonArcadeFollowsButtonNames)
 	shmup[0] = "Shot"; shmup[8] = "Bomb";
 	ASSERT_TRUE(!InputBindApplySixButtonLayout("Arcade", shmup));
 	InputBindResetDefaults();
+}
+
+TEST_CASE(InputExtendedAndOemKeyNames)
+{
+	InputBindResetDefaults();
+	// Esc is reserved (menu toggle/cancel) and must stay unbindable.
+	ASSERT_FALSE(InputBindSetKey(BIND_A, VK_ESCAPE));
+
+	const struct { int vk; const char* expected; } kCases[] = {
+		{ VK_LMENU, "Alt Esq" },
+		{ VK_RMENU, "Alt Dir" },
+		{ VK_PRIOR, "Page Up" },
+		{ VK_NEXT, "Page Down" },
+		{ VK_HOME, "Home" },
+		{ VK_END, "End" },
+		{ VK_INSERT, "Insert" },
+		{ VK_DELETE, "Delete" },
+		{ VK_OEM_COMMA, "," },
+		{ VK_OEM_PERIOD, "." },
+		{ VK_OEM_MINUS, "-" },
+		{ VK_OEM_PLUS, "=" },
+		{ VK_OEM_1, ";" },
+		{ VK_OEM_2, "/" },
+		{ VK_OEM_4, "[" },
+		{ VK_OEM_5, "\\" },
+		{ VK_OEM_6, "]" },
+		{ VK_OEM_7, "'" },
+	};
+	for (const auto& c : kCases)
+	{
+		ASSERT_TRUE(InputBindSetKey(BIND_A, c.vk));
+		ASSERT_STR_EQ(InputBindKeyName(BIND_A), c.expected);
+	}
+	InputBindResetDefaults();
+}
+
+TEST_CASE(DosSystemAllowsExecutablesWhileConsolesIgnoreThem)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	const fs::path base = fs::path("build/test_rom_filter");
+	fs::remove_all(base, ec);
+	fs::create_directories(base / "roms/DOS", ec);
+	fs::create_directories(base / "roms/SNES", ec);
+
+	auto touch = [](const fs::path& p) {
+		std::ofstream f(p, std::ios::binary);
+		f << "x";
+	};
+	touch(base / "roms/DOS/doom.exe");
+	touch(base / "roms/DOS/play.bat");
+	touch(base / "roms/DOS/duke.com");
+	touch(base / "roms/DOS/game.dosz");
+	touch(base / "roms/DOS/readme.txt");
+	touch(base / "roms/DOS/movie.mov");
+	touch(base / "roms/SNES/setup.exe");
+	touch(base / "roms/SNES/run.bat");
+	touch(base / "roms/SNES/Chrono.sfc");
+
+	ASSERT_TRUE(PathIsDosSystem(base / "roms/DOS/doom.exe"));
+	ASSERT_FALSE(PathIsDosSystem(base / "roms/SNES/setup.exe"));
+
+	ASSERT_FALSE(IsIgnoredNonGameExtension("doom.exe", true));
+	ASSERT_FALSE(IsIgnoredNonGameExtension("play.bat", true));
+	ASSERT_TRUE(IsIgnoredNonGameExtension("doom.exe", false));
+	ASSERT_TRUE(IsIgnoredNonGameExtension("play.bat", false));
+	ASSERT_TRUE(IsIgnoredNonGameExtension("readme.txt", true));
+	ASSERT_TRUE(IsIgnoredNonGameExtension("movie.mov", true));
+
+	// Both IsValidRomEntry (menu hide-empty + Web Studio) and IsIgnoredNonGameExtension
+	// (menu browse) must agree on DOS executables vs console folders.
+	ASSERT_EQ(CountGamesInDirectory(base / "roms/DOS", false), 4);
+	ASSERT_EQ(CountGamesInDirectory(base / "roms/SNES", false), 1);
+
+	fs::remove_all(base, ec);
 }

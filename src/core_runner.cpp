@@ -240,6 +240,8 @@ static std::map<std::string, std::string> s_arcade_core_for_rom;
 // is the punch-and-jump-at-once bug reported on Altered Beast.
 static bool SystemNeedsKeyboardBridge(const std::string& system_dir);
 
+static bool IsC64Core();
+
 // Same family of bug as the keyboard bridge above, different pair of
 // controls: on a real N64/PSX/PS2/Saturn/Dreamcast/GameCube/PSP/3DS pad the
 // D-Pad and the analog stick are independent controls that many games bind
@@ -509,11 +511,32 @@ static int g_output_sample_rate = 48000;
 // dev-sdl3: g_audio_stream replaces HWAVEOUT/WAVEHDR. SDL_OpenAudioDeviceStream
 // hands back a stream already bound to the default output device; feeding it
 // is just SDL_PutAudioStreamData with no header prepare/unprepare bookkeeping.
+struct AudioThreadContext
+{
+	SDL_AudioStream* stream = nullptr;
+	HANDLE event = NULL;
+	std::atomic<bool> stop{ false };
+	std::atomic<LONG> trim_to_frames{ -1 };
+	std::atomic<int> refcount{ 2 };
+};
+
+static AudioThreadContext* g_audio_ctx = nullptr;
 static SDL_AudioStream* g_audio_stream = nullptr;
 static HANDLE   h_audio_event = NULL;
 static HANDLE   h_audio_thread = NULL;
 static bool     audio_thread_running = false;
 static CoreAudioCallback g_audio_tap_callback = nullptr;
+
+static void ReleaseAudioThreadContext(AudioThreadContext* ctx)
+{
+	if (!ctx) return;
+	if (ctx->refcount.fetch_sub(1, std::memory_order_acq_rel) == 1)
+	{
+		if (ctx->stream) SDL_DestroyAudioStream(ctx->stream);
+		if (ctx->event) CloseHandle(ctx->event);
+		delete ctx;
+	}
+}
 
 // How many SAMPLES_PER_BUFFER-sized chunks of latency to keep queued in the
 // stream. Set from the Audio Latency setting when a game loads. A deeper
@@ -538,7 +561,6 @@ static int16_t  g_hist_l[4] = { 0, 0, 0, 0 };
 static int16_t  g_hist_r[4] = { 0, 0, 0, 0 };
 // Marcada quando a thread de audio nao respondeu e foi abandonada: o stream
 // dela nao pode ser destruido, porque ela pode estar dentro dele.
-static bool     audio_abandoned = false;
 static bool     audio_initialized = false;
 static volatile LONG g_startup_mute_samples = 0;
 static volatile LONG g_audio_underrun_count = 0; // incremented by audio thread, read by PERF log
@@ -569,6 +591,13 @@ static std::string   s_loaded_core_path = "";
 static std::string   s_active_rom_path = "";
 static std::string   s_active_core_path = "";
 static std::thread::id s_core_thread_id;
+
+static bool IsC64Core()
+{
+	return s_loaded_core_path.find("c64") != std::string::npos ||
+	       s_loaded_core_path.find("vice") != std::string::npos ||
+	       loaded_core_name == "Commodore 64";
+}
 
 static bool SystemNeedsKeyboardBridge(const std::string& system_dir)
 {
@@ -766,16 +795,50 @@ static std::atomic<FILE*> s_record_audio_fp{ nullptr };
 // so stopping a recording never closes the FILE under an fwrite in flight.
 static std::mutex s_record_audio_mtx;
 
+static void StopAudioContext(const char* caller_tag)
+{
+	if (g_audio_ctx)
+	{
+		g_audio_ctx->stop.store(true, std::memory_order_release);
+		if (g_audio_ctx->event) SetEvent(g_audio_ctx->event);
+	}
+	if (h_audio_thread)
+	{
+		if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
+		{
+			// Presa dentro de uma chamada do SDL (driver travado). Nao se mata:
+			// a thread retem sua referencia propria para ctx (stream + event),
+			// evitando uso apos liberacao enquanto este path abandona g_audio_ctx
+			// e zera os ponteiros globais para um proximo jogo abrir stream novo.
+			CoreLogPrintf(RETRO_LOG_WARN,
+				"[%s] audio thread nao respondeu em 1s (driver travado?) - abandonando thread e stream (vazam ate fechar o app)",
+				caller_tag);
+		}
+		CloseHandle(h_audio_thread);
+		h_audio_thread = NULL;
+	}
+	audio_thread_running = false;
+	g_audio_stream = nullptr;
+	h_audio_event = NULL;
+	audio_initialized = false;
+	if (g_audio_ctx)
+	{
+		ReleaseAudioThreadContext(g_audio_ctx);
+		g_audio_ctx = nullptr;
+	}
+}
+
 static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 {
-	(void)lpParam;
+	AudioThreadContext* ctx = (AudioThreadContext*)lpParam;
+	if (!ctx) return 0;
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-	while (audio_thread_running)
+	while (!ctx->stop.load(std::memory_order_acquire))
 	{
-		WaitForSingleObject(h_audio_event, 5);
+		WaitForSingleObject(ctx->event, 5);
 
-		if (!audio_thread_running || !g_audio_stream) break;
+		if (ctx->stop.load(std::memory_order_acquire) || !ctx->stream) break;
 
 		// Top the stream up to the target queue depth rather than always
 		// pushing one fixed chunk - SDL_GetAudioStreamQueued() is the
@@ -793,12 +856,24 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 
 		for (;;)
 		{
-			const int queued_bytes = SDL_GetAudioStreamQueued(g_audio_stream);
+			if (ctx->stop.load(std::memory_order_acquire)) break;
+
+			LONG trim_to = ctx->trim_to_frames.exchange(-1, std::memory_order_acq_rel);
+			if (trim_to >= 0)
+			{
+				LONG cur_wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
+				LONG cur_rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
+				LONG new_rp = (LONG)RingBufferTrimReadPos((int)cur_wp, (int)cur_rp, RING_BUFFER_SIZE, (int)trim_to);
+				if (new_rp != cur_rp)
+					InterlockedExchange(&g_ring_read_pos, new_rp);
+			}
+
+			const int queued_bytes = SDL_GetAudioStreamQueued(ctx->stream);
 			if (queued_bytes >= target_bytes) break;
 
 			LONG wp = InterlockedCompareExchange(&g_ring_write_pos, 0, 0);
 			LONG rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
-			LONG available = (wp >= rp) ? (wp - rp) : (RING_BUFFER_SIZE - rp + wp);
+			LONG available = (LONG)RingBufferOccupancy((int)wp, (int)rp, RING_BUFFER_SIZE);
 
 			// With two chunks still to play, a short ring is only the core's next frame
 			// not being here yet. Padding then put silence in the middle of the sound for
@@ -850,7 +925,7 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			// A false return means nothing was actually queued - breaking
 			// here avoids ever spinning forever on a while condition that
 			// SDL_GetAudioStreamQueued() would otherwise never satisfy.
-			if (!SDL_PutAudioStreamData(g_audio_stream, chunk, (int)sizeof(chunk)))
+			if (!SDL_PutAudioStreamData(ctx->stream, chunk, (int)sizeof(chunk)))
 				break;
 		}
 
@@ -887,6 +962,7 @@ static DWORD WINAPI AudioThreadProc(LPVOID lpParam)
 			s_escalate_window_underruns = 0;
 		}
 	}
+	ReleaseAudioThreadContext(ctx);
 	return 0;
 }
 
@@ -1002,9 +1078,25 @@ static void InitAudio(int sample_rate)
 
 		// Ring positions were already set above, including the target-occupancy
 		// preload; resetting them here would empty it on the first game.
+		AudioThreadContext* ctx = new AudioThreadContext();
+		ctx->stream = g_audio_stream;
+		ctx->event = h_audio_event;
+		g_audio_ctx = ctx;
 		audio_thread_running = true;
-		h_audio_thread = CreateThread(NULL, 0, AudioThreadProc, NULL, 0, NULL);
-		audio_initialized = true;
+		h_audio_thread = CreateThread(NULL, 0, AudioThreadProc, ctx, 0, NULL);
+		if (!h_audio_thread)
+		{
+			audio_thread_running = false;
+			ReleaseAudioThreadContext(ctx); // thread never ran: drop its ref
+			ReleaseAudioThreadContext(ctx); // drop g_audio_ctx ref (destroys stream+event)
+			g_audio_ctx = nullptr;
+			g_audio_stream = nullptr;
+			h_audio_event = NULL;
+		}
+		else
+		{
+			audio_initialized = true;
+		}
 	}
 	else
 	{
@@ -1207,7 +1299,8 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 
 	// A core whose rate never settles never reaches the control below, and nothing else
 	// held its queue back: the arcade core sat at over a second of delay. Too much
-	// queued is stale whichever stage this is, so the excess goes.
+	// queued is stale whichever stage this is, so the excess goes via consumer trim
+	// (never pulling wp backwards in the producer).
 	if (s_locked_step <= 0.0)
 	{
 		const LONG limit = InterlockedCompareExchange(&g_active_wave_buffers, 0, 0) * SAMPLES_PER_BUFFER * 3;
@@ -1217,9 +1310,13 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		{
 			const LONG excess = queued - limit / 3;
 			const LONG drop = excess < occupancy ? excess : occupancy;
-			rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
-			wp = (rp + (occupancy - drop)) % RING_BUFFER_SIZE;
-			occupancy -= drop;
+			const LONG keep = occupancy - drop;
+			if (g_audio_ctx)
+			{
+				g_audio_ctx->trim_to_frames.store(keep, std::memory_order_release);
+				SetEvent(g_audio_ctx->event);
+			}
+			occupancy = keep;
 			capacity = RING_BUFFER_SIZE - occupancy - 1;
 		}
 	}
@@ -1246,31 +1343,42 @@ static void SendAudioSamples(const int16_t* data, size_t frames)
 		// frames a second, so recovering from a stalled boot would mean half a
 		// minute of detune. A hard reseed is a discontinuity, but it only ever
 		// fires when playback is already broken (core booting below speed, a
-		// long stall), where silence is playing anyway. Padding with silence
-		// Too empty pads with silence; too full discards the excess, which is
-		// stale latency nobody wants to hear anyway.
+		// long stall), where silence is playing anyway.
+		// Too empty pads with silence forward from wp; too full asks the consumer
+		// to advance rp rather than pulling wp backwards.
 		const LONG seed = (LONG)target_fill;
 		const LONG min_thresh = SAMPLES_PER_BUFFER * 2;
 		if (total_queued < min_thresh || total_queued > seed * 3)
 		{
-			// Re-read: the audio thread has been draining since the snapshot
-			// above, so the stale value would seed us behind the reader.
 			rp = InterlockedCompareExchange(&g_ring_read_pos, 0, 0);
+			const LONG occ_now = (LONG)RingBufferOccupancy((int)wp, (int)rp, RING_BUFFER_SIZE);
+			LONG cap_now = RING_BUFFER_SIZE - occ_now - 1;
 			const LONG baseline_seed = (LONG)InterlockedCompareExchange(&g_baseline_wave_buffers, 0, 0) * SAMPLES_PER_BUFFER;
 			const LONG prime_target = (seed < baseline_seed) ? seed : baseline_seed;
 			const LONG ring_wanted = (prime_target > stream_frames) ? (prime_target - stream_frames) : 0;
-			for (LONG i = occupancy; i < ring_wanted; i++)
+			if (occ_now < ring_wanted)
 			{
-				LONG idx = (rp + i) % RING_BUFFER_SIZE;
-				g_ring_buffer[idx * 2 + 0] = 0;
-				g_ring_buffer[idx * 2 + 1] = 0;
+				for (LONG i = occ_now; i < ring_wanted && cap_now > 0; i++)
+				{
+					g_ring_buffer[wp * 2 + 0] = 0;
+					g_ring_buffer[wp * 2 + 1] = 0;
+					wp = (wp + 1) % RING_BUFFER_SIZE;
+					cap_now--;
+				}
+				InterlockedExchange(&g_ring_write_pos, wp);
+				occupancy = (LONG)RingBufferOccupancy((int)wp, (int)rp, RING_BUFFER_SIZE);
+				capacity = RING_BUFFER_SIZE - occupancy - 1;
 			}
-			// wp and capacity have to move with it: the write loop below
-			// continues from wp and stores it back at the end, which would
-			// otherwise undo this.
-			wp = (rp + ring_wanted) % RING_BUFFER_SIZE;
-			occupancy = ring_wanted;
-			capacity = RING_BUFFER_SIZE - occupancy - 1;
+			else if (occ_now > ring_wanted)
+			{
+				if (g_audio_ctx)
+				{
+					g_audio_ctx->trim_to_frames.store(ring_wanted, std::memory_order_release);
+					SetEvent(g_audio_ctx->event);
+				}
+				occupancy = ring_wanted;
+				capacity = RING_BUFFER_SIZE - occupancy - 1;
+			}
 
 			// The gap that just got closed was, by definition, not something
 			// the slow average had any hope of tracking - restart it at the
@@ -3109,19 +3217,20 @@ static void PollLocalInput(void)
 	}
 
 	// For Commodore 64 cores:
-	// If only 1 gamepad is connected, mirror port 0 inputs to port 1 so the controller
-	// works automatically whether the C64 game was programmed for Joystick Port 1 or Joystick Port 2.
-	if (s_loaded_core_path.find("c64") != std::string::npos ||
-	    s_loaded_core_path.find("vice") != std::string::npos ||
-	    loaded_core_name == "Commodore 64")
+	// If only 1 gamepad is connected and actively driven, mirror digital pad 0
+	// buttons onto port 1 so single-player games expecting Joystick Port 2 work
+	// out of the box without leaking keyboard stick bindings (Num 2/4/6) onto
+	// port 2 analog axes.
+	if (IsC64Core())
 	{
-		XINPUT_STATE pad1_state;
-		if (!GamepadGetState(1, &pad1_state))
+		XINPUT_STATE pad0_state{}, pad1_state{};
+		bool pad0_active = GamepadGetState(0, &pad0_state) &&
+		                   (pad0_state.Gamepad.wButtons != 0 ||
+		                    abs(pad0_state.Gamepad.sThumbLX) > deadzone_thresh ||
+		                    abs(pad0_state.Gamepad.sThumbLY) > deadzone_thresh);
+		if (pad0_active && !GamepadGetState(1, &pad1_state))
 		{
 			for (int b = 0; b < 16; b++) joypad_buttons[1][b] = joypad_buttons[0][b];
-			for (int s = 0; s < 2; s++)
-				for (int a = 0; a < 2; a++)
-					analog_sticks[1][s][a] = analog_sticks[0][s][a];
 		}
 	}
 
@@ -3858,8 +3967,9 @@ int CoreRunInputProbe(std::string& report)
 			unsigned port = std::get<0>(h), device = std::get<1>(h), id = std::get<2>(h);
 			bool ok = false;
 			if (pr.kind == 0)
-				ok = (int)port == pr.slot && (device == RETRO_DEVICE_JOYPAD || device == RETRO_DEVICE_ANALOG ||
-				     (device == RETRO_DEVICE_KEYBOARD && keyboard_bridge_active && pr.slot == 0));
+				ok = ((int)port == pr.slot && (device == RETRO_DEVICE_JOYPAD || device == RETRO_DEVICE_ANALOG ||
+				     (device == RETRO_DEVICE_KEYBOARD && keyboard_bridge_active && pr.slot == 0))) ||
+				     (pr.slot == 0 && port == 1 && device == RETRO_DEVICE_JOYPAD && IsC64Core());
 			else if (pr.kind == 1)
 				ok = port == 0 && (device == RETRO_DEVICE_JOYPAD || device == RETRO_DEVICE_ANALOG ||
 				     device == RETRO_DEVICE_KEYBOARD);
@@ -4760,51 +4870,10 @@ static void RecoverAfterKilledCore(unsigned long killed_thread_id)
 	// mapping costs memory, not correctness - a different core still loads.
 	h_core_dll = NULL;
 
-	// Stop-then-close, same order as CoreUnload: AudioThreadProc is a separate
-	// live thread the core-thread kill above never touched. Destroying
-	// g_audio_stream out from under it while it can still be mid-
-	// SDL_PutAudioStreamData() races the handle close against that thread's
-	// own use of it.
-	if (audio_thread_running)
-	{
-		audio_thread_running = false;
-		if (h_audio_event) SetEvent(h_audio_event);
-		if (h_audio_thread)
-		{
-			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
-			{
-				// Presa dentro de uma chamada do SDL (driver travado). Nao se
-				// mata: TerminateThread solta a thread sem soltar os locks que
-				// ela segura, e se um deles for interno do SDL a proxima
-				// chamada de audio trava para sempre. Foi essa a mecanica que
-				// deixou a interface presa em "LOADING..." no PS2, por outro
-				// caminho.
-				//
-				// Abandona-se a thread E o stream juntos. Destruir o stream
-				// aqui correria contra a chamada em que ela esta parada, que e
-				// o motivo original de existir um kill. Deixando os dois de pe
-				// nada corre risco: ela sai sozinha se a chamada retornar, e um
-				// jogo novo abre um stream novo.
-				audio_abandoned = true;
-				CoreLogPrintf(RETRO_LOG_WARN,
-					"[CoreShutdown] audio thread nao respondeu em 1s (driver travado?) - abandonando thread e stream (vazam ate fechar o app)");
-			}
-			CloseHandle(h_audio_thread);
-			h_audio_thread = NULL;
-		}
-	}
-
-	if (g_audio_stream)
-	{
-		// Destroying the stream also closes the device it was opened
-		// against - SDL_OpenAudioDeviceStream's own contract.
-		if (!audio_abandoned)
-			SDL_DestroyAudioStream(g_audio_stream);
-		g_audio_stream = nullptr;
-		audio_initialized = false;
-		audio_abandoned = false;
-	}
-	if (h_audio_event) { CloseHandle(h_audio_event); h_audio_event = NULL; }
+	// Stop-then-release via AudioThreadContext: AudioThreadProc keeps its own
+	// ref to stream+event if the audio driver hung past 1s, preventing UAF or
+	// NULL dereference if the abandoned thread wakes up later.
+	StopAudioContext("CoreShutdown");
 
 	g_resample_phase = 0.0;
 	memset(g_hist_l, 0, sizeof(g_hist_l));
@@ -5989,44 +6058,11 @@ static void CoreUnload()
 		is_core_loaded = false;
 	}
 
-	if (audio_thread_running)
+	if (audio_thread_running || g_audio_ctx)
 	{
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Parando audio thread...");
-		audio_thread_running = false;
-		if (h_audio_event) SetEvent(h_audio_event);
-		if (h_audio_thread)
-		{
-			if (WaitForSingleObject(h_audio_thread, 1000) == WAIT_TIMEOUT)
-			{
-				// Mesmo raciocinio do CoreShutdown: abandonar em vez de matar.
-				// Ver o comentario la para o porque.
-				audio_abandoned = true;
-				CoreLogPrintf(RETRO_LOG_WARN,
-					"[CoreUnload] audio thread nao respondeu a tempo (driver travado?) - abandonando thread e stream (vazam ate fechar o app)");
-			}
-			CloseHandle(h_audio_thread);
-			h_audio_thread = NULL;
-		}
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Audio thread finalizada.");
-	}
-
-	if (g_audio_stream)
-	{
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Fechando audio stream...");
-		// Destroying the stream also closes the device it was opened
-		// against - SDL_OpenAudioDeviceStream's own contract.
-		if (!audio_abandoned)
-			SDL_DestroyAudioStream(g_audio_stream);
-		g_audio_stream = nullptr;
-		audio_initialized = false;
-		audio_abandoned = false;
-		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] audio stream finalizado.");
-	}
-
-	if (h_audio_event)
-	{
-		CloseHandle(h_audio_event);
-		h_audio_event = NULL;
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Parando audio thread e fechando stream...");
+		StopAudioContext("CoreUnload");
+		CoreLogPrintf(RETRO_LOG_INFO, "[CoreUnload] Audio finalizado.");
 	}
 
 	g_resample_phase = 0.0;

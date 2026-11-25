@@ -139,3 +139,29 @@ TEST_CASE(JsonMiniParsesEscapesAndRejectsGarbage)
 	ASSERT_FALSE(JsonParse("{\"a\":1} trailing", v, err));
 	ASSERT_FALSE(JsonParse("[1,2", v, err));
 }
+
+TEST_CASE(PortCatalogNeedsRomHasKeywords)
+{
+	PortCatalog cat;
+	std::string err;
+	ASSERT_TRUE(PortCatalogParse(PortCatalogEmbeddedJson(), cat, err));
+	const char* const kAutoCopyIds[] = {
+		"SuperMetroidRecomp", "SuperMarioWorldRecomp", "StarFoxEnhanced",
+		"JungleStrikeSNES", "TopGearPC", "Sonic1Forever", "Sonic3AIR"
+	};
+	for (const char* id : kAutoCopyIds)
+	{
+		bool found = false;
+		for (const auto& p : cat.ports)
+		{
+			if (p.id == id)
+			{
+				found = true;
+				ASSERT_TRUE(p.needs_rom);
+				ASSERT_TRUE(!p.rom_keywords.empty());
+				break;
+			}
+		}
+		ASSERT_TRUE(found);
+	}
+}

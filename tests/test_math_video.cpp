@@ -168,3 +168,28 @@ TEST_CASE(FramePeriodsIgnoreRateDriftAndSilence)
 	ASSERT_EQ(1, FramePeriodsForAudio(100.0, 0.0, &carry));
 	ASSERT_EQ(1, FramePeriodsForAudio(100.0, per_frame, NULL));
 }
+
+TEST_CASE(AudioRingBufferOccupancyAndMonotonicTrim)
+{
+	const int CAP = 65536;
+	ASSERT_EQ(0, RingBufferOccupancy(0, 0, CAP));
+	ASSERT_EQ(1200, RingBufferOccupancy(1200, 0, CAP));
+	ASSERT_EQ(300, RingBufferOccupancy(100, CAP - 200, CAP));
+
+	// Nothing dropped when already within target keep_frames.
+	ASSERT_EQ(500, RingBufferTrimReadPos(1500, 500, CAP, 1000));
+	ASSERT_EQ(500, RingBufferTrimReadPos(1500, 500, CAP, 2000));
+
+	// Trimming excess latency advances rp monotonically rather than pulling wp back.
+	int new_rp = RingBufferTrimReadPos(5000, 1000, CAP, 1024);
+	ASSERT_EQ(new_rp, 5000 - 1024);
+	ASSERT_EQ(1024, RingBufferOccupancy(5000, new_rp, CAP));
+
+	// Wraparound boundary: wp=500, rp=CAP-1000 -> occupancy=1500; trim to 600 -> new_rp=CAP-100.
+	int wrap_rp = RingBufferTrimReadPos(500, CAP - 1000, CAP, 600);
+	ASSERT_EQ(wrap_rp, CAP - 100);
+	ASSERT_EQ(600, RingBufferOccupancy(500, wrap_rp, CAP));
+
+	// Trim to 0 advances rp all the way to wp.
+	ASSERT_EQ(500, RingBufferTrimReadPos(500, CAP - 1000, CAP, 0));
+}

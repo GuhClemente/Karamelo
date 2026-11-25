@@ -2822,7 +2822,7 @@ Novidades para o jogador:
   - *Claude Renderer* com 4K+, widescreen real (16:9, 21:9, 32:9), interpolação de alta taxa de quadros (60+ FPS), 108 shaders CRT do ShaderGlass, controles XInput com vibração e troca de clima ao vivo.
   - Carregamento da imagem do CD original (`.cue`/`.bin`, `.iso`, `.mds`/`.mdf`) via argumento `--disc {iso}`.
 - **Ridge Racer V (Fukami — Recompilação Estática Nativa de PS2)**:
-  - Adicionado ao catálogo de PC Ports & Recompilados (totalizando **106 ports** — 106 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎).
+  - Adicionado ao catálogo de PC Ports & Recompilados (totalizando **107 ports** — 107 Windows 🪟, 66 Linux 🐧, 47 macOS 🍎).
   - Recompilação estática Ahead-of-Time de código MIPS de PS2 para C++ nativo (`danisandoval/fukami`, versão americana `SLUS-20002`) utilizando a camada GS e SPU2 do PCSX2.
   - Binários oficiais nativos para Windows (Direct3D 11 / Vulkan), Linux (Vulkan) e macOS Apple Silicon (Metal).
   - 60 FPS cravados, widescreen real (16:9, 16:10, 21:9), upscaling até 8x, anti-aliasing (FXAA, CAS) e suporte a controles com rumble.
