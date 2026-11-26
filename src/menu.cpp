@@ -1928,7 +1928,7 @@ void PopulateSystemsMenu() {
   // Counted here rather than written down somewhere else: this is the list.
   g_system_count = 0;
   for (const auto &it : items)
-    if ((it.action_id >= 101 && it.action_id <= 137) || it.action_id == 140)
+    if ((it.action_id >= 101 && it.action_id <= 138) || it.action_id == 140)
       g_system_count++;
 
   if (g_system_count == 0) {
@@ -2259,6 +2259,14 @@ static void ResetAllSettingsToDefault() {
   setting_vsync = 1;
   setting_n64_core = 0; // ParaLLEl N64 - see the comment on its declaration
   setting_n64_upscale = 0;
+  setting_upscaler = 0;
+  setting_upscaler_sharpness = 5;
+  setting_lut = 0;
+  setting_cvd = 0;
+  setting_cvd_strength = 10;
+  setting_cvd_simulate = 0;
+  setting_dsu_enabled = 0;
+  g_persisted_core_options.clear();
   setting_osd_timeout = 0;
   setting_name_scroll = 3;
   setting_sms_fm = 0;
@@ -2278,6 +2286,8 @@ static void ResetAllSettingsToDefault() {
 
   InputBindRestoreGlobal();
   InputBindResetDefaults();
+  InputBindSetPresetTag(PRESET_MISTER_NINTENDO);
+  ApplyPersistedCoreOptions();
   CoreSetVolume(100);
   CoreSetMute(false);
   VoiceChatSetEnabled(false);
@@ -3739,9 +3749,9 @@ static void MenuLoadSettings() {
     else if (!strcmp(key, "pad_device"))
       setting_pad_device = ClampInt(iv, 0, 1);
     else if (InputBindFromConfigKey(key) >= 0)
-      InputBindSetKey(InputBindFromConfigKey(key), iv);
+      InputBindLoadKey(InputBindFromConfigKey(key), iv);
     else if (InputBindFromPadConfigKey(key) >= 0)
-      InputBindSetPad(InputBindFromPadConfigKey(key), iv);
+      InputBindLoadPad(InputBindFromPadConfigKey(key), iv);
     else if (!strcmp(key, "latency"))
       setting_latency = ClampInt(iv, 0, 4);
     else if (!strcmp(key, "driver"))
@@ -4728,7 +4738,7 @@ static void MenuGoBack() {
   } else if (current_state == STATE_DIAGNOSTICS) {
     current_state = STATE_SETTINGS;
     PopulateSettings();
-    SelectByAction(220, 10);
+    SelectByAction(215, 10);
   } else if (current_state == STATE_CLOUD) {
     current_state = STATE_SETTINGS;
     PopulateSettings();
@@ -5929,12 +5939,12 @@ static void MenuProcessKeyImpl(MenuKey key) {
       if (item.action_id == 211) {
         current_state = STATE_SETTINGS;
         PopulateSettings();
-        SelectByAction(item.action_id, 6);
+        SelectByAction(210, 6);
       } else if (item.action_id == 212) {
         ResetAllSettingsToDefault();
         current_state = STATE_SETTINGS;
         PopulateSettings();
-        SelectByAction(item.action_id, 6);
+        SelectByAction(210, 6);
         CoreSetToast(Tr("CONFIGURACOES RESTAURADAS AO PADRAO", "SETTINGS RESTORED TO DEFAULT"), 180);
       }
     } else if (current_state == STATE_CONTROLLER) {
@@ -6012,25 +6022,6 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateControllerSettings();
         SelectByAction(item.action_id, 4);
         MenuSaveSettings();
-      } else if (item.action_id == 310) {
-        setting_n64_upscale = (setting_n64_upscale + 1) % 3;
-        if (setting_n64_upscale > 0) {
-          setting_n64_core = 2; // Gopher64
-        }
-        CoreSetN64Upscale(setting_n64_upscale);
-        if (current_state == STATE_MAIN) PopulateMainMenu();
-        else PopulateVideoSettings();
-        SelectByAction(item.action_id, 7);
-        MenuSaveSettings();
-        const char *names[] = {"Desligado", "2x (640x240)", "4x (1280x240)"};
-        char msg[80];
-        if (CoreIsRunning())
-          snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
-        else if (setting_n64_upscale > 0)
-          snprintf(msg, sizeof(msg), "Upscale Horiz: %s (Gopher64)", names[setting_n64_upscale]);
-        else
-          snprintf(msg, sizeof(msg), "Upscale Horiz: Desligado");
-        CoreSetToast(msg, 90);
       } else if (item.action_id == 798) {
         wizard_active = true;
         wizard_step = 0;
@@ -6050,7 +6041,10 @@ static void MenuProcessKeyImpl(MenuKey key) {
         PopulateControllerSettings();
         SelectBindRow(capture_bind);
       } else if (item.action_id == 799) {
+        InputBindRestoreGlobal();
         InputBindResetDefaults();
+        InputBindSetPresetTag(PRESET_MISTER_NINTENDO);
+        ApplySystemPadLayout();
         PopulateControllerSettings();
         MenuSaveSettings();
         CoreSetToast(Tr("CONTROLES RESTAURADOS AO PADRAO", "CONTROLS RESTORED TO DEFAULT"), 120);
@@ -6137,6 +6131,24 @@ static void MenuProcessKeyImpl(MenuKey key) {
         shader_list_previous_state = STATE_VIDEO;
         current_state = STATE_SHADER_LIST;
         PopulateShaderList();
+      } else if (item.action_id == 310) {
+        setting_n64_upscale = (setting_n64_upscale + 1) % 3;
+        if (setting_n64_upscale > 0) {
+          setting_n64_core = 2; // Gopher64
+        }
+        CoreSetN64Upscale(setting_n64_upscale);
+        PopulateVideoSettings();
+        SelectByAction(item.action_id, 7);
+        MenuSaveSettings();
+        const char *names[] = {"Desligado", "2x (640x240)", "4x (1280x240)"};
+        char msg[80];
+        if (CoreIsRunning())
+          snprintf(msg, sizeof(msg), "%s (%s)", names[setting_n64_upscale], Tr("REINICIE O JOGO", "RESTART GAME"));
+        else if (setting_n64_upscale > 0)
+          snprintf(msg, sizeof(msg), "Upscale Horiz: %s (Gopher64)", names[setting_n64_upscale]);
+        else
+          snprintf(msg, sizeof(msg), "Upscale Horiz: Desligado");
+        CoreSetToast(msg, 90);
       } else if (item.action_id == 304) {
         setting_fullscreen = !setting_fullscreen;
         PopulateVideoSettings();

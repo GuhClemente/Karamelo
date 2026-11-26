@@ -323,6 +323,13 @@ bool InputBindSetKey(int bind, int vk)
 	return true;
 }
 
+void InputBindLoadKey(int bind, int vk)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return;
+	if (vk == 0) { s_keys[bind] = 0; return; }
+	if (vk > 0 && vk <= 255 && !KeyIsReserved(vk)) s_keys[bind] = vk;
+}
+
 bool InputBindSetPad(int bind, int pad_code)
 {
 	if (bind < 0 || bind >= BIND_COUNT) return false;
@@ -336,6 +343,12 @@ bool InputBindSetPad(int bind, int pad_code)
 
 	s_pads[bind] = pad_code;
 	return true;
+}
+
+void InputBindLoadPad(int bind, int pad_code)
+{
+	if (bind < 0 || bind >= BIND_COUNT) return;
+	if (pad_code >= 0) s_pads[bind] = pad_code;
 }
 
 void InputBindResetDefaults()

@@ -41,6 +41,10 @@ static const char* CRASH_API_URL = "https://karamelo-emu.com/api/crash-report";
 static std::mutex g_crash_context_lock;
 static std::string g_last_core_name = "Nenhum";
 static std::string g_last_game_stem = "Nenhum";
+// Async-signal-safe mirrors updated alongside g_last_core_name / g_last_game_stem
+// so PosixSignalHandler never needs to acquire a mutex or allocate heap memory.
+static char g_sig_core_name[128] = "Nenhum";
+static char g_sig_game_stem[256] = "Nenhum";
 // Off until the player turns it on (Settings > Diagnostics). A report
 // carries the name of the game that was running and a stack trace; under the
 // LGPD that is the player's to agree to, not ours to assume. A choice saved
@@ -173,6 +177,8 @@ void CrashReporterSetLastGameInfo(const char* core_name, const char* game_stem) 
     } else {
         g_last_game_stem = "Nenhum";
     }
+    strncpy_s(g_sig_core_name, sizeof(g_sig_core_name), g_last_core_name.c_str(), _TRUNCATE);
+    strncpy_s(g_sig_game_stem, sizeof(g_sig_game_stem), g_last_game_stem.c_str(), _TRUNCATE);
 }
 
 // -------------------------------------------------------------
@@ -289,7 +295,17 @@ void CrashReporterWriteDump(const char* fault_type, unsigned long code,
     auto now = std::chrono::system_clock::now();
     std::time_t tt = std::chrono::system_clock::to_time_t(now);
     char time_str[64] = { 0 };
-    std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S UTC", std::gmtime(&tt));
+    std::tm gmt_buf = {};
+    bool have_gmt = false;
+#ifdef _WIN32
+    have_gmt = (gmtime_s(&gmt_buf, &tt) == 0);
+#else
+    have_gmt = (gmtime_r(&tt, &gmt_buf) != nullptr);
+#endif
+    if (have_gmt)
+        std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S UTC", &gmt_buf);
+    else
+        snprintf(time_str, sizeof(time_str), "unknown");
 
     fprintf(f, "version=%s\n", APP_VERSION);
 #if defined(_WIN32)
@@ -319,6 +335,35 @@ void CrashReporterWriteDump(const char* fault_type, unsigned long code,
 // POSIX Signal Handlers (Linux & macOS)
 // -------------------------------------------------------------
 #ifndef _WIN32
+#include <fcntl.h>
+static void WriteAllFd(int fd, const char* s) {
+    if (fd < 0 || !s) return;
+    size_t len = 0;
+    while (s[len]) len++;
+    size_t off = 0;
+    while (off < len) {
+        ssize_t w = write(fd, s + off, len - off);
+        if (w <= 0) break;
+        off += (size_t)w;
+    }
+}
+
+static void WriteHexFd(int fd, unsigned long long val) {
+    char buf[20];
+    buf[0] = '0'; buf[1] = 'x';
+    int n = 2;
+    bool started = false;
+    for (int shift = 60; shift >= 0; shift -= 4) {
+        unsigned digit = (unsigned)((val >> shift) & 0xFu);
+        if (digit || started || shift == 0) {
+            started = true;
+            buf[n++] = (char)(digit < 10 ? ('0' + digit) : ('A' + digit - 10));
+        }
+    }
+    buf[n] = '\0';
+    WriteAllFd(fd, buf);
+}
+
 static void PosixSignalHandler(int sig, siginfo_t* info, void* ucontext) {
     (void)ucontext;
     const char* sig_name = "SIGSEGV";
@@ -330,21 +375,35 @@ static void PosixSignalHandler(int sig, siginfo_t* info, void* ucontext) {
 
     uintptr_t addr = info ? (uintptr_t)info->si_addr : 0;
 
-    std::string trace;
-#if defined(__APPLE__) || defined(__linux__)
-    void* callstack[64];
-    int frames = backtrace(callstack, 64);
-    char** strs = backtrace_symbols(callstack, frames);
-    if (strs) {
-        for (int i = 0; i < frames; i++) {
-            trace += strs[i];
-            trace += "\n";
-        }
-        free(strs);
-    }
+    // Strictly async-signal-safe: no heap allocation, no mutex, no stdio.
+    if (!g_transient_disabled) {
+        int fd = open(CRASH_DUMP_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd >= 0) {
+            WriteAllFd(fd, "version=" APP_VERSION "\n");
+#if defined(__APPLE__)
+            WriteAllFd(fd, "os=macOS arm64\n");
+#elif defined(__linux__)
+            WriteAllFd(fd, "os=Linux x64\n");
+#else
+            WriteAllFd(fd, "os=Generic Unknown\n");
 #endif
-
-    CrashReporterWriteDump(sig_name, (unsigned long)sig, "Karamelo", addr, trace);
+            WriteAllFd(fd, "timestamp=signal\n");
+            WriteAllFd(fd, "core="); WriteAllFd(fd, g_sig_core_name); WriteAllFd(fd, "\n");
+            WriteAllFd(fd, "game="); WriteAllFd(fd, g_sig_game_stem); WriteAllFd(fd, "\n");
+            WriteAllFd(fd, "fault_type="); WriteAllFd(fd, sig_name); WriteAllFd(fd, "\n");
+            WriteAllFd(fd, "code="); WriteHexFd(fd, (unsigned long long)(unsigned long)sig); WriteAllFd(fd, "\n");
+            WriteAllFd(fd, "module=Karamelo\n");
+            WriteAllFd(fd, "fault_addr="); WriteHexFd(fd, (unsigned long long)addr); WriteAllFd(fd, "\n");
+            WriteAllFd(fd, "stack_trace_begin\n");
+#if defined(__APPLE__) || defined(__linux__)
+            void* callstack[64];
+            int frames = backtrace(callstack, 64);
+            if (frames > 0) backtrace_symbols_fd(callstack, frames, fd);
+#endif
+            WriteAllFd(fd, "\nstack_trace_end\n");
+            close(fd);
+        }
+    }
 
     // Reinstall default handler and re-raise so core dump / debugger behaves normally
     signal(sig, SIG_DFL);
@@ -598,7 +657,17 @@ bool CrashReporterSendTest() {
     auto now = std::chrono::system_clock::now();
     std::time_t tt = std::chrono::system_clock::to_time_t(now);
     char time_str[64] = { 0 };
-    std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S UTC", std::gmtime(&tt));
+    std::tm gmt_buf = {};
+    bool have_gmt = false;
+#ifdef _WIN32
+    have_gmt = (gmtime_s(&gmt_buf, &tt) == 0);
+#else
+    have_gmt = (gmtime_r(&tt, &gmt_buf) != nullptr);
+#endif
+    if (have_gmt)
+        std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S UTC", &gmt_buf);
+    else
+        snprintf(time_str, sizeof(time_str), "unknown");
 
     std::ostringstream json;
     json << "{\n";

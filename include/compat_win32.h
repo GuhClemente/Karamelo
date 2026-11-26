@@ -46,12 +46,58 @@ static inline int MultiByteToWideChar(unsigned int CodePage, unsigned long dwFla
                                       const char* lpMultiByteStr, int cbMultiByte,
                                       wchar_t* lpWideCharStr, int cchWideChar)
 {
-	(void)CodePage; (void)dwFlags; (void)cbMultiByte;
+	(void)CodePage; (void)dwFlags;
 	if (!lpMultiByteStr) return 0;
-	if (cchWideChar == 0) return (int)strlen(lpMultiByteStr) + 1;
-	size_t n = mbstowcs(lpWideCharStr, lpMultiByteStr, (size_t)cchWideChar);
-	if (n == (size_t)-1) return 0;
-	return (int)n + 1;
+	size_t in_len = (cbMultiByte < 0) ? (strlen(lpMultiByteStr) + 1) : (size_t)cbMultiByte;
+	size_t i = 0;
+	int out_count = 0;
+	while (i < in_len)
+	{
+		unsigned char c = (unsigned char)lpMultiByteStr[i];
+		uint32_t cp = 0;
+		if (c < 0x80)
+		{
+			cp = c;
+			i += 1;
+		}
+		else if ((c & 0xE0) == 0xC0 && i + 1 < in_len)
+		{
+			cp = ((uint32_t)(c & 0x1F) << 6) | (uint32_t)((unsigned char)lpMultiByteStr[i + 1] & 0x3F);
+			i += 2;
+		}
+		else if ((c & 0xF0) == 0xE0 && i + 2 < in_len)
+		{
+			cp = ((uint32_t)(c & 0x0F) << 12) |
+			     ((uint32_t)((unsigned char)lpMultiByteStr[i + 1] & 0x3F) << 6) |
+			     (uint32_t)((unsigned char)lpMultiByteStr[i + 2] & 0x3F);
+			i += 3;
+		}
+		else if ((c & 0xF8) == 0xF0 && i + 3 < in_len)
+		{
+			cp = ((uint32_t)(c & 0x07) << 18) |
+			     ((uint32_t)((unsigned char)lpMultiByteStr[i + 1] & 0x3F) << 12) |
+			     ((uint32_t)((unsigned char)lpMultiByteStr[i + 2] & 0x3F) << 6) |
+			     (uint32_t)((unsigned char)lpMultiByteStr[i + 3] & 0x3F);
+			i += 4;
+		}
+		else
+		{
+			cp = 0xFFFD;
+			i += 1;
+		}
+		if (cchWideChar > 0)
+		{
+			if (out_count >= cchWideChar)
+			{
+				lpWideCharStr[cchWideChar - 1] = L'\0';
+				return 0;
+			}
+			lpWideCharStr[out_count] = (wchar_t)cp;
+		}
+		out_count++;
+		if (cbMultiByte < 0 && cp == 0) break;
+	}
+	return out_count;
 }
 
 #ifdef __cplusplus
@@ -340,14 +386,17 @@ static inline DWORD WaitForSingleObject(HANDLE handle, DWORD ms)
 	}
 	else if (h->type == HANDLE_TYPE_THREAD)
 	{
-		if (h->thread.joined) return WAIT_OBJECT_0;
-
 		pthread_mutex_lock(&h->thread.mtx);
-		if (h->thread.finished)
+		if (h->thread.joined)
 		{
 			pthread_mutex_unlock(&h->thread.mtx);
-			pthread_join(h->thread.th, NULL);
+			return WAIT_OBJECT_0;
+		}
+		if (h->thread.finished)
+		{
 			h->thread.joined = true;
+			pthread_mutex_unlock(&h->thread.mtx);
+			pthread_join(h->thread.th, NULL);
 			return WAIT_OBJECT_0;
 		}
 
@@ -382,15 +431,20 @@ static inline DWORD WaitForSingleObject(HANDLE handle, DWORD ms)
 			}
 		}
 
+		bool should_join = false;
 		bool is_finished = h->thread.finished;
+		if (is_finished && !h->thread.joined)
+		{
+			h->thread.joined = true;
+			should_join = true;
+		}
 		pthread_mutex_unlock(&h->thread.mtx);
 
-		if (is_finished)
+		if (should_join)
 		{
 			pthread_join(h->thread.th, NULL);
-			h->thread.joined = true;
-			return WAIT_OBJECT_0;
 		}
+		if (is_finished) return WAIT_OBJECT_0;
 		return (ret == ETIMEDOUT) ? WAIT_TIMEOUT : WAIT_FAILED;
 	}
 	return WAIT_FAILED;
@@ -408,7 +462,15 @@ static inline BOOL CloseHandle(HANDLE handle)
 	}
 	else if (h->type == HANDLE_TYPE_THREAD)
 	{
+		bool should_detach = false;
+		pthread_mutex_lock(&h->thread.mtx);
 		if (!h->thread.joined)
+		{
+			h->thread.joined = true;
+			should_detach = true;
+		}
+		pthread_mutex_unlock(&h->thread.mtx);
+		if (should_detach)
 		{
 			pthread_detach(h->thread.th);
 		}
@@ -462,14 +524,13 @@ static inline BOOL TerminateThread(HANDLE handle, DWORD exitCode)
 	WinHandle* h = (WinHandle*)handle;
 	if (h->type == HANDLE_TYPE_THREAD)
 	{
-		static bool installed = false;
-		if (!installed)
+		static std::atomic<bool> installed{ false };
+		if (!installed.exchange(true))
 		{
 			struct sigaction sa = {};
 			sa.sa_handler = KarameloParkHandler;
 			sigfillset(&sa.sa_mask);
 			sigaction(KarameloParkSignal(), &sa, NULL);
-			installed = true;
 		}
 		return pthread_kill(h->thread.th, KarameloParkSignal()) == 0 ? TRUE : FALSE;
 	}
@@ -519,7 +580,10 @@ static inline ULONGLONG GetTickCount64()
 
 static inline void Sleep(DWORD ms)
 {
-	usleep(ms * 1000);
+	struct timespec req;
+	req.tv_sec = (time_t)(ms / 1000);
+	req.tv_nsec = (long)((ms % 1000) * 1000000L);
+	while (nanosleep(&req, &req) == -1 && errno == EINTR) {}
 }
 
 static inline BOOL QueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)
@@ -745,6 +809,7 @@ static inline DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD 
 static inline DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize)
 {
 	(void)hModule;
+	if (!lpFilename || nSize == 0) return 0;
 	ssize_t len = readlink("/proc/self/exe", lpFilename, nSize - 1);
 	if (len != -1) {
 		lpFilename[len] = '\0';

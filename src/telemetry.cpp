@@ -44,8 +44,9 @@ static void LoadTelemetrySettings() {
     g_telemetry_loaded = true;
     g_telemetry_enabled = true; // Enabled by default (opt-out)
 
+    std::error_code ec;
     std::string path = INI_PATH;
-    if (!fs::exists(path) && fs::exists("karamelo.ini")) {
+    if (!fs::exists(path, ec) && fs::exists("karamelo.ini", ec)) {
         path = "karamelo.ini";
     }
 
@@ -83,14 +84,15 @@ static void LoadTelemetrySettings() {
 }
 
 static void SaveTelemetrySettings() {
+    std::error_code ec;
     std::string path = INI_PATH;
-    fs::create_directories("Config");
+    fs::create_directories("Config", ec);
 
     std::vector<std::string> lines;
     bool found_diag = false;
     bool key_written = false;
 
-    if (fs::exists(path)) {
+    if (fs::exists(path, ec)) {
         std::ifstream file(path);
         std::string line;
         bool in_diag = false;
@@ -203,14 +205,17 @@ static bool HttpPostTelemetry(const std::string& url, const std::string& json_pa
     WinHttpCloseHandle(session);
     return success;
 #else
-    std::string tmp_json = "scratch_telemetry.json";
+    std::error_code tec;
+    fs::path tmp_dir = fs::temp_directory_path(tec);
+    if (tec) return false;
+    std::string tmp_json = (tmp_dir / ("karamelo_telemetry_" + std::to_string((unsigned long long)getpid()) + ".json")).string();
     FILE* tf = fopen(tmp_json.c_str(), "w");
     if (!tf) return false;
     fwrite(json_payload.data(), 1, json_payload.size(), tf);
     fclose(tf);
 
     std::vector<std::string> args = {
-        "curl", "-s", "--max-time", "5", "-X", "POST",
+        "curl", "-s", "-f", "--max-time", "5", "-X", "POST",
         "-H", "Content-Type: application/json",
         "--data-binary", "@" + tmp_json,
         url, "-o", "/dev/null"

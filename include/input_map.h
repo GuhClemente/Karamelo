@@ -84,6 +84,7 @@ int  InputBindAnalogSign(int bind);
 int InputBindGetKey(int bind);
 const char* InputBindKeyName(int bind);
 bool InputBindSetKey(int bind, int vk);
+void InputBindLoadKey(int bind, int vk);
 const char* InputBindConfigKey(int bind);
 int InputBindFromConfigKey(const char* key);
 
@@ -91,6 +92,7 @@ int InputBindFromConfigKey(const char* key);
 int InputBindGetPad(int bind);
 const char* InputBindPadName(int bind);
 bool InputBindSetPad(int bind, int pad_code);
+void InputBindLoadPad(int bind, int pad_code);
 const char* InputBindPadConfigKey(int bind);
 int InputBindFromPadConfigKey(const char* key);
 

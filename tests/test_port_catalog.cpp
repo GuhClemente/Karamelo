@@ -138,6 +138,25 @@ TEST_CASE(JsonMiniParsesEscapesAndRejectsGarbage)
 	ASSERT_FALSE(JsonParse("{\"a\":}", v, err));
 	ASSERT_FALSE(JsonParse("{\"a\":1} trailing", v, err));
 	ASSERT_FALSE(JsonParse("[1,2", v, err));
+	ASSERT_FALSE(JsonParse("\"\\uDC00\"", v, err)); // lone low surrogate
+	ASSERT_FALSE(JsonParse("01", v, err));          // leading zero
+	ASSERT_FALSE(JsonParse("1.", v, err));          // trailing dot
+	ASSERT_FALSE(JsonParse("1e9999", v, err));      // overflow to Inf
+}
+
+TEST_CASE(PortCatalogRejectsUnsafeRepoTagAndIsoDirs)
+{
+	PortCatalog cat;
+	std::string err;
+	ASSERT_FALSE(PortCatalogParse(
+		"{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"A\",\"repo\":\"owner/repo/../../evil\"}]}",
+		cat, err));
+	ASSERT_FALSE(PortCatalogParse(
+		"{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"A\",\"release_tag\":\"v1?token=leak\"}]}",
+		cat, err));
+	ASSERT_FALSE(PortCatalogParse(
+		"{\"catalog_version\":1,\"ports\":[{\"id\":\"A\",\"display_name\":\"A\",\"iso_dirs\":[\"../secrets\"]}]}",
+		cat, err));
 }
 
 TEST_CASE(PortCatalogNeedsRomHasKeywords)

@@ -203,3 +203,27 @@ TEST_CASE(CoreOptions_BeetlePsxAndGenesisClassification)
     ASSERT_EQ((int)CORE_CAT_VIDEO, (int)ClassifyCoreOption("mupen64plus-rdp-plugin", "RDP Plugin"));
     ASSERT_EQ((int)CORE_CAT_PERF, (int)ClassifyCoreOption("mupen64plus-rsp-plugin", "RSP Plugin"));
 }
+
+TEST_CASE(Fsr1RcasInPlaceMatchesOutOfPlace)
+{
+    const int W = 96, H = 96;
+    std::vector<uint32_t> src((size_t)W * H);
+    for (int y = 0; y < H; y++)
+    {
+        for (int x = 0; x < W; x++)
+        {
+            uint32_t r = (uint32_t)(((x * 17 + y * 31) ^ (x * y)) & 0xFF);
+            uint32_t g = (uint32_t)(((x * 29 + y * 13) + 40) & 0xFF);
+            uint32_t b = (uint32_t)(((x * 7 + y * 43) ^ 0x5A) & 0xFF);
+            src[(size_t)y * W + x] = (r << 16) | (g << 8) | b;
+        }
+    }
+
+    std::vector<uint32_t> out_ref((size_t)W * H, 0);
+    std::vector<uint32_t> in_place = src;
+
+    Fsr1RcasWithPitch(src.data(), W, out_ref.data(), W, W, H, 0.7f);
+    Fsr1RcasWithPitch(in_place.data(), W, in_place.data(), W, W, H, 0.7f);
+
+    ASSERT_TRUE(in_place == out_ref);
+}

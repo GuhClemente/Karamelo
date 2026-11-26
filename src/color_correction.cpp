@@ -247,7 +247,7 @@ static inline void SampleCustomLut(float r, float g, float b, float* out_r, floa
 }
 
 uint32_t ColorCorrectionApplyLut(uint32_t xrgb, int lut_mode) {
-    if (lut_mode == LUT_MODE_OFF) return xrgb;
+    if (lut_mode == LUT_MODE_OFF && !s_custom_lut.loaded) return xrgb;
 
     uint32_t r = (xrgb >> 16) & 0xFF;
     uint32_t g = (xrgb >> 8) & 0xFF;

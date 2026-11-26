@@ -855,7 +855,7 @@ CloudSyncState CloudSyncGetState()
 
 const char* CloudSyncGetStatusString()
 {
-	static char s_buf[128];
+	static thread_local char s_buf[128];
 	std::lock_guard<std::mutex> lk(g_cloud_mutex);
 	snprintf(s_buf, sizeof(s_buf), "%s", g_cloud_status_str.c_str());
 	return s_buf;
@@ -885,7 +885,7 @@ int CloudSyncGetSyncedFileCount()
 
 const char* CloudSyncGetLastSyncTimeStr()
 {
-	static char s_time[64];
+	static thread_local char s_time[64];
 	std::lock_guard<std::mutex> lk(g_cloud_mutex);
 	snprintf(s_time, sizeof(s_time), "%s", g_cloud_last_sync_str.c_str());
 	return s_time;
@@ -1074,14 +1074,22 @@ static bool CloudHttp(const char* method, const std::string& url,
 	std::error_code ec;
 	fs::path dir = fs::temp_directory_path(ec);
 	if (ec) return false;
-	std::string base = (dir / ("karamelo_cloud_" + GenerateRandomHex(8))).string();
+	std::string rnd = GenerateRandomHex(8);
+	if (rnd.empty()) return false;
+	std::string base = (dir / ("karamelo_cloud_" + rnd)).string();
 	const std::string cfg = base + ".cfg", in_file = base + ".in", out_file = base + ".out";
 
-	int fd = open(cfg.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	int fd = open(cfg.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
 	if (fd < 0) return false;
 	std::string cfg_text;
 	for (const auto& h : headers)
 	{
+		if (h.find('\r') != std::string::npos || h.find('\n') != std::string::npos)
+		{
+			close(fd);
+			fs::remove(cfg, ec);
+			return false;
+		}
 		std::string esc;
 		for (char c : h)
 		{
@@ -1094,9 +1102,14 @@ static bool CloudHttp(const char* method, const std::string& url,
 	close(fd);
 	if (!wrote) { fs::remove(cfg, ec); return false; }
 
+	// Pre-create out_file with 0600 so OAuth tokens in the response body are never world-readable.
+	int ofd = open(out_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+	if (ofd < 0) { fs::remove(cfg, ec); return false; }
+	close(ofd);
+
 	const int max_time = timeout_seconds > 0 ? timeout_seconds : 120;
 	std::string cmd = "curl -sS --proto =https,http --connect-timeout " + std::to_string(std::min(15, max_time)) +
-		" --max-time " + std::to_string(max_time) + " -X " + std::string(method) +
+		" --max-time " + std::to_string(max_time) + " -X " + CloudShellQuote(method ? method : "GET") +
 		" -K " + CloudShellQuote(cfg) + " -o " + CloudShellQuote(out_file) + " -w '%{http_code}' ";
 	if (!body.empty())
 	{

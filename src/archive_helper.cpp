@@ -16,9 +16,12 @@ extern char **environ;
 #include <vector>
 #include <filesystem>
 #include <algorithm>
+#include <cctype>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <chrono>
+#include <thread>
 
 #include "archive_helper.h"
 #include "menu.h"
@@ -34,19 +37,53 @@ namespace fs = std::filesystem;
 // discarded. Waits up to timeout_ms; on timeout the process is killed rather
 // than left running in the background writing into a folder we are about to
 // scan. Returns whether it exited with code 0.
+#ifdef _WIN32
+static std::string QuoteWinArgA(const std::string& arg)
+{
+	std::string out = "\"";
+	size_t backslashes = 0;
+	for (char c : arg)
+	{
+		if (c == '\\')
+		{
+			backslashes++;
+		}
+		else if (c == '"')
+		{
+			out.append(backslashes * 2 + 1, '\\');
+			out += '"';
+			backslashes = 0;
+		}
+		else
+		{
+			if (backslashes > 0) { out.append(backslashes, '\\'); backslashes = 0; }
+			out += c;
+		}
+	}
+	if (backslashes > 0) out.append(backslashes * 2, '\\');
+	out += '"';
+	return out;
+}
+#endif
+
+static std::string ToLowerAscii(std::string s)
+{
+	for (char& c : s)
+		c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+	return s;
+}
+
+// Runs an external extractor synchronously with a hard timeout, killing it if
+// it stalls. Waiting for it to actually exit matters when we fall back to a
+// second extractor: both tools must never write into dest_dir at once.
 static bool RunHiddenCommand(const std::vector<std::string>& argv, uint32_t timeout_ms)
 {
 #ifdef _WIN32
-	// CreateProcessA takes one pre-quoted command line, not an argv array -
-	// every element here is a flag or a path, and Windows filenames cannot
-	// contain a double quote, so wrapping each in quotes is sufficient (no
-	// escaping needed, unlike the PowerShell '...' quoting elsewhere in this
-	// file).
 	std::string cmd;
 	for (size_t i = 0; i < argv.size(); i++)
 	{
 		if (i) cmd += ' ';
-		cmd += '"'; cmd += argv[i]; cmd += '"';
+		cmd += QuoteWinArgA(argv[i]);
 	}
 
 	char cmd_buf[2048];
@@ -523,7 +560,7 @@ static int RunHiddenCommandCaptureOutput(const std::vector<std::string>& argv, u
 	for (size_t i = 0; i < argv.size(); i++)
 	{
 		if (i) cmd += ' ';
-		cmd += '"'; cmd += argv[i]; cmd += '"';
+		cmd += QuoteWinArgA(argv[i]);
 	}
 	std::vector<char> cmd_buf(cmd.begin(), cmd.end());
 	cmd_buf.push_back('\0');
@@ -564,18 +601,32 @@ static int RunHiddenCommandCaptureOutput(const std::vector<std::string>& argv, u
 
 	if (!started) { CloseHandle(read_pipe); return -1; }
 
-	char buf[4096];
-	DWORD n = 0;
-	while (ReadFile(read_pipe, buf, sizeof(buf), &n, NULL) && n > 0)
-		out_output.append(buf, n);
+	// Drain the pipe on a helper thread while waiting on the child with the
+	// actual timeout; if the child stalls (e.g. password prompt), terminate it
+	// so ReadFile sees EOF and never blocks indefinitely.
+	std::thread reader([read_pipe, &out_output]() {
+		char buf[4096];
+		DWORD n = 0;
+		while (ReadFile(read_pipe, buf, sizeof(buf), &n, NULL) && n > 0)
+			out_output.append(buf, n);
+	});
+
+	DWORD wait = WaitForSingleObject(pi.hProcess, timeout_ms);
+	bool timed_out = (wait == WAIT_TIMEOUT);
+	if (timed_out)
+	{
+		TerminateProcess(pi.hProcess, 1);
+		WaitForSingleObject(pi.hProcess, 2000);
+	}
+	if (reader.joinable()) reader.join();
 	CloseHandle(read_pipe);
 
-	WaitForSingleObject(pi.hProcess, timeout_ms);
 	DWORD exit_code = 1;
-	GetExitCodeProcess(pi.hProcess, &exit_code);
+	if (!timed_out)
+		GetExitCodeProcess(pi.hProcess, &exit_code);
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
-	return (int)exit_code;
+	return timed_out ? -1 : (int)exit_code;
 #else
 	std::vector<char*> cargv;
 	for (const auto& a : argv) cargv.push_back(const_cast<char*>(a.c_str()));
@@ -700,6 +751,19 @@ static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
 	// we could not check the paths of is worse.
 	if (exit_code != 0) return true;
 
+	auto has_dotdot_component = [](const std::string& p) {
+		size_t i = 0;
+		while (i < p.size())
+		{
+			size_t sep = p.find_first_of("/\\", i);
+			std::string comp = (sep == std::string::npos) ? p.substr(i) : p.substr(i, sep - i);
+			if (comp == "..") return true;
+			if (sep == std::string::npos) break;
+			i = sep + 1;
+		}
+		return false;
+	};
+
 	std::stringstream ss(output);
 	std::string entry;
 	while (std::getline(ss, entry))
@@ -707,7 +771,7 @@ static bool ArchiveHasUnsafeEntry(const std::string& archive_path)
 		if (!entry.empty() && entry.back() == '\r') entry.pop_back();
 		if (entry.empty()) continue;
 
-		if (entry.find("..") != std::string::npos) return true;
+		if (has_dotdot_component(entry)) return true;
 		if (entry[0] == '/' || entry[0] == '\\') return true;
 		if (entry.size() >= 2 && entry[1] == ':') return true; // drive-letter absolute path
 	}
@@ -740,10 +804,11 @@ bool ArchiveExtractAll(const std::string& archive_path, const std::string& dest_
 			for (char c : s) { out += c; if (c == '\'') out += c; }
 			return out;
 		};
-		std::string ps_script = "try { Expand-Archive -LiteralPath '" + ps_quote(archive_path) +
-			"' -DestinationPath '" + ps_quote(dest_dir) + "' -Force } catch {}";
-		RunHiddenCommand({ "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps_script }, EXTRACT_TIMEOUT_MS);
+		std::string ps_script = "$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath '" + ps_quote(archive_path) +
+			"' -DestinationPath '" + ps_quote(dest_dir) + "' -Force";
+		ok = RunHiddenCommand({ "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps_script }, EXTRACT_TIMEOUT_MS);
 	}
+	if (!ok) return false;
 #else
 	bool ok = false;
 	std::string ext = fs::path(archive_path).extension().string();
@@ -837,8 +902,7 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 	if (!fs::exists(arch_path, fs_ec)) return false;
 
 	std::string stem = arch_path.stem().string();
-	std::string ext = arch_path.extension().string();
-	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+	std::string ext = ToLowerAscii(arch_path.extension().string());
 
 	// Special case: NeoGeo Arcade ROM sets (.zip) loaded directly by FBNeo/Geolith
 	if (archive_path.find("NeoGeo") != std::string::npos && ext == ".zip")
@@ -848,7 +912,38 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 		return true;
 	}
 
-	std::string cache_dir = (fs::current_path(fs_ec) / "cache" / stem).string();
+	// Sanitize stem so filenames like "...zip" (stem == "..") or "..zip"
+	// (stem == ".") can never escape cache/ and trigger remove_all on cwd!
+	std::string safe_stem;
+	safe_stem.reserve(stem.size());
+	for (unsigned char c : stem)
+	{
+		if (c == '/' || c == '\\' || c == ':' || c < 0x20)
+			safe_stem.push_back('_');
+		else
+			safe_stem.push_back(static_cast<char>(c));
+	}
+	if (safe_stem.empty() || safe_stem == "." || safe_stem == "..")
+	{
+		size_t h = std::hash<std::string>{}(archive_path);
+		safe_stem = "rom_" + std::to_string(h);
+	}
+
+	fs::path cache_root = fs::current_path(fs_ec) / "cache";
+	if (fs_ec) return false;
+	fs::path cache_path = cache_root / safe_stem;
+	std::error_code c_ec1, c_ec2;
+	fs::path canon_root = fs::weakly_canonical(cache_root, c_ec1);
+	fs::path canon_target = fs::weakly_canonical(cache_path, c_ec2);
+	if (c_ec1 || c_ec2 || canon_target == canon_root) return false;
+	std::string root_str = canon_root.string();
+	std::string target_str = canon_target.string();
+	if (root_str.empty()) return false;
+	if (root_str.back() != '/' && root_str.back() != '\\')
+		root_str.push_back(fs::path::preferred_separator);
+	if (target_str.rfind(root_str, 0) != 0) return false;
+
+	std::string cache_dir = cache_path.string();
 	// Emptied first. The folder is named after the archive's stem alone, so
 	// roms/SNES/Aladdin.zip and roms/Genesis/Aladdin.zip share it - and the
 	// scan below ranks .sfc above .md, so opening the Genesis one after the

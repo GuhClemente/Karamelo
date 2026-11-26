@@ -1367,6 +1367,7 @@ static void BlitToDc(HDC hdc, HWND hwnd)
 static void PaintNow(HWND hwnd)
 {
 	HDC hdc = GetDC(hwnd);
+	if (!hdc) return;
 	BlitToDc(hdc, hwnd);
 	ReleaseDC(hwnd, hdc);
 }
@@ -1426,7 +1427,7 @@ static bool SdlWindowsMsgHook(void* userdata, MSG* msg_ptr)
 		return true;
 
 	case WM_KEYDOWN:
-		if (wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000))
+		if ((wParam == VK_RETURN && (GetKeyState(VK_MENU) & 0x8000)) || wParam == VK_F11)
 		{
 			if (!key_repeat) ToggleFullscreen(hwnd);
 			return 0;

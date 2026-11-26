@@ -416,6 +416,12 @@ bool HwEnsureSurface(unsigned width, unsigned height)
 		HwLog("FBO %s (0x%04X) em %ux%u, glGetError=0x%04X",
 			status == 0 ? "sem contexto valido" : "incompleto",
 			status, width, height, glGetError());
+		p_glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		if (g_fbo) { p_glDeleteFramebuffers(1, &g_fbo); g_fbo = 0; }
+		if (g_depth_rb) { p_glDeleteRenderbuffers(1, &g_depth_rb); g_depth_rb = 0; }
+		if (g_color_tex) { glDeleteTextures(1, &g_color_tex); g_color_tex = 0; }
+		g_surface_w = 0;
+		g_surface_h = 0;
 		return false;
 	}
 
@@ -503,8 +509,12 @@ void HwContextDestroy()
 		{
 #ifndef _WIN32
 			s_hw_sig_active = true;
-			hw_sig_fn_t old_segv = signal(SIGSEGV, HwSigHandler);
-			hw_sig_fn_t old_bus = signal(SIGBUS, HwSigHandler);
+			struct sigaction new_sa = {}, old_segv_sa = {}, old_bus_sa = {};
+			new_sa.sa_handler = HwSigHandler;
+			sigemptyset(&new_sa.sa_mask);
+			new_sa.sa_flags = 0;
+			sigaction(SIGSEGV, &new_sa, &old_segv_sa);
+			sigaction(SIGBUS, &new_sa, &old_bus_sa);
 			if (sigsetjmp(s_hw_sig_env, 1) == 0)
 			{
 				g_hw_cb.context_destroy();
@@ -514,8 +524,8 @@ void HwContextDestroy()
 				HwLog("excecao dentro do context_destroy do core - ignorada");
 			}
 			s_hw_sig_active = false;
-			signal(SIGSEGV, old_segv);
-			signal(SIGBUS, old_bus);
+			sigaction(SIGSEGV, &old_segv_sa, NULL);
+			sigaction(SIGBUS, &old_bus_sa, NULL);
 #else
 			__try { g_hw_cb.context_destroy(); }
 			__except (EXCEPTION_EXECUTE_HANDLER)
@@ -553,6 +563,7 @@ bool HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	// BGRA lands as 0x00RRGGBB in a little-endian uint32, which is exactly the
 	// layout the rest of the pipeline and the DIB section expect.
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	glPixelStorei(GL_PACK_ROW_LENGTH, 0);
 	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height,
 		GL_BGRA_EXT, GL_UNSIGNED_BYTE, dest);
 

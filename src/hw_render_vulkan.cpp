@@ -741,6 +741,8 @@ void VkHwShutdown()
 	g_surface_w = g_surface_h = 0;
 	g_staging_size = 0;
 	g_pending_image_valid = false;
+	g_pending_num_semaphores = 0;
+	g_pending_signal_semaphore = VK_NULL_HANDLE;
 	g_pending_core_cmds.clear();
 	memset(&g_hw_cb, 0, sizeof(g_hw_cb));
 }
@@ -1038,11 +1040,22 @@ void VkHwContextDestroy()
 	}
 	else
 	{
-		// Orfão para evitar use-after-free na thread que ainda pode estar executando
+		// Orfão para evitar use-after-free na thread que ainda pode estar executando;
+		// zera TODOS os handles do device antigo para que a proxima carga nunca os reutilize.
 		g_device = VK_NULL_HANDLE;
 		g_instance = VK_NULL_HANDLE;
 		g_gpu = VK_NULL_HANDLE;
 		g_queue = VK_NULL_HANDLE;
+		g_staging_buf = VK_NULL_HANDLE;
+		g_staging_mem = VK_NULL_HANDLE;
+		g_staging_size = 0;
+		g_cmd_pool = VK_NULL_HANDLE;
+		g_cmd_buf = VK_NULL_HANDLE;
+		g_fence = VK_NULL_HANDLE;
+		g_core_created_device = false;
+		g_core_created_instance = false;
+		g_pending_num_semaphores = 0;
+		g_pending_signal_semaphore = VK_NULL_HANDLE;
 		g_vk_ready = false;
 	}
 	g_skip_context_destroy = false;
@@ -1153,6 +1166,7 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	if (submit_result != VK_SUCCESS)
 	{
 		VkHwLog("vkQueueSubmit falhou (%d)", (int)submit_result);
+		g_pending_image_valid = false;
 		return false;
 	}
 
@@ -1160,12 +1174,18 @@ bool VkHwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	// multi-frame-in-flight scheme, at the cost of a small CPU stall waiting
 	// for the GPU every frame - the same trade-off HwReadPixels's single GL
 	// glReadPixels call already makes.
-	vkWaitForFences_(g_device, 1, &g_fence, VK_TRUE, UINT64_MAX);
+	if (vkWaitForFences_(g_device, 1, &g_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
+	{
+		VkHwLog("vkWaitForFences falhou");
+		g_pending_image_valid = false;
+		return false;
+	}
 
 	void* mapped = NULL;
 	if (vkMapMemory_(g_device, g_staging_mem, 0, (VkDeviceSize)width * height * 4, 0, &mapped) != VK_SUCCESS || !mapped)
 	{
 		VkHwLog("vkMapMemory falhou");
+		g_pending_image_valid = false;
 		return false;
 	}
 

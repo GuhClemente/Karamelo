@@ -661,17 +661,18 @@ bool VoiceChatStartP2P(const char* peer_ip, int port)
 		VoiceSessionLoop(peer_addr, mic, spk);
 		if (mic) SDL_DestroyAudioStream(mic);
 		if (spk) SDL_DestroyAudioStream(spk);
-		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 	});
 	return true;
 }
 
 void VoiceChatStopP2P()
 {
-	g_voice_p2p_active.store(false);
+	bool was_active = g_voice_p2p_active.exchange(false);
 	// The thread still uses the socket until it sees the flag: join first.
 	if (g_voice_thread.joinable())
 		g_voice_thread.join();
+	if (was_active)
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
 #ifdef _WIN32
 	if (g_voice_sock != INVALID_SOCKET)

@@ -194,12 +194,16 @@ void DsuClientPoll(void) {
 
     uint8_t buffer[512];
     sockaddr_in from_addr;
-    socklen_t from_len = sizeof(from_addr);
 
     // Esvazia a fila de pacotes recebidos pegando a amostra mais recente
     while (true) {
+        socklen_t from_len = sizeof(from_addr);
         int bytes = recvfrom(s_socket, (char*)buffer, sizeof(buffer), 0, (sockaddr*)&from_addr, &from_len);
         if (bytes <= 0) break;
+        if (from_addr.sin_addr.s_addr != s_server_addr.sin_addr.s_addr ||
+            from_addr.sin_port != s_server_addr.sin_port) {
+            continue;
+        }
 
         DsuMotionState state;
         if (DsuDecodePacket(buffer, (size_t)bytes, &state)) {

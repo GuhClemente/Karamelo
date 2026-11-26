@@ -186,26 +186,28 @@ static bool ReadTrackTable(ChdTrackHandle* h)
 		// t.frames), letting it read whatever frame that wraps to instead of
 		// cleanly rejecting the file. Reject the whole track table instead.
 		if (num < 0 || frames < 0 || pregap < 0 || postgap < 0)
-			break;
+			return false;
+
+		uint64_t next_lba_start = (uint64_t)lba + (uint64_t)pregap;
+		uint64_t next_lba = next_lba_start + (uint64_t)frames + (uint64_t)postgap;
+		uint64_t next_chd = (uint64_t)chd_frame + (uint64_t)frames;
+		if (padding) next_chd += (uint64_t)padding;
+		else next_chd = (next_chd + 3ull) & ~3ull;
+		if (next_lba > 0xFFFFFFFFull || next_chd > 0xFFFFFFFFull)
+			return false;
 
 		ChdTrack& t = h->tracks[h->track_count];
 		t.number = (uint32_t)num;
 		t.frames = (uint32_t)frames;
 		t.pregap = (uint32_t)pregap;
 		t.chd_start = chd_frame;
-		t.lba_start = lba + (uint32_t)pregap;
+		t.lba_start = (uint32_t)next_lba_start;
 		ClassifyTrack(type, &t.sector_size, &t.data_offset);
 
 		h->track_count++;
 
-		lba += (uint32_t)frames + (uint32_t)pregap;
-
-		// CD tracks are padded up to a 4-frame boundary; GD-ROM tracks state
-		// their padding explicitly. Skipping either makes every track after
-		// the first read from the wrong place.
-		chd_frame += (uint32_t)frames;
-		if (padding) chd_frame += padding;
-		else chd_frame = (chd_frame + 3) & ~3u;
+		lba = (uint32_t)next_lba;
+		chd_frame = (uint32_t)next_chd;
 	}
 
 	return h->track_count > 0;
@@ -235,19 +237,80 @@ static void* ChdOpenTrack(const char* path, uint32_t track)
 		return NULL;
 	}
 
-	// track 0 means "the first data track", which is what a hash needs.
-	h->active = 0;
+	bool found = false;
 	if (track == RC_HASH_CDTRACK_FIRST_DATA || track == 0)
 	{
 		for (uint32_t i = 0; i < h->track_count; i++)
 		{
-			if (h->tracks[i].sector_size != 2352) { h->active = i; break; }
+			if (h->tracks[i].sector_size != 2352) { h->active = i; found = true; break; }
+		}
+		if (!found) { h->active = 0; found = true; }
+	}
+	else if (track == RC_HASH_CDTRACK_LAST)
+	{
+		h->active = h->track_count - 1;
+		found = true;
+	}
+	else if (track == RC_HASH_CDTRACK_LARGEST)
+	{
+		uint32_t best = 0;
+		uint32_t best_frames = 0;
+		for (uint32_t i = 0; i < h->track_count; i++)
+		{
+			if (h->tracks[i].sector_size != 2352 && h->tracks[i].frames > best_frames)
+			{
+				best = i;
+				best_frames = h->tracks[i].frames;
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			for (uint32_t i = 0; i < h->track_count; i++)
+			{
+				if (h->tracks[i].frames >= best_frames)
+				{
+					best = i;
+					best_frames = h->tracks[i].frames;
+					found = true;
+				}
+			}
+		}
+		h->active = best;
+	}
+	else if (track == RC_HASH_CDTRACK_FIRST_OF_SECOND_SESSION)
+	{
+		// In multi-session / GD-ROM discs (Dreamcast), the high-density area
+		// starts at track 3 (LBA >= 45000); otherwise pick the first data track
+		// after an initial data/audio boundary.
+		for (uint32_t i = 1; i < h->track_count; i++)
+		{
+			if (h->tracks[i].lba_start >= 45000 && h->tracks[i].sector_size != 2352)
+			{
+				h->active = i;
+				found = true;
+				break;
+			}
+		}
+		if (!found && h->track_count >= 2)
+		{
+			for (uint32_t i = 1; i < h->track_count; i++)
+			{
+				if (h->tracks[i].sector_size != 2352) { h->active = i; found = true; break; }
+			}
 		}
 	}
 	else
 	{
 		for (uint32_t i = 0; i < h->track_count; i++)
-			if (h->tracks[i].number == track) { h->active = i; break; }
+			if (h->tracks[i].number == track) { h->active = i; found = true; break; }
+	}
+
+	if (!found)
+	{
+		chd_close(chd);
+		free(h);
+		return NULL;
 	}
 
 	h->hunk_buffer = (uint8_t*)malloc(h->header->hunkbytes);

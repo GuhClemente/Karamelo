@@ -203,18 +203,18 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 	{
 		SDL_JoystickID id = event->gdevice.which;
 
-		AcquireSRWLockExclusive(&s_pads_lock);
-		if (FindSlotByInstanceId(id) >= 0) // already open
+		AcquireSRWLockShared(&s_pads_lock);
+		bool already_open = (FindSlotByInstanceId(id) >= 0);
+		bool full = (FindFreeSlot() < 0);
+		ReleaseSRWLockShared(&s_pads_lock);
+		if (already_open) return;
+		if (full)
 		{
-			ReleaseSRWLockExclusive(&s_pads_lock);
-			return;
-		}
-		if (FindFreeSlot() < 0)
-		{
-			ReleaseSRWLockExclusive(&s_pads_lock);
 			GamepadLog("conectado mas os 4 slots ja estao ocupados - ignorado");
 			return;
 		}
+		// Open outside s_pads_lock: SDL_OpenGamepad does USB/BT I/O and can
+		// block for tens of ms, which would stall GamepadGetState on the core thread.
 		SDL_Gamepad* opened = SDL_OpenGamepad(id);
 		int slot = -1;
 		bool returned = false;
@@ -222,14 +222,26 @@ void GamepadHandleDeviceEvent(const SDL_Event* event)
 		{
 			char key[160];
 			PadKey(opened, id, key, sizeof(key));
-			for (int i = 0; i < 4 && slot < 0; i++)  // rule 1: its own slot
-				if (!s_pads[i] && s_slot_reserved[i] && strcmp(s_slot_key[i], key) == 0) { slot = i; returned = true; }
-			if (slot < 0) slot = FindFreeSlot();     // rule 2: first empty slot
-			s_pads[slot] = opened;
-			SDL_strlcpy(s_slot_key[slot], key, sizeof(s_slot_key[slot]));
-			s_slot_reserved[slot] = false;
+			AcquireSRWLockExclusive(&s_pads_lock);
+			if (FindSlotByInstanceId(id) < 0)
+			{
+				for (int i = 0; i < 4 && slot < 0; i++)  // rule 1: its own slot
+					if (!s_pads[i] && s_slot_reserved[i] && strcmp(s_slot_key[i], key) == 0) { slot = i; returned = true; }
+				if (slot < 0) slot = FindFreeSlot();     // rule 2: first empty slot
+				if (slot >= 0)
+				{
+					s_pads[slot] = opened;
+					SDL_strlcpy(s_slot_key[slot], key, sizeof(s_slot_key[slot]));
+					s_slot_reserved[slot] = false;
+				}
+			}
+			ReleaseSRWLockExclusive(&s_pads_lock);
+			if (slot < 0)
+			{
+				SDL_CloseGamepad(opened);
+				opened = nullptr;
+			}
 		}
-		ReleaseSRWLockExclusive(&s_pads_lock);
 
 		// Logged outside the lock: this writes to disk, and GamepadGetState is
 		// polled every frame from the core thread behind the same lock.

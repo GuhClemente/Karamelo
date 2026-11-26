@@ -2,6 +2,8 @@
 #include "json_mini.h"
 #include "ports_catalog_json.h"
 
+#include <cmath>
+#include <climits>
 #include <set>
 
 std::string PortCatalogEmbeddedJson()
@@ -33,7 +35,9 @@ bool GetInt(const JsonValue& obj, const char* key, int& out, std::string& error,
 {
     const JsonValue* v = obj.Find(key);
     if (!v) return true;
-    if (v->type != JsonValue::Number || v->number != (double)(int)v->number) {
+    if (v->type != JsonValue::Number || !std::isfinite(v->number) ||
+        v->number < (double)INT_MIN || v->number > (double)INT_MAX ||
+        v->number != (double)(int)v->number) {
         error = where + ": '" + key + "' deve ser inteiro";
         return false;
     }
@@ -198,6 +202,37 @@ bool PortCatalogParse(const std::string& json, PortCatalog& out, std::string& er
             d.detached_process.find_first_of("/\\") != std::string::npos) {
             error = where + ": caminho fora da pasta do port";
             return false;
+        }
+        for (const auto& dir : d.iso_dirs) {
+            if (!RelPathIsSafe(dir)) {
+                error = where + ": iso_dirs contem caminho inseguro";
+                return false;
+            }
+        }
+        if (!d.repo.empty()) {
+            size_t slash = d.repo.find('/');
+            bool bad_repo = (slash == std::string::npos || slash == 0 || slash + 1 >= d.repo.size() ||
+                             d.repo.find('/', slash + 1) != std::string::npos ||
+                             d.repo.find("..") != std::string::npos);
+            for (unsigned char c : d.repo) {
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '/' || c == '-' || c == '_' || c == '.')) {
+                    bad_repo = true;
+                    break;
+                }
+            }
+            if (bad_repo) {
+                error = where + ": repo invalido";
+                return false;
+            }
+        }
+        if (!d.release_tag.empty()) {
+            bool bad_tag = (d.release_tag.find("..") != std::string::npos ||
+                            d.release_tag.find_first_of("/\\?# \t\r\n") != std::string::npos);
+            if (bad_tag) {
+                error = where + ": release_tag invalido";
+                return false;
+            }
         }
         if (!d.downloads_json_url.empty() && d.downloads_json_url.rfind("https://", 0) != 0) {
             error = where + ": downloads_json_url precisa ser https://";

@@ -189,6 +189,19 @@ void Fsr1RcasWithPitch(const uint32_t* src, int src_pitch,
 
     sharpness = std::clamp(sharpness, 0.0f, 1.0f);
 
+    // RCAS reads 4 neighbors (x+-1, y+-1). Running in-place (src == dst) both
+    // turns the filter recursive and causes a multi-thread data race across
+    // horizontal band boundaries. Snapshot src into a scratch buffer first.
+    std::vector<uint32_t> scratch;
+    if (src == dst) {
+        scratch.resize((size_t)w * (size_t)h);
+        for (int y = 0; y < h; y++) {
+            std::memcpy(scratch.data() + (size_t)y * w, src + (size_t)y * src_pitch, (size_t)w * sizeof(uint32_t));
+        }
+        src = scratch.data();
+        src_pitch = w;
+    }
+
     auto clamp_x = [w](int x) -> int { return std::clamp(x, 0, w - 1); };
     auto clamp_y = [h](int y) -> int { return std::clamp(y, 0, h - 1); };
 

@@ -262,6 +262,7 @@ bool TrayManagerHandleWin32Message(void* hwnd, unsigned int msg, uintptr_t wpara
 		HWND target_hwnd = g_tray_hwnd ? g_tray_hwnd : (HWND)hwnd;
 		SetForegroundWindow(target_hwnd);
 		UINT cmd = (UINT)TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, target_hwnd, NULL);
+		PostMessageW(target_hwnd, WM_NULL, 0, 0);
 		DestroyMenu(hMenu);
 
 		switch (cmd)

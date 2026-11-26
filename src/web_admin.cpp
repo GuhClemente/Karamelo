@@ -3259,7 +3259,31 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 		{
 			if (!param.empty() && g_hooks.launch_game)
 			{
-				g_hooks.launch_game(param);
+				// Restrict remote launch to paths inside roms/, app/roms/, ports/, or app/ports/
+				std::error_code lec;
+				fs::path req_path = fs::weakly_canonical(fs::path(param), lec);
+				bool allowed = false;
+				if (!lec && !req_path.empty())
+				{
+					std::string req_str = req_path.string();
+					const char* allowed_roots[] = { "roms", "app/roms", "ports", "app/ports" };
+					for (const char* r : allowed_roots)
+					{
+						std::error_code rec;
+						fs::path rp = fs::weakly_canonical(fs::path(r), rec);
+						if (rec || rp.empty()) continue;
+						std::string prefix = rp.string();
+						if (prefix.back() != '/' && prefix.back() != '\\')
+							prefix.push_back((char)fs::path::preferred_separator);
+						if (req_str.rfind(prefix, 0) == 0) { allowed = true; break; }
+					}
+				}
+				if (!allowed)
+				{
+					SendHttpResponse(cli, "403 Forbidden", "application/json", "{\"error\":\"launch_path_not_allowed\"}");
+					return;
+				}
+				g_hooks.launch_game(req_path.string());
 			}
 		}
 
@@ -3288,14 +3312,15 @@ if (method == "GET" && (path == "/api/bios" || path == "/api/bios-audit"))
 			: (fs::path("roms") / sys_dir);
 		fs::create_directories(target_root, ec);
 
-		fs::path canonical_root = fs::weakly_canonical(target_root, ec);
-		fs::path canonical_dest = fs::weakly_canonical(target_root / safe_fn, ec);
+		std::error_code ec1, ec2;
+		fs::path canonical_root = fs::weakly_canonical(target_root, ec1);
+		fs::path canonical_dest = fs::weakly_canonical(target_root / safe_fn, ec2);
 		std::string root_prefix = canonical_root.string();
 		if (!root_prefix.empty() && root_prefix.back() != '/' && root_prefix.back() != '\\')
 			root_prefix.push_back((char)fs::path::preferred_separator);
 
 		std::string dest_str = canonical_dest.string();
-		if (ec || dest_str.rfind(root_prefix, 0) != 0)
+		if (ec1 || ec2 || root_prefix.empty() || dest_str.rfind(root_prefix, 0) != 0)
 		{
 			SendHttpResponse(cli, "403 Forbidden", "application/json", "{\"error\":\"path_boundary_violation\"}");
 			return;
@@ -3453,6 +3478,12 @@ void WebAdminStop()
 	if (!g_web_running.exchange(false))
 		return;
 
+	// Wait for g_web_thread to exit its select()/accept() loop BEFORE closing
+	// g_listen_sock and setting it to -1 (calling FD_SET(-1) on POSIX corrupts
+	// the stack). The select() slice is 250ms so join() returns promptly.
+	if (g_web_thread.joinable())
+		g_web_thread.join();
+
 #ifdef _WIN32
 	if (g_listen_sock != INVALID_SOCKET)
 	{
@@ -3466,9 +3497,6 @@ void WebAdminStop()
 		g_listen_sock = -1;
 	}
 #endif
-
-	if (g_web_thread.joinable())
-		g_web_thread.join();
 }
 
 void WebAdminOpenInBrowser()

@@ -376,6 +376,12 @@ bool D3D11HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 		g_staging_fmt = src_desc.Format;
 	}
 
+	if (src_desc.SampleDesc.Count > 1)
+	{
+		D3D11HwLog("src_tex MSAA (Count=%u) nao suportado para CopyResource direto", src_desc.SampleDesc.Count);
+		src_tex->Release();
+		return false;
+	}
 	g_context->CopyResource(g_staging_tex, src_tex);
 	src_tex->Release();
 
@@ -392,7 +398,8 @@ bool D3D11HwReadPixels(uint32_t* dest, unsigned width, unsigned height)
 	// matches DXGI_FORMAT_B8G8R8A8_UNORM (every core seen so far) directly;
 	// an RGBA-ordered format needs the same channel swap the Vulkan/GL paths
 	// already do for their own R8G8B8A8 case.
-	bool needs_swap = (g_staging_fmt == DXGI_FORMAT_R8G8B8A8_UNORM);
+	bool needs_swap = (g_staging_fmt == DXGI_FORMAT_R8G8B8A8_UNORM ||
+	                   g_staging_fmt == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
 
 	unsigned copy_w = width < g_staging_w ? width : g_staging_w;
 	unsigned copy_h = height < g_staging_h ? height : g_staging_h;

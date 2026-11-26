@@ -316,14 +316,20 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 	HINTERNET connect = WinHttpConnect(session, host, uc.nPort, 0);
 	if (connect)
 	{
-		DWORD flags = (uc.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0;
+		if (uc.nScheme != INTERNET_SCHEME_HTTPS)
+		{
+			WinHttpCloseHandle(connect);
+			WinHttpCloseHandle(session);
+			return false;
+		}
+		DWORD flags = WINHTTP_FLAG_SECURE;
 		HINTERNET request = WinHttpOpenRequest(connect, L"GET", path, NULL,
 			WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
 
 		if (request)
 		{
-			// Follow redirects automatically
-			DWORD opt = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+			// Follow HTTPS redirects only (disallow HTTPS->HTTP downgrade)
+			DWORD opt = WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP;
 			WinHttpSetOption(request, WINHTTP_OPTION_REDIRECT_POLICY, &opt, sizeof(opt));
 
 			// GITHUB_TOKEN, when the environment has one, authenticates calls to
@@ -402,7 +408,11 @@ static bool HttpFetchData(const std::string& url, std::string* out_str, std::vec
 
 						if (dest_file)
 						{
-							fwrite(buffer.data(), 1, read_bytes, dest_file);
+							if (fwrite(buffer.data(), 1, read_bytes, dest_file) != read_bytes)
+							{
+								read_ok = false;
+								break;
+							}
 						}
 						else if (out_bin)
 						{
@@ -480,7 +490,11 @@ static bool RunAndWait(const std::vector<std::string>& args, const std::string& 
 	{
 		pid_t r = waitpid(pid, &status, WNOHANG);
 		if (r == pid) break;
-		if (r < 0) return false;
+		if (r < 0)
+		{
+			if (errno == EINTR) continue;
+			return false;
+		}
 		if (!track_file.empty() && expected_size > 0)
 		{
 			struct stat st;
@@ -764,12 +778,13 @@ void UpdaterInit()
 {
 	// Clean up any leftover temporary files from a previous update
 #ifdef _WIN32
+	std::error_code ec;
 	std::string app_dir = GetExecutableDirectory();
-	std::string old_bat = app_dir + "\\_update_apply.bat";
-	std::string old_exe = app_dir + "\\Karamelo.exe.old";
-
-	if (fs::exists(old_bat)) fs::remove(old_bat);
-	if (fs::exists(old_exe)) fs::remove(old_exe);
+	std::string cur_exe = GetCurrentExecutablePath();
+	fs::remove(app_dir + "\\_update_apply.bat", ec);
+	fs::remove(app_dir + "\\Karamelo.exe.old", ec);
+	if (!cur_exe.empty()) fs::remove(cur_exe + ".old", ec);
+	fs::remove(app_dir + "\\Karamelo.new", ec);
 #else
 	// The previous binary kept by the last update, and a download that was
 	// never applied (the "ready" state does not survive a restart).
@@ -974,8 +989,9 @@ bool UpdaterApplyAndRestart()
 	// away, new_exe never showed up or never copied cleanly) - restore the
 	// backup so the install is not left completely broken, even though the
 	// update itself did not apply.
-	fprintf(f, "if exist \"%s\" copy /y \"%s\" \"%s\" >nul 2>&1\r\n",
-		old_exe.c_str(), old_exe.c_str(), target_exe.c_str());
+	fprintf(f, "if exist \"%s\" ren \"%s\" \"%s\" >nul 2>&1\r\n",
+		old_exe.c_str(), old_exe.c_str(),
+		(fs::path(target_exe).filename().string()).c_str());
 	fprintf(f, "if exist \"%s\" start \"\" \"%s\"\r\n", target_exe.c_str(), target_exe.c_str());
 	fprintf(f, "del \"%%~f0\" >nul 2>&1\r\n");
 	fclose(f);

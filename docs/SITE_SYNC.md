@@ -2912,3 +2912,14 @@ Testado com o M30 calibrado: **L** acende a lanterna, **R** prepara a arma, **R 
 - Atalhos de firmware do M30 (SELECT + direcional etc.) como se fossem do Karamelo: são do controle, vêm do manual da 8BitDo e não foram conferidos aqui.
 
 ---
+
+## 75. Lançamento da Versão 0.986 (26/11/2026)
+
+Pacote abrangente de auditoria, segurança, estabilidade e paridade multiplataforma cobrindo Core Runner, Renderização, Rede/Web/Social, Ports, Updater e Menu.
+
+- **Segurança em Arquivos, Ports e Updater**: sanitização de `stem` na extração de ROMs compactadas (evitando escape de `cache/`), checagem de limites no conversor Xbox 360 (`XexToolUncrypted`), bloqueio de downgrade HTTPS→HTTP no WinHTTP, validação de caminhos em `/api/remote`, remoção de encadeamento em `cmd.exe /c` no setup de ports e validação de `repo`/`release_tag`/`iso_dirs` no catálogo.
+- **Estabilidade do Motor e Renderização**: correção de data race in-place no FSR1/FidelityFX CAS, reset de `core_pixel_format` entre cargas, sincronização de `CoreSetPlaybackMute` e `CoreLogPrintf`, limpeza de handles Vulkan/OpenGL em falhas e suporte a 3D LUT `.cube` com `LUT_MODE_OFF`.
+- **Rede, Chat, Cloud e RetroAchievements**: correção de `FD_SET(-1)` no encerramento do Web Admin, eliminação de use-after-free em `DesktopChatGetKarameloTag` e `RaGetGameTitle`, proteção contra spoofing de código de sala UDP, correção de `connect()` não-bloqueante no Netplay Windows e suporte completo a faixas especiais CHD no rcheevos.
+- **Menu, Controles e Paridade Multiplataforma**: carregamento correto de bindings desatribuídos (`0`) no `karamelo.cfg`, reset completo de configurações, correções de navegação em `MenuGoBack` e `Upscale Horiz`, atalho `F11` (Tela Cheia) no Windows, frame pacer sem V-Sync no Linux/macOS e correções no shim POSIX (`compat_win32.h`).
+
+---

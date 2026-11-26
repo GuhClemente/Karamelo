@@ -149,6 +149,9 @@ static void RaSaveConfig()
 		"hardcore=%d\n",
 		g_username.c_str(), g_password.c_str(), g_token.c_str(), g_hardcore ? 1 : 0);
 	fclose(f);
+#ifndef _WIN32
+	chmod(RA_CONFIG_PATH, 0600);
+#endif
 }
 
 // -------------------------------------------------------------
@@ -222,9 +225,9 @@ static void HttpPerform(HttpJob* job)
 			{
 				const char* ct = job->content_type.empty()
 					? "application/x-www-form-urlencoded" : job->content_type.c_str();
-				wchar_t wct[256];
-				MultiByteToWideChar(CP_UTF8, 0, ct, -1, wct, 256);
-				headers = std::wstring(L"Content-Type: ") + wct;
+				wchar_t wct[256] = { 0 };
+				if (MultiByteToWideChar(CP_UTF8, 0, ct, -1, wct, 256) > 0)
+					headers = std::wstring(L"Content-Type: ") + wct;
 			}
 
 			BOOL ok = WinHttpSendRequest(request,
@@ -276,10 +279,12 @@ static void HttpPerform(HttpJob* job)
 	posix_spawn_file_actions_init(&actions);
 	posix_spawn_file_actions_adddup2(&actions, in_pipe[0], STDIN_FILENO);
 	posix_spawn_file_actions_adddup2(&actions, out_pipe[1], STDOUT_FILENO);
+	posix_spawn_file_actions_addclose(&actions, in_pipe[0]);
 	posix_spawn_file_actions_addclose(&actions, in_pipe[1]);
 	posix_spawn_file_actions_addclose(&actions, out_pipe[0]);
+	posix_spawn_file_actions_addclose(&actions, out_pipe[1]);
 
-	std::vector<std::string> args = { "curl", "-s", "-w", "\n%{http_code}" };
+	std::vector<std::string> args = { "curl", "-s", "--connect-timeout", "15", "--max-time", "30", "-w", "\n%{http_code}" };
 	if (!g_user_agent_str.empty())
 	{
 		args.push_back("-A");
@@ -897,13 +902,14 @@ void RaShutdown()
 		g_login_async = NULL;
 	}
 
-	// The worker thread has fully stopped by this point (waited above), so
-	// nothing else can still be pushing into these deques - safe to drain
-	// and free whatever job was in flight or completed-but-unconsumed.
-	for (HttpJob* job : g_http_pending) delete job;
-	g_http_pending.clear();
-	for (HttpJob* job : g_http_done) delete job;
-	g_http_done.clear();
+	if (g_http_thread_done.load())
+	{
+		std::lock_guard<std::mutex> hlock(g_http_lock);
+		for (HttpJob* job : g_http_pending) delete job;
+		g_http_pending.clear();
+		for (HttpJob* job : g_http_done) delete job;
+		g_http_done.clear();
+	}
 
 	{
 		std::lock_guard<std::recursive_mutex> lock(g_client_lock);
@@ -922,9 +928,10 @@ void RaShutdown()
 
 void RaDoFrame()
 {
-	if (!g_enabled || !g_client) return;
+	if (!g_enabled) return;
 
 	g_client_lock.lock();
+	if (!g_client) { g_client_lock.unlock(); return; }
 	RaPumpHttp();
 
 	// InitMemoryForConsole() only refuses the "inferred memory map" mechanism
@@ -1002,13 +1009,14 @@ bool        RaHasPendingUnlocks() { return g_server_pending; }
 
 int RaGetAchievements(RaAchievementInfo* out, int max_out)
 {
-	if (!out || max_out <= 0 || !g_client) return 0;
+	if (!out || max_out <= 0) return 0;
 
 	// Called from the UI thread (menu.cpp's Achievements page) while the core
 	// thread can concurrently unload the game (RaOnGameUnload) or advance
 	// rc_client (RaDoFrame) - without g_client_lock this could walk buckets
 	// the core thread is freeing at the same instant.
 	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+	if (!g_client) return 0;
 
 	rc_client_achievement_list_t* list = rc_client_create_achievement_list(g_client,
 		RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE,
@@ -1068,23 +1076,29 @@ bool RaGetHardcore()
 
 bool RaHasToken()
 {
+	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
 	return !g_token.empty();
 }
 
 const char* RaGetGameTitle()
 {
+	static thread_local char s_game_title[256];
+	s_game_title[0] = '\0';
 	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
 	if (!g_client) return "";
 	const rc_client_game_t* game = rc_client_get_game_info(g_client);
 	if (game && game->title && *game->title)
-		return game->title;
+	{
+		strncpy_s(s_game_title, sizeof(s_game_title), game->title, _TRUNCATE);
+		return s_game_title;
+	}
 	return "";
 }
 
 void RaUpdate()
 {
-	if (!g_client) return;
 	std::lock_guard<std::recursive_mutex> lock(g_client_lock);
+	if (!g_client) return;
 	RaPumpHttp();
 	if (!g_memory_ready)
 		rc_client_idle(g_client);

@@ -409,6 +409,10 @@ bool NetplayStartHost(int port)
 
 bool NetplayStartClient(const char* host_ip, int port)
 {
+	if (!host_ip || !host_ip[0] || port <= 0 || port > 65535) return false;
+	unsigned long ip_addr = inet_addr(host_ip);
+	if (ip_addr == INADDR_NONE) return false;
+
 	NetplayDisconnect();
 
 	{
@@ -420,13 +424,32 @@ bool NetplayStartClient(const char* host_ip, int port)
 		sockaddr_in addr = { 0 };
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons((u_short)port);
-		addr.sin_addr.s_addr = inet_addr(host_ip);
+		addr.sin_addr.s_addr = ip_addr;
 
 		ConfigurePeerSocket(peer_sock);
 		net_stream.Clear();
 		sync_state = SyncState();
 
-		connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
+		int rc = connect(peer_sock, (sockaddr*)&addr, sizeof(addr));
+		if (rc != 0)
+		{
+#ifdef _WIN32
+			int err = WSAGetLastError();
+			if (err != WSAEWOULDBLOCK && err != WSAEINPROGRESS)
+			{
+				closesocket(peer_sock);
+				peer_sock = INVALID_SOCKET;
+				return false;
+			}
+#else
+			if (errno != EINPROGRESS && errno != EWOULDBLOCK)
+			{
+				closesocket(peer_sock);
+				peer_sock = INVALID_SOCKET;
+				return false;
+			}
+#endif
+		}
 
 		peer_ip_str = host_ip;
 		net_role = NETPLAY_CLIENT;
@@ -673,9 +696,11 @@ static void HandlePacket(const NetPacket& pk, const std::vector<uint8_t>& blob)
 		else if (pk.frame_seq == NET_BLOB_MASK && net_role == NETPLAY_CLIENT)
 		{
 			// The host's list, so both machines leave out exactly the same bytes.
-			sync_state.state_mask.resize(blob.size() / sizeof(uint32_t));
-			if (!sync_state.state_mask.empty())
-				memcpy(sync_state.state_mask.data(), blob.data(), sync_state.state_mask.size() * sizeof(uint32_t));
+			size_t count = blob.size() / sizeof(uint32_t);
+			if (count > kNetMaskMaxBlocks) count = kNetMaskMaxBlocks;
+			sync_state.state_mask.resize(count);
+			if (count > 0)
+				memcpy(sync_state.state_mask.data(), blob.data(), count * sizeof(uint32_t));
 		}
 		else if (pk.frame_seq == NET_BLOB_STATE && net_role == NETPLAY_CLIENT)
 		{
@@ -798,35 +823,32 @@ void NetplayUpdate()
 	}
 	else if (net_role == NETPLAY_CLIENT && net_state == NETPLAY_CONNECTING)
 	{
-		fd_set write_fds;
+		fd_set write_fds, except_fds;
 		FD_ZERO(&write_fds);
+		FD_ZERO(&except_fds);
 		FD_SET(peer_sock, &write_fds);
+		FD_SET(peer_sock, &except_fds);
 
 		timeval tv = { 0, 0 };
-		// nfds (1st arg): Winsock ignores it entirely, kept only for BSD-socket
-		// compatibility, so "0" was harmless there and this went unnoticed for
-		// as long as this file only ever ran on Windows. POSIX select() takes
-		// it literally - "highest fd in any set, plus 1" - so 0 means "examine
-		// no descriptors at all": peer_sock's writability was never actually
-		// checked, res was always <= 0, and a Linux client sat in
-		// NETPLAY_CONNECTING forever no matter how fast the host accepted it.
-		int res = select((int)peer_sock + 1, NULL, &write_fds, NULL, &tv);
+		// nfds (1st arg): POSIX requires highest fd + 1; Winsock signals
+		// non-blocking connect() failure via except_fds (not write_fds).
+		int res = select((int)peer_sock + 1, NULL, &write_fds, &except_fds, &tv);
 		if (res > 0)
 		{
 			int so_error = 0;
 			socklen_t len = sizeof(so_error);
 			getsockopt(peer_sock, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len);
-			if (so_error == 0)
-			{
-				net_state = NETPLAY_CONNECTED;
-				status_str = "Connected to Host as Player 2!";
-				CoreSetToast(Tr("CONECTADO AO HOST VIA NETPLAY!", "CONNECTED TO HOST VIA NETPLAY!"), 180);
-			}
-			else
+			if (FD_ISSET(peer_sock, &except_fds) || so_error != 0)
 			{
 				NetplayDisconnect();
 				status_str = "Connection refused";
 				CoreSetToast(Tr("NETPLAY: CONEXAO RECUSADA", "NETPLAY: CONNECTION REFUSED"), 180);
+			}
+			else if (FD_ISSET(peer_sock, &write_fds))
+			{
+				net_state = NETPLAY_CONNECTED;
+				status_str = "Connected to Host as Player 2!";
+				CoreSetToast(Tr("CONECTADO AO HOST VIA NETPLAY!", "CONNECTED TO HOST VIA NETPLAY!"), 180);
 			}
 		}
 	}

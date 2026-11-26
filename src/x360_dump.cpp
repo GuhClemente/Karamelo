@@ -156,7 +156,10 @@ struct FileSource : Source {
     uint64_t size = 0;
     explicit FileSource(const std::string& path) {
         f = _wfopen(fs::path(path).wstring().c_str(), L"rb");
-        if (f && _fseeki64(f, 0, SEEK_END) == 0) size = uint64_t(_ftelli64(f));
+        if (f && _fseeki64(f, 0, SEEK_END) == 0) {
+            int64_t end_pos = _ftelli64(f);
+            if (end_pos > 0) size = uint64_t(end_pos);
+        }
     }
     ~FileSource() override { if (f) fclose(f); }
     bool Read(uint64_t off, void* dst, size_t n) override {
@@ -659,15 +662,29 @@ bool XexToolUncrypted(const std::vector<uint8_t>& xex, const XexInfo& info,
     const uint32_t old_sec = info.security_offset;
     const uint32_t sec_size = Be32(&xex[old_sec]);
     if (sec_size < 0x184 || uint64_t(old_sec) + sec_size > info.header_size) return false;
-    const uint32_t sec = 0x18 + count * 8 + 0x80;
-    uint32_t pos = sec + sec_size, import_size = 0;
+    const uint64_t sec64 = 0x18ull + uint64_t(count) * 8ull + 0x80ull;
+    const uint64_t kMaxRebuiltHeader = 64ull * 1024ull * 1024ull;
+    uint64_t pos64 = sec64 + uint64_t(sec_size);
+    uint64_t import_size64 = 0;
+    bool seen_import_libs = false;
     for (Entry& e : ents) {
         if (e.body.empty()) continue;
-        if (e.key == kHeaderImportLibraries) { import_size = uint32_t(e.body.size()); continue; }
-        e.val = pos;
-        pos += uint32_t(e.body.size());
+        if (e.key == kHeaderImportLibraries) {
+            if (seen_import_libs) return false;
+            seen_import_libs = true;
+            import_size64 = uint64_t(e.body.size());
+            continue;
+        }
+        if (pos64 > kMaxRebuiltHeader || e.body.size() > kMaxRebuiltHeader - pos64) return false;
+        e.val = uint32_t(pos64);
+        pos64 += uint64_t(e.body.size());
     }
-    const uint32_t data_offset = (pos + import_size + 0xFFF) & ~0xFFFu;
+    if (import_size64 > kMaxRebuiltHeader || pos64 > kMaxRebuiltHeader - import_size64) return false;
+    const uint64_t data_offset64 = (pos64 + import_size64 + 0xFFFull) & ~0xFFFull;
+    if (data_offset64 > kMaxRebuiltHeader || data_offset64 < sec64 + 0x17Cull) return false;
+    const uint32_t sec = uint32_t(sec64);
+    const uint32_t data_offset = uint32_t(data_offset64);
+    const uint32_t import_size = uint32_t(import_size64);
     for (Entry& e : ents)
         if (e.key == kHeaderImportLibraries && !e.body.empty()) e.val = data_offset - import_size;
 
@@ -680,7 +697,10 @@ bool XexToolUncrypted(const std::vector<uint8_t>& xex, const XexInfo& info,
     for (uint32_t j = 0; j < count; ++j) {
         PutBe32(&out[0x18 + j * 8], ents[j].key);
         PutBe32(&out[0x1C + j * 8], ents[j].val);
-        if (!ents[j].body.empty()) memcpy(&out[ents[j].val], ents[j].body.data(), ents[j].body.size());
+        if (!ents[j].body.empty()) {
+            if (uint64_t(ents[j].val) + ents[j].body.size() > out.size()) return false;
+            memcpy(&out[ents[j].val], ents[j].body.data(), ents[j].body.size());
+        }
     }
 
     // Signature at sec+8 (0x100 bytes), then the signed image info; the

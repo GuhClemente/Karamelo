@@ -1,5 +1,8 @@
 #include "json_mini.h"
 
+#include <cmath>
+#include <locale>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -110,6 +113,10 @@ struct Parser
 			{
 				unsigned cp;
 				if (!Hex4(cp)) return false;
+				if (cp >= 0xDC00 && cp <= 0xDFFF)
+				{
+					return Fail("surrogate baixo isolado");
+				}
 				if (cp >= 0xD800 && cp <= 0xDBFF)
 				{
 					unsigned lo;
@@ -132,13 +139,30 @@ struct Parser
 		size_t start = pos;
 		if (pos < s.size() && s[pos] == '-') pos++;
 		if (pos >= s.size() || !(s[pos] >= '0' && s[pos] <= '9')) return Fail("numero invalido");
-		while (pos < s.size() && ((s[pos] >= '0' && s[pos] <= '9') || s[pos] == '.' || s[pos] == 'e' ||
-		                          s[pos] == 'E' || s[pos] == '+' || s[pos] == '-'))
+		if (s[pos] == '0') {
 			pos++;
+			if (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') return Fail("zero a esquerda invalido");
+		} else {
+			while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') pos++;
+		}
+		if (pos < s.size() && s[pos] == '.') {
+			pos++;
+			if (pos >= s.size() || !(s[pos] >= '0' && s[pos] <= '9')) return Fail("fracao invalida");
+			while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') pos++;
+		}
+		if (pos < s.size() && (s[pos] == 'e' || s[pos] == 'E')) {
+			pos++;
+			if (pos < s.size() && (s[pos] == '+' || s[pos] == '-')) pos++;
+			if (pos >= s.size() || !(s[pos] >= '0' && s[pos] <= '9')) return Fail("expoente invalido");
+			while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') pos++;
+		}
 		std::string num = s.substr(start, pos - start);
-		char* end = nullptr;
-		out = strtod(num.c_str(), &end);
-		if (!end || *end != '\0') return Fail("numero invalido");
+		std::istringstream iss(num);
+		iss.imbue(std::locale::classic());
+		double val = 0.0;
+		iss >> val;
+		if (iss.fail() || !iss.eof() || !std::isfinite(val)) return Fail("numero invalido");
+		out = val;
 		return true;
 	}
 

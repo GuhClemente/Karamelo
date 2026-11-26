@@ -215,6 +215,7 @@ static void SeedWelcomeMessagesLocked() {
 // =============================================================
 
 const char* DesktopChatGetKarameloTag() {
+  static thread_local char s_tag_buf[64];
   std::lock_guard<std::recursive_mutex> lk(g_chat_mutex);
   if (g_karamelo_tag.empty()) {
     uint32_t h = 2166136261u;
@@ -223,7 +224,8 @@ const char* DesktopChatGetKarameloTag() {
     snprintf(buf, sizeof(buf), "%s#%04u", g_nickname.c_str(), (h % 9000) + 1000);
     g_karamelo_tag = buf;
   }
-  return g_karamelo_tag.c_str();
+  snprintf(s_tag_buf, sizeof(s_tag_buf), "%s", g_karamelo_tag.c_str());
+  return s_tag_buf;
 }
 
 void DesktopChatSetKarameloTag(const char* tag) {
@@ -1061,10 +1063,13 @@ bool DesktopChatHandleDatagram(const std::string& data, const std::string& from_
       return false;
     if (const JsonValue* v = root.Find("game"))
       if (v->type == JsonValue::String) peer.current_game = DesktopChatSanitizeText(v->str, 64);
-    if (const JsonValue* v = root.Find("code"))
-      if (v->type == JsonValue::String) peer.room_code = DesktopChatSanitizeText(v->str, 16);
     if (const JsonValue* v = root.Find("port"))
       if (v->type == JsonValue::Number && v->number > 0 && v->number <= 65535) peer.host_port = (int)v->number;
+    // Derive room_code from the verified UDP source IP rather than trusting the
+    // untrusted JSON "code" field (prevents LAN peers from redirecting Join to
+    // an arbitrary IP/port).
+    if (peer.host_port > 0)
+      peer.room_code = DesktopChatGenerateRoomCode(from_ip, peer.host_port);
     if (const JsonValue* v = root.Find("status"))
       if (v->type == JsonValue::Number) peer.status = (int)v->number;
     if (const JsonValue* v = root.Find("challenge"))

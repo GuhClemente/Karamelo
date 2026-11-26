@@ -1845,16 +1845,34 @@ int main(int argc, char* argv[])
 		}
 		else if (!last_vsync)
 		{
-			SDL_Delay(1);
+			// Frame pacer when V-Sync is off so the main loop does not spin at
+			// ~1000 FPS burning CPU and speeding up frame-based animations.
+			static uint64_t s_last_frame_ns = 0;
+			uint64_t now_ns = SDL_GetTicksNS();
+			uint64_t target_ns = 16666667ULL; // ~60 Hz
+			if (s_last_frame_ns > 0 && now_ns > s_last_frame_ns)
+			{
+				uint64_t elapsed = now_ns - s_last_frame_ns;
+				if (elapsed < target_ns)
+					SDL_DelayNS(target_ns - elapsed);
+			}
+			s_last_frame_ns = SDL_GetTicksNS();
 		}
+	}
+
+	if (fp_rec_video)
+	{
+		pclose(fp_rec_video);
+		fp_rec_video = nullptr;
+		CoreStopAudioRecording();
 	}
 
 	// -------------------------------------------------------------
 	// 5. Clean Teardown
 	// -------------------------------------------------------------
-	GamepadShutdown();
 	PortShutdown();
 	CoreShutdown();
+	GamepadShutdown();
 	RaShutdown();
 	UpdaterShutdown();
 	DesktopChatShutdown();

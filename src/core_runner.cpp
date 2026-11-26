@@ -126,7 +126,7 @@ static bool is_core_loaded = false;
 static bool is_game_loaded = false;
 static DWORD s_game_loaded_tick = 0; // GetTickCount() when the current game finished loading
 static bool  s_core_faulted = false;   // retro_run raised an exception this session - never call it again
-static enum retro_pixel_format core_pixel_format = RETRO_PIXEL_FORMAT_RGB565;
+static enum retro_pixel_format core_pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
 
 // Triple-Buffered Lock-Free Framebuffer System
 // Supports up to 4K / 3840x2880 internal resolution for 3D cores (Flycast, Mupen, Dolphin, PCSX2).
@@ -432,16 +432,9 @@ void CoreSetToast(const char* message, int frames_duration)
 	// toast could pop back up if a stale duration overwrote timer=0 after it.
 	EnterCriticalSection(&toast_lock);
 	strncpy_s(toast_message, sizeof(toast_message), message, _TRUNCATE);
-	LeaveCriticalSection(&toast_lock);
-
-	// InterlockedExchange itself still can't be inside the critical section
-	// (CoreUpdateToast's decrement path also needs toast_lock only for the
-	// clear, not the countdown), but publishing it immediately after, with
-	// nothing else able to run between the two, keeps the pairing correct
-	// for the actual race that mattered: two CoreSetToast() calls stepping
-	// on each other.
 	InterlockedExchange64(&toast_expires_ms,
 		frames_duration > 0 ? (LONGLONG)GetTickCount64() + ToastFramesToMs(frames_duration) : 0);
+	LeaveCriticalSection(&toast_lock);
 }
 
 const char* CoreGetToast()
@@ -795,12 +788,21 @@ static std::atomic<FILE*> s_record_audio_fp{ nullptr };
 // so stopping a recording never closes the FILE under an fwrite in flight.
 static std::mutex s_record_audio_mtx;
 
+static std::mutex s_audio_ctx_mtx;
+
 static void StopAudioContext(const char* caller_tag)
 {
-	if (g_audio_ctx)
+	AudioThreadContext* ctx_to_release = nullptr;
 	{
-		g_audio_ctx->stop.store(true, std::memory_order_release);
-		if (g_audio_ctx->event) SetEvent(g_audio_ctx->event);
+		std::lock_guard<std::mutex> lock(s_audio_ctx_mtx);
+		ctx_to_release = g_audio_ctx;
+		if (ctx_to_release)
+		{
+			ctx_to_release->stop.store(true, std::memory_order_release);
+			if (ctx_to_release->event) SetEvent(ctx_to_release->event);
+		}
+		g_audio_ctx = nullptr;
+		g_audio_stream = nullptr;
 	}
 	if (h_audio_thread)
 	{
@@ -818,13 +820,11 @@ static void StopAudioContext(const char* caller_tag)
 		h_audio_thread = NULL;
 	}
 	audio_thread_running = false;
-	g_audio_stream = nullptr;
 	h_audio_event = NULL;
 	audio_initialized = false;
-	if (g_audio_ctx)
+	if (ctx_to_release)
 	{
-		ReleaseAudioThreadContext(g_audio_ctx);
-		g_audio_ctx = nullptr;
+		ReleaseAudioThreadContext(ctx_to_release);
 	}
 }
 
@@ -1639,6 +1639,8 @@ static FILE* OpenCoreLog()
 	return fopen("karamelo.log", "a");
 }
 
+static std::mutex s_core_log_mtx;
+
 static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 {
 	static const char* lvl_names[] = { "DEBUG", "INFO", "WARN", "ERROR" };
@@ -1654,6 +1656,7 @@ static void CoreLogPrintf(enum retro_log_level level, const char* fmt, ...)
 
 	// Kept open: reopening per line meant 35 open/close pairs just to
 	// list the tracks of one CD image.
+	std::lock_guard<std::mutex> log_lock(s_core_log_mtx);
 	static FILE* f = OpenCoreLog();
 	// A core can repeat one error for as long as the game runs: a Lynx game wrote
 	// 800 MB of the same line here. The start of a session is what explains it anyway.
@@ -1772,7 +1775,7 @@ const char* CoreGetOption(const char* key)
 }
 void CoreSetN64Upscale(int mode)
 {
-	if (p_retro_set_n64_upscale)
+	if (is_core_loaded && p_retro_set_n64_upscale)
 	{
 		p_retro_set_n64_upscale(mode);
 	}
@@ -2153,7 +2156,13 @@ static bool CB_Environment(unsigned cmd, void* data)
 				{
 					msx_sys_dir = sys_dir;
 					if (!msx_sys_dir.empty() && msx_sys_dir.back() != '\\' && msx_sys_dir.back() != '/')
+					{
+#ifdef _WIN32
 						msx_sys_dir += "\\";
+#else
+						msx_sys_dir += "/";
+#endif
+					}
 				}
 				*dir = msx_sys_dir.c_str();
 				return true;
@@ -2902,8 +2911,7 @@ void CoreSetAudioCallback(CoreAudioCallback cb)
 }
 int CoreGetAudioSampleRate()
 {
-	// The resampled audio output from AudioThreadProc is always 48000 Hz.
-	return 48000;
+	return g_output_sample_rate > 0 ? g_output_sample_rate : 48000;
 }
 
 void CoreStartAudioRecording(const char* raw_audio_path)
@@ -4846,13 +4854,10 @@ static void RecoverAfterKilledCore(unsigned long killed_thread_id)
 #ifdef _WIN32
 	CoreRecoverLocksHeldByThread(killed_thread_id);
 #else
+	// On POSIX, destroying a pthread_mutex_t that another live thread (UI,
+	// updater, port monitor) currently holds is undefined behavior. Leave
+	// live locks intact rather than calling pthread_mutex_destroy blindly.
 	(void)killed_thread_id;
-	DeleteCriticalSection(&options_lock);
-	InitializeCriticalSection(&options_lock);
-	DeleteCriticalSection(&name_lock);
-	InitializeCriticalSection(&name_lock);
-	DeleteCriticalSection(&toast_lock);
-	InitializeCriticalSection(&toast_lock);
 #endif
 
 	// All three are safe to call unconditionally - each only acts if its own
@@ -5357,8 +5362,11 @@ static bool CoreLoad(const char* core_dll_path)
 	// this file, which is either SEH-guarded or null-checked at its call
 	// site). A core DLL missing it is malformed; reject it here rather than
 	// null-call it later.
+	core_pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+
 	if (!p_retro_init || !p_retro_run || !p_retro_load_game || !p_retro_get_system_av_info)
 	{
+		ResetCoreFunctionPointers();
 		InterlockedExchange(&g_core_in_module_op, 1);
 		FreeLibrary(h_core_dll);
 		InterlockedExchange(&g_core_in_module_op, 0);
@@ -5369,6 +5377,7 @@ static bool CoreLoad(const char* core_dll_path)
 	if (!RetroSetEnvironmentGuarded())
 	{
 		CoreLogPrintf(RETRO_LOG_ERROR, "[CoreRunner] retro_set_environment falhou: %s", core_dll_path);
+		ResetCoreFunctionPointers();
 		InterlockedExchange(&g_core_in_module_op, 1);
 		FreeLibrary(h_core_dll);
 		InterlockedExchange(&g_core_in_module_op, 0);
@@ -5377,6 +5386,7 @@ static bool CoreLoad(const char* core_dll_path)
 	}
 	if (!RetroInitGuarded())
 	{
+		ResetCoreFunctionPointers();
 		InterlockedExchange(&g_core_in_module_op, 1);
 		FreeLibrary(h_core_dll);
 		InterlockedExchange(&g_core_in_module_op, 0);
@@ -5703,7 +5713,14 @@ static bool CoreLoadGame(const char* rom_path, bool suppress_toast)
 		bool surface_ok = D3D11HwIsActive() ? D3D11HwEnsureSurface(hw_w, hw_h)
 		                : VkHwIsActive()    ? VkHwEnsureSurface(hw_w, hw_h)
 		                                    : HwEnsureSurface(hw_w, hw_h);
-		if (surface_ok)
+		if (!surface_ok)
+		{
+			CoreLogPrintf(RETRO_LOG_ERROR, "[HW] falha ao criar superficie de renderizacao %ux%u para '%s'",
+				hw_w, hw_h, loaded_core_name.c_str());
+			RetroUnloadGameGuarded();
+			CoreReleaseMemoryMap();
+			return false;
+		}
 		{
 			// The core allocates its GL/Vulkan/D3D11 resources here, so it has
 			// to happen after load and before the first retro_run. Only
@@ -6255,7 +6272,11 @@ static bool DoSaveState(int slot)
 	// that was already in the slot and left a truncated one behind.
 	fs::path tmp_file = save_file;
 	tmp_file += ".tmp";
+#ifdef _WIN32
+	FILE* f = _wfopen(tmp_file.wstring().c_str(), L"wb");
+#else
 	FILE* f = fopen(tmp_file.string().c_str(), "wb");
+#endif
 	if (!f)
 	{
 		free(buf);
@@ -6292,12 +6313,18 @@ static bool DoLoadState(int slot)
 		return false;
 	}
 
-	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir);
+	std::error_code abs_ec;
+	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir, abs_ec);
+	if (abs_ec) return false;
 	char slot_filename[512];
 	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", GetLoadedGameStemSafe().c_str(), slot);
 	fs::path save_file = save_dir / slot_filename;
 
+#ifdef _WIN32
+	FILE* f = _wfopen(save_file.wstring().c_str(), L"rb");
+#else
 	FILE* f = fopen(save_file.string().c_str(), "rb");
+#endif
 	if (!f)
 	{
 		char toast_str[128];
@@ -6436,7 +6463,13 @@ bool CoreGetStateSlotInfo(int slot, bool* out_exists, char* out_time_str, size_t
 
 	if (!CoreIsRunning() || slot < 0 || slot > 9) return false;
 
-	fs::path save_dir = fs::absolute("saves/" + loaded_system_dir);
+	std::string sys_dir;
+	EnterCriticalSection(&name_lock);
+	sys_dir = loaded_system_dir;
+	LeaveCriticalSection(&name_lock);
+	std::error_code abs_ec;
+	fs::path save_dir = fs::absolute("saves/" + sys_dir, abs_ec);
+	if (abs_ec) return false;
 	char slot_filename[512];
 	snprintf(slot_filename, sizeof(slot_filename), "%s.state%d", GetLoadedGameStemSafe().c_str(), slot);
 	fs::path save_file = save_dir / slot_filename;
@@ -7225,7 +7258,13 @@ void CoreSetAnalogState(int player, int stick_id, int axis_id, int16_t value)
 	}
 }
 
-void CoreSetPlaybackMute(bool mute) { s_playback_muted = mute; if (g_audio_stream) SDL_SetAudioStreamGain(g_audio_stream, mute ? 0.0f : 1.0f); }
+void CoreSetPlaybackMute(bool mute)
+{
+	s_playback_muted = mute;
+	std::lock_guard<std::mutex> lock(s_audio_ctx_mtx);
+	if (g_audio_ctx && g_audio_ctx->stream)
+		SDL_SetAudioStreamGain(g_audio_ctx->stream, mute ? 0.0f : 1.0f);
+}
 void CoreSetVolume(int volume_percent) { master_volume = std::clamp(volume_percent, 0, 100); }
 int  CoreGetVolume() { return master_volume; }
 void CoreSetMute(bool mute) { audio_muted = mute; }

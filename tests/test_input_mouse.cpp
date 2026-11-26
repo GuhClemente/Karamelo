@@ -324,3 +324,16 @@ TEST_CASE(DosSystemAllowsExecutablesWhileConsolesIgnoreThem)
 
 	fs::remove_all(base, ec);
 }
+
+TEST_CASE(InputBindLoadZeroClearsBinding)
+{
+	InputBindResetDefaults();
+	ASSERT_TRUE(InputBindGetKey(BIND_A) != 0);
+	ASSERT_TRUE(InputBindGetPad(BIND_A) != 0);
+	// Loading 0 from karamelo.cfg must unbind instead of silently reverting to default.
+	InputBindLoadKey(BIND_A, 0);
+	InputBindLoadPad(BIND_A, 0);
+	ASSERT_EQ(InputBindGetKey(BIND_A), 0);
+	ASSERT_EQ(InputBindGetPad(BIND_A), 0);
+	InputBindResetDefaults();
+}

@@ -324,7 +324,10 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 			}
 			else if (b == 0x0d || b == 0x0a) // force a line wrap to the next row
 			{
-				if (++n >= lineLimit) n = 0;
+				for (; col < lineLimit; ++col)
+					row.Push(xorInvert);
+				col = 0;
+				if (++n >= OSD_ROW_SLOTS) n = 0;
 				row = RowEncoder(RowStart(n));
 			}
 			else if (col < (lineLimit - 8))

@@ -413,6 +413,7 @@ static std::string FindBestExecutable(const std::string& dir) {
             nested.push_back(e.path());
         }
     }
+    if (!nested.empty()) return BestExeAmong(nested);
 
 #ifdef __APPLE__
     fs::path direct_macos = fs::path(dir) / "Contents" / "MacOS";
@@ -1032,8 +1033,9 @@ std::vector<PortGameInfo> PortGetAvailableList() {
         std::string dir = ResolvePortDir(def.id);
         std::string exe = ResolvePortExe(&def, dir);
         if (exe.empty() && !dir.empty() && !def.exe_hint.empty() && def.exe_relpath.empty()) {
+            std::error_code hint_ec;
             std::string hinted = dir + "/" + def.exe_hint;
-            if (fs::exists(hinted)) exe = hinted;
+            if (fs::exists(hinted, hint_ec)) exe = hinted;
         }
 
 #ifdef _WIN32
@@ -1127,7 +1129,7 @@ bool PortAutoSetupRom(const std::string& port_id) {
                     fs::copy_file(iso, target_disc, fs::copy_options::overwrite_existing, link_ec);
                 }
             }
-            return true;
+            return !link_ec;
         }
         return false;
     }
@@ -1978,14 +1980,19 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
     }
 
     // 4. Launch process
-    fs::path abs_exe = fs::absolute(exe_path);
+    std::error_code abs_ec;
+    fs::path abs_exe = fs::absolute(exe_path, abs_ec);
+    if (abs_ec) abs_exe = fs::path(exe_path);
     fs::path abs_dir = abs_exe.parent_path();
     // A pinned exe_relpath runs from the port folder itself, the way the
     // project's own launcher script does (paths in its arguments and its
     // settings/saves are relative to there, not to the exe's subfolder).
     if (def && !def->exe_relpath.empty()) {
         std::string port_dir = ResolvePortDir(port_id);
-        if (!port_dir.empty()) abs_dir = fs::absolute(port_dir);
+        if (!port_dir.empty()) {
+            fs::path p = fs::absolute(port_dir, abs_ec);
+            if (!abs_ec) abs_dir = p;
+        }
     }
 
 #ifdef _WIN32
@@ -1994,6 +2001,37 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
     std::wstring wexe = abs_exe.wstring();
     std::wstring wdir = abs_dir.wstring();
+
+    // Run one-time setup directly via CreateProcessW (never concatenated into
+    // cmd.exe /c, where quotes or %VAR% in setup_args / {iso} could inject
+    // commands). Wait for exit code 0 before starting the launcher.
+    if (run_setup) {
+        fs::path setup_exe = (abs_dir / def->setup_relpath).make_preferred();
+        std::wstring wsetup = setup_exe.wstring();
+        std::wstring setup_cmd = QuoteWinArg(wsetup);
+        for (const auto& a : setup_args) setup_cmd += L" " + QuoteWinArg(fs::path(a).wstring());
+        std::vector<wchar_t> sbuf(setup_cmd.begin(), setup_cmd.end());
+        sbuf.push_back(L'\0');
+        STARTUPINFOW ssi = { sizeof(STARTUPINFOW) };
+        PROCESS_INFORMATION spi = { 0 };
+        CoreSetToast(Tr("COMPILANDO O JOGO DO SEU ISO - PODE LEVAR VARIOS MINUTOS", "BUILDING THE GAME FROM YOUR ISO - THIS MAY TAKE SEVERAL MINUTES"), 600);
+        BOOL sok = CreateProcessW(wsetup.c_str(), sbuf.data(), NULL, NULL, FALSE, 0, NULL, wdir.c_str(), &ssi, &spi);
+        if (!sok) {
+            if (window) SDL_RestoreWindow(window);
+            CoreSetToast(Tr("FALHA AO INICIAR INSTALADOR DO PORT", "COULD NOT START PORT SETUP"), 180);
+            return false;
+        }
+        WaitForSingleObject(spi.hProcess, INFINITE);
+        DWORD setup_rc = 1;
+        GetExitCodeProcess(spi.hProcess, &setup_rc);
+        CloseHandle(spi.hProcess);
+        CloseHandle(spi.hThread);
+        if (setup_rc != 0) {
+            if (window) SDL_RestoreWindow(window);
+            CoreSetToast(Tr("FALHA NO SETUP DO PORT", "PORT SETUP FAILED"), 240);
+            return false;
+        }
+    }
 
     // .bat/.cmd (Severed Chains among them) aren't real PE executables -
     // CreateProcessW can't run one as lpApplicationName directly, it has to
@@ -2005,21 +2043,7 @@ static bool LaunchResolvedExecutable(const std::string& exe_path, const PortDefi
 
     BOOL ok;
     if (is_script) {
-        // Doubled quotes, not a single pair: cmd.exe's own quote-stripping-and-
-        // reparse rule for `/c "..."` (it strips exactly one outer pair when the
-        // whole argument starts and ends with a quote) would otherwise leave a
-        // filename containing &, |, or ^ able to inject a second command. The
-        // doubled quotes survive that one strip, so the path stays inside its
-        // own quoted token instead of being reparsed as bare command text.
-        std::wstring cmdline = L"cmd.exe /c \"";
-        if (run_setup) {
-            // Every argument quoted: a disc named "A&B.iso" has no space, but
-            // cmd.exe would still split the command there.
-            cmdline += L"\"" + (abs_dir / def->setup_relpath).make_preferred().wstring() + L"\"";
-            for (const auto& a : setup_args) cmdline += L" \"" + fs::path(a).wstring() + L"\"";
-            cmdline += L" && ";
-        }
-        cmdline += L"\"" + wexe + L"\"\"";
+        std::wstring cmdline = L"cmd.exe /c \"\"" + wexe + L"\"\"";
         std::vector<wchar_t> buf(cmdline.begin(), cmdline.end());
         buf.push_back(L'\0');
         ok = CreateProcessW(NULL, buf.data(), NULL, NULL, FALSE, 0, NULL, wdir.c_str(), &si, &pi);
@@ -2264,7 +2288,7 @@ bool PortLaunch(const std::string& port_id) {
     // else (an unknown id, or a known one with no repo configured) has
     // nothing to download - say so and stop.
     if (exe_path.empty() || needs_x360_prep || needs_psp_prep) {
-        if (exe_path.empty() && (!def || def->repo.empty())) {
+        if (exe_path.empty() && (!def || (def->repo.empty() && def->downloads_json_url.empty()))) {
             CoreSetToast(Tr("PORT NAO INSTALADO EM ports/", "PORT NOT INSTALLED IN ports/"), 200);
             return false;
         }
