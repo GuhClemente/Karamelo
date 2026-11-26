@@ -5,6 +5,7 @@
 #pragma comment(lib, "winhttp.lib")
 #else
 #include "compat_win32.h"
+#include <sys/stat.h>
 #endif
 #include <stdarg.h>
 #include <stdio.h>

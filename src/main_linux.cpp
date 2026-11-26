@@ -1516,6 +1516,9 @@ int main(int argc, char* argv[])
 	// -------------------------------------------------------------
 	bool running = true;
 	static bool was_busy = false;
+	static FILE* fp_rec_video = nullptr;
+	static int rec_frames_captured = 0;
+	static bool rec_started = false;
 
 	while (running)
 	{
@@ -1725,10 +1728,6 @@ int main(int argc, char* argv[])
 		}
 
 		DesktopChatRenderSdlWindow();
-
-		static FILE* fp_rec_video = nullptr;
-		static int rec_frames_captured = 0;
-		static bool rec_started = false;
 
 		if (!record_out_path.empty())
 		{

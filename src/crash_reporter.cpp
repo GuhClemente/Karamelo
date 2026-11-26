@@ -177,8 +177,8 @@ void CrashReporterSetLastGameInfo(const char* core_name, const char* game_stem) 
     } else {
         g_last_game_stem = "Nenhum";
     }
-    strncpy_s(g_sig_core_name, sizeof(g_sig_core_name), g_last_core_name.c_str(), _TRUNCATE);
-    strncpy_s(g_sig_game_stem, sizeof(g_sig_game_stem), g_last_game_stem.c_str(), _TRUNCATE);
+    snprintf(g_sig_core_name, sizeof(g_sig_core_name), "%s", g_last_core_name.c_str());
+    snprintf(g_sig_game_stem, sizeof(g_sig_game_stem), "%s", g_last_game_stem.c_str());
 }
 
 // -------------------------------------------------------------
