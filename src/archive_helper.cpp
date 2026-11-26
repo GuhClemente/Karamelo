@@ -948,7 +948,25 @@ bool ArchiveExtractRom(const std::string& archive_path, std::string& out_extract
 	// roms/SNES/Aladdin.zip and roms/Genesis/Aladdin.zip share it - and the
 	// scan below ranks .sfc above .md, so opening the Genesis one after the
 	// SNES one found the leftover .sfc and booted the wrong game.
+	// If a previously unloaded core (e.g. Beetle PC-FX) leaked an OS file handle
+	// inside cache_dir, remove_all cannot clear it and tar.exe would fail trying
+	// to overwrite the locked file; step to a fresh sibling folder under cache/.
 	fs::remove_all(cache_dir, fs_ec);
+	if (fs::exists(cache_path, fs_ec))
+	{
+		for (int attempt = 1; attempt <= 16; attempt++)
+		{
+			fs::path alt = cache_root / (safe_stem + "_" + std::to_string(attempt));
+			fs_ec.clear();
+			fs::remove_all(alt, fs_ec);
+			if (!fs::exists(alt, fs_ec))
+			{
+				cache_path = alt;
+				cache_dir = cache_path.string();
+				break;
+			}
+		}
+	}
 	if (!ArchiveExtractAll(archive_path, cache_dir)) return false;
 
 	// 3. Scan the extracted directory. Ordered by priority, not by whatever the
