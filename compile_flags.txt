@@ -1,5 +1,7 @@
 -Iinclude
 -Isrc
+-Itests
+-Ithird_party/SDL3/include
 -Ithird_party/libchdr/include
 -Ithird_party/libchdr
 -Ithird_party/rcheevos/include
